@@ -1,12 +1,14 @@
 # TGP remediation and durable recovery
 
-Bradley authorized S1–S5 remediation after all twelve R1 reports returned. As of 2026-09-20 17:56 UTC, S2/S4/S5 are active; S1 remediation and S3 proof have returned, with independent attestations pending. S6 remains held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
+Bradley authorized S1–S5 remediation after all twelve R1 reports returned. S1/S2 remediation and S3 proof have returned, with independent attestations pending; S4/S5 are active. S6 remains held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
 
 ## Current checkpoint
 
 S3 subsequently returned its unchanged-head completion packet: [S3 evidence completion](s3-evidence-completion/README.md). Independent re-attestation is pending; this does not clear R1.
 
-S1 returned a new remediation head `90a66475`: [S1 R2 candidate recovery](s1-r2/README.md), including synthetic 68/0 proof and the entire recovery packet. Independent R2 audit is pending. S2 remains active.
+S1 returned a new remediation head `90a66475`: [S1 R2 candidate recovery](s1-r2/README.md), including synthetic 68/0 proof and the entire recovery packet. Independent R2 audit is pending.
+
+S2 returned head `0b05fcf5`: [S2 R2 candidate and separate composition preview](s2-r2/README.md), including the 115-test log, all bundles and outside temporary evidence. The 394-test preview-parent proof does not attest the final S1/S2/S3 combined preview. Image and hosted workflow proof remain missing.
 
 `checkpoint-1724/` captures available S1–S3 execution evidence at approximately 2026-09-20 17:24–17:26 UTC, before resumed remediation completes. Files retain their original claims and limitations, including stale historical milestone text; current findings and applicability are in `../audits/`. Capture does not retroactively validate a log or document.
 

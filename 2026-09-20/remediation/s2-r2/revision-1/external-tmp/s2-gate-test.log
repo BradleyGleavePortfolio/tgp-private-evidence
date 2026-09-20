@@ -1,0 +1,36 @@
+PASS test/ci/release-evidence-gate.spec.ts (102.667 s)
+  release-evidence-gate.sh — passing world
+    ✓ passes and writes a manifest naming every run, the analysis and the SBOM sha256 (195 ms)
+    ✓ newest run wins: an older failure superseded by a newer success passes (765 ms)
+  release-evidence-gate.sh — exact head binding
+    ✓ rejects a short / non-hex sha (7 ms)
+    ✓ rejects RELEASE_SHA != DISPATCH_SHA (push landed after authorization) (6 ms)
+  release-evidence-gate.sh — required run negatives (one mutation each)
+    ✓ missing CI run for the sha fails (absence is not success) (2079 ms)
+    ✓ stale run on a different sha does not count (3215 ms)
+    ✓ newest run failed even though an older run succeeded (209 ms)
+    ✓ in-progress newest run fails (2026 ms)
+    ✓ cancelled / skipped run conclusions fail (3282 ms)
+    ✓ run from a fork head repository is not trusted (40 ms)
+    ✓ pull_request-event run is not trusted (workflow file may be the PR copy) (661 ms)
+    ✓ run on a non-main branch is not trusted (204 ms)
+    ✓ a same-name workflow at a different path is not the required workflow (304 ms)
+    ✓ a required job that was skipped inside a green run fails (256 ms)
+    ✓ a required job missing from the run fails (394 ms)
+    ✓ a candidate-weakened required list (SBOM dropped) is refused (442 ms)
+    ✓ an empty required list is refused (656 ms)
+  release-evidence-gate.sh — CodeQL analysis and SBOM artifact negatives
+    ✓ green CodeQL job but no uploaded analysis for the sha fails (342 ms)
+    ✓ code-scanning API error (e.g. GHAS disabled → 403/404) fails instead of defaulting (551 ms)
+    ✓ SBOM artifact missing fails (178 ms)
+    ✓ SBOM artifact named for another sha fails (373 ms)
+    ✓ expired SBOM artifact fails (454 ms)
+    ✓ SBOM with zero components fails (566 ms)
+    ✓ SBOM download failure fails (606 ms)
+    ✓ runs listing API error fails closed (18 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+Snapshots:   0 total
+Time:        105.725 s
+Ran all test suites matching test/ci/release-evidence-gate.spec.ts.

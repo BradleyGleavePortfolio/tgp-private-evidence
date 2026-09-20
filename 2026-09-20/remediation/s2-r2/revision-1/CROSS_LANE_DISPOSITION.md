@@ -1,0 +1,25 @@
+# S2 disposition of S3 auditor-B cross-lane items (S3-B-10, S3-B-11, residual pool risk)
+
+Written 2026-09-20 17:45 UTC. Source: `execution/audits/s3-r1/b/REPORT.md`. **Record only — under the user override no source, test, harness or hosted change is made for these items.** S2 R1 auditors were not shown this file.
+
+## S3-B-10 — `/readyz` Fly http check activation (fly.toml in #525 head `925780e0`)
+**Accepted as S2-owned.** Adding the first `[[http_service.checks]]` changes platform behaviour at deploy time; S3's `fly-readiness.spec.ts` is a literal-text contract and proves nothing about hosted enforcement.
+- What S2 can state now: nothing about activation, outage or recovery — no deploy has occurred (currently serving image is GH_SHA `5076a07a`, deployed 2026-09-18 outside any gate; `execution/FLY_RUNTIME_METADATA.md`).
+- Evidence that would prove it (all post-landing, executed by Bradley per `LANDING_PROPOSAL.md` §5): (1) `flyctl machines list --json` after the first gated deploy showing `checks[]` with the `/readyz` check `status: passing` — this is already captured to `release-evidence/machines.json` by the R1 `fly-deploy.yml`; (2) a controlled DB-outage drill (not production) or the first real incident: check turns `critical`, machine withdrawn from routing, no restart; (3) recovery: check returns to `passing` without a machine restart (this is exactly where the residual pool risk below could bite).
+- Design consequences for the S2 lane (no change made): with an http check present, `flyctl deploy` waits for it; a DB outage during rollout fails the deploy after the machine has already been replaced (single machine, rolling strategy, no automatic rollback on Fly). Recovery path under the R1 design is a re-dispatch of the previous main sha through the same gate — the gate is sha-bound, so previously accepted evidence for that sha remains valid. Worth adding an explicit "rollback = re-dispatch prior sha" note and a `--wait-timeout` to the deploy step in any post-audit candidate. The R1 post-deploy `/readyz` probe (`.ok && .db == "up"`) is an independent second observation, not a substitute for the platform check.
+- Composition dependency: `fly.toml` is untouched by the S2 R1 candidate; the integrated head takes #525's `fly.toml` as-is. S2 owns the applicability review of that composition (not done; held).
+
+## S3-B-11 — R75 policy read from the candidate head (`scripts/check-r75.js`, #525)
+**Accepted as S2-owned for the hosted half; repository content alone cannot satisfy G07.**
+- Fact: in range mode the script loads `${head}:.github/r75-policy.json`; on `pull_request` the workflow file also comes from the candidate. A PR can therefore weaken both the policy and the workflow that evaluates it and still show a green `Banned cast tokens (R75 / R100.A2)` check.
+- Hosted mitigation (already in `LANDING_PROPOSAL.md` §2–3, no writes made): required check bound to the GitHub Actions app via `integration_id` (name-only checks are not trusted); `bypass_actors: []`; strict up-to-date policy; human review of trusted-gate paths before merge. **Addition to the proposal from this finding:** `.github/r75-policy.json` and `scripts/check-r75.js` join `.github/workflows/`, `scripts/ci/`, `Dockerfile`, `.dockerignore` in the CODEOWNERS / review-required path set.
+- Source-side mitigation (S3-owned source, S2-owned composition; **held, not implemented**): in range mode resolve the policy from the merge-base/target ref (`${ancestor}:.github/r75-policy.json`, falling back to failing closed if absent) instead of `${head}`, so a candidate cannot weaken the policy applied to itself and policy changes take effect only after they are merged. The workflow file remains candidate-controlled on `pull_request`; that residual is exactly what the hosted controls exist for.
+- Honest limit: with one maintainer (G05), "review of trusted-gate paths" is a recorded self-decision (option B in the proposal), not four-eyes.
+
+## Residual pool risk (bounded `/readyz` probe does not cancel the underlying `$queryRaw`)
+**Not S2-fixable in repository content; dependency recorded.**
+- Bounding server-side means connection-string or role parameters: `DATABASE_URL` is a Fly secret (not plain env — parent observation) pointing at the Supabase pgbouncer pooler (`?pgbouncer=true`, schema comments). `statement_timeout`/`socket_timeout` as URL options are not reliably honoured through pgbouncer transaction pooling; the durable alternatives are `ALTER ROLE … SET statement_timeout` on the database (a production DB mutation — forbidden now) or Prisma-side `connection_limit`/`pool_timeout` tuning in the secret (a hosted secret mutation — forbidden now).
+- Owner: Bradley for secret/role values, with S1 (database lane) advising; S2 will record whichever bound is chosen in the release evidence at first gated deploy (no gating on it). Until then the S3 report's characterisation stands: strict improvement over base, not blocking, recovery-after-outage unproven.
+
+## State
+Written: yes (this record). Tested/audited/merged/deployed/enabled: no. No file under the S2 worktree was changed for these items.

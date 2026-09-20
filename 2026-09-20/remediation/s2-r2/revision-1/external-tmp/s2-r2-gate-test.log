@@ -1,0 +1,70 @@
+FAIL test/ci/release-evidence-gate.spec.ts (32.883 s)
+  release-evidence-gate.sh — passing world
+    ✕ passes and writes a manifest naming every run, the analysis and the SBOM sha256 (5903 ms)
+    ✓ newest run wins: an older failure superseded by a newer success passes (4778 ms)
+  release-evidence-gate.sh — exact head binding
+    ✓ rejects a short / non-hex sha (412 ms)
+    ✓ rejects RELEASE_SHA != DISPATCH_SHA (push landed after authorization) (205 ms)
+  release-evidence-gate.sh — required run negatives (one mutation each)
+    ✓ missing CI run for the sha fails (absence is not success) (712 ms)
+    ✓ stale run on a different sha does not count (611 ms)
+    ✓ newest run failed even though an older run succeeded (425 ms)
+    ✓ in-progress newest run fails (1006 ms)
+    ✓ cancelled / skipped run conclusions fail (1840 ms)
+    ✓ run from a fork head repository is not trusted (1011 ms)
+    ✓ pull_request-event run is not trusted (workflow file may be the PR copy) (88 ms)
+    ✓ run on a non-main branch is not trusted (100 ms)
+    ✓ a same-name workflow at a different path is not the required workflow (23 ms)
+    ✓ a required job that was skipped inside a green run fails (62 ms)
+    ✓ a required job missing from the run fails (556 ms)
+    ✓ duplicate job names: a failed duplicate behind a green first entry fails (not resolved by .[0]) (54 ms)
+    ✓ duplicate job names: all entries green passes (400 ms)
+    ✓ a candidate-weakened required list (SBOM dropped) is refused (105 ms)
+    ✓ an empty required list is refused (51 ms)
+  release-evidence-gate.sh — deployment environment must already be protected
+    ✓ environment without a required_reviewers rule fails (auto-created unprotected env) (705 ms)
+    ✓ required_reviewers rule with an empty reviewer list fails (910 ms)
+    ✓ only a wait_timer rule is not a human authorization (623 ms)
+    ✓ admin bypass enabled fails even with reviewers (296 ms)
+    ✓ environment missing (404) fails (328 ms)
+    ✓ REQUIRED_ENVIRONMENT selects which environment is checked (636 ms)
+  release-evidence-gate.sh — CodeQL analysis and SBOM artifact negatives
+    ✓ green CodeQL job but no uploaded analysis for the sha fails (131 ms)
+    ✓ analysis for the sha with rules_count 0 (analysed nothing) fails (139 ms)
+    ✓ analysis for the sha carrying an error string fails (168 ms)
+    ✓ analysis object without rules_count at all fails (unknown is not success) (163 ms)
+    ✓ code-scanning API error (e.g. GHAS disabled → 403/404) fails instead of defaulting (206 ms)
+    ✓ SBOM artifact missing fails (153 ms)
+    ✓ SBOM artifact named for another sha fails (184 ms)
+    ✓ expired SBOM artifact fails (639 ms)
+    ✓ SBOM with zero components fails (315 ms)
+    ✓ SBOM whose closure proof fails (dev-only package present) fails at the gate, not only in sbom.yml (369 ms)
+    ✓ SBOM missing a required runtime package (prisma CLI) fails at the gate (211 ms)
+    ✓ sha256 sidecar mismatch fails (310 ms)
+    ✓ sha256 sidecar absent fails (202 ms)
+    ✓ lockfile of the release commit missing fails (239 ms)
+    ✓ SBOM download failure fails (546 ms)
+    ✓ runs listing API error fails closed (19 ms)
+
+  ● release-evidence-gate.sh — passing world › passes and writes a manifest naming every run, the analysis and the SBOM sha256
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 4
+
+      188 |     expect(manifest.codeql_analysis.commit_sha).toBe(SHA);
+      189 |     expect(manifest.sbom.sha256).toMatch(/^[0-9a-f]{64}$/);
+    > 190 |     expect(manifest.sbom.components).toBe(1);
+          |                                      ^
+      191 |     expect(manifest.image).toBeNull();
+      192 |     expect(manifest.environment).toBe('production');
+      193 |   });
+
+      at Object.<anonymous> (test/ci/release-evidence-gate.spec.ts:190:38)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 40 passed, 41 total
+Snapshots:   0 total
+Time:        33.135 s, estimated 76 s
+Ran all test suites matching test/ci/release-evidence-gate.spec.ts.
