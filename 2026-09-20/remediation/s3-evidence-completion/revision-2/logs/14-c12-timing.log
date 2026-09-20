@@ -1,0 +1,59 @@
+[2026-09-20T17:26:23Z] S3 waiting for test lock (14-c12-timing)
+label=14-c12-timing cwd=/home/user/workspace/worktrees/s3-backend head=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 tree=83211d25d714e4c539cd3aa248a06ef0658fc8e7 node=v20.20.1 npm=10.8.2 NODE_OPTIONS='' loadavg_before='1.67 1.74 3.80 2/130 29653' date=2026-09-20T17:26:23Z
+cmd: /home/user/workspace/execution/s3-backend/logs/c12-timing.sh
+--- probe body (sha256 2f6306f96c34c51b):
+const assert = require('node:assert/strict');
+(async () => {
+  const t0 = Date.now();
+  const fs = require('node:fs'); const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'prisma-dependency-'));
+  fs.writeFileSync(path.join(dir, 'prisma.config.ts'),
+    'export default { schema: "./schema.prisma", migrations: { path: "./migrations" } };');
+  const { loadConfigFromFile } = require('@prisma/config');
+  console.error('require(@prisma/config) ms=' + (Date.now() - t0));
+  const loaded = await loadConfigFromFile({ configRoot: dir });
+  console.error('loadConfigFromFile ms=' + (Date.now() - t0));
+  assert.equal(loaded.error, undefined);
+  assert.equal(loaded.config.schema, path.join(dir, 'schema.prisma'));
+  const missing = await loadConfigFromFile({ configRoot: dir, configFile: 'absent.ts' });
+  assert.equal(missing.error._tag, 'ConfigFileNotFound');
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.error('total ms=' + (Date.now() - t0));
+})().then(() => process.stdout.write('dependency-probe-ok\n'), e => { console.error(e); process.exitCode = 1; });
+--- run 1 loadavg=1.67 1.74 3.80 1/131 29662
+require(@prisma/config) ms=279
+loadConfigFromFile ms=470
+total ms=474
+dependency-probe-ok
+probe exit=0
+--- run 2 loadavg=1.67 1.74 3.80 1/131 29674
+require(@prisma/config) ms=279
+loadConfigFromFile ms=545
+total ms=549
+dependency-probe-ok
+probe exit=0
+--- run 3 loadavg=1.67 1.74 3.80 1/127 29686
+require(@prisma/config) ms=265
+loadConfigFromFile ms=452
+total ms=456
+dependency-probe-ok
+probe exit=0
+--- spec once
+PASS test/dependency-compatibility.spec.ts (9.285 s)
+  locked dependency compatibility
+    ✓ rejects shell operator injection and preserves literal argument round trips (35 ms)
+    ✓ preserves Prisma deepmerge CommonJS semantics and bounds cyclic input (32 ms)
+    ✓ merges through the deepmerge ESM condition resolved from the Prisma consumer (38 ms)
+    ✓ loads an actual Prisma config through c12 and the overridden merger (498 ms)
+    ✓ restores real Istanbul instrumentation selection without a minimatch API override (39 ms)
+    ✓ loads YAML through both Swagger and NYC consumers without cross-major replacement (58 ms)
+    ✓ reads a real Git object through Danger without requiring a remote platform (46 ms)
+    ✓ parses normal multipart data and rejects a truncated upload with Nest-resolved Multer (72 ms)
+    ✓ decodes normal WebSocket frames and rejects oversized and excess-fragment input (51 ms)
+    ✓ keeps every advisory-patched floor resolved under its real consumer (46 ms)
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        9.52 s
+Ran all test suites matching test/dependency-compatibility.spec.ts.
+exit=0 loadavg_after='2.05 1.82 3.80 1/127 29896' date=2026-09-20T17:26:35Z
