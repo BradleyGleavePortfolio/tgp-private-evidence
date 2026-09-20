@@ -1,6 +1,6 @@
-# S1–S3 remediation and durable recovery
+# TGP remediation and durable recovery
 
-Bradley authorized S1–S3 fixers after all twelve R1 reports returned. S4–S6 remain held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
+Bradley authorized S1–S5 remediation after all twelve R1 reports returned. As of 2026-09-20 17:56 UTC, S2/S4/S5 are active; S1 remediation and S3 proof have returned, with independent attestations pending. S6 remains held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
 
 ## Current checkpoint
 
@@ -35,5 +35,7 @@ Verify SHA256SUMS from inside the checkpoint directory before importing. Preserv
 ## Ownership and publication policy
 
 S1 alone owns schema/migration/generator changes; S2 owns delivery workflow composition; S3 owns backend reliability source and proof. Parent alone updates this archive and the [current handoff](https://github.com/BradleyGleavePortfolio/tgp-agent-context/blob/main/LAST_OPERATOR_STATE.md).
+
+S4 resumed extension loader/package remediation from frozen `a6d885a10d7dbc64e99961f44e0f6fe7bea5dfba`. S5 resumed validation-only G2 proof from builder head `65b1da27d9dab4f51f5fad6d8a05be8b64e53dde` (same tree as its R1 audit snapshot). Held patches and prior failed evidence must be preserved, not silently substituted into old attestations. S5 routes schema/product defects to S1; it does not become a second migration owner.
 
 The product repository is public. Unresolved security findings and associated candidate source are preserved here privately rather than disclosed publicly. Completed fixer work must include recoverable commits, scripts, logs, dispositions, checksums and exact head/tree identities; independently audited/merged/deployed states remain separate.
