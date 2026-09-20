@@ -1,0 +1,114 @@
+2026-09-20T23:08:03Z
+84471e99b278e964f7cb3f6bf9c78491064c41b7
+f31a978034d0aa8a2c39615ade5ec0255a19b1d0
+commit 84471e99b278e964f7cb3f6bf9c78491064c41b7
+Author:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+AuthorDate: Sun Sep 20 22:57:07 2026 +0000
+Commit:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+CommitDate: Sun Sep 20 22:57:07 2026 +0000
+
+    S4 R3: bound auth body reads inside the deadline; epoch-isolate refresh coalescer
+    
+    The pairing redeem and token refresh paths awaited fetchWithTimeout only
+    until response headers arrived, then parsed the body outside the deadline.
+    A 2xx/4xx whose body stream never closes left the coach's single pairing
+    submit and every coalesced refresh caller pending until browser teardown,
+    and a clear + re-establish joined the stale in-flight refresh.
+    
+    - shared/net.js: fetchWithTimeout passes its AbortSignal to the consumer;
+      new readBoundedJson reads at most MAX_AUTH_BODY_BYTES inside the deadline,
+      cancels the reader on abort without awaiting a possibly hung cancel, and
+      throws a byte-free BodyError. discardBody requests cancellation of bodies
+      we will not read. Non-stream {ok,status,json} responses still work.
+    - shared/pairing.js: consume the body inside the deadline consumer; a
+      deadline abort mid-body is the existing timeout copy, not a parse error.
+    - shared/session.js: refresh consumes/bounds the body inside the deadline,
+      discards non-2xx bodies, keeps epoch-fenced commit under the lock; the
+      in-flight coalescer is detached on clearTokens/establishSession and an old
+      run's finally can no longer clear a newer slot.
+    - shared/log.js: allowlist auth_body_cancel_failed (fixed code, no bytes).
+    - test/auth-body-deadline.spec.js: regressions on real Response bodies over
+      never-closing ReadableStreams with fake timers.
+c5a5ae12c5b3c3e32a4601c99319ad7c0d980057
+ shared/log.js                   |   1 +
+ shared/net.js                   |  95 ++++++-
+ shared/pairing.js               | 162 ++++++-----
+ shared/session.js               |  67 +++--
+ test/auth-body-deadline.spec.js | 588 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 832 insertions(+), 81 deletions(-)
+ .github/PULL_REQUEST_TEMPLATE.md       |   3 +-
+ .github/workflows/ci.yml               |  11 -
+ .github/workflows/secrets-scan.yml     |  38 ++
+ .gitleaks.toml                         |  38 ++
+ _locales/en/messages.json              | 137 ++++++
+ background.js                          | 198 ++++++---
+ content/main.js                        |  80 ++--
+ docs/DECISION_V03_AUTONOMOUS_CRAWL.md  |  57 +++
+ docs/PACKAGE_PROOF.md                  |  36 ++
+ docs/SECRETS_SCANNING.md               | 148 +++++++
+ docs/STAGING_RELIABILITY_BOUNDARY.md   |  25 ++
+ docs/TIER0_CONTRACT_INTEGRITY.md       |  41 +-
+ docs/TRANSFER_OUTCOME_BOUNDARY.md      |  27 ++
+ jsconfig.json                          |   3 +-
+ lefthook.yml                           |   2 +
+ manifest.json                          |   1 +
+ package.json                           |   9 +-
+ popup/outcome.js                       | 120 ++++++
+ popup/popup.html                       | 150 ++++++-
+ popup/popup.js                         | 316 ++++++++++----
+ scripts/browser-load-proof.mjs         | 753 +++++++++++++++++++++++++++++++++
+ scripts/check-hook-config.mjs          |   9 +
+ scripts/check-prod-loc.mjs             |  27 --
+ scripts/check-test-ratio.mjs           |  42 --
+ scripts/install-gitleaks.sh            |  32 ++
+ scripts/lib/git-diff.mjs               | 105 +----
+ scripts/lib/shipping.mjs               | 445 +++++++++++++++++++
+ scripts/package-extension.mjs          | 106 +++++
+ scripts/secrets-scan.sh                |  63 +++
+ shared/ingest-ack.js                   |  45 ++
+ shared/log.js                          |  25 +-
+ shared/net.js                          | 230 +++++++---
+ shared/pairing.js                      | 162 ++++---
+ shared/replay/blueprint.js             |  83 +++-
+ shared/replay/engine.js                |  79 ++--
+ shared/session.js                      |  67 ++-
+ test/auth-body-deadline.spec.js        | 588 +++++++++++++++++++++++++
+ test/content-collector.spec.js         | 151 ++++---
+ test/content-entrypoint.spec.js        | 158 +++++++
+ test/helpers/background-mock.js        |  30 ++
+ test/helpers/source-tab.js             | 105 +++--
+ test/ingest-ack-cancellation.spec.js   |  34 ++
+ test/ingest-acknowledgement.spec.js    | 178 ++++++++
+ test/ingest-complete-contract.spec.js  |  16 +-
+ test/ingest-legacy-settlement.spec.js  |   8 +-
+ test/ingest-settlement.spec.js         |   8 +-
+ test/package-integrity.spec.js         | 257 +++++++++++
+ test/policy-alignment.spec.js          | 213 ++++++++++
+ test/policy-gates.spec.js              | 117 ++---
+ test/popup-staging.spec.js             |  77 ++++
+ test/popup-start-import.spec.js        |  35 ++
+ test/replay-array-boundary.spec.js     | 104 +++++
+ test/replay-blueprint.spec.js          | 393 +++++++++++++++--
+ test/replay-boundary-fix.spec.js       | 262 ++++++++++++
+ test/replay-empty-outcome.spec.js      |  11 +-
+ test/replay-engine-edge.spec.js        | 708 ++++++++++++++++++-------------
+ test/replay-engine.spec.js             | 258 ++++++++++-
+ test/replay-pagination-outcome.spec.js | 206 +++++++++
+ test/replay-truecoach-e2e.spec.js      |   8 +-
+ test/router-principal-gate.spec.js     | 120 ++++++
+ test/secrets-scan-controls.py          | 441 +++++++++++++++++++
+ test/source-fetch-boundary.spec.js     | 306 ++++++++++++++
+ test/start-import-hardening.spec.js    |  16 +-
+ test/start-import.spec.js              |   8 +-
+ test/transfer-outcome-model.spec.js    | 234 ++++++++++
+ test/transfer-outcome-popup.spec.js    | 506 ++++++++++++++++++++++
+ test/transfer-outcome-wire.spec.js     | 246 +++++++++++
+ types/punycode.d.ts                    |   5 +
+ 68 files changed, 8429 insertions(+), 1091 deletions(-)
+The bundle contains this ref:
+84471e99b278e964f7cb3f6bf9c78491064c41b7 refs/heads/execute/20260920-s4-r3
+The bundle requires this ref:
+0111be661922234d670bbf23e23d270eec1b4a4e 
+The bundle uses this hash algorithm: sha1
+/home/user/workspace/execution/s4-r3/artifacts/s4-importer-r3-84471e9.bundle is okay
+84471e99b278e964f7cb3f6bf9c78491064c41b7 refs/heads/execute/20260920-s4-r3
