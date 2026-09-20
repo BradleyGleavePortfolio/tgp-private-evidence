@@ -1,0 +1,8 @@
+# S4 milestone 1 — architecture/boundaries understood (09:2x PDT)
+
+- Worktree `worktrees/s4-importer`, branch `execute/20260920-s4-importer`, head `49c1aa96fa2d6df9a09f22c97952b45d10271952` (= #25 head), clean. Merge-base with `origin/main` (`0111be6`) confirmed; chain #21 `fc7fdf6` → #23 `15636ff` → #24 `c0824cb` → #25 `49c1aa9` all ancestors. Repo-local identity Bradley Gleave is configured in `repos/importer/.git/config` (shared by the worktree).
+- #26 `d595092`: not an ancestor; its diff is byte-identical to head commit `49c1aa9` except the pre-existing `package.json` `test` script line. Nothing to re-apply.
+- Membership donor `312280bb` (3 commits on `main`: C2b-0B membership provenance): disjoint feature branch, not an ancestor, touches `shared/blueprint/url-templates.js` + new docs/tests. Will inspect for conflicts and record disposition; no blind cherry-pick.
+- Runtime found: Chrome for Testing 147.0.7727.15 at `~/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome` (Playwright cache, no Playwright library). Plan: drive it via CDP over `--remote-debugging-pipe` from Node 20 with no new dependency; load the *packaged* extension unpacked from the reproducible zip; synthetic isolated origin via `--host-resolver-rules` + local TLS server; no real source/API contact.
+- Gaps in head: no packaging script, no shipping-bytes inventory/hash, no browser loader proof. Existing `test/content-entrypoint.spec.js` executes the classic content script via `vm.Script` (parse proof only).
+- Next: `npm ci --ignore-scripts` (lefthook `prepare` hook would write into `repos/importer/.git/hooks`, so skipped) under heavy lock; baseline full suite; then add package script + integrity tests + browser loader proof.
