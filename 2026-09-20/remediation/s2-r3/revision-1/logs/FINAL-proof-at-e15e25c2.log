@@ -1,0 +1,48 @@
+FINAL PROOF bound to committed head e15e25c28824b43558f7c231eec26a5ac64bafa9 tree b2fa201dabd2180afd499180df72102e0e36862d clean=yes start=2026-09-20T23:29:40Z
+toolchain: bash 5.3.9(1)-release, Python 3.14.3, PyYAML 6.0.3, version: 0.10.0, actionlint 1.7.7, node v20.20.1
+
+== p01 workflow static
+ok   .github/workflows/fly-secrets-set.yml: allowlist guard present
+ok   fly-logs-dump.yml absent
+19 workflows parsed; failures=0
+exit=0
+
+== p02 dispatch injection exec (hostile payloads, fake flyctl)
+ok   .github/workflows/fly-recent-auth-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-secrets-list.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-secrets-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+step executions=352 failures=0
+exit=0
+
+== p03 release.sh verifier contract (fake prisma)
+happy-path-required-present                  exit=0 (want 0) migrate-deploy-ran=yes (want yes) => PASS
+required-verifier-missing                    exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+zero-verifiers-in-tree                       exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+migrations-dir-absent                        exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+migrations-is-a-file                         exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+discovery-error-unreadable-subdir            exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-file-missing                        exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-file-empty                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-entry-traversal                     exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-entry-with-slash                    exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-entry-duplicate                     exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-entry-glob                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+contract-entry-crlf                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+required-verifier-is-a-directory             exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+required-verifier-RAISEs                     exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+other-discovered-verifier-RAISEs             exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+pass=16 fail=0
+exit=0
+
+== shellcheck 0.10.0 (infra-lint.yml selection)
+exit=0 (10 files)
+
+== actionlint 1.7.7
+exit=0
+
+== fly-launch-env-set.yml braced APP_NAME occurrences: 2 unbraced: 0
+
+== jest test/ci (separate wrapper log): logs/jest-test-ci-at-e15e25c2-attempt-20260920T232827Z.log — Tests: 172 passed, 172 total, exit 0
+
+== git state after proof
+head=e15e25c28824b43558f7c231eec26a5ac64bafa9 clean=yes end=2026-09-20T23:29:46Z

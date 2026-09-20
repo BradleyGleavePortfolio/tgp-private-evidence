@@ -1,0 +1,19 @@
+First run of probes/p03-release-verifiers.sh against worktrees/s2-r3 (pre-commit, ~22:49Z). The full log was
+overwritten by the re-run (same filename) and no other copy exists; only the grep-filtered verdict lines that were
+displayed at the time are reproduced below, verbatim. The rest of that run's output is NOT recoverable and is not
+reconstructed here.
+Result: pass=13 fail=3, probe exit=1.
+
+contract-entry-crlf                          exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+required-verifier-RAISEs                     exit=0 (want 1) migrate-deploy-ran=yes (want yes) => FAIL
+other-discovered-verifier-RAISEs             exit=0 (want 1) migrate-deploy-ran=yes (want yes) => FAIL
+
+Root causes and fixes:
+1. CRLF: release.sh trimmed with [[:space:]], which includes \r, so a CRLF entry resolved. Product fix: trim
+   [[:blank:]] (space/tab) only; CR now fails the name regex → malformed contract, refused pre-deploy.
+2/3. RAISE cases: bug in the PROBE's fake npx (`f="${*##*--file }"` does not strip on $* in bash; grep read the
+   whole argv string as a filename and never saw RAISE_FAIL). Probe fix: `all="$*"; f="${all##*--file }"`.
+   Not a product defect — the product's step 4 `if ! npx prisma db execute …; then exit 1` was unchanged.
+   (The fake-npx bug was confirmed by a standalone reproduction that printed `file=[prisma db execute --url x --file fk/v.sql]`.)
+Re-run after both fixes: pass=16 fail=0 (logs/p03-release-verifiers.log); bound-to-head re-run in
+logs/FINAL-proof-at-1c6db2b6.log. All subsequent probe/lint logs use unique or explicitly labelled filenames.

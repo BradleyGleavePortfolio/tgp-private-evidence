@@ -1,0 +1,58 @@
+start=2026-09-20T23:26:05Z attempt=20260920T232605Z
+head=1c6db2b68c3521fbdf7c0f468b1f52d0152a16b9 tree=e44f976e928d53b82d5d538a7d5812750c02fbf3 clean=yes
+shared_root=/home/user/workspace/worktrees/s1-r3
+cmp package.json: identical (sha256 bb939038a2a8ad47)
+cmp package-lock.json: identical (sha256 62b05b908c835dae)
+layout: /home/user/workspace/worktrees/s2-r3/node_modules -> /home/user/workspace/worktrees/s1-r3/node_modules (symlink to shared tree)
+node=v20.20.1 npm=10.8.2 jest=30.4.1
+toolchain: shellcheck/actionlint not involved; bash 5.3.9(1)-release
+command: timeout --foreground -k 30 1500 node /home/user/workspace/worktrees/s1-r3/node_modules/jest/bin/jest.js --ci --runInBand test/ci
+PASS test/ci/r100-pathspec.spec.ts (10.083 s)
+PASS test/ci/release-evidence-gate.spec.ts (7.209 s)
+PASS test/ci/lockfile-relevance.spec.ts
+FAIL test/ci/delivery-artifact.spec.ts
+  ● operator workflows — dispatch inputs are data, never shell source (S2-R2-A-01) › fly-launch-env-set.yml: no run: block interpolates inputs; every input reaches shell only through step env:
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /"\$\{APP_NAME\}"/
+    Received string:  "set -euo pipefail
+    if [ -z \"$APP_NAME\" ]; then echo \"App name is empty; aborting.\"; exit 1; fi
+    for pair in \"GUEST_CHECKOUT_PII_SALT=$V_PII_SALT\" \"LANDING_VIEW_HASH_SECRET=$V_LANDING\" \"CHECKOUT_RECOVERY_SECRET=$V_CHECKOUT\" \"COACH_AI_MAX_ACTUAL_CENTS=$V_CENTS\" \"COACH_AI_VALUE_MULTIPLIER=$V_MULT\"; do
+      name=\"${pair%%=*}\"; val=\"${pair#*=}\"
+      if [ -z \"$val\" ]; then echo \"Missing GH secret for $name; aborting.\"; exit 1; fi
+    done
+    args=(
+      \"GUEST_CHECKOUT_PII_SALT=$V_PII_SALT\"
+      \"LANDING_VIEW_HASH_SECRET=$V_LANDING\"
+      \"CHECKOUT_RECOVERY_SECRET=$V_CHECKOUT\"
+      \"COACH_AI_MAX_ACTUAL_CENTS=$V_CENTS\"
+      \"COACH_AI_VALUE_MULTIPLIER=$V_MULT\"
+    )
+    if [ -n \"$V_ANDROID\" ]; then
+      args+=(\"ANDROID_CERT_SHA256_FINGERPRINTS=$V_ANDROID\")
+      echo \"Including ANDROID_CERT_SHA256_FINGERPRINTS.\"
+    else
+      echo \"ANDROID_CERT_SHA256_FINGERPRINTS not set in repo secrets; skipping.\"
+    fi
+    flyctl secrets set \"${args[@]}\" --app \"$APP_NAME\"
+    "
+
+      674 |         const appVar = Object.entries(st.env ?? {}).find(([, v]) => /inputs\.app\s*\}\}/.test(String(v)))?.[0];
+      675 |         if (!appVar || !st.run) continue;
+    > 676 |         expect(st.run).toMatch(new RegExp(`"\\$\\{${appVar}\\}"`));
+          |                        ^
+      677 |       }
+      678 |     });
+      679 |     it(`${f}.yml: validates the app target against the allowlist before any credentialed command`, () => {
+
+      at Object.<anonymous> (test/ci/delivery-artifact.spec.ts:676:24)
+
+Test Suites: 1 failed, 3 passed, 4 total
+Tests:       1 failed, 171 passed, 172 total
+Snapshots:   0 total
+Time:        21.045 s
+Ran all test suites matching test/ci.
+jest exit=1
+post-run clean=yes head=1c6db2b68c3521fbdf7c0f468b1f52d0152a16b9 end=2026-09-20T23:26:27Z
+wrapper exit=1 log=/home/user/workspace/execution/s2-r3/logs/jest-test-ci-at-1c6db2b6-attempt-20260920T232605Z.log

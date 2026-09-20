@@ -1,15 +1,15 @@
 # TGP R3 independent audit index
 
-Observed 2026-09-20 23:28 UTC. Reports are frozen independent opinions; parent disposition is consequence-based, not a vote. No release or customer acceptance follows from a lane verdict.
+Observed 2026-09-20 23:33 UTC. Reports are frozen independent opinions; parent disposition is consequence-based, not a vote. No release or customer acceptance follows from a lane verdict.
 
 | Lane | Frozen candidate | Audit A | Audit B | Parent status |
 |---|---|---|---|---|
 | S1 | `b7d7fe59` | Active, independent | Active, independent | 89/89 real PG17.6 synthetic checks passed; builder evidence, not clearance |
-| S2 | Successor of `1c6db2b6` in progress | Not dispatched | Not dispatched | Jest 171/172 on predecessor; two-token quoted-variable consistency fix and exact-head rerun authorized; composition pending |
+| S2 | `e15e25c2` | Source review active | Source review active | 172/172 exact-head Jest and adversarial controls passed; final verdicts await real composition proof |
 | S3 | `5c7b42b3` unchanged | R2 bounded evidence accepted | R2 bounded evidence accepted | No gratuitous R3 rerun |
 | S4 | `84471e99` / package `90883cad…f6a9a7` | [NOT CLEARED](s4-r3/a/revision-1/REPORT.md) | [CLEARED, bounded](s4-r3/b/revision-1/REPORT.md) | NOT CLEARED; two reproduced material session races routed to isolated successor |
 | S5 | `9f38ab03` | Not dispatched | Not dispatched | Fixture/assertion source prepared; new live proof pending |
-| S6 | Successor of `55db31a0`, not committed | Not dispatched | Not dispatched | Source repair and consumer-safety follow-ups; meaningful tests pending |
+| S6 | Successor of `55db31a0`, not committed | Not dispatched | Not dispatched | SLOT E focused identity/cache tests authorized against fingerprinted dirty source; results pending |
 
 ## S4 disposition
 

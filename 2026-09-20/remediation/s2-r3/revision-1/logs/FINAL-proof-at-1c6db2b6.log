@@ -1,0 +1,173 @@
+FINAL PROOF bound to committed head 1c6db2b68c3521fbdf7c0f468b1f52d0152a16b9 tree e44f976e928d53b82d5d538a7d5812750c02fbf3 clean=yes start=2026-09-20T22:57:19Z
+toolchain: bash 5.3.9(1)-release, python3 Python 3.14.3, PyYAML 6.0.3, shellcheck version: 0.10.0, actionlint 1.7.7, node v20.20.1
+
+== p01 workflow static
+ok   .github/workflows/fly-db-secrets-set.yml: allowlist guard present
+ok   .github/workflows/fly-feature-flags-set.yml: allowlist guard present
+ok   .github/workflows/fly-launch-env-set.yml: allowlist guard present
+ok   .github/workflows/fly-logs.yml: allowlist guard present
+ok   .github/workflows/fly-recent-auth-set.yml: allowlist guard present
+ok   .github/workflows/fly-secrets-list.yml: allowlist guard present
+ok   .github/workflows/fly-secrets-set.yml: allowlist guard present
+ok   fly-logs-dump.yml absent
+19 workflows parsed; failures=0
+exit=0
+
+== p02 dispatch injection exec (hostile payloads, fake flyctl)
+ok   .github/workflows/fly-db-secrets-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-feature-flags-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-launch-env-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-logs.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-recent-auth-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-secrets-list.yml: all run: steps executed under 10 hostile payloads + allowed app
+ok   .github/workflows/fly-secrets-set.yml: all run: steps executed under 10 hostile payloads + allowed app
+step executions=352 failures=0
+exit=0
+
+== p03 release.sh verifier contract (fake prisma)
+release.sh probe at 1c6db2b68c3521fbdf7c0f468b1f52d0152a16b9 (2026-09-20T22:57:22Z) root=/home/user/workspace/worktrees/s2-r3
+happy-path-required-present                  exit=0 (want 0) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2 (discovered=2, required=1)
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2 verifiers_required=1
+required-verifier-missing                    exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 1
+  | [release] REQUIRED catalog verifier missing from this image: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] Refusing to release: the integrated candidate is incomplete (S1 migration not composed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+zero-verifiers-in-tree                       exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 0
+  | [release] REQUIRED catalog verifier missing from this image: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] Refusing to release: the integrated candidate is incomplete (S1 migration not composed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+migrations-dir-absent                        exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release] prisma/migrations is not a directory in this image.
+  | [release] Refusing to release: verifier discovery impossible.
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+migrations-is-a-file                         exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release] prisma/migrations is not a directory in this image.
+  | [release] Refusing to release: verifier discovery impossible.
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+discovery-error-unreadable-subdir            exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release] catalog verifier DISCOVERY FAILED (find/sort returned non-zero).
+  | [release] Refusing to release: cannot tell zero verifiers from a broken enumeration.
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-file-missing                        exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier contract missing/unreadable: scripts/release-required-verifiers.txt
+  | [release] Refusing to release: the expected verifier set is not established in this image.
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-file-empty                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier contract lists no verifiers: scripts/release-required-verifiers.txt
+  | [release] Refusing to release: an empty expected set is not an established contract.
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-entry-traversal                     exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier entry is not a bare migration directory name: '../../etc'
+  | [release] Refusing to release (contract file malformed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-entry-with-slash                    exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier entry is not a bare migration directory name: '20261224000000_rls_close_public_exposure/verify.sql'
+  | [release] Refusing to release (contract file malformed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-entry-duplicate                     exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier entry listed twice: '20261224000000_rls_close_public_exposure'
+  | [release] Refusing to release (contract file malformed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-entry-glob                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier entry is not a bare migration directory name: '*'
+  | [release] Refusing to release (contract file malformed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+contract-entry-crlf                          exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 2
+  | [release] required-verifier entry is not a bare migration directory name: '20261224000000_rls_close_public_exposure'
+  | [release] Refusing to release (contract file malformed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+required-verifier-is-a-directory             exit=1 (want 1) migrate-deploy-ran=no (want no) => PASS
+  ---- tail of release output:
+  | [release] step 0: verifier contract preflight (no database contact)...
+  | [release]   verifiers_discovered = 1
+  | [release] REQUIRED catalog verifier missing from this image: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] Refusing to release: the integrated candidate is incomplete (S1 migration not composed).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+required-verifier-RAISEs                     exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] catalog verifier FAILED: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] Refusing to mark this release green (schema drift or incomplete migration).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+other-discovered-verifier-RAISEs             exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release] catalog verifier FAILED: prisma/migrations/20260101000000_other/verify.sql
+  | [release] Refusing to mark this release green (schema drift or incomplete migration).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+pass=16 fail=0
+exit=0
+
+== shellcheck 0.10.0 (infra-lint.yml selection)
+exit=0 (10 files)
+
+== actionlint 1.7.7
+exit=0
+
+== bash -n all scripts
+done
+
+== git state after proof
+head=1c6db2b68c3521fbdf7c0f468b1f52d0152a16b9 clean=yes end=2026-09-20T22:57:23Z

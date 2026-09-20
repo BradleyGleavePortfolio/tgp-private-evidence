@@ -1,0 +1,178 @@
+release.sh probe at 0b05fcf5352287109ac88ed2ba3682e441e3a076 (2026-09-20T22:48:57Z) root=/home/user/workspace/worktrees/s2
+  (no contract file at root — predecessor)
+happy-path-required-present                  exit=0 (want 0) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+required-verifier-missing                    exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 1: checking migration status...
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifiers_passed = 1
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=1
+  (no contract file at root — predecessor)
+zero-verifiers-in-tree                       exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 1: checking migration status...
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifiers_passed = 0
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=0
+  (no contract file at root — predecessor)
+migrations-dir-absent                        exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release]   verifier: [release] ─── last prisma output ─────────────────────────────────
+  | [release]   verifier: No pending migrations to apply.
+  | [release]   verifier: [release] ────────────────────────────────────────────────────────
+  | [release]   verifier: [release] Deploy ABORTED. Existing machines on Fly are unaffected.
+  | [release]   verifier: [release] See docs/deploy-runbook.md §9 for recovery.
+  | [release]   verifiers_passed = 6
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=6
+  (no contract file at root — predecessor)
+migrations-is-a-file                         exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 1: checking migration status...
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifiers_passed = 0
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=0
+  (no contract file at root — predecessor)
+discovery-error-unreadable-subdir            exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release]   verifier: [release] ─── last prisma output ─────────────────────────────────
+  | [release]   verifier: No pending migrations to apply.
+  | [release]   verifier: [release] ────────────────────────────────────────────────────────
+  | [release]   verifier: [release] Deploy ABORTED. Existing machines on Fly are unaffected.
+  | [release]   verifier: [release] See docs/deploy-runbook.md §9 for recovery.
+  | [release]   verifiers_passed = 8
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=8
+  (no contract file at root — predecessor)
+rm: cannot remove 'scripts/release-required-verifiers.txt': No such file or directory
+contract-file-missing                        exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-file-empty                          exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-entry-traversal                     exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-entry-with-slash                    exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-entry-duplicate                     exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-entry-glob                          exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+contract-entry-crlf                          exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release]   verifiers_passed = 2
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=2
+  (no contract file at root — predecessor)
+required-verifier-is-a-directory             exit=0 (want 1) migrate-deploy-ran=yes (want no) => FAIL
+  ---- tail of release output:
+  | [release] step 1: checking migration status...
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifiers_passed = 1
+  | [release] ✔ release_command completed successfully
+  | [release]   verifiers_passed=1
+  (no contract file at root — predecessor)
+required-verifier-RAISEs                     exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] catalog verifier FAILED: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+  | [release] Refusing to mark this release green (schema drift or incomplete migration).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED. Existing machines on Fly are unaffected.
+  (no contract file at root — predecessor)
+other-discovered-verifier-RAISEs             exit=1 (want 1) migrate-deploy-ran=yes (want yes) => PASS
+  ---- tail of release output:
+  | [release] step 2: applying pending migrations (prisma migrate deploy)...
+  | [release] step 3: verifying database is up-to-date...
+  | [release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+  | [release]   verifier: prisma/migrations/20260101000000_other/verify.sql
+  | [release] catalog verifier FAILED: prisma/migrations/20260101000000_other/verify.sql
+  | [release] Refusing to mark this release green (schema drift or incomplete migration).
+  | [release] ❌ FAIL at line 1 (exit=1)
+  | [release] Deploy ABORTED. Existing machines on Fly are unaffected.
+pass=3 fail=13
+probe exit=1
