@@ -4,17 +4,19 @@ Parent owns scheduling. All moderate/heavy commands require an explicit slot and
 
 ## Current slot
 
-S4 R3 SLOT B active: deterministic install and focused tests passed; continuation granted for committed-head full Vitest/gates/package and browser positive/control proof. Owner `s4_r3_auth_fixer_muaeepla`. Candidate `84471e9` observed; wait for final frozen packet and lock release.
+S1 R3 SLOT C active (granted after S4 release): shared S1/S2 locked dependency installation, verified PostgreSQL/client setup and owned S1 synthetic fixture proof. Owner `s1_r3_safety_fixer_muaeeplu`; source `7cbbb039`. Guard prerequisite accepted (72/0 exact-head offline assertions); wrapper revision 2 runs offline guard and locked server preflight before proof. Only local S1 disposable setup/run/stop authorized, not fixture destruction or hosted actions.
+
+S4 SLOT B closed at 23:02:34 UTC. Frozen candidate `84471e99` passed 62 suites/1702 tests, gates, package and browser positive/control. Package `90883cad44cd78b60a18ab232aba0b965ae40ab6edb99054138cac61c0f6a9a7`. Independent R3 auditors A `s4_r3_independent_audit_a_muafcz9i` and B `s4_r3_independent_audit_b_muafczaf` are active, no verdict yet.
 
 S6 combined R2 finished at `55db31a0`: all stages exit 0, packet frozen, lock released. Both final audits are archived; candidate remains NOT CLEARED.
 
 S2 SLOT A closed. Clean candidate `1c6db2b6` has exact-head plain-Node adversarial controls and real shell/action lint, but Jest remains unrun.
 
-Next reserved slot: S1 shared S1/S2 locked dependency installation, verified PostgreSQL/client setup and owned S1 synthetic fixture proof. Source `7cbbb039` guard has 72/0 exact-head offline assertions accepted as a prerequisite. Wrapper corrections must precede execution. Reservation is not execution authorization; parent grants after S4 releases.
+Next reserved slot: S2 exact-head `test/ci` against the matching read-only S1 npm-ci tree, only after successful S1 setup/proof and explicit slot grant. Wrapper revision 2 verifies root manifests and preserves unique attempt logs/child status.
 
-S5 `9f38ab03` source committed; first packet archived as a checkpoint only. Runner corrections required: canonical lock, actual disposable-server preflight before reset, explicit working directory. No install or DB authorization yet.
+S5 `9f38ab03` source committed; first packet archived as a checkpoint only. Runner revision 2 added preflight and fixed working directory/lock. Final correction required before execution: hold canonical lock across preflight and mutation, pin a distinctive S5 fixture marker rather than an overridable blank marker. No install or DB authorization yet.
 
-S6 source repair continues. Unslotted unstamped type-check smoke runs are excluded from acceptance evidence; authorized final-head proof remains required.
+S6 source repair continues. Unslotted unstamped type-check smoke runs are excluded from acceptance evidence; authorized final-head proof remains required. Parent approved retaining unowned legacy offline rows as NULL rather than blindly assigning the now-resolving current identity, and requested a narrow food-queue owner capture/fence regression. No S6 heavy slot yet.
 
 ## Awaiting specific execution requests
 

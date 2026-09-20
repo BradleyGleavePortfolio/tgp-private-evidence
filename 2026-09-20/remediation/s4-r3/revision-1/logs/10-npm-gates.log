@@ -1,0 +1,52 @@
+[2026-09-20T23:00:45Z] 10-npm-gates head=84471e99b278e964f7cb3f6bf9c78491064c41b7 tree=f31a978034d0aa8a2c39615ade5ec0255a19b1d0 dirty_paths=0 cmd: npm run gates
+
+> tgp-importer-extension@0.3.0-rc.1 gates
+> npm run check:banned && npm run check:flags && npm run check:fixtures && npm run check:production-preflight && npm run check:hooks && npm run lint && npm run type-check && npm run format:check
+
+
+> tgp-importer-extension@0.3.0-rc.1 check:banned
+> node scripts/check-banned.mjs
+
+OK: banned-token net clean (source patterns + origin/main commit identity)
+
+> tgp-importer-extension@0.3.0-rc.1 check:flags
+> node scripts/check-flag-discipline.mjs
+
+flag discipline — PAIRING_ENABLED=true (sole auth path)
+OK: sole auth path is enabled — no dark-merged dead-end
+
+> tgp-importer-extension@0.3.0-rc.1 check:fixtures
+> node scripts/check-production-fixtures.mjs
+
+production fixture exclusion — scanned=44 violations=0
+OK: production modules do not reference test fixtures or mocks
+
+> tgp-importer-extension@0.3.0-rc.1 check:production-preflight
+> node scripts/check-deploy-readiness.mjs
+
+PRODUCTION STATIC PREFLIGHT (manifest, entrypoint, markers only)
+PASS  manifest-v3
+PASS  background-worker-declared
+PASS  background-worker-exists
+PASS  version-format
+PASS  forbidden-production-markers
+EXIT: STATIC PREFLIGHT CHECKS CLEAR
+
+> tgp-importer-extension@0.3.0-rc.1 check:hooks
+> node scripts/check-hook-config.mjs
+
+OK: pinned pre-commit hook semantically checks the effective 114-file production/test/scripts set and formatting
+
+> tgp-importer-extension@0.3.0-rc.1 lint
+> eslint --max-warnings=0 --config scripts/eslint.config.mjs .
+
+
+> tgp-importer-extension@0.3.0-rc.1 type-check
+> tsc -p jsconfig.json && tsc -p jsconfig.scripts.json
+
+
+> tgp-importer-extension@0.3.0-rc.1 format:check
+> node scripts/check-format.mjs
+
+OK: Prettier checked 49 tracked files with no ignored or unformatted file
+[2026-09-20T23:01:15Z] 10-npm-gates exit=0

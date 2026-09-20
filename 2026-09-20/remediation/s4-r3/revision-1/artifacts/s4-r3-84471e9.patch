@@ -1,0 +1,1087 @@
+From 84471e99b278e964f7cb3f6bf9c78491064c41b7 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Sun, 20 Sep 2026 22:57:07 +0000
+Subject: [PATCH] S4 R3: bound auth body reads inside the deadline;
+ epoch-isolate refresh coalescer
+
+The pairing redeem and token refresh paths awaited fetchWithTimeout only
+until response headers arrived, then parsed the body outside the deadline.
+A 2xx/4xx whose body stream never closes left the coach's single pairing
+submit and every coalesced refresh caller pending until browser teardown,
+and a clear + re-establish joined the stale in-flight refresh.
+
+- shared/net.js: fetchWithTimeout passes its AbortSignal to the consumer;
+  new readBoundedJson reads at most MAX_AUTH_BODY_BYTES inside the deadline,
+  cancels the reader on abort without awaiting a possibly hung cancel, and
+  throws a byte-free BodyError. discardBody requests cancellation of bodies
+  we will not read. Non-stream {ok,status,json} responses still work.
+- shared/pairing.js: consume the body inside the deadline consumer; a
+  deadline abort mid-body is the existing timeout copy, not a parse error.
+- shared/session.js: refresh consumes/bounds the body inside the deadline,
+  discards non-2xx bodies, keeps epoch-fenced commit under the lock; the
+  in-flight coalescer is detached on clearTokens/establishSession and an old
+  run's finally can no longer clear a newer slot.
+- shared/log.js: allowlist auth_body_cancel_failed (fixed code, no bytes).
+- test/auth-body-deadline.spec.js: regressions on real Response bodies over
+  never-closing ReadableStreams with fake timers.
+---
+ shared/log.js                   |   1 +
+ shared/net.js                   |  95 +++++-
+ shared/pairing.js               | 162 +++++----
+ shared/session.js               |  67 +++-
+ test/auth-body-deadline.spec.js | 588 ++++++++++++++++++++++++++++++++
+ 5 files changed, 832 insertions(+), 81 deletions(-)
+ create mode 100644 test/auth-body-deadline.spec.js
+
+diff --git a/shared/log.js b/shared/log.js
+index 8783231..eb9d535 100644
+--- a/shared/log.js
++++ b/shared/log.js
+@@ -16,6 +16,7 @@ const KNOWN_EVENTS = new Set([
+   "refresh_timeout",
+   "settlement_network_error",
+   "ingest_ack_cancel_failed",
++  "auth_body_cancel_failed",
+   "status_popup_unavailable",
+ ]);
+ 
+diff --git a/shared/net.js b/shared/net.js
+index b61e2ee..394fa96 100644
+--- a/shared/net.js
++++ b/shared/net.js
+@@ -9,9 +9,14 @@
+ //
+ // Caller-supplied init.signal is composed, not dropped: abort from either the
+ // timeout controller OR the caller's signal cancels the underlying fetch.
++import { logNetworkEvent } from "./log.js";
++
+ export const DEFAULT_TIMEOUT_MS = 15000;
+ 
+-// An optional consumer keeps response-body work inside the same deadline.
++// An optional consumer keeps response-body work inside the same deadline. It
++// receives the deadline AbortSignal as its second argument so body readers can
++// release their stream when the deadline (or the caller) aborts.
++/** @param {(response: any, signal: AbortSignal) => any} [consume] */
+ export function fetchWithTimeout(
+   fetchImpl,
+   url,
+@@ -48,6 +53,7 @@ export function fetchWithTimeout(
+       controller.signal.throwIfAborted();
+       return consume(
+         await fetchImpl(url, { ...rest, signal: controller.signal }),
++        controller.signal,
+       );
+     })(),
+   ]).finally(() => {
+@@ -62,6 +68,93 @@ export function isTimeout(err) {
+   return err instanceof Error && err.name === "TimeoutError";
+ }
+ 
++// Upper bound on any authentication response body. A token pair is a few
++// kilobytes at most; anything larger is not a token response we should parse.
++export const MAX_AUTH_BODY_BYTES = 16384;
++
++// Parse a JSON body INSIDE the caller's deadline, bounded in bytes as well as
++// time. Must be called from a fetchWithTimeout consumer so a body that never
++// closes is cut off by the same deadline that bounds the headers. Rejects with a
++// tagged BodyError on oversize, undecodable or malformed bodies; the error
++// never carries response bytes. Falls back to response.json() when the runtime
++// exposes no body stream. Aborting `signal` cancels an in-progress read.
++/** @param {AbortSignal | null} [signal] */
++export async function readBoundedJson(
++  response,
++  signal = null,
++  maxBytes = MAX_AUTH_BODY_BYTES,
++) {
++  const bodyError = () => {
++    const err = new Error("body_invalid");
++    err.name = "BodyError";
++    return err;
++  };
++  const body = response && typeof response === "object" ? response.body : null;
++  if (
++    body === null ||
++    body === undefined ||
++    typeof body !== "object" ||
++    typeof body.getReader !== "function"
++  ) {
++    try {
++      return await response.json();
++    } catch {
++      throw bodyError();
++    }
++  }
++  const reader = body.getReader();
++  const cancel = () => {
++    void reader.cancel().catch(() => {
++      logNetworkEvent("auth_body_cancel_failed");
++    });
++  };
++  if (signal) {
++    if (signal.aborted) cancel();
++    else signal.addEventListener("abort", cancel, { once: true });
++  }
++  try {
++    const decoder = new TextDecoder("utf-8", { fatal: true });
++    let bytes = 0;
++    let text = "";
++    for (;;) {
++      const { done, value } = await reader.read();
++      if (done) break;
++      bytes += value.byteLength;
++      if (bytes > maxBytes) throw bodyError();
++      text += decoder.decode(value, { stream: true });
++    }
++    text += decoder.decode();
++    return JSON.parse(text);
++  } catch {
++    // Never echo response bytes, parser errors or transport diagnostics.
++    cancel();
++    throw bodyError();
++  } finally {
++    if (signal) signal.removeEventListener("abort", cancel);
++    reader.releaseLock();
++  }
++}
++
++// Request cancellation of a body we will not read (e.g. a non-2xx auth reply)
++// so the connection is not left live after the caller has settled. Never
++// awaited: a hung cancel must not block the caller. Never throws.
++export function discardBody(response) {
++  const body = response && typeof response === "object" ? response.body : null;
++  if (!body || typeof body !== "object" || typeof body.cancel !== "function") {
++    return false;
++  }
++  try {
++    if (body.locked === true) return false;
++    void Promise.resolve(body.cancel()).catch(() => {
++      logNetworkEvent("auth_body_cancel_failed");
++    });
++    return true;
++  } catch {
++    logNetworkEvent("auth_body_cancel_failed");
++    return false;
++  }
++}
++
+ // Upper bound on any server-supplied Retry-After. "Retry-After: 86400" would park
+ // an MV3 worker for a day, so clamp at parse time — no caller can forget to.
+ export const MAX_RETRY_AFTER_MS = 60000;
+diff --git a/shared/pairing.js b/shared/pairing.js
+index 00cd0e8..1e92510 100644
+--- a/shared/pairing.js
++++ b/shared/pairing.js
+@@ -14,8 +14,12 @@
+ // if the backend contract is ever pulled.
+ //
+ // R75: zero banned type-assertions — every narrowing is a real guard.
+-import { TGP_API_ORIGIN, PAIRING_ENABLED, PAIR_REDEEM_PATH } from "./protocol.js";
+-import { fetchWithTimeout, isTimeout } from "./net.js";
++import {
++  TGP_API_ORIGIN,
++  PAIRING_ENABLED,
++  PAIR_REDEEM_PATH,
++} from "./protocol.js";
++import { fetchWithTimeout, isTimeout, readBoundedJson } from "./net.js";
+ import { logNetworkEvent } from "./log.js";
+ 
+ const REDEEM_ENDPOINT = `${TGP_API_ORIGIN}${PAIR_REDEEM_PATH}`;
+@@ -23,19 +27,22 @@ const REDEEM_ENDPOINT = `${TGP_API_ORIGIN}${PAIR_REDEEM_PATH}`;
+ // Structured backend failure codes -> coach-facing copy. Unknown codes fall
+ // back to a generic message; no raw server text is ever echoed to the coach.
+ const ERROR_COPY = {
+-    expired: "That code has expired. Generate a fresh one in the TGP app.",
+-    already_used: "That code was already used. Generate a fresh one in the TGP app.",
+-    invalid: "That code isn't valid. Check the digits and try again.",
+-    locked: "Too many attempts. Wait a moment, then generate a new code.",
++  expired: "That code has expired. Generate a fresh one in the TGP app.",
++  already_used:
++    "That code was already used. Generate a fresh one in the TGP app.",
++  invalid: "That code isn't valid. Check the digits and try again.",
++  locked: "Too many attempts. Wait a moment, then generate a new code.",
+ };
+ 
+ function readString(record, key) {
+-    return typeof record === "object" && record !== null && typeof record[key] === "string"
+-        ? record[key]
+-        : null;
++  return typeof record === "object" &&
++    record !== null &&
++    typeof record[key] === "string"
++    ? record[key]
++    : null;
+ }
+ function isOk(value) {
+-    return typeof value === "object" && value !== null && value.ok === true;
++  return typeof value === "object" && value !== null && value.ok === true;
+ }
+ 
+ // Redeem a 6-digit pairing code and establish the session. Returns
+@@ -43,65 +50,92 @@ function isOk(value) {
+ // message — never token material. `deps` injects fetch + sendMessage so this is
+ // unit-testable with no live network and no chrome runtime.
+ export async function redeemPairingCode(code, deps = {}) {
+-    const fetchImpl = deps.fetch ?? globalThis.fetch;
+-    const sendMessage = deps.sendMessage ?? ((m) => chrome.runtime.sendMessage(m));
+-    // The shipped state comes from PAIRING_ENABLED (on for the v0.3 RC).
+-    // `deps.enabled` lets a test pin either branch explicitly without depending
+-    // on the shipped flag value. Production callers (pair.js) never pass it.
+-    const enabled = deps.enabled ?? PAIRING_ENABLED;
++  const fetchImpl = deps.fetch ?? globalThis.fetch;
++  const sendMessage =
++    deps.sendMessage ?? ((m) => chrome.runtime.sendMessage(m));
++  // The shipped state comes from PAIRING_ENABLED (on for the v0.3 RC).
++  // `deps.enabled` lets a test pin either branch explicitly without depending
++  // on the shipped flag value. Production callers (pair.js) never pass it.
++  const enabled = deps.enabled ?? PAIRING_ENABLED;
+ 
+-    if (!enabled) {
+-        return { ok: false, error: "Pairing isn't available yet." };
+-    }
+-    if (!/^\d{6}$/.test(typeof code === "string" ? code : "")) {
+-        return { ok: false, error: ERROR_COPY.invalid };
+-    }
++  if (!enabled) {
++    return { ok: false, error: "Pairing isn't available yet." };
++  }
++  if (!/^\d{6}$/.test(typeof code === "string" ? code : "")) {
++    return { ok: false, error: ERROR_COPY.invalid };
++  }
+ 
+-    let res;
+-    try {
+-        res = await fetchWithTimeout(fetchImpl, REDEEM_ENDPOINT, {
+-            method: "POST",
+-            headers: { "Content-Type": "application/json" },
+-            body: JSON.stringify({ code }),
+-        });
+-    }
+-    catch (err) {
+-        if (isTimeout(err)) {
+-            logNetworkEvent("pair_timeout");
+-            return { ok: false, error: "That took too long. Check your connection and try again." };
++  // Headers AND body are consumed inside the one finite deadline: a response
++  // whose JSON never finishes arriving must fail the same way a hung connect
++  // does, so the coach's single submit is never parked without its remedy.
++  // The body is parsed inside the consumer with a byte bound as well. A
++  // malformed/empty/oversized body maps to `null` (not a silent swallow); the
++  // null then routes to explicit copy below. We log a PII-free event code —
++  // never the body, which could carry server text.
++  let res;
++  try {
++    res = await fetchWithTimeout(
++      fetchImpl,
++      REDEEM_ENDPOINT,
++      {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ code }),
++      },
++      undefined,
++      async (response, signal) => {
++        let body = null;
++        try {
++          body = await readBoundedJson(response, signal);
++        } catch (err) {
++          // A deadline abort mid-body is reported as the timeout below, not
++          // as a parse failure.
++          if (signal.aborted) throw err;
++          logNetworkEvent("pair_body_parse_error");
+         }
+-        logNetworkEvent("pair_network_error");
+-        return { ok: false, error: "Network error. Please try again." };
++        return { ok: response.ok === true, body };
++      },
++    );
++  } catch (err) {
++    if (isTimeout(err)) {
++      logNetworkEvent("pair_timeout");
++      return {
++        ok: false,
++        error: "That took too long. Check your connection and try again.",
++      };
+     }
++    logNetworkEvent("pair_network_error");
++    return { ok: false, error: "Network error. Please try again." };
++  }
++  const body = res.body;
+ 
+-    // Parse the body explicitly. A malformed/empty body maps to `null` here (not
+-    // a silent swallow); the null then routes to explicit copy below. We log a
+-    // PII-free event code — never the body, which could carry server text.
+-    let body;
+-    try {
+-        body = await res.json();
+-    }
+-    catch {
+-        logNetworkEvent("pair_body_parse_error");
+-        body = null;
+-    }
++  if (!res.ok) {
++    const reason = readString(body, "code");
++    return {
++      ok: false,
++      error:
++        (reason && ERROR_COPY[reason]) || "Pairing failed. Please try again.",
++    };
++  }
+ 
+-    if (!res.ok) {
+-        const reason = readString(body, "code");
+-        return { ok: false, error: (reason && ERROR_COPY[reason]) || "Pairing failed. Please try again." };
+-    }
+-
+-    const accessToken = readString(body, "access_token");
+-    const refreshToken = readString(body, "refresh_token");
+-    if (accessToken === null || refreshToken === null) {
+-        return { ok: false, error: "Unexpected pairing response." };
+-    }
++  const accessToken = readString(body, "access_token");
++  const refreshToken = readString(body, "refresh_token");
++  if (accessToken === null || refreshToken === null) {
++    return { ok: false, error: "Unexpected pairing response." };
++  }
+ 
+-    // Hand the token pair to the single owner (background worker). Fail-closed:
+-    // report success only once the worker acknowledges the session.
+-    const ack = await sendMessage({ kind: "session_established", accessToken, refreshToken });
+-    if (!isOk(ack)) {
+-        return { ok: false, error: "Could not establish session. Please try again." };
+-    }
+-    return { ok: true, chosenPlatform: readString(body, "chosen_platform") };
++  // Hand the token pair to the single owner (background worker). Fail-closed:
++  // report success only once the worker acknowledges the session.
++  const ack = await sendMessage({
++    kind: "session_established",
++    accessToken,
++    refreshToken,
++  });
++  if (!isOk(ack)) {
++    return {
++      ok: false,
++      error: "Could not establish session. Please try again.",
++    };
++  }
++  return { ok: true, chosenPlatform: readString(body, "chosen_platform") };
+ }
+diff --git a/shared/session.js b/shared/session.js
+index eb436f8..8f29a9e 100644
+--- a/shared/session.js
++++ b/shared/session.js
+@@ -19,7 +19,12 @@
+ //
+ // R75: zero banned type-assertions — every narrowing is a real guard.
+ import { TGP_API_ORIGIN } from "./protocol.js";
+-import { fetchWithTimeout, isTimeout } from "./net.js";
++import {
++  discardBody,
++  fetchWithTimeout,
++  isTimeout,
++  readBoundedJson,
++} from "./net.js";
+ import { logNetworkEvent } from "./log.js";
+ 
+ // The one persisted secret. Lives only in chrome.storage.session.
+@@ -42,7 +47,15 @@ let stateEpoch = 0;
+ 
+ // Coalesce concurrent cold-wake refreshes so the same refresh token is never
+ // presented twice in parallel (backend reuse-detection would force a re-pair).
++// The in-flight refresh belongs to the session epoch it started under; every
++// establish/clear detaches it so callers arriving for the NEW session never
++// join stale work (its commit would be fenced off anyway) — they start their
++// own refresh against the new refresh token. The stale promise still settles
++// for its own callers and only vacates the slot if it is still the current one.
+ let refreshInFlight = null;
++function detachRefreshInFlight() {
++  refreshInFlight = null;
++}
+ 
+ // Serializes state transitions. Each transition chains onto the previous one so
+ // they apply atomically relative to each other; a rejected transition never
+@@ -91,6 +104,7 @@ export async function hasActiveSession() {
+ export function clearTokens() {
+   return withStateLock(async () => {
+     stateEpoch += 1;
++    detachRefreshInFlight();
+     accessTokenInMemory = undefined;
+     await chrome.storage.session.remove(REFRESH_TOKEN_KEY);
+   });
+@@ -113,6 +127,7 @@ export function establishSession(accessToken, refreshToken) {
+       return { ok: false, error: "session_persist_failed" };
+     }
+     stateEpoch += 1;
++    detachRefreshInFlight();
+     accessTokenInMemory = accessToken;
+     return { ok: true };
+   });
+@@ -132,10 +147,11 @@ export async function refreshAccessToken() {
+   if (refreshInFlight !== null) {
+     return refreshInFlight;
+   }
+-  refreshInFlight = refreshAccessTokenOnce().finally(() => {
+-    refreshInFlight = null;
++  const run = refreshAccessTokenOnce().finally(() => {
++    if (refreshInFlight === run) refreshInFlight = null;
+   });
+-  return refreshInFlight;
++  refreshInFlight = run;
++  return run;
+ }
+ 
+ async function refreshAccessTokenOnce() {
+@@ -147,13 +163,38 @@ async function refreshAccessTokenOnce() {
+     return null;
+   }
+ 
++  // Headers AND body are consumed inside the one finite deadline. A refresh
++  // whose JSON never finishes arriving must settle (null) like a hung connect,
++  // so coalesced callers are released and can fail closed instead of pinning
++  // the worker until teardown. Body bytes are bounded as well as time.
+   let res;
+   try {
+-    res = await fetchWithTimeout(fetch, REFRESH_ENDPOINT, {
+-      method: "POST",
+-      headers: { "Content-Type": "application/json" },
+-      body: JSON.stringify({ refresh_token: snapshot.token }),
+-    });
++    res = await fetchWithTimeout(
++      fetch,
++      REFRESH_ENDPOINT,
++      {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ refresh_token: snapshot.token }),
++      },
++      undefined,
++      async (response, signal) => {
++        if (!response.ok) {
++          // Not parsed (fixed categories only), but not left live either.
++          discardBody(response);
++          return { ok: false, body: null };
++        }
++        let body = null;
++        try {
++          body = await readBoundedJson(response, signal);
++        } catch (err) {
++          // A deadline abort mid-body is the timeout below, not a parse error.
++          if (signal.aborted) throw err;
++          logNetworkEvent("refresh_body_parse_error");
++        }
++        return { ok: true, body };
++      },
++    );
+   } catch (err) {
+     logNetworkEvent(
+       isTimeout(err) ? "refresh_timeout" : "refresh_network_error",
+@@ -164,13 +205,7 @@ async function refreshAccessTokenOnce() {
+     return null;
+   }
+ 
+-  let body;
+-  try {
+-    body = await res.json();
+-  } catch {
+-    logNetworkEvent("refresh_body_parse_error");
+-    return null;
+-  }
++  const body = res.body;
+   const next = readString(body, "access_token");
+   if (next === null) {
+     return null;
+diff --git a/test/auth-body-deadline.spec.js b/test/auth-body-deadline.spec.js
+new file mode 100644
+index 0000000..dcf4a14
+--- /dev/null
++++ b/test/auth-body-deadline.spec.js
+@@ -0,0 +1,588 @@
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
++import {
++  discardBody,
++  fetchWithTimeout,
++  readBoundedJson,
++  isTimeout,
++  DEFAULT_TIMEOUT_MS,
++  MAX_AUTH_BODY_BYTES,
++} from "../shared/net.js";
++import { redeemPairingCode } from "../shared/pairing.js";
++
++// S4-R2-A-01 regression: the authentication paths (pair redeem, token refresh)
++// used to await fetchWithTimeout only until HEADERS arrived and then parsed the
++// body outside the deadline. A response whose JSON prefix arrives but whose
++// stream never closes left the coach's single pairing submit and every
++// coalesced refresh caller pending until browser teardown, and a later
++// clear + re-establish joined the stale in-flight refresh.
++//
++// These tests use REAL Response objects on open ReadableStreams (not a fetch
++// that never resolves) so they exercise body consumption, and fake timers so
++// the 15 s deadline is deterministic.
++
++const REFRESH_KEY = "tgp_refresh_token";
++const TIMEOUT_COPY = "That took too long. Check your connection and try again.";
++const enc = new TextEncoder();
++
++// Headers 200, valid JSON prefix, stream never closes.
++function stalledResponse(status = 200, cancel = undefined) {
++  return new Response(
++    new ReadableStream({
++      start(controller) {
++        controller.enqueue(enc.encode('{"access_token":'));
++      },
++      cancel,
++    }),
++    { status },
++  );
++}
++function streamed(text, status = 200) {
++  return new Response(
++    new ReadableStream({
++      start(controller) {
++        controller.enqueue(enc.encode(text));
++        controller.close();
++      },
++    }),
++    { status },
++  );
++}
++// A stream whose remaining bytes arrive later — the "body completes AFTER the
++// deadline" case. Once the deadline cancels the stream, late bytes are refused.
++function lateResponse() {
++  let ctl;
++  const state = { cancelled: false, lateBytesAccepted: false };
++  const res = new Response(
++    new ReadableStream({
++      start(controller) {
++        ctl = controller;
++        controller.enqueue(enc.encode('{"access_token":'));
++      },
++      cancel() {
++        state.cancelled = true;
++      },
++    }),
++    { status: 200 },
++  );
++  return {
++    res,
++    state,
++    finish(rest) {
++      try {
++        ctl.enqueue(enc.encode(rest));
++        ctl.close();
++        state.lateBytesAccepted = true;
++      } catch {
++        state.lateBytesAccepted = false;
++      }
++    },
++  };
++}
++function settleTracker(promise) {
++  const state = { settled: false, value: undefined, error: undefined };
++  promise.then(
++    (v) => {
++      state.settled = true;
++      state.value = v;
++    },
++    (e) => {
++      state.settled = true;
++      state.error = e;
++    },
++  );
++  return state;
++}
++
++afterEach(() => {
++  vi.useRealTimers();
++  vi.restoreAllMocks();
++  vi.unstubAllGlobals();
++});
++
++describe("fetchWithTimeout consumer + readBoundedJson", () => {
++  it("the deadline covers body consumption inside the consumer", async () => {
++    vi.useFakeTimers();
++    const fetchImpl = vi.fn(async () => stalledResponse());
++    const p = fetchWithTimeout(
++      fetchImpl,
++      "https://x/y",
++      {},
++      1000,
++      (response, signal) => readBoundedJson(response, signal),
++    );
++    const assertion = expect(p).rejects.toSatisfy(isTimeout);
++    await vi.advanceTimersByTimeAsync(1000);
++    await assertion;
++  });
++
++  it("also bounds the non-stream response.json() fallback", async () => {
++    vi.useFakeTimers();
++    const fetchImpl = vi.fn(async () => ({
++      ok: true,
++      json: () => new Promise(() => {}),
++    }));
++    const p = fetchWithTimeout(
++      fetchImpl,
++      "https://x/y",
++      {},
++      1000,
++      (response, signal) => readBoundedJson(response, signal),
++    );
++    const assertion = expect(p).rejects.toSatisfy(isTimeout);
++    await vi.advanceTimersByTimeAsync(1000);
++    await assertion;
++  });
++
++  it("a deadline abort releases the reader even if stream cancel hangs", async () => {
++    vi.useFakeTimers();
++    const response = stalledResponse(200, () => new Promise(() => {}));
++    const fetchImpl = vi.fn(async () => response);
++    let consumerState = settleTracker(Promise.reject(new Error("unset")));
++    const p = fetchWithTimeout(
++      fetchImpl,
++      "https://x/y",
++      {},
++      1000,
++      (res, signal) => {
++        const inner = readBoundedJson(res, signal);
++        consumerState = settleTracker(inner);
++        return inner;
++      },
++    );
++    const assertion = expect(p).rejects.toSatisfy(isTimeout);
++    await vi.advanceTimersByTimeAsync(1000);
++    await assertion;
++    await vi.advanceTimersByTimeAsync(0);
++    expect(consumerState.settled).toBe(true);
++    expect(consumerState.error).toBeInstanceOf(Error);
++    expect(consumerState.error.name).toBe("BodyError");
++    expect(response.body.locked).toBe(false);
++  });
++
++  it("a caller abort mid-body rejects AbortError and releases the stream", async () => {
++    const response = stalledResponse();
++    const ac = new AbortController();
++    const p = fetchWithTimeout(
++      async () => response,
++      "https://x/y",
++      { signal: ac.signal },
++      60000,
++      (res, signal) => readBoundedJson(res, signal),
++    );
++    const assertion = expect(p).rejects.toSatisfy(
++      (e) => e instanceof Error && e.name === "AbortError",
++    );
++    await Promise.resolve();
++    ac.abort();
++    await assertion;
++    await new Promise((r) => setTimeout(r, 0));
++    expect(response.body.locked).toBe(false);
++  });
++
++  it("rejects oversized bodies with a tagged BodyError carrying no bytes", async () => {
++    const secret = "PRIVATE_RESPONSE_BODY";
++    const big = JSON.stringify({
++      access_token: secret + "x".repeat(MAX_AUTH_BODY_BYTES),
++    });
++    const response = streamed(big);
++    await expect(readBoundedJson(response)).rejects.toSatisfy(
++      (e) =>
++        e instanceof Error &&
++        e.name === "BodyError" &&
++        !e.message.includes(secret),
++    );
++    expect(response.body.locked).toBe(false);
++  });
++
++  it("rejects malformed bodies with a BodyError carrying no bytes", async () => {
++    const response = streamed("<html>PRIVATE</html>");
++    await expect(readBoundedJson(response)).rejects.toSatisfy(
++      (e) => e.name === "BodyError" && !e.message.includes("PRIVATE"),
++    );
++  });
++
++  it("discardBody requests cancellation without awaiting a hung cancel", async () => {
++    let cancelRequested = false;
++    const response = stalledResponse(401, () => {
++      cancelRequested = true;
++      return new Promise(() => {});
++    });
++    expect(discardBody(response)).toBe(true);
++    expect(cancelRequested).toBe(true);
++    expect(discardBody({ ok: false, status: 401 })).toBe(false);
++    expect(discardBody(null)).toBe(false);
++  });
++
++  it("parses a well-formed streamed body", async () => {
++    await expect(
++      readBoundedJson(streamed('{"access_token":"a","refresh_token":"r"}')),
++    ).resolves.toEqual({ access_token: "a", refresh_token: "r" });
++  });
++});
++
++describe("pairing — body stall settles inside the deadline", () => {
++  it("200 headers with a body that never ends -> timeout copy, no session", async () => {
++    vi.useFakeTimers();
++    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
++    let signal = new AbortController().signal;
++    const sendMessage = vi.fn(async () => ({ ok: true }));
++    const p = redeemPairingCode("123456", {
++      fetch: async (_url, init) => {
++        signal = init.signal;
++        return stalledResponse();
++      },
++      sendMessage,
++    });
++    const state = settleTracker(p);
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS - 1);
++    expect(state.settled).toBe(false);
++    await vi.advanceTimersByTimeAsync(1);
++    expect(state.settled).toBe(true);
++    expect(state.value).toEqual({ ok: false, error: TIMEOUT_COPY });
++    expect(sendMessage).not.toHaveBeenCalled();
++    expect(signal.aborted).toBe(true);
++    const events = warn.mock.calls.map(([line]) => JSON.parse(line).event);
++    expect(events).toContain("pair_timeout");
++    expect(events).not.toContain("pair_body_parse_error");
++  });
++
++  it("non-2xx headers with a body that never ends also settles", async () => {
++    vi.useFakeTimers();
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    const p = redeemPairingCode("123456", {
++      fetch: async () => stalledResponse(409),
++      sendMessage: vi.fn(async () => ({ ok: true })),
++    });
++    const state = settleTracker(p);
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(state.value).toEqual({ ok: false, error: TIMEOUT_COPY });
++  });
++
++  it("a body that completes AFTER the deadline never establishes a session", async () => {
++    vi.useFakeTimers();
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    const late = lateResponse();
++    const sendMessage = vi.fn(async () => ({ ok: true }));
++    const p = redeemPairingCode("123456", {
++      fetch: async () => late.res,
++      sendMessage,
++    });
++    const state = settleTracker(p);
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(state.value).toEqual({ ok: false, error: TIMEOUT_COPY });
++    // The deadline cancelled the body stream, so late bytes are refused.
++    expect(late.state.cancelled).toBe(true);
++    late.finish('"A","refresh_token":"R"}');
++    await vi.advanceTimersByTimeAsync(10);
++    expect(late.state.lateBytesAccepted).toBe(false);
++    expect(sendMessage).not.toHaveBeenCalled();
++  });
++
++  it("a non-stream body that resolves AFTER the deadline never establishes a session", async () => {
++    vi.useFakeTimers();
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    /** @type {(value: unknown) => void} */
++    let releaseJson = () => {};
++    const sendMessage = vi.fn(async () => ({ ok: true }));
++    const p = redeemPairingCode("123456", {
++      fetch: async () => ({
++        ok: true,
++        status: 200,
++        json: () =>
++          new Promise((r) => {
++            releaseJson = r;
++          }),
++      }),
++      sendMessage,
++    });
++    const state = settleTracker(p);
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(state.value).toEqual({ ok: false, error: TIMEOUT_COPY });
++    releaseJson({ access_token: "A", refresh_token: "R" });
++    await vi.advanceTimersByTimeAsync(10);
++    expect(sendMessage).not.toHaveBeenCalled();
++  });
++
++  it("oversized 200 body -> unexpected response, token never forwarded", async () => {
++    vi.spyOn(console, "warn").mockImplementation(() => {});
++    const sendMessage = vi.fn(async () => ({ ok: true }));
++    const res = await redeemPairingCode("123456", {
++      fetch: async () =>
++        streamed(
++          JSON.stringify({
++            access_token: "x".repeat(MAX_AUTH_BODY_BYTES + 1),
++            refresh_token: "y",
++          }),
++        ),
++      sendMessage,
++    });
++    expect(res).toEqual({ ok: false, error: "Unexpected pairing response." });
++    expect(sendMessage).not.toHaveBeenCalled();
++  });
++
++  it("a well-formed streamed body still pairs and forwards only via session_established", async () => {
++    const sendMessage = vi.fn(async () => ({ ok: true }));
++    const res = await redeemPairingCode("123456", {
++      fetch: async () =>
++        streamed(
++          JSON.stringify({
++            access_token: "A",
++            refresh_token: "R",
++            chosen_platform: "truecoach",
++          }),
++        ),
++      sendMessage,
++    });
++    expect(res).toEqual({ ok: true, chosenPlatform: "truecoach" });
++    expect(sendMessage).toHaveBeenCalledExactlyOnceWith({
++      kind: "session_established",
++      accessToken: "A",
++      refreshToken: "R",
++    });
++  });
++});
++
++describe("session refresh — body stall, recovery and epoch isolation", () => {
++  let store;
++  let fetchImpl;
++  let fetches;
++  let mod;
++  let warn;
++
++  beforeEach(async () => {
++    vi.resetModules();
++    store = new Map([[REFRESH_KEY, "refresh-1"]]);
++    vi.stubGlobal("chrome", {
++      storage: {
++        session: {
++          get: async (key) => (store.has(key) ? { [key]: store.get(key) } : {}),
++          set: async (obj) => {
++            for (const [k, v] of Object.entries(obj)) store.set(k, v);
++          },
++          remove: async (key) => {
++            store.delete(key);
++          },
++        },
++      },
++    });
++    fetches = [];
++    fetchImpl = async () => stalledResponse();
++    vi.stubGlobal("fetch", async (url, init) => {
++      fetches.push(JSON.parse(init.body).refresh_token);
++      return fetchImpl(url, init);
++    });
++    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
++    mod = await import("../shared/session.js");
++  });
++
++  // Let the snapshot-under-lock resolve and the fetch fire.
++  const settleMicrotasks = async () => {
++    for (let i = 0; i < 4; i++) await Promise.resolve();
++  };
++
++  it("a refresh whose body never ends settles null at the deadline and keeps the stored token", async () => {
++    vi.useFakeTimers();
++    const state = settleTracker(mod.refreshAccessToken());
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS - 1);
++    expect(state.settled).toBe(false);
++    await vi.advanceTimersByTimeAsync(1);
++    expect(state.settled).toBe(true);
++    expect(state.value).toBeNull();
++    expect(store.get(REFRESH_KEY)).toBe("refresh-1");
++    const events = warn.mock.calls.map(([line]) => JSON.parse(line).event);
++    expect(events).toContain("refresh_timeout");
++    expect(events).not.toContain("refresh_body_parse_error");
++    // Coalesced callers are released too: a fresh call does its own fetch.
++    fetchImpl = async () =>
++      streamed(JSON.stringify({ access_token: "access-after-timeout" }));
++    await expect(mod.refreshAccessToken()).resolves.toBe(
++      "access-after-timeout",
++    );
++    expect(fetches).toEqual(["refresh-1", "refresh-1"]);
++  });
++
++  it("a body that completes AFTER the deadline is never committed", async () => {
++    vi.useFakeTimers();
++    const late = lateResponse();
++    fetchImpl = async () => late.res;
++    const state = settleTracker(mod.refreshAccessToken());
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(state.value).toBeNull();
++    expect(late.state.cancelled).toBe(true);
++    late.finish('"LATE","refresh_token":"rotated-late"}');
++    await vi.advanceTimersByTimeAsync(10);
++    expect(late.state.lateBytesAccepted).toBe(false);
++    expect(store.get(REFRESH_KEY)).toBe("refresh-1");
++    // No access token was published: the next getAccessToken must refresh.
++    fetchImpl = async () =>
++      streamed(JSON.stringify({ access_token: "access-fresh" }));
++    await expect(mod.getAccessToken()).resolves.toBe("access-fresh");
++  });
++
++  it("a non-stream refresh body that resolves AFTER the deadline is never committed", async () => {
++    vi.useFakeTimers();
++    /** @type {(value: unknown) => void} */
++    let releaseJson = () => {};
++    fetchImpl = async () => ({
++      ok: true,
++      status: 200,
++      json: () =>
++        new Promise((r) => {
++          releaseJson = r;
++        }),
++    });
++    const state = settleTracker(mod.refreshAccessToken());
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(state.value).toBeNull();
++    releaseJson({ access_token: "LATE", refresh_token: "rotated-late" });
++    await vi.advanceTimersByTimeAsync(10);
++    expect(store.get(REFRESH_KEY)).toBe("refresh-1");
++    fetchImpl = async () =>
++      streamed(JSON.stringify({ access_token: "access-fresh" }));
++    await expect(mod.getAccessToken()).resolves.toBe("access-fresh");
++  });
++
++  it("clear + re-establish during a stalled refresh: the new session refreshes on its own and stale work cannot overwrite it", async () => {
++    vi.useFakeTimers();
++    await mod.establishSession("access-old", "refresh-old");
++    const stale = settleTracker(mod.refreshAccessToken());
++    await settleMicrotasks();
++    expect(fetches).toEqual(["refresh-old"]);
++
++    await mod.clearTokens();
++    await mod.establishSession("access-new", "refresh-new");
++    fetchImpl = async () =>
++      streamed(
++        JSON.stringify({
++          access_token: "access-new-minted",
++          refresh_token: "refresh-new-2",
++        }),
++      );
++    await expect(mod.refreshAccessToken()).resolves.toBe("access-new-minted");
++    expect(fetches).toEqual(["refresh-old", "refresh-new"]);
++    expect(store.get(REFRESH_KEY)).toBe("refresh-new-2");
++    expect(stale.settled).toBe(false);
++
++    // The stale body's deadline fires afterwards: null, nothing overwritten.
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(stale.settled).toBe(true);
++    expect(stale.value).toBeNull();
++    await expect(mod.getAccessToken()).resolves.toBe("access-new-minted");
++    expect(store.get(REFRESH_KEY)).toBe("refresh-new-2");
++  });
++
++  it("a stale refresh that later SUCCEEDS after re-establish is still fenced", async () => {
++    await mod.establishSession("access-e1", "refresh-e1");
++    /** @type {(value: Response) => void} */
++    let release = () => {};
++    fetchImpl = () =>
++      new Promise((r) => {
++        release = r;
++      });
++    const staleP = mod.refreshAccessToken();
++    await settleMicrotasks();
++    await mod.clearTokens();
++    await mod.establishSession("access-e2", "refresh-e2");
++    release(
++      streamed(
++        JSON.stringify({
++          access_token: "RESURRECT",
++          refresh_token: "refresh-resurrect",
++        }),
++      ),
++    );
++    await expect(staleP).resolves.toBeNull();
++    await expect(mod.getAccessToken()).resolves.toBe("access-e2");
++    expect(store.get(REFRESH_KEY)).toBe("refresh-e2");
++  });
++
++  it("the stale refresh's completion cannot clear the NEW session's in-flight slot", async () => {
++    vi.useFakeTimers();
++    await mod.establishSession("access-old", "refresh-old");
++    const stale = settleTracker(mod.refreshAccessToken());
++    await settleMicrotasks();
++    // The stale deadline is 1 s older than the new session's deadline.
++    await vi.advanceTimersByTimeAsync(1000);
++    await mod.clearTokens();
++    await mod.establishSession("access-new", "refresh-new");
++    // New-session refresh parks on the network (headers not yet in).
++    /** @type {(value: Response) => void} */
++    let releaseNew = () => {};
++    fetchImpl = () =>
++      new Promise((r) => {
++        releaseNew = r;
++      });
++    const fresh = settleTracker(mod.refreshAccessToken());
++    await settleMicrotasks();
++    expect(fetches).toEqual(["refresh-old", "refresh-new"]);
++    // Stale deadline fires while the new refresh is still in flight.
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS - 1000);
++    expect(stale.settled).toBe(true);
++    expect(fresh.settled).toBe(false);
++    // A third caller must join the NEW in-flight refresh, not start another.
++    const joiner = settleTracker(mod.refreshAccessToken());
++    await settleMicrotasks();
++    expect(fetches).toEqual(["refresh-old", "refresh-new"]);
++    releaseNew(streamed(JSON.stringify({ access_token: "access-new-2" })));
++    await vi.advanceTimersByTimeAsync(1);
++    expect(fresh.value).toBe("access-new-2");
++    expect(joiner.value).toBe("access-new-2");
++  });
++
++  it("stalled refresh then clear only: the next refresh is null without another fetch", async () => {
++    vi.useFakeTimers();
++    const stale = settleTracker(mod.refreshAccessToken());
++    await settleMicrotasks();
++    await mod.clearTokens();
++    await expect(mod.refreshAccessToken()).resolves.toBeNull();
++    expect(fetches).toEqual(["refresh-1"]);
++    await expect(mod.hasActiveSession()).resolves.toBe(false);
++    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS);
++    expect(stale.value).toBeNull();
++    await expect(mod.hasActiveSession()).resolves.toBe(false);
++  });
++
++  it("a non-2xx refresh reply is not parsed but its body is cancelled", async () => {
++    let cancelRequested = false;
++    fetchImpl = async () =>
++      stalledResponse(401, () => {
++        cancelRequested = true;
++        return new Promise(() => {});
++      });
++    await expect(mod.refreshAccessToken()).resolves.toBeNull();
++    expect(cancelRequested).toBe(true);
++    expect(store.get(REFRESH_KEY)).toBe("refresh-1");
++    const events = warn.mock.calls.map(([line]) => JSON.parse(line).event);
++    expect(events).not.toContain("refresh_body_parse_error");
++    expect(events).not.toContain("auth_body_cancel_failed");
++  });
++
++  it("an oversized refresh body is a parse failure: nothing committed, token kept", async () => {
++    fetchImpl = async () =>
++      streamed(
++        JSON.stringify({ access_token: "x".repeat(MAX_AUTH_BODY_BYTES + 1) }),
++      );
++    await expect(mod.refreshAccessToken()).resolves.toBeNull();
++    expect(store.get(REFRESH_KEY)).toBe("refresh-1");
++    const events = warn.mock.calls.map(([line]) => JSON.parse(line).event);
++    expect(events).toContain("refresh_body_parse_error");
++  });
++
++  it("same-epoch concurrent refreshes still coalesce onto one fetch", async () => {
++    /** @type {(value: Response) => void} */
++    let release = () => {};
++    fetchImpl = () =>
++      new Promise((r) => {
++        release = r;
++      });
++    const all = Promise.all([
++      mod.refreshAccessToken(),
++      mod.refreshAccessToken(),
++      mod.refreshAccessToken(),
++    ]);
++    await settleMicrotasks();
++    release(streamed(JSON.stringify({ access_token: "access-k" })));
++    await expect(all).resolves.toEqual(["access-k", "access-k", "access-k"]);
++    expect(fetches).toEqual(["refresh-1"]);
++  });
++});
+-- 
+2.53.0
+

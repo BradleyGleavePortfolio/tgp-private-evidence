@@ -1,0 +1,29 @@
+  ok   fetchWithTimeout consumer + readBoundedJson > the deadline covers body consumption inside the consumer
+  ok   fetchWithTimeout consumer + readBoundedJson > also bounds the non-stream response.json() fallback
+  ok   fetchWithTimeout consumer + readBoundedJson > a deadline abort releases the reader even if stream cancel hangs
+  ok   fetchWithTimeout consumer + readBoundedJson > a caller abort mid-body rejects AbortError and releases the stream
+  ok   fetchWithTimeout consumer + readBoundedJson > rejects oversized bodies with a tagged BodyError carrying no bytes
+  ok   fetchWithTimeout consumer + readBoundedJson > rejects malformed bodies with a BodyError carrying no bytes
+  ok   fetchWithTimeout consumer + readBoundedJson > discardBody requests cancellation without awaiting a hung cancel
+  ok   fetchWithTimeout consumer + readBoundedJson > parses a well-formed streamed body
+  ok   pairing — body stall settles inside the deadline > 200 headers with a body that never ends -> timeout copy, no session
+  ok   pairing — body stall settles inside the deadline > non-2xx headers with a body that never ends also settles
+  ok   pairing — body stall settles inside the deadline > a body that completes AFTER the deadline never establishes a session
+  ok   pairing — body stall settles inside the deadline > a non-stream body that resolves AFTER the deadline never establishes a session
+  ok   pairing — body stall settles inside the deadline > oversized 200 body -> unexpected response, token never forwarded
+  ok   pairing — body stall settles inside the deadline > a well-formed streamed body still pairs and forwards only via session_established
+  ok   session refresh — body stall, recovery and epoch isolation > a refresh whose body never ends settles null at the deadline and keeps the stored token
+  ok   session refresh — body stall, recovery and epoch isolation > a body that completes AFTER the deadline is never committed
+  ok   session refresh — body stall, recovery and epoch isolation > a non-stream refresh body that resolves AFTER the deadline is never committed
+  ok   session refresh — body stall, recovery and epoch isolation > clear + re-establish during a stalled refresh: the new session refreshes on its own and stale work cannot overwrite it
+  ok   session refresh — body stall, recovery and epoch isolation > a stale refresh that later SUCCEEDS after re-establish is still fenced
+  ok   session refresh — body stall, recovery and epoch isolation > the stale refresh's completion cannot clear the NEW session's in-flight slot
+  ok   session refresh — body stall, recovery and epoch isolation > stalled refresh then clear only: the next refresh is null without another fetch
+  ok   session refresh — body stall, recovery and epoch isolation > a non-2xx refresh reply is not parsed but its body is cancelled
+  ok   session refresh — body stall, recovery and epoch isolation > an oversized refresh body is a parse failure: nothing committed, token kept
+  ok   session refresh — body stall, recovery and epoch isolation > same-epoch concurrent refreshes still coalesce onto one fetch
+{
+  "passed": 24,
+  "failed": 0,
+  "failures": []
+}

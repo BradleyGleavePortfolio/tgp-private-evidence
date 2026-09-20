@@ -1,0 +1,246 @@
+{
+  "head": "working-tree-uncommitted",
+  "root": "/home/user/workspace/worktrees/s4-r3",
+  "observations": [
+    {
+      "case": "pair: 200 headers, JSON body never ends",
+      "liveDeadlineBeforeFire": 1,
+      "stateAfterDeadline": "resolved",
+      "value": {
+        "ok": false,
+        "error": "That took too long. Check your connection and try again."
+      },
+      "signalAborted": true,
+      "sessionEstablishedSent": 0,
+      "liveDeadlineAfter": 0
+    },
+    {
+      "case": "pair: 409 headers, body never ends",
+      "value": {
+        "ok": false,
+        "error": "That took too long. Check your connection and try again."
+      }
+    },
+    {
+      "case": "pair: streamed success",
+      "value": {
+        "ok": true,
+        "chosenPlatform": "truecoach"
+      },
+      "messageKinds": [
+        "session_established"
+      ]
+    },
+    {
+      "case": "pair: oversized 200 body",
+      "value": {
+        "ok": false,
+        "error": "Unexpected pairing response."
+      },
+      "sent": 0,
+      "bytes": 20039
+    },
+    {
+      "case": "pair: plain-object response fallback",
+      "value": {
+        "ok": false,
+        "error": "That code has expired. Generate a fresh one in the TGP app."
+      }
+    },
+    {
+      "case": "refresh: 200 headers, body never ends",
+      "liveDeadlineBeforeFire": 1,
+      "stateAfterDeadline": "resolved",
+      "value": null,
+      "storedRefreshToken": "synthetic-refresh-1",
+      "fetches": 1
+    },
+    {
+      "case": "refresh: fresh refresh after timeout",
+      "value": "A-after-timeout",
+      "fetches": 2
+    },
+    {
+      "case": "refresh: stalled, then clear + establish, then refresh",
+      "staleStateBeforeDeadline": "pending",
+      "freshState": "resolved",
+      "freshValue": "A-new-minted",
+      "fetches": [
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "refreshToken": "synthetic-refresh-old"
+        },
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "refreshToken": "synthetic-refresh-new"
+        }
+      ],
+      "storedRefreshToken": "synthetic-refresh-new-2"
+    },
+    {
+      "case": "refresh: stale deadline fires after re-establish",
+      "staleState": "resolved",
+      "staleValue": null,
+      "currentAccessToken": "A-new-minted",
+      "storedRefreshToken": "synthetic-refresh-new-2",
+      "liveDeadlines": 0
+    },
+    {
+      "case": "refresh: stale success after re-establish",
+      "stale": null,
+      "current": "A-e2",
+      "storedRefreshToken": "R-e2"
+    },
+    {
+      "case": "refresh: stalled then clear only",
+      "after": null,
+      "fetches": 1,
+      "hasSession": false
+    },
+    {
+      "case": "refresh: oversized body",
+      "value": null,
+      "current": "A-o"
+    },
+    {
+      "case": "refresh: same-epoch coalescing",
+      "vals": [
+        "A-k2",
+        "A-k2",
+        "A-k2"
+      ],
+      "fetches": 1
+    }
+  ],
+  "events": [
+    "pair_timeout",
+    "pair_timeout",
+    "pair_body_parse_error",
+    "refresh_timeout",
+    "refresh_timeout",
+    "refresh_timeout",
+    "refresh_body_parse_error"
+  ],
+  "pass": true,
+  "failure": null,
+  "timerTrace": [
+    {
+      "op": "set",
+      "id": 1,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 1
+    },
+    {
+      "op": "set",
+      "id": 2,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 2
+    },
+    {
+      "op": "set",
+      "id": 3,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 3
+    },
+    {
+      "op": "set",
+      "id": 4,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 4
+    },
+    {
+      "op": "set",
+      "id": 5,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 5
+    },
+    {
+      "op": "set",
+      "id": 6,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 6
+    },
+    {
+      "op": "set",
+      "id": 7,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 7
+    },
+    {
+      "op": "set",
+      "id": 8,
+      "ms": 15000
+    },
+    {
+      "op": "set",
+      "id": 9,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 9
+    },
+    {
+      "op": "clear",
+      "id": 8
+    },
+    {
+      "op": "set",
+      "id": 10,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 10
+    },
+    {
+      "op": "set",
+      "id": 11,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 11
+    },
+    {
+      "op": "set",
+      "id": 12,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 12
+    },
+    {
+      "op": "set",
+      "id": 13,
+      "ms": 15000
+    },
+    {
+      "op": "clear",
+      "id": 13
+    }
+  ],
+  "scope": "actual shipped modules, actual Response bodies on synthetic ReadableStreams, deterministic timer interception; single process; not a browser execution and not customer import"
+}

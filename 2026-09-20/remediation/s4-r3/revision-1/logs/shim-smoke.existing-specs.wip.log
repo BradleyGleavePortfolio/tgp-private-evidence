@@ -1,0 +1,43 @@
+== net
+  ok   fetchWithTimeout — deadline > rejects with a tagged TimeoutError when fetch never settles
+  ok   isTimeout > is true only for a TimeoutError-tagged Error
+  FAIL fetchWithTimeout — caller signal composition > caller abort is composed (not dropped by timeout controller)
+  FAIL fetchWithTimeout — caller signal composition > pre-aborted caller signal fails closed immediately
+  "passed": 9,
+  "failed": 2,
+      "error": "TypeError: matchers(...)[key] is not a function\n    at Proxy.<anonymous> (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:157:32)\n    at async Object.fn (file:///home/user/workspace/worktrees/s4-r3/test/net.spec.js:153:5)\n    at async run (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:172:9)\n    at async file:///home/user/workspace/execution/s4-r3/scripts/run-spec-shim.mjs:6:12"
+      "error": "TypeError: matchers(...)[key] is not a function\n    at Proxy.<anonymous> (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:157:32)\n    at async Object.fn (file:///home/user/workspace/worktrees/s4-r3/test/net.spec.js:170:5)\n    at async run (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:172:9)\n    at async file:///home/user/workspace/execution/s4-r3/scripts/run-spec-shim.mjs:6:12"
+== pairing
+TypeError: it.each is not a function
+== session-establishment
+  FAIL session_established — happy path > does NOT broadcast a snapshot or clobber an active ingest snapshot
+  FAIL session_established — happy path > never writes a token to storage.local or storage.sync
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects missing accessToken without persisting anything
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects missing refreshToken without persisting anything
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects both missing without persisting anything
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects empty accessToken without persisting anything
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects empty refreshToken without persisting anything
+  FAIL session_established — malformed / missing tokens (fail-closed) > rejects numeric accessToken without persisting anything
+== session-lifecycle
+  ok   establishSession > a persist FAILURE never wipes an existing valid session (no asymmetric wipe)
+  FAIL getAccessToken / refresh rotation > throws no_session when the refresh call is rejected
+  FAIL serialized state transitions (mutex) > a genuinely concurrent establish + clear resolves to a coherent state
+  FAIL serialized state transitions (mutex) > concurrent establishes never produce a mixed access/refresh pair
+  FAIL refresh serialization vs logout (no stale resurrection) > a logout during an in-flight refresh is NOT resurrected
+{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+  FAIL refresh serialization vs logout (no stale resurrection) > a rotation-persist FAILURE preserves prior state and fails closed (no torn pair)
+  FAIL refresh serialization vs logout (no stale resurrection) > a refresh that times out returns null (bounded, never hangs)
+== session-refresh-path
+TypeError: it.each is not a function
+== refresh-coalesce
+  "passed": 1,
+  "failed": 0,
+== log
+  "passed": 4,
+  "failed": 0,
+== ingest-ack-cancellation
+  FAIL receipt cleanup failure visibility > rejects the receipt promptly and logs only a fixed code if cancellation fails
+  "passed": 0,
+  "failed": 1,
+      "error": "Error: expected to throw ingest_ack_invalid\n    at fail (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:123:9)\n    at check (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:127:33)\n    at Object.toThrow (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:139:7)\n    at Proxy.<anonymous> (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:157:32)\n    at async Object.fn (file:///home/user/workspace/worktrees/s4-r3/test/ingest-ack-cancellation.spec.js:18:7)\n    at async run (file:///home/user/workspace/execution/s4-r3/scripts/mini-vitest-shim.mjs:172:9)\n    at async file:///home/user/workspace/execution/s4-r3/scripts/run-spec-shim.mjs:6:12"
+{"src":"tgp-importer","event":"ingest_ack_cancel_failed"}
