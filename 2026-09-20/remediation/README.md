@@ -1,0 +1,35 @@
+# S1–S3 remediation and durable recovery
+
+Bradley authorized S1–S3 fixers after all twelve R1 reports returned. S4–S6 remain held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
+
+## Current checkpoint
+
+`checkpoint-1724/` captures available S1–S3 execution evidence at approximately 2026-09-20 17:24–17:26 UTC, before resumed remediation completes. Files retain their original claims and limitations, including stale historical milestone text; current findings and applicability are in `../audits/`. Capture does not retroactively validate a log or document.
+
+- S1 source: `s1-database/bundles/s1-database-R1-620b47f.bundle`, frozen head `620b47fc8517fa5e5950c5b673baf8b002f5c78a`.
+- S2 source: `s2-delivery/s2-delivery-r1.bundle`, frozen head `b801a776558d18acea2d03f19029f0ea85ffca39`. Held pre-override work survives in `s2-post-r1-held.bundle`, head `cb0bc91094fcad322b54a72c4ff317313e052c18`; it was not the R1 audit candidate.
+- S3 source: `s3-backend/s3-backend-5c7b42b3.bundle`, frozen head `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06`. The duplicate 64 MB full-history bundle is omitted; the incremental bundle preserves the same candidate and requires only the public base below.
+- Captured reports, scripts and logs include S2's available `/tmp` test logs. Synthetic localhost credentials are disposable fixture values, not production credentials. No database contents or production environment values are included.
+- Final remediation candidates, new evidence and infrastructure recreation instructions are pending. This checkpoint is not a claim that ongoing work is fully captured.
+
+## Restore source without the original sandbox
+
+Clone `https://github.com/BradleyGleavePortfolio/growth-project-backend.git` and fetch its history. All three lane bundles require public base `c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7`, not an unpushed private prerequisite.
+
+From that clone:
+
+```sh
+git cat-file -e c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7^{commit}
+git bundle verify /path/to/lane.bundle
+git bundle list-heads /path/to/lane.bundle
+git fetch /path/to/lane.bundle '<listed-ref>:refs/heads/recovered-lane'
+git worktree add ../recovered-lane recovered-lane
+```
+
+Verify SHA256SUMS from inside the checkpoint directory before importing. Preserve the original frozen heads; create new remediation branches. Archived shell scripts include original absolute paths and may require path adaptation; inspect before execution. Never run synthetic database teardown against a production endpoint.
+
+## Ownership and publication policy
+
+S1 alone owns schema/migration/generator changes; S2 owns delivery workflow composition; S3 owns backend reliability source and proof. Parent alone updates this archive and the [current handoff](https://github.com/BradleyGleavePortfolio/tgp-agent-context/blob/main/LAST_OPERATOR_STATE.md).
+
+The product repository is public. Unresolved security findings and associated candidate source are preserved here privately rather than disclosed publicly. Completed fixer work must include recoverable commits, scripts, logs, dispositions, checksums and exact head/tree identities; independently audited/merged/deployed states remain separate.

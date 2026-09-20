@@ -1,0 +1,28 @@
+[2026-09-20T16:59:16Z] S3 waiting for test lock (05-tsc)
+label=05-tsc head=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 tree=83211d25d714e4c539cd3aa248a06ef0658fc8e7 node=v20.20.1 npm=10.8.2 date=2026-09-20T17:01:04Z
+cmd: npx tsc --noEmit -p tsconfig.json
+
+<--- Last few GCs --->
+
+[26233:0x2cd14490]    59666 ms: Scavenge 2041.2 (2085.0) -> 2037.9 (2093.0) MB, 5.45 / 0.00 ms  (average mu = 0.279, current mu = 0.170) allocation failure; 
+[26233:0x2cd14490]    61516 ms: Mark-Compact (reduce) 2045.6 (2093.0) -> 2043.2 (2083.2) MB, 1109.84 / 0.00 ms  (+ 678.9 ms in 120 steps since start of marking, biggest step 30.6 ms, walltime since start of marking 1850 ms) (average mu = 0.251, current mu
+
+<--- JS stacktrace --->
+
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0xb78db1 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 2: 0xee82f0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 3: 0xee85d7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 4: 0x10fa275  [node]
+ 5: 0x10fa804 v8::internal::Heap::RecomputeLimits(v8::internal::GarbageCollector) [node]
+ 6: 0x11116f4 v8::internal::Heap::PerformGarbageCollection(v8::internal::GarbageCollector, v8::internal::GarbageCollectionReason, char const*) [node]
+ 7: 0x1111f0c v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]
+ 8: 0x10e8211 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]
+ 9: 0x10e93a5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]
+10: 0x10c69f6 v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]
+11: 0x1522276 v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]
+12: 0x7f0c52e99ef6 
+Aborted (core dumped)
+exit=134

@@ -1,0 +1,45 @@
+PASS test/ci/delivery-artifact.spec.ts (10.033 s)
+  fly-deploy.yml — merge is not deployment
+    ✓ has no push / pull_request / schedule trigger; only workflow_dispatch with a required release_sha (2 ms)
+    ✓ deploy job needs the evidence gate, requires its success result and re-pins the sha (1 ms)
+    ✓ gate runs only from main, runs the committed gate script and has no continue-on-error / || true fallbacks (1 ms)
+    ✓ deploy passes the authorized sha as image label and build args (not GITHUB_SHA of some other ref) (1 ms)
+  fly-deploy.yml — gate checks the same environment the deploy job binds to
+    ✓ REQUIRED_ENVIRONMENT equals deploy environment.name (1 ms)
+  codeql.yml — fail closed
+    ✓ analyze step has no continue-on-error and no GHAS-state fallback step (1 ms)
+    ✓ still runs on PRs, pushes to main and a schedule (11 ms)
+  sbom.yml — production closure, lifecycle-free install, proven artifact
+    ✓ runs on pull requests to main and on main pushes (requirable pre-merge, verifiable post-merge) (3 ms)
+    ✓ installs with --omit=dev --ignore-scripts (the lefthook prepare hook killed the old job)
+    ✓ generates with npm sbom from the installed tree (not --package-lock-only) and runs the proof before upload (4 ms)
+  r100-quality-gate.yml — generic volume quotas retired, concrete check kept
+    ✓ has only the banned-casts job (1 ms)
+  setup-branch-protection.sh — required check list matches current workflows
+    ✓ does not require retired checks and does require CodeQL (1 ms)
+    ✓ no longer recommends a second PAT as reviewer
+  Dockerfile / .dockerignore — production artifact shape (structural only; no image built here)
+    ✓ is multi-stage with a runtime stage that installs --omit=dev and copies dist from build
+    ✓ runtime stage asserts prisma CLI present and dev tooling absent at build time (1 ms)
+    ✓ does not bake NODE_ENV or secrets, keeps Sentry token as a build secret in the build stage only (4 ms)
+    ✓ .dockerignore excludes VCS, CI, tests and docs from the build context (1 ms)
+  verify-fly-release.sh — running machines must be the authorized image
+    ✓ passes for a converged app and records the digest in the manifest (39 ms)
+    ✓ fails when a machine still runs the previous image tag (20 ms)
+    ✓ fails when the image label GH_SHA does not match the release sha (16 ms)
+    ✓ fails when no machine is started (19 ms)
+    ✓ fails when started machines run two different digests (24 ms)
+    ✓ fails on malformed or missing digest (32 ms)
+    ✓ fails on non-array input (32 ms)
+  assert-prod-sbom.sh — production dependency proof
+    ✓ passes for the production closure including the dev-optional prisma CLI (111 ms)
+    ✓ fails when a lockfile dev-only package leaks in (name@version match) (28 ms)
+    ✓ fails when an explicit build/test tool is present even if the lockfile mis-flags it (35 ms)
+    ✓ fails when the prisma CLI (release_command dependency) is missing (62 ms)
+    ✓ fails on zero components or a non-CycloneDX document (12 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       29 passed, 29 total
+Snapshots:   0 total
+Time:        10.684 s
+Ran all test suites matching test/ci/delivery-artifact.spec.ts.
