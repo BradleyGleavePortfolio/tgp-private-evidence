@@ -1,0 +1,55 @@
+== S1-DB-01 proof on 127.0.0.1:54321 db=s1_rls_proof  (log: /home/user/workspace/execution/s1-database/proof-run-01.detail.log)
+PASS  replay of parent migration chain (without candidate) as non-superuser postgres
+PASS  out-of-band rls_fitness_backend.sql applies (production pre-state twin)
+PASS  pre-state reproduces exactly the 18 observed RLS-disabled public relations
+PASS  pre-state: anon has full CRUD on DunningAttempt via default privileges
+FAIL  pre-state: verify.sql FAILS (detects exposure) (expected [1] got [3])
+FAIL  synthetic fixtures inserted (expected [0] got [3])
+PASS  migration.sql fails fast with lock_timeout (SQLSTATE 55P03) when a lock is held
+PASS  lock wait bounded (5s <= 12s)
+PASS  failed attempt left the pre-state untouched (18 still exposed)
+PASS  prisma migrate deploy fails (non-zero) while the lock is held
+PASS  failed deploy recorded in _prisma_migrations (finished_at null, rolled_back_at null)
+PASS  documented recovery: prisma migrate resolve --rolled-back succeeds after a real failure
+PASS  prisma migrate deploy applies the candidate (lock released)
+PASS  verify.sql passes after apply
+PASS  no RLS-disabled relation remains in public that CI's floor would flag among the 18
+PASS  populated data preserved (row counts unchanged)
+PASS  no other table's RLS flags or ACLs changed (catalog snapshot identical)
+PASS  community_messages parent policies untouched
+PASS  idempotent re-run of migration.sql succeeds
+PASS  verify.sql still passes after re-run
+      anon MuxProcessedEvent :: update "MuxProcessedEvent" set id=id where false -> 42P01
+FAIL  anon: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations (expected [1] got [0])
+PASS  anon: cannot execute community_messages_create_month_partition
+      authenticated MuxProcessedEvent :: update "MuxProcessedEvent" set id=id where false -> 42P01
+FAIL  authenticated: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations (expected [1] got [0])
+PASS  authenticated: cannot execute community_messages_create_month_partition
+PASS  service_role (BYPASSRLS) via authenticator still reads DunningAttempt
+PASS  service_role can write recent_auth_nonce
+PASS  postgres (BYPASSRLS, the source-assumed app role) reads and writes coach_ltv_peak
+PASS  RLS alone (probe role WITH grants): SELECT on DunningAttempt returns 0 rows
+PASS  RLS alone: SELECT on protected partition directly returns 0 rows (1 seeded)
+PASS  RLS alone: INSERT into recent_auth_nonce rejected by policy (42501)
+PASS  RLS alone: FORCE applies to table owner? (owner is postgres BYPASSRLS -> unaffected, expected 00000)
+FAIL  parent path: coach (via app.current_user_id) reads both seeded messages through community_messages (expected [2] got [])
+FAIL  parent path: cohort member reads cohort messages (expected [2] got [])
+FAIL  parent path: non-member reads nothing (expected [0] got [])
+FAIL  parent path: member INSERT routes into protected partition 2027_02 and succeeds (expected [00000] got [42501])
+FAIL  parent path: inserted row landed in community_messages_2027_02 (expected [1] got [0])
+PASS  parent path: forged sender rejected by existing parent policy (42501)
+FAIL  app.* helpers still resolve with search_path='' (coach check true) (expected [t] got [])
+PASS  new partition created by helper
+PASS  new partition has RLS enabled+forced and no anon/authenticated privileges
+PASS  new partition carries the deny/service_role policies
+PASS  anon denied on new partition
+PASS  helper is idempotent (second call for same month succeeds)
+PASS  rollback.sql restores the exposed pre-state (18 relations RLS off again)
+PASS  INVARIANT: after out-of-band reversal, prisma migrate status still claims up to date
+FAIL  INVARIANT: prisma migrate resolve --rolled-back refuses (P3012) for an applied-then-reversed migration (expected [1] got [0])
+FAIL  INVARIANT: verify.sql (catalog truth) FAILS while Prisma says up to date (expected [1] got [3])
+PASS  recovery: re-running migration.sql directly restores protection
+PASS  recovery: verify.sql passes again
+FAIL  data still intact after rollback + re-apply (expected [1/0/0] got [0/0/0])
+== 37 passed, 13 failed (server 17.6)
+harness exit=1

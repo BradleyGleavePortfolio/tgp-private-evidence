@@ -1,0 +1,72 @@
+== S1-DB-01 proof on 127.0.0.1:54321 db=s1_rls_proof  (log: /home/user/workspace/execution/s1-database/proof-run-04.detail.log)
+PASS  replay of parent migration chain (without candidate) as non-superuser postgres
+PASS  out-of-band rls_fitness_backend.sql applies (production pre-state twin)
+PASS  pre-state reproduces exactly the 18 observed RLS-disabled public relations
+PASS  pre-state: anon has full CRUD on DunningAttempt via default privileges
+PASS  pre-state: verify.sql FAILS (detects exposure)
+PASS  pre-state: verify.sql failure names the exposure (not an internal error)
+PASS  synthetic fixtures inserted
+PASS  DB2: parent chain + legacy RLS file replayed for the lock/recovery scenario
+PASS  DB2: migration.sql (psql --single-transaction) fails fast with lock_timeout SQLSTATE 55P03 while a lock is held
+PASS  DB2: lock wait bounded (5s <= 12s)
+PASS  DB2: failed direct attempt left the pre-state untouched (18 still exposed)
+PASS  DB2: prisma migrate deploy fails (non-zero) while the lock is held
+PASS  DB2: prisma deploy failure bounded (6s <= 20s)
+PASS  DB2: failed deploy recorded in _prisma_migrations (finished_at null, rolled_back_at null)
+PASS  DB2: failed Prisma attempt is ATOMIC — pre-state untouched (no partially protected tables)
+PASS  DB2: verify.sql fails cleanly after the failed attempt
+PASS  DB2: session timeout settings did not leak (fresh connection shows defaults)
+PASS  DB2: documented recovery step 1 — prisma migrate resolve --rolled-back succeeds after a REAL failure
+PASS  DB2: documented recovery step 2 — prisma migrate deploy succeeds once the lock is gone
+PASS  DB2: verify.sql passes after recovery
+PASS  DB2: down.sql runs (--single-transaction)
+      DB2 observed: resolve --rolled-back after reversal WITH earlier failed row -> exit 0; applied row: 1
+PASS  DB2: applied row still marked applied after resolve (Prisma state unchanged by reversal)
+PASS  DB2: verify.sql FAILS after reversal regardless of Prisma output
+PASS  prisma migrate deploy applies the candidate (lock released)
+PASS  verify.sql passes after apply
+PASS  verify.sql reports all 18 relations protected (4 partitions)
+PASS  timeouts RESET at end of migration (fresh session defaults)
+PASS  no RLS-disabled relation remains in public that CI's floor would flag among the 18
+PASS  populated data preserved (row counts unchanged)
+PASS  no other table's RLS flags or ACLs changed (catalog snapshot identical)
+PASS  community_messages parent policies untouched
+PASS  idempotent re-run of migration.sql succeeds
+PASS  verify.sql still passes after re-run
+PASS  anon: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations
+PASS  anon: cannot execute community_messages_create_month_partition
+PASS  authenticated: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations
+PASS  authenticated: cannot execute community_messages_create_month_partition
+PASS  service_role (BYPASSRLS) via authenticator still reads DunningAttempt
+PASS  service_role can write recent_auth_nonce
+PASS  postgres (BYPASSRLS, the source-assumed app role) reads and writes coach_ltv_peak
+PASS  RLS alone (probe role WITH grants): SELECT on DunningAttempt returns 0 rows
+PASS  RLS alone: SELECT on protected partition directly returns 0 rows (1 seeded)
+PASS  RLS alone: INSERT into recent_auth_nonce rejected by policy (42501)
+PASS  RLS alone: FORCE applies to table owner? (owner is postgres BYPASSRLS -> unaffected, expected 00000)
+PASS  parent path: coach (via app.current_user_id) reads both seeded messages through community_messages
+PASS  parent path: cohort member reads cohort messages
+PASS  parent path: non-member reads nothing
+PASS  parent path: member INSERT routes into protected partition 2027_02 and succeeds
+PASS  parent path: inserted row landed in community_messages_2027_02
+PASS  parent path: forged sender rejected by existing parent policy (42501)
+PASS  app.* helpers still resolve with search_path='' (coach check true)
+PASS  new partition created by helper
+PASS  new partition has RLS enabled+forced and no anon/authenticated privileges
+PASS  new partition carries the deny/service_role policies
+PASS  anon denied on new partition
+PASS  helper is idempotent (second call for same month succeeds)
+PASS  down.sql applies (--single-transaction, ON_ERROR_STOP)
+PASS  down.sql restores the exposed pre-state (18 relations RLS off again; new partition also unprotected)
+PASS  down.sql changes the schema dump (reverse is not a no-op)
+PASS  INVARIANT: after out-of-band reversal, prisma migrate status still claims up to date
+PASS  INVARIANT (clean history): prisma migrate resolve --rolled-back refuses with P3012
+PASS  INVARIANT: verify.sql (catalog truth) FAILS while Prisma says up to date
+PASS  recovery: re-running migration.sql with psql --single-transaction restores protection
+PASS  recovery: verify.sql passes again
+PASS  REVERSIBILITY GATE PARITY: schema dump after forward->down->forward is byte-identical
+PASS  prisma migrate status still up to date after direct re-apply (history untouched)
+PASS  data still intact after reversal + re-apply (seeded counts + 1 parent-path insert)
+PASS  row content intact (seeded bodies present, read by BYPASSRLS owner)
+== 68 passed, 0 failed (server 17.6, head 620b47fc+dirty)
+harness exit=0

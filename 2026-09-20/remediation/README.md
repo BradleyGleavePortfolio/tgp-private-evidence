@@ -6,6 +6,8 @@ Bradley authorized S1–S3 fixers after all twelve R1 reports returned. S4–S6 
 
 S3 subsequently returned its unchanged-head completion packet: [S3 evidence completion](s3-evidence-completion/README.md). Independent re-attestation is pending; this does not clear R1.
 
+S1 returned a new remediation head `90a66475`: [S1 R2 candidate recovery](s1-r2/README.md), including synthetic 68/0 proof and the entire recovery packet. Independent R2 audit is pending. S2 remains active.
+
 `checkpoint-1724/` captures available S1–S3 execution evidence at approximately 2026-09-20 17:24–17:26 UTC, before resumed remediation completes. Files retain their original claims and limitations, including stale historical milestone text; current findings and applicability are in `../audits/`. Capture does not retroactively validate a log or document.
 
 - S1 source: `s1-database/bundles/s1-database-R1-620b47f.bundle`, frozen head `620b47fc8517fa5e5950c5b673baf8b002f5c78a`.
