@@ -20,4 +20,4 @@ The four shard summaries record 545 passing suites, 12 skipped suites, 8,209 pas
 
 State: written, locally built/type-checked/linted/tested; **not independently audit-cleared, merged, deployed, enabled or customer-accepted**. S1/S2 remediation remains active; S4–S6 remain held.
 
-Publication status at this update: GitHub rejected the S3 packet push and API reads with HTTP 401 after the earlier checkpoint was successfully published at `2135de9dae6ca2d378574e9a46bf8d92d230bda9`. Reauthorization requested. Both S3 revisions and the updated handoff are also preserved in the attached **TGP S3 completed-proof recovery checkpoint**; no successful GitHub upload of this completion packet is claimed yet.
+Publication verified 2026-09-20 17:34 UTC after GitHub reauthorization: both S3 revisions are remotely preserved at commit `0318ea091dfc4fe7171242e41e6bab79441f5ecc` in the PRIVATE evidence repository. The remote main SHA matched the local commit. Both revisions also survive in the attached **TGP S3 completed-proof recovery checkpoint**. The temporary authentication blocker is resolved; audit clearance remains pending.
