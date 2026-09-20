@@ -1,0 +1,486 @@
+From d7079265ea1263a1af6cd9cd132fc18dcb1793d9 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Sun, 20 Sep 2026 22:24:04 +0000
+Subject: [PATCH] storage: make react-native-mmkv a bundle-safe optional
+ dependency
+
+`expo export --platform android` failed on main and on the S6 candidate with
+"Unable to resolve module react-native-mmkv from src/storage/mmkv.ts" even
+though the package is intentionally undeclared and the AsyncStorage shim is
+the intended persistence layer.
+
+Root cause: Metro (with Expo's allowOptionalDependencies) only tolerates an
+unresolvable specifier while every require() of it sits directly inside a
+try block. src/storage/mmkv.ts required the package twice: a guarded probe
+and an unguarded require inside the MmkvStorage constructor. The second one
+demoted the dependency to required; Metro reported the first location, so
+the try/catch looked sufficient when it was not.
+
+Fix (narrow, no dependency/native/flag changes):
+- require the module exactly once, directly inside a try block, and hand the
+  loaded module to MmkvStorage instead of re-requiring it;
+- decide availability from the loaded module's shape (asMmkvModule: must
+  expose an MMKV constructor) rather than from "require did not throw";
+- export isMmkvAvailable() for truthful capability reporting.
+
+Namespaces (prefs:/cache:/secure:), the AsyncStorage shim, clearAllStorage
+(sign-out wipe) and the MMKV path's configuration are behaviourally unchanged;
+the MMKV path stays inactive because the package remains absent.
+
+Tests:
+- declaredDependencies guard: replace the stale claim that try/catch alone
+  protects Metro; parse shipped source and assert the package is required
+  from exactly one Metro-optional site, has no static import/re-export/
+  dynamic import, and remains absent from package.json and the lockfile.
+- new src/storage/__tests__/mmkv.test.ts: shape detection, shim fallback,
+  namespace layout/isolation, logout wipe leaves foreign keys.
+---
+ .../__tests__/declaredDependencies.test.ts    | 175 +++++++++++++++++-
+ src/storage/__tests__/mmkv.test.ts            | 121 ++++++++++++
+ src/storage/mmkv.ts                           |  85 +++++++--
+ 3 files changed, 362 insertions(+), 19 deletions(-)
+ create mode 100644 src/storage/__tests__/mmkv.test.ts
+
+diff --git a/src/config/__tests__/declaredDependencies.test.ts b/src/config/__tests__/declaredDependencies.test.ts
+index f6a79d8..b5274df 100644
+--- a/src/config/__tests__/declaredDependencies.test.ts
++++ b/src/config/__tests__/declaredDependencies.test.ts
+@@ -159,14 +159,88 @@ const INSTALLS_THE_COMMITTED_LOCKFILE = new Set(['ci', 'install-ci-test']);
+  * because its absence is handled. Adding an entry here is a review decision,
+  * not a way to silence the guard.
+  *
+- * `react-native-mmkv` is require()'d inside a try/catch in storage/mmkv.ts as
+- * an optional native-module probe. It is absent from package.json today, so
+- * the probe always throws and every build takes the AsyncStorage fallback.
+- * Declaring it would change which native modules the app links, so that is a
+- * separate decision and is NOT bundled into this dependency-hygiene fix.
++ * `react-native-mmkv` is require()'d in storage/mmkv.ts as an optional
++ * native-module probe. It is absent from package.json today, so every build
++ * takes the AsyncStorage fallback. Declaring it would change which native
++ * modules the app links, so that is a separate decision and is NOT bundled
++ * into this dependency-hygiene fix.
++ *
++ * A try/catch alone does NOT keep that absence out of the release bundle.
++ * Metro resolves every specifier statically at bundle time; the Expo config
++ * enables `transformer.allowOptionalDependencies`, under which Metro tolerates
++ * an unresolvable specifier only while EVERY `require()` of it is a plain
++ * statement directly inside a `try { }` block (Metro's `isOptionalDependency`
++ * walks statement -> block -> TryStatement). If any occurrence of the same
++ * specifier in a module is unguarded, Metro's dependency registry demotes the
++ * whole dependency to required and `expo export` fails with "Unable to resolve
++ * module react-native-mmkv". That is exactly what a second, unguarded require
++ * inside the MmkvStorage constructor did on main `a5933fd6`. The
++ * `optional undeclared packages` suite below pins the guarded shape so the
++ * next unguarded occurrence fails here rather than in a release export.
+  */
+ const OPTIONAL_UNDECLARED = new Set(['react-native-mmkv']);
+ 
++type OptionalRequireSite = { file: string; line: number; guarded: boolean };
++
++/**
++ * Metro's optional-dependency condition, applied with the TypeScript parser:
++ * the `require('pkg')` call must be inside a statement whose own parent is the
++ * `tryBlock` of a TryStatement. Anything else that names the package — a
++ * static `import`, a re-export, a dynamic `import()`, or a `require()` inside a
++ * nested block within the try (an `if { }` body, say) — is unguarded.
++ *
++ * Mirrors `isOptionalDependency` in @expo/metro-config's collect-dependencies:
++ * walk up from the call counting statements; on reaching a block, the
++ * dependency is optional only if that block is the `block` of a TryStatement.
++ */
++function optionalRequireSitesIn(source: string, fileName: string, pkgName: string): OptionalRequireSite[] {
++  const parsed = ts.createSourceFile(
++    fileName,
++    source,
++    ts.ScriptTarget.Latest,
++    /* setParentNodes */ true,
++    fileName.endsWith('.ts') ? ts.ScriptKind.TS : ts.ScriptKind.TSX,
++  );
++  const sites: OptionalRequireSite[] = [];
++  const lineOf = (node: ts.Node) => parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line + 1;
++  const names = (spec: ts.Node | undefined) =>
++    spec !== undefined && ts.isStringLiteralLike(spec) && packageNameOf(spec.text) === pkgName;
++  function isDirectlyInTryBlock(call: ts.CallExpression): boolean {
++    let statements = 0;
++    let p: ts.Node | undefined = call;
++    while (p && statements < 3) {
++      if (ts.isBlock(p)) {
++        return p.parent !== undefined && ts.isTryStatement(p.parent) && p.parent.tryBlock === p;
++      }
++      if (ts.isStatement(p)) statements += 1;
++      p = p.parent;
++    }
++    return false;
++  }
++  function visit(node: ts.Node): void {
++    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
++      if (names(node.moduleSpecifier)) sites.push({ file: fileName, line: lineOf(node), guarded: false });
++    } else if (
++      ts.isImportEqualsDeclaration(node) &&
++      ts.isExternalModuleReference(node.moduleReference)
++    ) {
++      if (names(node.moduleReference.expression)) {
++        sites.push({ file: fileName, line: lineOf(node), guarded: false });
++      }
++    } else if (ts.isCallExpression(node) && node.arguments.length > 0 && names(node.arguments[0])) {
++      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
++      sites.push({
++        file: fileName,
++        line: lineOf(node),
++        guarded: isRequire && isDirectlyInTryBlock(node),
++      });
++    }
++    ts.forEachChild(node, visit);
++  }
++  visit(parsed);
++  return sites;
++}
++
+ /**
+  * Real [package, importing file] pairs that the regex scanner this suite
+  * replaced could not see. The first three packages have no single-line import
+@@ -563,6 +637,97 @@ describe('every package imported by bundled source is declared in package.json',
+   });
+ });
+ 
++describe('optional undeclared packages are required in the shape Metro treats as optional', () => {
++  const PKG = 'react-native-mmkv';
++
++  it('recognises only a require that is a plain statement directly inside a try block', () => {
++    const FIXTURE = [
++      'function probe() {',
++      '  let mod;',
++      '  try {',
++      "    mod = require('react-native-mmkv');", // guarded (statement -> block -> try)
++      '  } catch {',
++      '    return null;',
++      '  }',
++      '  return mod;',
++      '}',
++      'function alsoGuarded() {',
++      '  try {',
++      "    const { MMKV } = require('react-native-mmkv');", // guarded (declaration -> block -> try)
++      '    return MMKV;',
++      '  } catch {',
++      '    return undefined;',
++      '  }',
++      '}',
++      'function unguardedCtor() {',
++      "  const { MMKV } = require('react-native-mmkv');", // the main a5933fd6 defect shape
++      '  return MMKV;',
++      '}',
++      'function nestedInTry(flag) {',
++      '  try {',
++      "    if (flag) { require('react-native-mmkv'); }", // inside a nested block: not optional for Metro
++      '  } catch {',
++      '    return;',
++      '  }',
++      '}',
++      "const notThisPackage = require('react-native-mmkv-lookalike');",
++      'export { probe, alsoGuarded, unguardedCtor, nestedInTry, notThisPackage };',
++    ].join('\n');
++    expect(optionalRequireSitesIn(FIXTURE, 'fixture.ts', PKG)).toEqual([
++      { file: 'fixture.ts', line: 4, guarded: true },
++      { file: 'fixture.ts', line: 12, guarded: true },
++      { file: 'fixture.ts', line: 19, guarded: false },
++      { file: 'fixture.ts', line: 24, guarded: false },
++    ]);
++  });
++
++  it('treats static imports, re-exports and dynamic import() of the package as unguarded', () => {
++    const FIXTURE = [
++      "import { MMKV } from 'react-native-mmkv';",
++      "export { MMKV as Store } from 'react-native-mmkv';",
++      "export const lazy = () => import('react-native-mmkv');",
++      'export { MMKV };',
++    ].join('\n');
++    expect(optionalRequireSitesIn(FIXTURE, 'fixture.ts', PKG).map((site) => site.guarded)).toEqual([
++      false,
++      false,
++      false,
++    ]);
++  });
++
++  it('is required by shipped source (the exception is not vacuous)', () => {
++    const sites = SOURCE_FILES.filter((file) => !isTestFile(path.relative(REPO_ROOT, file))).flatMap(
++      (file) => optionalRequireSitesIn(fs.readFileSync(file, 'utf8'), path.relative(REPO_ROOT, file), PKG),
++    );
++    expect(sites.length).toBeGreaterThan(0);
++    expect(sites.map((site) => site.file)).toContain(path.join('src', 'storage', 'mmkv.ts'));
++  });
++
++  it('has no unguarded occurrence in shipped source, so the release bundle can resolve without it', () => {
++    const unguarded = SOURCE_FILES.filter((file) => !isTestFile(path.relative(REPO_ROOT, file)))
++      .flatMap((file) =>
++        optionalRequireSitesIn(fs.readFileSync(file, 'utf8'), path.relative(REPO_ROOT, file), PKG),
++      )
++      .filter((site) => !site.guarded)
++      .map((site) => `${site.file}:${site.line}`);
++    expect(unguarded).toEqual([]);
++  });
++
++  it('is required from exactly one site, so a stray second require cannot demote it again', () => {
++    const sites = SOURCE_FILES.filter((file) => !isTestFile(path.relative(REPO_ROOT, file))).flatMap(
++      (file) => optionalRequireSitesIn(fs.readFileSync(file, 'utf8'), path.relative(REPO_ROOT, file), PKG),
++    );
++    expect(sites).toHaveLength(1);
++  });
++
++  it('is still absent from package.json and the lockfile (no native activation)', () => {
++    expect(DECLARED.has(PKG)).toBe(false);
++    expect(lock.packages[`node_modules/${PKG}`]).toBeUndefined();
++    expect(lockRoot.dependencies?.[PKG]).toBeUndefined();
++    expect(lockRoot.devDependencies?.[PKG]).toBeUndefined();
++  });
++});
++
+ describe('zod is a direct runtime dependency', () => {
+   it('is declared in dependencies, not devDependencies', () => {
+     // The range itself is deliberately not asserted. Rule 14 expects Dependabot
+diff --git a/src/storage/__tests__/mmkv.test.ts b/src/storage/__tests__/mmkv.test.ts
+new file mode 100644
+index 0000000..e0ef67a
+--- /dev/null
++++ b/src/storage/__tests__/mmkv.test.ts
+@@ -0,0 +1,121 @@
++/**
++ * storage/mmkv — optional native module handling and the AsyncStorage fallback.
++ *
++ * `react-native-mmkv` is undeclared and absent in every current build, so the
++ * AsyncStorage shim IS the persistence layer. These tests pin:
++ *   1. availability is decided by module shape (a resolved-but-empty module or
++ *      one without an `MMKV` constructor is NOT available), never by "require
++ *      did not throw";
++ *   2. with the module absent (this Jest environment, where the require is
++ *      also short-circuited by NODE_ENV=test) every namespaced instance is the
++ *      AsyncStorage shim, with the `namespace:key` layout consumers and the
++ *      sign-out wipe rely on;
++ *   3. `clearAllStorage()` removes exactly the three namespaces and nothing
++ *      else — the logout contract `authActions.signOut` depends on.
++ */
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import {
++  asMmkvModule,
++  cacheStorage,
++  clearAllStorage,
++  isMmkvAvailable,
++  prefsStorage,
++  secureStorage,
++} from '../mmkv';
++
++describe('asMmkvModule — truthful capability detection', () => {
++  it('rejects nothing-shaped results (absent module, Metro empty stub, primitives)', () => {
++    expect(asMmkvModule(undefined)).toBeNull();
++    expect(asMmkvModule(null)).toBeNull();
++    expect(asMmkvModule({})).toBeNull(); // what a Metro `type: 'empty'` resolution yields
++    expect(asMmkvModule('react-native-mmkv')).toBeNull();
++    expect(asMmkvModule(42)).toBeNull();
++    expect(asMmkvModule(true)).toBeNull();
++  });
++
++  it('rejects a module whose MMKV export is not a constructor', () => {
++    expect(asMmkvModule({ MMKV: undefined })).toBeNull();
++    expect(asMmkvModule({ MMKV: null })).toBeNull();
++    expect(asMmkvModule({ MMKV: 'MMKV' })).toBeNull();
++    expect(asMmkvModule({ MMKV: {} })).toBeNull();
++    expect(asMmkvModule({ useMMKVString: () => undefined })).toBeNull();
++  });
++
++  it('accepts a module exposing an MMKV constructor, returning the same object', () => {
++    class MMKV {}
++    const mod = { MMKV };
++    expect(asMmkvModule(mod)).toBe(mod);
++    const fnStyle = { MMKV: function MMKV() {} };
++    expect(asMmkvModule(fnStyle)).toBe(fnStyle);
++  });
++});
++
++describe('with react-native-mmkv absent, the AsyncStorage shim is the storage layer', () => {
++  beforeEach(async () => {
++    await AsyncStorage.clear();
++    jest.restoreAllMocks();
++  });
++
++  it('reports MMKV as unavailable', () => {
++    expect(isMmkvAvailable()).toBe(false);
++  });
++
++  it('synchronous getString is undefined (shim limitation, documented for callers)', async () => {
++    await prefsStorage.set('theme', 'dark');
++    expect(prefsStorage.getString('theme')).toBeUndefined();
++    await expect(prefsStorage.getStringAsync('theme')).resolves.toBe('dark');
++  });
++
++  it('writes under the `namespace:key` layout for all three instances', async () => {
++    await prefsStorage.set('a', 'p');
++    await cacheStorage.set('a', 1);
++    await secureStorage.set('a', true);
++    await expect(AsyncStorage.getItem('prefs:a')).resolves.toBe('p');
++    await expect(AsyncStorage.getItem('cache:a')).resolves.toBe('1');
++    await expect(AsyncStorage.getItem('secure:a')).resolves.toBe('true');
++    await expect(AsyncStorage.getAllKeys()).resolves.toEqual(
++      expect.arrayContaining(['prefs:a', 'cache:a', 'secure:a']),
++    );
++  });
++
++  it('keeps namespaces isolated for reads, deletes and key enumeration', async () => {
++    await prefsStorage.set('shared', 'from-prefs');
++    await cacheStorage.set('shared', 'from-cache');
++    await expect(prefsStorage.getStringAsync('shared')).resolves.toBe('from-prefs');
++    await expect(cacheStorage.getStringAsync('shared')).resolves.toBe('from-cache');
++    await expect(prefsStorage.getAllKeys()).resolves.toEqual(['shared']);
++    await prefsStorage.delete('shared');
++    await expect(prefsStorage.getStringAsync('shared')).resolves.toBeUndefined();
++    await expect(cacheStorage.getStringAsync('shared')).resolves.toBe('from-cache');
++  });
++
++  it('clearNamespace removes only that namespace', async () => {
++    await prefsStorage.set('k', '1');
++    await cacheStorage.set('k', '2');
++    await AsyncStorage.setItem('unrelated', 'x');
++    await cacheStorage.clearNamespace();
++    await expect(AsyncStorage.getAllKeys()).resolves.toEqual(
++      expect.arrayContaining(['prefs:k', 'unrelated']),
++    );
++    await expect(AsyncStorage.getItem('cache:k')).resolves.toBeNull();
++  });
++
++  it('clearAllStorage (logout) wipes prefs, cache and secure namespaces and nothing else', async () => {
++    await prefsStorage.set('user', '{"id":"A"}');
++    await cacheStorage.set('thread:A', '[]');
++    await secureStorage.set('pin', 'hash');
++    await AsyncStorage.setItem('legacy-outside-namespaces', 'keep');
++    await clearAllStorage();
++    const remaining = await AsyncStorage.getAllKeys();
++    expect(remaining).toEqual(['legacy-outside-namespaces']);
++    await expect(prefsStorage.getStringAsync('user')).resolves.toBeUndefined();
++    await expect(cacheStorage.getStringAsync('thread:A')).resolves.toBeUndefined();
++    await expect(secureStorage.getStringAsync('pin')).resolves.toBeUndefined();
++  });
++
++  it('clearAllStorage is a no-op on an empty store (no removeMany with an empty list)', async () => {
++    const removeMany = jest.spyOn(AsyncStorage, 'removeMany');
++    await clearAllStorage();
++    expect(removeMany).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/storage/mmkv.ts b/src/storage/mmkv.ts
+index 82bec5b..5f60f8f 100644
+--- a/src/storage/mmkv.ts
++++ b/src/storage/mmkv.ts
+@@ -25,17 +25,74 @@
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import { Platform } from 'react-native';
+ 
+-// ─── Runtime detection ──────────────────────────────────────────────────────
++// ─── Optional native module (bundle-safe) ───────────────────────────────────
++//
++// `react-native-mmkv` is deliberately NOT declared in package.json (see
++// OPTIONAL_UNDECLARED in src/config/__tests__/declaredDependencies.test.ts),
++// so in every current build it is absent and the AsyncStorage shim below is
++// the real persistence layer.
++//
++// A try/catch alone does NOT make that absence safe for Metro. Metro resolves
++// statically at bundle time; the Expo config enables
++// `transformer.allowOptionalDependencies`, under which an unresolvable
++// specifier is tolerated ONLY while every `require()` of it in this module
++// sits directly inside a `try { }` block. One unguarded require of the same
++// specifier anywhere in the file demotes the whole dependency to required and
++// `expo export` fails with "Unable to resolve module react-native-mmkv" — the
++// exact failure a second, unguarded require inside the MmkvStorage
++// constructor used to cause. The module is therefore required exactly once,
++// here, and the result is handed to MmkvStorage. For an unresolved optional
++// dependency Metro emits a null module id and `require` throws at runtime,
++// which the catch turns into the fallback. The guard test pins this shape.
++//
++// Availability is decided by the loaded module's shape, not by "require did
++// not throw": a resolved-but-empty module (e.g. a Metro `empty` stub) carries
++// no `MMKV` constructor and must be reported as unavailable, otherwise
++// `new MMKV(...)` would crash at startup.
++
++interface MmkvInstance {
++  getString(key: string): string | undefined;
++  set(key: string, value: string | number): void;
++  delete(key: string): void;
++  getAllKeys(): string[];
++}
++
++interface MmkvModule {
++  MMKV: new (config: { id: string; encryptionKey?: string }) => MmkvInstance;
++}
+ 
+-function isMmkvAvailable(): boolean {
+-  if (Platform.OS === 'web') return false;
+-  if (process.env.NODE_ENV === 'test') return false;
++/**
++ * Truthful capability check on whatever `require('react-native-mmkv')`
++ * returned. Only a module exposing an `MMKV` constructor counts as available.
++ */
++export function asMmkvModule(candidate: unknown): MmkvModule | null {
++  if (candidate === null || candidate === undefined) return null;
++  if (typeof candidate !== 'object' && typeof candidate !== 'function') return null;
++  const ctor = (candidate as { MMKV?: unknown }).MMKV;
++  return typeof ctor === 'function' ? (candidate as MmkvModule) : null;
++}
++
++function loadOptionalMmkv(): MmkvModule | null {
++  if (Platform.OS === 'web') return null;
++  if (process.env.NODE_ENV === 'test') return null;
++  let candidate: unknown;
+   try {
+-    require('react-native-mmkv');
+-    return true;
++    // The ONLY require of this specifier in the app. Keep it as a plain
++    // statement directly inside this try block (Metro's optional condition).
++    // eslint-disable-next-line @typescript-eslint/no-var-requires
++    candidate = require('react-native-mmkv');
+   } catch {
+-    return false;
++    return null;
+   }
++  return asMmkvModule(candidate);
++}
++
++/** Resolved once at module load; null means the AsyncStorage shim is in use. */
++const optionalMmkv: MmkvModule | null = loadOptionalMmkv();
++
++/** True only when a real `MMKV` constructor was loaded — never inferred. */
++export function isMmkvAvailable(): boolean {
++  return optionalMmkv !== null;
+ }
+ 
+ // ─── AsyncStorage shim ──────────────────────────────────────────────────────
+@@ -93,14 +150,14 @@ class AsyncStorageShim {
+ // ─── MMKV wrapper ────────────────────────────────────────────────────────────
+ 
+ class MmkvStorage {
+-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+-  private store: any;
++  private store: MmkvInstance;
+   private namespace: string;
+ 
+-  constructor(namespace: string, encrypted = false) {
++  constructor(mmkv: MmkvModule, namespace: string, encrypted = false) {
+     this.namespace = namespace;
+-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+-    const { MMKV } = require('react-native-mmkv');
++    // No second require here: it would demote the optional dependency to a
++    // required one and break the release bundle (see loadOptionalMmkv).
++    const { MMKV } = mmkv;
+     this.store = new MMKV({
+       id: namespace,
+       encryptionKey: encrypted ? `tgp-mmkv-enc-${namespace}` : undefined,
+@@ -159,8 +216,8 @@ export interface StorageInstance {
+ }
+ 
+ function makeStorage(namespace: string, encrypted = false): StorageInstance {
+-  if (isMmkvAvailable()) {
+-    return new MmkvStorage(namespace, encrypted);
++  if (optionalMmkv) {
++    return new MmkvStorage(optionalMmkv, namespace, encrypted);
+   }
+   return new AsyncStorageShim(namespace);
+ }
+-- 
+2.53.0
+

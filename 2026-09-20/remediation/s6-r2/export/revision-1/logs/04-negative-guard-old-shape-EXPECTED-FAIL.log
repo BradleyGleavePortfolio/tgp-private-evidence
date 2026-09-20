@@ -1,0 +1,85 @@
+FAIL src/config/__tests__/declaredDependencies.test.ts (11.448 s)
+  the import scanner sees every form the codebase actually uses
+    ✓ reads multi-line, dynamic and require specifiers, and nothing else (3 ms)
+    ✓ reads JSX-bearing .js and .jsx, which Metro bundles like any other module (1 ms)
+    ✓ reduces specifiers to installable package names and drops builtins
+  every package imported by bundled source is declared in package.json
+    ✓ finds source files to scan (the walker is not silently empty)
+    ✓ scans the repo-root modules, not just src/ (2 ms)
+    ✓ reaches every package that only the root modules import
+    ✓ scans bundled .js under src/, which Metro resolves like any other module (2 ms)
+    ✓ excludes root build config, which loads devDependencies by design (2 ms)
+    ✓ attributes the multi-line and dynamic import sites only a parser can see (1 ms)
+    ✓ has no undeclared package imports
+    ✓ ships no runtime import that is only a devDependency (1 ms)
+  optional undeclared packages are required in the shape Metro treats as optional
+    ✓ recognises only a require that is a plain statement directly inside a try block (2 ms)
+    ✓ treats static imports, re-exports and dynamic import() of the package as unguarded (1 ms)
+    ✓ is required by shipped source (the exception is not vacuous) (735 ms)
+    ✕ has no unguarded occurrence in shipped source, so the release bundle can resolve without it (823 ms)
+    ✕ is required from exactly one site, so a stray second require cannot demote it again (733 ms)
+    ✓ is still absent from package.json and the lockfile (no native activation)
+  zod is a direct runtime dependency
+    ✓ is declared in dependencies, not devDependencies
+    ✓ is a root lockfile dependency at the manifest range, so npm ci installs it deliberately
+    ✓ resolves to a published tarball rather than a hoisting side effect (1 ms)
+    ✓ is imported by the production schema boundary it exists to serve (1 ms)
+  typecheck tooling types are declared
+    ✓ declares an @types package for every tsconfig compilerOptions.types entry
+    ✓ pins @types/node in the lockfile root so npm ci installs it deliberately
+  CI installs deterministically
+    ✓ reads run: scripts inline and block-scalar, and no surrounding prose (1 ms)
+    ✓ reads npm commands past their flags and ignores commented-out prose
+    ✓ sees the command behind leading global flags (1 ms)
+    ✓ resolves npm aliases to the command they actually run (1 ms)
+    ✓ is not fooled by lookalikes, separators or script names (1 ms)
+    ✓ classifies every alias of a banned command as banned (1 ms)
+    ✓ finds workflows to scan (the directory read is not silently empty)
+    ✓ installs the committed lockfile with npm ci (1 ms)
+    ✓ never resolves dependencies afresh in any workflow
+
+  ● optional undeclared packages are required in the shape Metro treats as optional › has no unguarded occurrence in shipped source, so the release bundle can resolve without it
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "src/storage/__negative_old_mmkv_shape.ts:103",
+    + ]
+
+    [0m [90m 711 |[39m       [33m.[39mfilter((site) [33m=>[39m [33m![39msite[33m.[39mguarded)
+     [90m 712 |[39m       [33m.[39mmap((site) [33m=>[39m [32m`${site.file}:${site.line}`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 713 |[39m     expect(unguarded)[33m.[39mtoEqual([])[33m;[39m
+     [90m     |[39m                       [31m[1m^[22m[39m
+     [90m 714 |[39m   })[33m;[39m
+     [90m 715 |[39m
+     [90m 716 |[39m   it([32m'is required from exactly one site, so a stray second require cannot demote it again'[39m[33m,[39m () [33m=>[39m {[0m
+
+      at Object.toEqual (src/config/__tests__/declaredDependencies.test.ts:713:23)
+
+  ● optional undeclared packages are required in the shape Metro treats as optional › is required from exactly one site, so a stray second require cannot demote it again
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 1
+    Received length: 3
+    Received array:  [{"file": "src/storage/__negative_old_mmkv_shape.ts", "guarded": true, "line": 34}, {"file": "src/storage/__negative_old_mmkv_shape.ts", "guarded": false, "line": 103}, {"file": "src/storage/mmkv.ts", "guarded": true, "line": 83}]
+
+    [0m [90m 718 |[39m       (file) [33m=>[39m optionalRequireSitesIn(fs[33m.[39mreadFileSync(file[33m,[39m [32m'utf8'[39m)[33m,[39m path[33m.[39mrelative([33mREPO_ROOT[39m[33m,[39m file)[33m,[39m [33mPKG[39m)[33m,[39m
+     [90m 719 |[39m     )[33m;[39m
+    [31m[1m>[22m[39m[90m 720 |[39m     expect(sites)[33m.[39mtoHaveLength([35m1[39m)[33m;[39m
+     [90m     |[39m                   [31m[1m^[22m[39m
+     [90m 721 |[39m   })[33m;[39m
+     [90m 722 |[39m
+     [90m 723 |[39m   it([32m'is still absent from package.json and the lockfile (no native activation)'[39m[33m,[39m () [33m=>[39m {[0m
+
+      at Object.toHaveLength (src/config/__tests__/declaredDependencies.test.ts:720:19)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 30 passed, 32 total
+Snapshots:   0 total
+Time:        11.611 s, estimated 13 s
+Ran all test suites matching /src\/config\/__tests__\/declaredDependencies.test.ts/i.
