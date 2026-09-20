@@ -1,0 +1,45 @@
+{
+  "first_destructive_statement": {
+    "line": 52,
+    "text": "psql \"$SUPER_URL\" -X -qAt -c \"DROP DATABASE IF EXISTS $DB WITH (FORCE)\" -c \"DROP DATABASE IF EXISTS ${DB}_lock WITH (FORCE)\" -c \"CREATE DATABASE $DB\" >/dev/null 2>>\"$LOG\" || { echo \"cannot create db\"; exit 1; }"
+  },
+  "pre_destructive_locality_confirmation_version_or_name_guard_lines": [],
+  "fresh_connection_timeout_assertions": [
+    {
+      "line": 118,
+      "text": "check \"DB2: session timeout settings did not leak (fresh connection shows defaults)\" \"0|0\" \"$(q \"$PG2_URL\" \"select current_setting('lock_timeout')||'|'||current_setting('statement_timeout')\")\""
+    },
+    {
+      "line": 139,
+      "text": "check \"timeouts RESET at end of migration (fresh session defaults)\" \"0|0\" \"$(q \"$PG_URL\" \"select current_setting('lock_timeout')||'|'||current_setting('statement_timeout')\")\""
+    }
+  ],
+  "lock_target": [
+    {
+      "line": 103,
+      "text": "psql \"$PG2_URL\" -X -qAt -c \"begin; select 1 from \\\"DunningAttempt\\\" limit 1; select pg_sleep(25);\" >/dev/null 2>&1 &"
+    }
+  ],
+  "seeded_target_tables": [
+    "recent_auth_nonce",
+    "coach_ltv_peak",
+    "MuxProcessedEvent",
+    "community_messages_2027_01",
+    "community_messages_2027_02"
+  ],
+  "unseeded_target_tables": [
+    "ClientAssetGrant",
+    "CoachMediaAsset",
+    "CoachPackageContent",
+    "DripResolverMarker",
+    "DunningAttempt",
+    "NudgeLog",
+    "PaymentRecoveryToken",
+    "PayoutMethod",
+    "PurchaseFanout",
+    "ScheduledDrop",
+    "UserAIQuota",
+    "community_messages_2026_12",
+    "community_messages_default"
+  ]
+}
