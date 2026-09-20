@@ -1,0 +1,16 @@
+diff --git a/test/utils/g2-pg17-bootstrap.sh b/test/utils/g2-pg17-bootstrap.sh
+index 779aba02..879fb6e3 100755
+--- a/test/utils/g2-pg17-bootstrap.sh
++++ b/test/utils/g2-pg17-bootstrap.sh
+@@ -57,6 +57,11 @@ fi
+ # 3. CI-only Supabase shim (roles, auth schema/helpers) from the candidate root,
+ #    plus harness-only LOGIN for service_role so worker processes can connect as
+ #    the runtime role over loopback trust. Neither is ever applied to Supabase.
++# The verbatim CI shim grants its roles TO the CI login role "postgres", which the
++# zonky cluster does not define. A NOLOGIN placeholder keeps the shim unmodified;
++# it is cluster-local to the disposable lane and never a product change.
++psql_maint -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++  CREATE ROLE postgres NOLOGIN NOINHERIT; END IF; END \$\$;"
+ psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
+ psql_db -c "GRANT anon, authenticated, service_role TO s5_super;"
+ printf '%s\n' "ALTER ROLE service_role LOGIN PASSWORD :'pw';" | psql_db -v pw="$G2_PG17_PASSWORD"

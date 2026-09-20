@@ -1,0 +1,62 @@
+pg_ctl: server is running (PID: 29556)
+/home/user/pg17/dist/bin/postgres "-D" "/home/user/pg17/clusters/s5"
+node v20.20.1 npm 10.8.2 psql: psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+65b1da27d9dab4f51f5fad6d8a05be8b64e53dde
+PASS test/scout/g2-pg17-db-guard.spec.ts (13.097 s)
+  S5 G2 PG17 disposable target guard
+    ✓ accepts a confirmed loopback target and strips only Prisma options for psql (11 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@localhost:55417/g2_s5_etq0_disposable (7 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@db.supabase.co:55417/g2_s5_etq0_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:5432/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:6543/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55439/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:70000/g2_s5_etq0_disposable (6 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_tq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/postgres (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://service_role@127.0.0.1:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super:secret@127.0.0.1:55417/g2_s5_etq0_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://postgres@127.0.0.1:55417/g2_s5_etq0_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:54321/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgres://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?host=remote
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?sslmode=disable
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?options=-csearch_path%3Dprivate (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?schema=private (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connection_limit=0
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connection_limit=01 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?schema=public&schema=public
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable#fragment (1 ms)
+    ✓ refuses absent, mistaken or port-mismatched confirmation (2 ms)
+    ✓ attaches the fixture password only from the environment and only in plain form (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       26 passed, 26 total
+Snapshots:   0 total
+Time:        14.849 s
+Ran all test suites matching test/scout/g2-pg17-db-guard.spec.ts.
+psql:/home/user/workspace/worktrees/s5-g2/scripts/ci/supabase-shim.sql:37: ERROR:  role "postgres" does not exist
+
+<--- Last few GCs --->
+
+[12363:0x3d58f7e0]    41099 ms: Scavenge 2042.2 (2083.6) -> 2041.9 (2088.1) MB, 61.39 / 0.00 ms  (average mu = 0.650, current mu = 0.594) allocation failure; 
+[12363:0x3d58f7e0]    42771 ms: Mark-Compact (reduce) 2046.0 (2088.3) -> 2044.9 (2084.6) MB, 865.14 / 0.00 ms  (+ 360.8 ms in 52 steps since start of marking, biggest step 28.8 ms, walltime since start of marking 1342 ms) (average mu = 0.533, current mu =
+
+<--- JS stacktrace --->
+
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0xb78db1 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 2: 0xee82f0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 3: 0xee85d7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]
+ 4: 0x10fa275  [node]
+ 5: 0x11120f8 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]
+ 6: 0x10e8211 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]
+ 7: 0x10e93a5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]
+ 8: 0x10c69f6 v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]
+ 9: 0x1522276 v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]
+10: 0x195bef6  [node]
+Aborted (core dumped)
+PROOF_EXIT=137

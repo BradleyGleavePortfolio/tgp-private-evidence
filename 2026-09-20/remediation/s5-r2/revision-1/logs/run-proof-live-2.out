@@ -1,0 +1,2146 @@
+pg_ctl: server is running (PID: 29556)
+/home/user/pg17/dist/bin/postgres "-D" "/home/user/pg17/clusters/s5"
+TS=20260920T182017Z STAGE=live
+HEAD=65b1da27d9dab4f51f5fad6d8a05be8b64e53dde TREE=9bbc0223e809e8e9b10b541bbde98b11903be362
+ M test/rls-g2-pg17-etq0.spec.ts
+ M test/scout/g2-pg17-db-guard.spec.ts
+ M test/utils/g2-pg17-bootstrap.sh
+ M test/utils/g2-pg17-db.ts
+ M test/utils/g2-pg17-harness.ts
+node v20.20.1 npm 10.8.2 psql: psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+G2_PG17_CONFIRM=g2_s5_etq0_disposable:54325
+G2_PG17_DATABASE_URL=postgresql://s5_super@127.0.0.1:54325/g2_s5_etq0_disposable?schema=public&connection_limit=2
+G2_PG17_DATA_DIRECTORY=/home/user/pg17/clusters/s5
+G2_PG17_OLD_CLIENT=/home/user/workspace/execution/s5-g2/old-client-925780e0
+G2_PG17_OLD_ROOT=/home/user/workspace/execution/s5-g2/old-root-925780e0
+G2_PG17_PSQL=/usr/bin/psql
+G2_PG17_SERVER_VERSION=170006
+NODE_OPTIONS=--max-old-space-size=4096
+G2_PG17_PASSWORD=<from environment, not logged>
+2
+               total        used        free      shared  buff/cache   available
+Mem:            7966         475        3065         136        4692        7490
+CMD: npx jest --config jest.rls.config.js test/rls-g2-pg17-etq0.spec.ts --runInBand --testTimeout=180000
+  console.warn
+    PG17_DATABASE {"port":54325,"user":"postgres","owner":"postgres","super":false,"address":"127.0.0.1","version":"170006","database":"g2_s5_etq0_disposable","bypassrls":true,"directory":"/home/user/pg17/clusters/s5"}
+
+      41 |   expect(Number(identity.version)).toBeLessThan(180000);
+      42 |   expect(directory).toMatch(/\/pg17\/clusters\/s5$/);
+    > 43 |   console.warn('PG17_DATABASE', JSON.stringify(identity));
+         |           ^
+      44 |   // Bootstrap leaves the full 164-migration O history and NO E column/history.
+      45 |   expect(appliedMigrations()).toBe('164');
+      46 |   expect(sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`)).toBe('0');
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:43:11)
+
+  console.warn
+    PG17_API_ROLE_TABLE_PRIVILEGES Person=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ScoutIngestEntity=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ScoutReconstructedEntity=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ScoutReconstructionLedger=DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+
+      62 |     GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
+      63 |       public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
+    > 64 |   console.warn('PG17_API_ROLE_TABLE_PRIVILEGES', sql(`SELECT string_agg(table_name||'='||privileges,' ' ORDER BY table_name) FROM (
+         |           ^
+      65 |     SELECT table_name, string_agg(privilege_type,',' ORDER BY privilege_type) privileges
+      66 |     FROM information_schema.role_table_grants WHERE grantee='anon' AND table_schema='public'
+      67 |     AND table_name IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity') GROUP BY 1) g`));
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:64:11)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_2","old":true,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":30,"reconstructed":38,"skipped":8,"failed":9},"queries":124,"pid":6470}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_4","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":6700}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_5","old":false,"options":{"coach":"other"},"result":{"intent_id":"intent","staged":0,"reconstructed":1,"skipped":0,"failed":0},"queries":3,"pid":6725}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_6","old":false,"options":{},"result":{"intent_id":"intent","staged":4,"reconstructed":2,"skipped":1,"failed":1},"queries":37,"pid":6764}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_7","old":false,"options":{},"result":{"intent_id":"intent","staged":4,"reconstructed":2,"skipped":1,"failed":1},"queries":37,"pid":6782}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_8","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":6808}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_9","old":false,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":11,"pid":6834}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_10","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":14,"pid":6960}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_11","old":false,"options":{"family":"clients"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":10,"pid":7026}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_12","old":false,"options":{"family":"clients"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7048}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_13","old":false,"options":{"family":"clients"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":10,"pid":7073}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_14","old":false,"options":{"family":"workouts"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":10,"pid":7105}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_15","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7127}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_16","old":false,"options":{"family":"workouts"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":10,"pid":7150}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_17","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":26,"pid":7184}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_18","old":false,"options":{},"result":{"intent_id":"intent","staged":4,"reconstructed":4,"skipped":0,"failed":0},"queries":36,"pid":7206}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_19","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7230}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_20","old":false,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":11,"pid":7250}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_21","old":false,"options":{"mapper":"skip"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":9,"pid":7272}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_22","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7303}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_23","old":false,"options":{"mapper":"throw"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":11,"pid":7324}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_24","old":false,"options":{"mapper":"throw"},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":9,"pid":7346}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_25","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7372}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_26","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":14,"pid":7394}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_27","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":12,"pid":7423}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_28","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7448}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_29","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7472}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_30","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7495}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_31","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7517}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_32","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7539}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_33","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7561}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_34","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":3,"pid":7593}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_35","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7625}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_36","old":false,"options":{"intent":"i2"},"result":{"intent_id":"i2","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7641}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_37","old":false,"options":{"intent":"i3"},"result":{"intent_id":"i3","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7658}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_38","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7694}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_39","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7720}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_40","old":true,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":8,"pid":7741}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_41","old":true,"options":{},"result":{"intent_id":"intent","staged":2,"reconstructed":1,"skipped":0,"failed":1},"queries":12,"pid":7763}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_42","old":false,"options":{},"result":{"intent_id":"intent","staged":2,"reconstructed":2,"skipped":0,"failed":0},"queries":20,"pid":7783}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_44","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:476:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_43","old":false,"options":{"pause":"before-ledger"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7810}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_44","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7826}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_46","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:476:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_46","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":7898}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_45","old":true,"options":{"pause":"before-ledger"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":8,"pid":7882}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_47","rows":[{"type":"Lock","wait":"advisory"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:497:7)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_48","rows":[{"type":"Lock","wait":"advisory"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:498:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_47","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":11,"pid":7958}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_48","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":15,"pid":7960}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_49","old":false,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":15,"pid":8036}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_50","old":false,"options":{"mapper":"throw"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":15,"pid":8067}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_51","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":17,"pid":8097}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_52","old":false,"options":{},"failure":{"status":500,"message":"Internal server error","code":"P2034"},"queries":11,"pid":8127}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_54","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:558:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_53","old":false,"options":{"pause":"claimed"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":8155}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_54","old":false,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":18,"pid":8173}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_56","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:558:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_56","old":true,"options":{},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":8,"pid":8247}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_55","old":false,"options":{"pause":"claimed"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":12,"pid":8229}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_58","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:574:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_57","old":false,"options":{"pause":"claimed"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":8303}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_58","old":false,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":15,"pid":8320}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_60","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at test/rls-g2-pg17-etq0.spec.ts:574:7
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_59","old":false,"options":{"pause":"claimed"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":12,"pid":8372}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_60","old":true,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":5,"pid":8389}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_62","old":false,"options":{"mapper":"skip"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":1,"failed":0},"queries":11,"pid":8463}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_61","old":false,"options":{"pause":"before-ledger"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":8447}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_64","old":false,"options":{"mapper":"throw"},"result":{"intent_id":"intent","staged":1,"reconstructed":0,"skipped":0,"failed":1},"queries":11,"pid":8508}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_63","old":false,"options":{"pause":"before-ledger"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":8492}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2p17_66","rows":[{"type":"Lock","wait":"transactionid"}]}
+
+      171 |     const rows = jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
+      172 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+    > 173 |     if (rows.length > 0) { console.warn('PG17_BLOCKED', JSON.stringify({ name, rows })); return; }
+          |                                    ^
+      174 |     await new Promise((r) => setTimeout(r, 25));
+      175 |   }
+      176 |   throw new Error('expected observed PostgreSQL lock wait');
+
+      at blocked (test/utils/g2-pg17-harness.ts:173:36)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:603:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_66","old":false,"options":{},"failure":{"status":409,"message":"reconstruction provenance conflict"},"queries":10,"pid":8554}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_65","old":false,"options":{"pause":"claimed"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":8536}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_67","old":false,"options":{"family":"clients"},"result":{"intent_id":"intent","staged":3,"reconstructed":3,"skipped":0,"failed":0},"queries":28,"pid":8610}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_68","old":false,"options":{"action":"roster","family":"clients"},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[{"id":"a20c762c-f3e0-427b-97a5-1c5df234cad1","state":"InvitePending","source_platform":"truecoach","source_person_id":"a","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.035Z","updated_at":"2026-09-20T18:21:56.035Z"}],"page":{"limit":1,"next_cursor":"YQ","has_more":true}},"queries":8,"pid":8640}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_69","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[{"id":"b5d977d2-ec48-4ebb-bc86-5be87d9987f1","state":"InvitePending","source_platform":"truecoach","source_person_id":"b","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.041Z","updated_at":"2026-09-20T18:21:56.041Z"}],"page":{"limit":1,"next_cursor":"Yg","has_more":true}},"queries":8,"pid":8656}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_70","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[{"id":"b159bfa3-50c5-4196-806f-4e72dedcf0c4","state":"InvitePending","source_platform":"truecoach","source_person_id":"c","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.045Z","updated_at":"2026-09-20T18:21:56.045Z"}],"page":{"limit":1,"next_cursor":null,"has_more":false}},"queries":8,"pid":8675}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_71","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[{"id":"b5d977d2-ec48-4ebb-bc86-5be87d9987f1","state":"InvitePending","source_platform":"truecoach","source_person_id":"b","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.041Z","updated_at":"2026-09-20T18:21:56.041Z"}],"page":{"limit":1,"next_cursor":"Yg","has_more":true}},"queries":8,"pid":8691}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_72","old":false,"options":{"action":"roster","family":"clients","coach":"foreign"},"failure":{"status":404,"message":"Not Found"},"queries":4,"pid":8707}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_73","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":8723}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_74","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>","limit":200},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[{"id":"b5d977d2-ec48-4ebb-bc86-5be87d9987f1","state":"InvitePending","source_platform":"truecoach","source_person_id":"b","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.041Z","updated_at":"2026-09-20T18:21:56.041Z"},{"id":"b159bfa3-50c5-4196-806f-4e72dedcf0c4","state":"InvitePending","source_platform":"truecoach","source_person_id":"c","display_name":"Synthetic A","created_at":"2026-09-20T18:21:56.045Z","updated_at":"2026-09-20T18:21:56.045Z"}],"page":{"limit":200,"next_cursor":null,"has_more":false}},"queries":8,"pid":8739}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_75","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>","limit":2},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[],"page":{"limit":2,"next_cursor":null,"has_more":false}},"queries":8,"pid":8757}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_76","old":false,"options":{"action":"roster","family":"clients","limit":200},"result":{"intent_id":"intent","accounting":{"staged":3,"reconstructed":3,"skipped":0,"failed":0},"persons":[],"page":{"limit":200,"next_cursor":null,"has_more":false}},"queries":8,"pid":8775}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_77","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":3,"reconstructed":3,"skipped":0,"failed":0},"queries":28,"pid":8801}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_78","old":false,"options":{"action":"entities","family":"workouts"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"47338441-2d16-4c9e-8e54-e00c888b4362","source_platform":"truecoach","entity_type":"workouts","source_id":"a","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.944Z","updated_at":"2026-09-20T18:22:04.944Z"}],"page_count":1,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoiYSJ9"},"queries":6,"pid":8821}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_79","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"2e942a99-a8a9-4156-a91a-472147a0863c","source_platform":"truecoach","entity_type":"workouts","source_id":"b","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.949Z","updated_at":"2026-09-20T18:22:04.949Z"}],"page_count":1,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoiYiJ9"},"queries":6,"pid":8837}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_80","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"fff86cd7-be5c-446a-b7e1-fd365c43fa42","source_platform":"truecoach","entity_type":"workouts","source_id":"c","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.953Z","updated_at":"2026-09-20T18:22:04.953Z"}],"page_count":1,"next_cursor":null},"queries":6,"pid":8856}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_81","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"2e942a99-a8a9-4156-a91a-472147a0863c","source_platform":"truecoach","entity_type":"workouts","source_id":"b","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.949Z","updated_at":"2026-09-20T18:22:04.949Z"}],"page_count":1,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoiYiJ9"},"queries":6,"pid":8874}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_82","old":false,"options":{"action":"entities","family":"workouts","coach":"foreign"},"failure":{"status":404,"message":"Not Found"},"queries":4,"pid":8891}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_83","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":8907}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_84","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>","limit":200},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"2e942a99-a8a9-4156-a91a-472147a0863c","source_platform":"truecoach","entity_type":"workouts","source_id":"b","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.949Z","updated_at":"2026-09-20T18:22:04.949Z"},{"id":"fff86cd7-be5c-446a-b7e1-fd365c43fa42","source_platform":"truecoach","entity_type":"workouts","source_id":"c","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:04.953Z","updated_at":"2026-09-20T18:22:04.953Z"}],"page_count":2,"next_cursor":null},"queries":6,"pid":8922}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_85","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>","limit":2},"result":{"intent_id":"intent","family":"workouts","entities":[],"page_count":0,"next_cursor":null},"queries":6,"pid":8940}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_86","old":false,"options":{"action":"entities","family":"workouts","limit":200},"result":{"intent_id":"intent","family":"workouts","entities":[],"page_count":0,"next_cursor":null},"queries":6,"pid":8963}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_87","old":false,"options":{"family":"clients"},"result":{"intent_id":"intent","staged":4,"reconstructed":4,"skipped":0,"failed":0},"queries":36,"pid":8991}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_88","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":4,"reconstructed":4,"skipped":0,"failed":0},"persons":[{"id":"511b76f2-134d-4afc-8998-b2bd8825f336","state":"InvitePending","source_platform":"truecoach","source_person_id":"b","display_name":"Synthetic A","created_at":"2026-09-20T18:22:13.940Z","updated_at":"2026-09-20T18:22:13.940Z"}],"page":{"limit":1,"next_cursor":"YQ","has_more":true}},"queries":8,"pid":9013}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_89","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":4,"reconstructed":4,"skipped":0,"failed":0},"persons":[{"id":"156636f8-7dd7-4386-b6b7-b5881f63b9ae","state":"InvitePending","source_platform":"truecoach","source_person_id":"d","display_name":"Synthetic A","created_at":"2026-09-20T18:22:13.947Z","updated_at":"2026-09-20T18:22:13.947Z"}],"page":{"limit":1,"next_cursor":null,"has_more":false}},"queries":8,"pid":9030}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_90","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":4,"reconstructed":4,"skipped":0,"failed":0},"persons":[{"id":"5fe81c00-6a68-4399-99e9-224c02555dfe","state":"InvitePending","source_platform":"truecoach","source_person_id":"c","display_name":"Synthetic A","created_at":"2026-09-20T18:22:13.944Z","updated_at":"2026-09-20T18:22:13.944Z"}],"page":{"limit":1,"next_cursor":"YQ","has_more":true}},"queries":8,"pid":9046}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_91","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":4,"reconstructed":4,"skipped":0,"failed":0},"queries":36,"pid":9077}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_92","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"3ac6844f-ab1a-4f25-bd79-eb1975a0dde9","source_platform":"truecoach","entity_type":"workouts","source_id":"b","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:17.643Z","updated_at":"2026-09-20T18:22:17.643Z"}],"page_count":1,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoiYSJ9"},"queries":6,"pid":9099}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_93","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"4dac02ea-0b4c-4044-94d4-d279adbfac15","source_platform":"truecoach","entity_type":"workouts","source_id":"d","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:17.650Z","updated_at":"2026-09-20T18:22:17.650Z"}],"page_count":1,"next_cursor":null},"queries":6,"pid":9116}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_94","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"c26569e7-714b-4274-97f9-1ce6670e8e90","source_platform":"truecoach","entity_type":"workouts","source_id":"c","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:17.647Z","updated_at":"2026-09-20T18:22:17.647Z"}],"page_count":1,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoiYSJ9"},"queries":6,"pid":9132}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_95","old":false,"options":{"family":"clients"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":9156}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_96","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9172}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_97","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":1,"reconstructed":1,"skipped":0,"failed":0},"persons":[],"page":{"limit":1,"next_cursor":null,"has_more":false}},"queries":7,"pid":9185}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_98","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9201}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_99","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9214}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_100","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9231}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_101","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9244}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_102","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9257}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_103","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9270}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_104","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9284}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_105","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9297}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_106","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9320}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_107","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9333}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_108","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9347}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_109","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9360}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_110","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9373}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_111","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9386}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_112","old":false,"options":{"action":"roster","family":"clients","cursor":"<cursor>"},"result":{"intent_id":"intent","accounting":{"staged":1,"reconstructed":1,"skipped":0,"failed":0},"persons":[{"id":"5255773a-d63b-4b4e-bcc9-e8d1a6f1d896","state":"InvitePending","source_platform":"truecoach","source_person_id":"a","display_name":"Synthetic A","created_at":"2026-09-20T18:22:21.202Z","updated_at":"2026-09-20T18:22:21.202Z"}],"page":{"limit":1,"next_cursor":null,"has_more":false}},"queries":8,"pid":9399}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_113","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"queries":12,"pid":9421}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_114","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9437}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_115","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[],"page_count":0,"next_cursor":null},"queries":5,"pid":9450}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_116","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9467}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_117","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9480}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_118","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9493}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_119","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9506}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_120","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9519}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_121","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9532}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_122","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9545}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_123","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9558}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_124","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9571}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_125","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9584}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_126","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9597}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_127","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9611}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_128","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9624}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_129","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"failure":{"status":400,"message":"malformed cursor"},"queries":0,"pid":9638}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_130","old":false,"options":{"action":"entities","family":"workouts","cursor":"<cursor>"},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"36286134-8421-4ef8-a864-77dc348da267","source_platform":"truecoach","entity_type":"workouts","source_id":"a","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-20T18:22:36.201Z","updated_at":"2026-09-20T18:22:36.201Z"}],"page_count":1,"next_cursor":null},"queries":6,"pid":9651}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+  console.warn
+    PG17_PROCESS {"name":"g2p17_131","old":false,"options":{},"result":{"intent_id":"intent","staged":2,"reconstructed":2,"skipped":0,"failed":0},"queries":20,"pid":9675}
+
+      152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+          |               ^
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+      156 |       resolveDone(result);
+      157 |     });
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:154:15)
+
+FAIL rls-live test/rls-g2-pg17-etq0.spec.ts (159.356 s)
+  stage 1: E on a populated narrow base with the actual O binary
+    ✕ populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows (4245 ms)
+    ✕ applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default (120 ms)
+    ✕ keeps the actual O writer and readers working on E, creating NULL provenance (914 ms)
+    ✓ retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim (996 ms)
+    ✓ refuses a wrong public index owner in up on the populated base (380 ms)
+    ✓ refuses a wrong public index owner in down on the populated base (287 ms)
+    ✓ schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact (396 ms)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true) (64 ms)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false) (30 ms)
+    ✕ rolls E back only while every provenance is NULL, preserving rows, then re-applies (88 ms)
+  stage 2: E recorded through the real release mechanism
+    ✕ prisma migrate deploy applies exactly E on the populated database and records history (1099 ms)
+  stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17
+    ✕ claims historical NULL history at volume with honest multi-page accounting and identical replay (4923 ms)
+    ✓ claims only the exact coach/intent/family identity and leaves adjacent tenants untouched (2120 ms)
+    ✓ creates every outcome with actual provenance, isolates failures and replays honestly (2069 ms)
+    ✓ claims historical NULL on reconstructed attempts (1001 ms)
+    ✓ claims historical NULL on skipped attempts (1311 ms)
+    ✓ claims historical NULL on failed attempts (1193 ms)
+    ✓ rolls back new and pre-existing clients target changes on late mismatch (3053 ms)
+    ✓ rolls back new and pre-existing workouts target changes on late mismatch (2998 ms)
+    ✓ fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts (2083 ms)
+    ✓ preserves success and reason on skip failure/skip, but still checks mismatch (2882 ms)
+    ✓ preserves success and reason on throw failure/skip, but still checks mismatch (5697 ms)
+    ✓ preserves success and reason on database failure/skip, but still checks mismatch (3641 ms)
+    ✓ rejects invalid staging before writes and preserves narrow staging/ledger identities (6526 ms)
+    ✕ cross-intent same source: same platform converges on one Person, different platform mints a second (3057 ms)
+    ✕ characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source (1047 ms)
+    ✓ characterizes actual O after T: provenance stays but O can downgrade success (3796 ms)
+  stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17
+    ✓ concurrent success replays with false old winner converge on one target (2049 ms)
+    ✓ concurrent success replays with true old winner converge on one target (2036 ms)
+    ✓ two absent skip inserts observe real P2002 contention and bounded full-transaction retry (1756 ms)
+    ✓ retries real PostgreSQL serialization failure once for skip (1122 ms)
+    ✓ retries real PostgreSQL serialization failure once for throw (1078 ms)
+    ✓ retries real PostgreSQL serialization failure once for success (1136 ms)
+    ✓ exhausted real ledger serialization conflicts stop after two transactions with no invented tally (1081 ms)
+    ✓ success holds claim while a failing false old writer waits (2063 ms)
+    ✓ success holds claim while a failing true old writer waits (2034 ms)
+    ✓ success holds claim while a skipped false old writer waits (1973 ms)
+    ✓ success holds claim while a skipped true old writer waits (2049 ms)
+    ✓ T success upgrades serialized skip while target write is open (1813 ms)
+    ✓ T success upgrades serialized throw while target write is open (1899 ms)
+    ✓ concurrent different-platform NULL claims serialize and the loser rolls back target changes (2004 ms)
+  stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission
+    ✓ enumerates exact narrow-schema clients page union and retains NULL legacy history (8854 ms)
+    ✓ enumerates exact narrow-schema workouts page union and retains NULL legacy history (8924 ms)
+    ✓ characterizes clients ties ONLY in a temporary future-schema fixture (3756 ms)
+    ✓ characterizes workouts ties ONLY in a temporary future-schema fixture (3664 ms)
+    ✓ bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection (14956 ms)
+    ✓ bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection (14954 ms)
+  stage 5: rollout recovery boundaries after T has claimed provenance
+    ✕ refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back (1245 ms)
+    ✕ E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it (5987 ms)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows
+
+    worker exited 0: [33m[Nest] 6445  - [39m09/20/2026, 6:20:39 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent","coach_id":"coach","staged":600,"reconstructed":596,"skipped":8,"failed":21}[39m
+
+      150 |     child.on('exit', (code) => {
+      151 |       clearTimeout(timer);
+    > 152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+          |                                           ^
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+      154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:152:43)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+
+    expect(received).toEqual(expected) // deep equality
+
+    Expected: undefined
+    Received: [{"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00001", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00001", "status": "failed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00002", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00002", "status": "reconstructed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00003", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00003", "status": "skipped", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00004", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00004", "status": "failed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00005", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00005", "status": "reconstructed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00006", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00006", "status": "skipped", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00007", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00007", "status": "failed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00008", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00008", "status": "reconstructed", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00009", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00009", "status": "skipped", "target_id": "legacy-target"}, {"coach_id": "c2", "created_at": "2026-09-20T18:20:35.162", "entity_type": "client_history", "id": "c2-i2-client_history-00010", "intent_id": "i2", "reason": "legacy-reason", "source_id": "h00010", "status": "failed", "target_id": "legacy-target"}, …]
+
+      137 |     sql(up);
+      138 |     expect(hasColumn()).toBe('1');
+    > 139 |     expect(allLedger().map((r: any) => { const { source_platform, ...rest } = r; return rest; })).toEqual(before);
+          |                                                                                                   ^
+      140 |     expect(sql('SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform IS NOT NULL')).toBe('0');
+      141 |     expect(catalog()).toBe(beforeCatalog);
+      142 |     expect(sql(`SELECT is_nullable||':'||data_type||':'||COALESCE(column_default,'NONE')
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:139:99)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › keeps the actual O writer and readers working on E, creating NULL provenance
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 3
+
+      Object {
+    -   "failed": 0,
+    +   "failed": 9,
+        "intent_id": "intent",
+    -   "reconstructed": 30,
+    -   "skipped": 0,
+    +   "reconstructed": 38,
+    +   "skipped": 8,
+        "staged": 30,
+      }
+
+      153 |     stageMany(30, 'workouts', 'truecoach', 'coach', 'intent', 0, 'w');
+      154 |     const o = await run({ family: 'workouts' }, true);
+    > 155 |     expect(o.result).toEqual({ intent_id: 'intent', staged: 30, reconstructed: 30, skipped: 0, failed: 0 });
+          |                      ^
+      156 |     expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE entity_type='workouts'
+      157 |       AND source_id LIKE 'w%' AND source_platform IS NULL`)).toBe('30');
+      158 |     expect(o.queries.filter((q) => q.startsWith('INSERT INTO "public"."ScoutReconstructionLedger"'))
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:155:22)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:54325/g2_s5_etq0_disposable?connect_timeout=5
+    ERROR:  permission denied for schema public
+
+      33 | const adminUrl = asRole(G2_PG17_ADMIN_ROLE);
+      34 |
+    > 35 | const psqlRun = (url: string, args: string[], input?: string) => execFileSync(
+         |                                                                              ^
+      36 |   psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url],
+      37 |   { input, encoding: 'utf8', timeout: 60000, env: psqlEnv, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] },
+      38 | ).trim();
+
+      at psqlRun (test/utils/g2-pg17-harness.ts:35:78)
+      at sql (test/utils/g2-pg17-harness.ts:39:46)
+      at test/rls-g2-pg17-etq0.spec.ts:227:8
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:54325/g2_s5_etq0_disposable?connect_timeout=5
+    ERROR:  role "g2p_ledger_owner" already exists
+
+      33 | const adminUrl = asRole(G2_PG17_ADMIN_ROLE);
+      34 |
+    > 35 | const psqlRun = (url: string, args: string[], input?: string) => execFileSync(
+         |                                                                              ^
+      36 |   psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url],
+      37 |   { input, encoding: 'utf8', timeout: 60000, env: psqlEnv, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] },
+      38 | ).trim();
+
+      at psqlRun (test/utils/g2-pg17-harness.ts:35:78)
+      at sql (test/utils/g2-pg17-harness.ts:39:46)
+      at test/rls-g2-pg17-etq0.spec.ts:227:8
+
+  ● stage 1: E on a populated narrow base with the actual O binary › rolls E back only while every provenance is NULL, preserving rows, then re-applies
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:54325/g2_s5_etq0_disposable?connect_timeout=5
+    ERROR:  G2-E refuses removal of assigned provenance
+    CONTEXT:  PL/pgSQL function inline_code_block line 41 at RAISE
+
+      33 | const adminUrl = asRole(G2_PG17_ADMIN_ROLE);
+      34 |
+    > 35 | const psqlRun = (url: string, args: string[], input?: string) => execFileSync(
+         |                                                                              ^
+      36 |   psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url],
+      37 |   { input, encoding: 'utf8', timeout: 60000, env: psqlEnv, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] },
+      38 | ).trim();
+
+      at psqlRun (test/utils/g2-pg17-harness.ts:35:78)
+      at sql (test/utils/g2-pg17-harness.ts:39:46)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:246:8)
+
+  ● stage 2: E recorded through the real release mechanism › prisma migrate deploy applies exactly E on the populated database and records history
+
+    prisma migrate deploy failed: Prisma schema loaded from prisma/schema.prisma
+    Datasource "db": PostgreSQL database "g2_s5_etq0_disposable", schema "public" at "127.0.0.1:54325"
+
+    165 migrations found in prisma/migrations
+
+    Applying migration `20270118000000_scout_ledger_platform_expand`
+
+    Error: ERROR: current transaction is aborted, commands ignored until end of transaction block
+       0: schema_commands::commands::apply_migrations::Applying migration
+               with migration_name="20270118000000_scout_ledger_platform_expand"
+                 at schema-engine/commands/src/commands/apply_migrations.rs:95
+       1: schema_core::state::ApplyMigrations
+                 at schema-engine/core/src/state.rs:260
+
+      207 | export function prismaMigrateDeploy(schemaRoot: string): string {
+      208 |   const result = prisma(schemaRoot, ['migrate', 'deploy']);
+    > 209 |   if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
+          |                         ^
+      210 |   return result.output;
+      211 | }
+      212 |
+
+      at prismaMigrateDeploy (test/utils/g2-pg17-harness.ts:209:25)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:264:39)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL history at volume with honest multi-page accounting and identical replay
+
+    worker exited 0: [33m[Nest] 6657  - [39m09/20/2026, 6:20:48 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent","coach_id":"coach","staged":1050,"reconstructed":1040,"skipped":0,"failed":10}[39m
+
+      150 |     child.on('exit', (code) => {
+      151 |       clearTimeout(timer);
+    > 152 |       if (code !== 0 || !result) { reject(new Error(`worker exited ${code}: ${output}`)); return; }
+          |                                           ^
+      153 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+      154 |       console.warn('PG17_PROCESS', JSON.stringify({ name, old, options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
+      155 |         result: result.result, failure: result.failure, queries: result.queries.length, pid: result.pid }));
+
+      at ChildProcess.<anonymous> (test/utils/g2-pg17-harness.ts:152:43)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › cross-intent same source: same platform converges on one Person, different platform mints a second
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Array [
+        "truecoach",
+    -   "truecoach",
+        "conformance_alpha",
+    +   "truecoach",
+      ]
+
+      424 |     expect(records('coach', 'intent')[0].target_id).toBe(records('coach', 'i2')[0].target_id);
+      425 |     expect(records('coach', 'i3')[0].target_id).not.toBe(records('coach', 'intent')[0].target_id);
+    > 426 |     expect(allLedger().map((r: any) => r.source_platform)).toEqual(['truecoach', 'truecoach', 'conformance_alpha']);
+          |                                                            ^
+      427 |     // Another coach's identical source id never touches this coach's roster.
+      428 |     settle('other', 'intent');
+      429 |     stage('a', 'clients', 'truecoach', 'Synthetic', 'other', 'intent');
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:426:60)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "CREATE UNIQUE INDEX ScoutReconstructionLedger_coach_id_intent_id_entity_type_source ON public.\"ScoutReconstructionLedger\" USING btree (coach_id, intent_id, entity_type, source_id)"
+    Received: "CREATE UNIQUE INDEX \"ScoutReconstructionLedger_coach_id_intent_id_entity_type_source\" ON public.\"ScoutReconstructionLedger\" USING btree (coach_id, intent_id, entity_type, source_id)"
+
+      442 |     // EXPLICIT LIMITATION carried to R/N/C: wide identities are not permitted on E/T.
+      443 |     expect(sql(`SELECT pg_get_indexdef('public.${ledgerKey}'::regclass)`))
+    > 444 |       .toBe(`CREATE UNIQUE INDEX ${ledgerKey.replace(/"/g, '')} ON public."ScoutReconstructionLedger" USING btree (coach_id, intent_id, entity_type, source_id)`);
+          |        ^
+      445 |   });
+      446 |
+      447 |   it('characterizes actual O after T: provenance stays but O can downgrade success', async () => {
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:444:8)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "165"
+    Received: "164"
+
+      736 |     expect(hasColumn()).toBe('1');
+      737 |     expect(catalog()).toBe(before);
+    > 738 |     expect(appliedMigrations()).toBe('165');
+          |                                 ^
+      739 |     // Simulated operator drain (SQL cannot prove an actual writer drain): every claim removed.
+      740 |     sql(`UPDATE "ScoutReconstructionLedger" SET source_platform=NULL`);
+      741 |     const narrowRows = allLedger().map((r: any) => { const { source_platform, ...rest } = r; return rest; });
+
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:738:33)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "lock timeout"
+    Received string:    "Error: Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:54325/g2_s5_etq0_disposable?connect_timeout=5
+    ERROR:  G2-E platform column already exists
+    CONTEXT:  PL/pgSQL function inline_code_block line 33 at RAISE
+    "
+
+      49 |   try { sql(statement); } catch (e) { error = e; }
+      50 |   if (error === undefined) throw new Error('SQL unexpectedly succeeded');
+    > 51 |   expect(String(error)).toContain(message);
+         |                         ^
+      52 | }
+      53 |
+      54 | export const stageSql = resolve(root, 'prisma/migrations', E_MIGRATION);
+
+      at refused (test/utils/g2-pg17-harness.ts:51:25)
+      at Object.<anonymous> (test/rls-g2-pg17-etq0.spec.ts:785:14)
+
+Test Suites: 1 failed, 1 total
+Tests:       12 failed, 37 passed, 49 total
+Snapshots:   0 total
+Time:        159.604 s
+Ran all test suites matching test/rls-g2-pg17-etq0.spec.ts.
+PROOF_EXIT=1 STAGE=live TS=20260920T182017Z
