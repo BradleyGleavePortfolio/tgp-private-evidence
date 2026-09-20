@@ -4,11 +4,17 @@ Parent owns scheduling. All moderate/heavy commands require an explicit slot and
 
 ## Current slot
 
-S2 R3 SLOT A granted: verified static shellcheck/actionlint tool acquisition and workflow/shell lint under nonblocking lock. Owner `s2_r3_delivery_fixer_muaeepli`. Await explicit completion/release before granting S4.
+S4 R3 SLOT B active: deterministic install and focused tests passed; continuation granted for committed-head full Vitest/gates/package and browser positive/control proof. Owner `s4_r3_auth_fixer_muaeepla`. Candidate `84471e9` observed; wait for final frozen packet and lock release.
 
 S6 combined R2 finished at `55db31a0`: all stages exit 0, packet frozen, lock released. Both final audits are archived; candidate remains NOT CLEARED.
 
-Next reserved slot: S4 deterministic install and focused authentication-body tests. Reservation is not execution authorization; parent grants after S2 releases.
+S2 SLOT A closed. Clean candidate `1c6db2b6` has exact-head plain-Node adversarial controls and real shell/action lint, but Jest remains unrun.
+
+Next reserved slot: S1 shared S1/S2 locked dependency installation, verified PostgreSQL/client setup and owned S1 synthetic fixture proof. Source `7cbbb039` guard has 72/0 exact-head offline assertions accepted as a prerequisite. Wrapper corrections must precede execution. Reservation is not execution authorization; parent grants after S4 releases.
+
+S5 `9f38ab03` source committed; first packet archived as a checkpoint only. Runner corrections required: canonical lock, actual disposable-server preflight before reset, explicit working directory. No install or DB authorization yet.
+
+S6 source repair continues. Unslotted unstamped type-check smoke runs are excluded from acceptance evidence; authorized final-head proof remains required.
 
 ## Awaiting specific execution requests
 
