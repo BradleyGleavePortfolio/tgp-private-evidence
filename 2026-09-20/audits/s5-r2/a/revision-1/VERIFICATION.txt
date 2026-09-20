@@ -1,0 +1,85 @@
+S5 R2 auditor A bounded verification
+2026-09-20T21:25:02.075286+00:00
+No tests, DB connection, install, source edits, or publication performed.
+
+$ git -C worktrees/s5 status --short
+
+
+EXIT=0
+
+$ git -C worktrees/s5 rev-parse HEAD HEAD^{tree}
+485c67973b56758fb9b8404579f5ddaec87136bd
+2fbf5028413557f99faea3f1de27b1352a4fe8d4
+
+
+EXIT=0
+
+$ git -C worktrees/s5 merge-base d7404cd49578647cf72bb633819d8e86ffc3da3a HEAD
+d7404cd49578647cf72bb633819d8e86ffc3da3a
+
+
+EXIT=0
+
+$ git -C worktrees/s5 merge-base 925780e0a1906593e5383c618311b6b17364b8dc d7404cd49578647cf72bb633819d8e86ffc3da3a
+925780e0a1906593e5383c618311b6b17364b8dc
+
+
+EXIT=0
+
+$ git -C worktrees/s5 diff --stat d7404cd49578647cf72bb633819d8e86ffc3da3a..HEAD
+ test/rls-g2-pg17-etq0.spec.ts       | 850 ++++++++++++++++++++++++++++++++++++
+ test/scout/g2-pg17-db-guard.spec.ts |  61 +++
+ test/utils/g2-pg17-bootstrap.sh     | 141 ++++++
+ test/utils/g2-pg17-db.ts            |  75 ++++
+ test/utils/g2-pg17-harness.ts       | 226 ++++++++++
+ test/utils/g2-tq0-worker.cjs        |   6 +-
+ 6 files changed, 1357 insertions(+), 2 deletions(-)
+
+
+EXIT=0
+
+$ git -C worktrees/s5 log -3 --format=%H %T %an <%ae> %cn <%ce>
+485c67973b56758fb9b8404579f5ddaec87136bd 2fbf5028413557f99faea3f1de27b1352a4fe8d4 Bradley Gleave <bradley@bradleytgpcoaching.com> Bradley Gleave <bradley@bradleytgpcoaching.com>
+5270e103cd5d051405e74dbb0e32796ac07b4964 1c06cdfa03365d396ab1055dabb491d2efd8ec25 Bradley Gleave <bradley@bradleytgpcoaching.com> Bradley Gleave <bradley@bradleytgpcoaching.com>
+65b1da27d9dab4f51f5fad6d8a05be8b64e53dde 9bbc0223e809e8e9b10b541bbde98b11903be362 Bradley Gleave <bradley@bradleytgpcoaching.com> Bradley Gleave <bradley@bradleytgpcoaching.com>
+
+
+EXIT=0
+
+$ git -C worktrees/s5 bundle verify /home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle
+The bundle contains this ref:
+485c67973b56758fb9b8404579f5ddaec87136bd refs/heads/execute/20260920-s5-g2
+The bundle requires this ref:
+c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7 
+The bundle uses this hash algorithm: sha1
+
+/home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle is okay
+
+EXIT=0
+
+$ git -C worktrees/s5 diff --check d7404cd49578647cf72bb633819d8e86ffc3da3a..HEAD
+
+
+EXIT=0
+
+$ bash -n worktrees/s5/test/utils/g2-pg17-bootstrap.sh
+
+
+EXIT=0
+
+$ bash -n repos/evidence/2026-09-20/remediation/s5-r2/revision-1/run-proof.sh
+
+
+EXIT=0
+
+$ node --check worktrees/s5/test/utils/g2-tq0-worker.cjs
+
+
+EXIT=0
+SHA256SUMS: 114 entries; mismatches=[]
+Final bundle sha256=7b2e2e5ce1d4ebfb547357c799e03a3ad18c205bea58e4c3d70e1c6e49cf9b8d
+
+Read-only gh pr view observed separately during this audit:
+#528 OPEN head=8644715c429e7dde1dfeb71f7ad42b1bd9121eaf base=agent/orchestrator/backend-repair-r3 https://github.com/BradleyGleavePortfolio/growth-project-backend/pull/528
+#529 OPEN head=d7404cd49578647cf72bb633819d8e86ffc3da3a base=agent/builder/g2-e-ledger-platform https://github.com/BradleyGleavePortfolio/growth-project-backend/pull/529
+Read-only git ls-remote observed earlier this audit: main=c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; PR528/529 refs match above.

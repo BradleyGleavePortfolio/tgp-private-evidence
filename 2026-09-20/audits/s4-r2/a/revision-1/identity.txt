@@ -1,0 +1,125 @@
+S4 R2 A identity snapshot 2026-09-20T21:27:27.176760+00:00
+Read-only local observations; PR observations in pr25.json/pr26.json.
+Earlier read-only ls-remote observation: refs/heads/main 0111be661922234d670bbf23e23d270eec1b4a4e; refs/pull/25/head 49c1aa96fa2d6df9a09f22c97952b45d10271952; refs/pull/26/head d595092c50ffdf891ebec11f27e29436fa27af89.
+
+$ git -C /home/user/workspace/worktrees/s4 rev-parse HEAD HEAD^{tree}
+c5a5ae12c5b3c3e32a4601c99319ad7c0d980057
+5f3c8f6a729427ce6c23bcb1ba18dc7b986b7447
+
+
+exit=0
+
+$ git -C /home/user/workspace/worktrees/s4 merge-base HEAD 0111be661922234d670bbf23e23d270eec1b4a4e
+0111be661922234d670bbf23e23d270eec1b4a4e
+
+
+exit=0
+
+$ git -C /home/user/workspace/worktrees/s4 status --porcelain=v1
+
+
+exit=0
+
+$ git -C /home/user/workspace/worktrees/s4 diff --stat a6d885a HEAD
+ background.js                      |  31 +++-
+ docs/PACKAGE_PROOF.md              |  18 ++-
+ scripts/browser-load-proof.mjs     | 323 +++++++++++++++++++++++++++++--------
+ test/router-principal-gate.spec.js | 120 ++++++++++++++
+ 4 files changed, 414 insertions(+), 78 deletions(-)
+
+
+exit=0
+
+$ git -C /home/user/workspace/worktrees/s4 log -3 --format=fuller
+commit c5a5ae12c5b3c3e32a4601c99319ad7c0d980057
+Author:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+AuthorDate: Sun Sep 20 18:07:59 2026 +0000
+Commit:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+CommitDate: Sun Sep 20 18:07:59 2026 +0000
+
+    S4 R2: wait for worker bindings/router before probing the packaged worker
+    
+    Attaching on target discovery races the worker's extension bindings and the
+    module graph's top-level evaluation (r2a run: chrome.runtime undefined ~1.5s
+    after launch). Poll until chrome.runtime.id is a string and the router has
+    registered (15s cap) and record the last observed state plus per-phase
+    progress in aborted evidence so any future abort is diagnosable.
+
+commit a2a52fd461398c34b301e5ebfaeafae7c7c8de6c
+Author:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+AuthorDate: Sun Sep 20 18:02:55 2026 +0000
+Commit:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+CommitDate: Sun Sep 20 18:02:55 2026 +0000
+
+    S4 R2: bind loader proof to packaged identity; gate legacy/capture kinds; origin-only error text
+    
+    Browser harness (scripts/browser-load-proof.mjs), root cause of try1-3: the
+    worker selector took the first service_worker target, which was a Chrome
+    component extension, and one check was hard-coded true.
+    - Select the worker whose URL path equals the shipped manifest's
+      background.service_worker; assert chrome.runtime.id, URL host/path and
+      manifest name/version/version_name agree with the shipped manifest.
+    - evaluate() surfaces exceptionDetails/undefined; aborted runs write evidence
+      with abortError and exit non-zero.
+    - Popup check asserts the truthful fresh-profile state: module graph loads,
+      no session, redirect to pair.html with the pairing form present.
+    - Network.requestWillBeSent observed on page/popup/worker sessions; every
+      attempted host must be the synthetic host or the extension origin.
+    - Evidence binds package sha256 and the inventory's source head.
+    - Negative control passes only on the specific no-receiver signature with all
+      unrelated checks passing; verdict recorded in the evidence JSON.
+    
+    background.js (audit S4-A-03/B-05, S4-A-05/B-07):
+    - start_ingest, start_capture, stop_capture now require the trusted
+      extension-page sender shape, like start_import/session_established.
+    - Pre-run lastError text carries the tab origin only, never a full URL.
+    - test/router-principal-gate.spec.js pins both.
+
+commit a6d885a10d7dbc64e99961f44e0f6fe7bea5dfba
+Author:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+AuthorDate: Sun Sep 20 17:00:17 2026 +0000
+Commit:     Bradley Gleave <bradley@bradleytgpcoaching.com>
+CommitDate: Sun Sep 20 17:00:17 2026 +0000
+
+    S4: reproducible manifest-closure package, integrity spec, isolated browser load proof
+    
+    - scripts/lib/shipping.mjs: manifest closure collector (module graph via TS AST,
+      classic content scripts compiled as scripts, page module graphs, icons,
+      locales); fails closed on missing/escaping/dev-only references; deterministic
+      STORE zip with CRC-verified reader.
+    - scripts/package-extension.mjs: builds dist/<name>-<version_name>.zip plus a
+      per-file sha256 inventory with source head and cleanliness.
+    - test/package-integrity.spec.js: determinism, round-trip + corruption, frozen
+      permissions/hosts, no dev/test references in shipped code, negative loader
+      cases including the historical classic-script ESM defect.
+    - scripts/browser-load-proof.mjs: loads the built archive into an isolated local
+      Chrome over the DevTools pipe (throwaway profile, DNS mapped to NOTFOUND except
+      a synthetic source host served locally with an SPKI-pinned cert); checks
+      worker, popup and content script evaluation, the internal token boundary, and
+      that the synthetic token never reaches storage or console; negative-control
+      mode must detect the reapplied defect. Exits 2 with an explicit gap when no
+      Chrome is available. Loader proof only, not import completion.
+    - jsconfig.json/types: pin string_decoder like punycode so a stray ancestor
+      node_modules package cannot enter the checked program.
+    - package.json: package, proof:browser, proof:browser:control scripts.
+
+
+exit=0
+
+$ git -C /home/user/workspace/repos/evidence rev-parse HEAD
+7328446a28e526696716f84ddbec8f2c0c290656
+
+
+exit=0
+
+$ git -C /home/user/workspace/repos/context rev-parse HEAD
+acf3c424fca7e5c358bd9d4bd63c9f4000c3c2ae
+
+
+exit=0
+
+$ node --version
+v20.20.1
+
+
+exit=0
