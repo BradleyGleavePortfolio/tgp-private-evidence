@@ -1,0 +1,35 @@
++ rm -rf /tmp/recovered-s5 /tmp/recovered-old-root
++ git clone -q --branch main /home/user/workspace/repos/backend /tmp/recovered-s5
++ git -C /tmp/recovered-s5 rev-parse HEAD
+c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7
++ B=/home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle
++ sha256sum /home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle
+7b2e2e5ce1d4ebfb547357c799e03a3ad18c205bea58e4c3d70e1c6e49cf9b8d  /home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle
++ git -C /tmp/recovered-s5 bundle verify /home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle
+/home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle is okay
+The bundle contains this ref:
+485c67973b56758fb9b8404579f5ddaec87136bd refs/heads/execute/20260920-s5-g2
+The bundle requires this ref:
+c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7 
+The bundle uses this hash algorithm: sha1
++ git -C /tmp/recovered-s5 fetch -q /home/user/workspace/repos/evidence/2026-09-20/remediation/s5-r2/revision-1/s5-g2-candidate.bundle execute/20260920-s5-g2:recovered-s5
++ git -C /tmp/recovered-s5 switch -q recovered-s5
++ git -C /tmp/recovered-s5 rev-parse HEAD 'HEAD^{tree}'
+485c67973b56758fb9b8404579f5ddaec87136bd
+2fbf5028413557f99faea3f1de27b1352a4fe8d4
++ git -C /tmp/recovered-s5 cat-file -t 925780e0a1906593e5383c618311b6b17364b8dc
+commit
++ cp /home/user/workspace/worktrees/s5-r3/test/utils/g2-pg17-old-root.sh /tmp/recovered-s5/test/utils/
++ G2_PG17_OLD_ROOT=/tmp/recovered-old-root
++ bash /tmp/recovered-s5/test/utils/g2-pg17-old-root.sh create
+old_root=/tmp/recovered-old-root head=925780e0a1906593e5383c618311b6b17364b8dc detached=yes migrations=164 alternates=none
+G2_PG17_OLD_ROOT_OK
++ echo rc=0
+rc=0
++ grep -E 'in-pack|count'
++ git -C /tmp/recovered-old-root count-objects -v
+count: 0
+in-pack: 13316
++ cat /tmp/recovered-old-root/.git/objects/info/alternates
+cat: /tmp/recovered-old-root/.git/objects/info/alternates: No such file or directory
++ set +x

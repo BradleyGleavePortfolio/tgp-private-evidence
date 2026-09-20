@@ -1,0 +1,358 @@
+From 9f38ab033b08ae30ce2fc62d0150520239d6a5c8 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Sun, 20 Sep 2026 22:55:09 +0000
+Subject: [PATCH] test(s5-r3): assert claim-race terminal contract,
+ deterministic refused down, real detached O fixture
+
+Validation-only follow-up to 485c6797 (S5 R2 audit findings); no src/, prisma/ or workflow change.
+
+- rls-g2-pg17-etq0: the claim-race characterization now awaits the T worker and asserts each
+  branch's terminal contract instead of logging it: down-applied => worker failure
+  {500, Internal server error, P2022}, no result, no completion event, zero ledger rows, zero
+  targets, column absent, history 165, then forward repair; down-refused => column and catalog
+  intact, exactly one ledger row whose status is coupled to the target/result/event
+  (reconstructed, or failed with error:Prisma.P2028 and no target). Both branches converge on a
+  T replay minting exactly one reconstructed row bound to one Person. The 500/P2022 outcome is
+  labelled as characterization of a state a rollout must never enter, not acceptable behaviour.
+- New deterministic refused-branch test: the fixture worker holds its claim past E's 5 s
+  lock_timeout (txTimeout, fixture-only), down is refused with a lock timeout leaving column,
+  catalog, history and visibility untouched, and the released claim then commits whole.
+- g2-tq0-worker.cjs: optional fixture-only txTimeout passed to Prisma $transaction only when the
+  service passes no options.
+- New test/utils/g2-pg17-old-root.sh: creates/verifies the preserved-O fixture as a detached
+  Git checkout of 925780e0 (self-contained local clone by default) and runs bootstrap's step-4
+  identity gate offline; a git archive extraction is rejected because it cannot pass that gate.
+- Spec beforeAll reads the confirmed port from the guarded target instead of a literal.
+- Fixture-owned comments corrected: E's forward file is not idempotent (rerun fails closed);
+  --single-transaction is redundant around a file with its own BEGIN/COMMIT. Recovery text
+  remains S1-owned and is untouched.
+---
+ test/rls-g2-pg17-etq0.spec.ts   | 127 +++++++++++++++++++++++++++++---
+ test/utils/g2-pg17-bootstrap.sh |   4 +-
+ test/utils/g2-pg17-harness.ts   |   5 +-
+ test/utils/g2-pg17-old-root.sh  |  82 +++++++++++++++++++++
+ test/utils/g2-tq0-worker.cjs    |   8 +-
+ 5 files changed, 212 insertions(+), 14 deletions(-)
+ create mode 100755 test/utils/g2-pg17-old-root.sh
+
+diff --git a/test/rls-g2-pg17-etq0.spec.ts b/test/rls-g2-pg17-etq0.spec.ts
+index 84d8a51..840c2c6 100644
+--- a/test/rls-g2-pg17-etq0.spec.ts
++++ b/test/rls-g2-pg17-etq0.spec.ts
+@@ -10,7 +10,7 @@ import { resolve } from 'path';
+ import {
+   allLedger, appliedMigrations, blocked, catalog, directory, down, encoded, expectedVersion, gitShow,
+   hasColumn, holdAdvisory, holdTransaction, json, legacy, legacyEntityCursor, oldClient, oldRoot, OLD_HEAD, prisma, prismaMigrateDeploy,
+-  quote, records, refused, resetData, root, run, settle, sql, sqlAdmin, sqlFile, stage, stageMany, targets, up, upFile, v2, worker,
++  quote, records, refused, resetData, root, run, settle, sql, sqlAdmin, sqlFile, stage, stageMany, target, targets, up, upFile, v2, worker,
+ } from './utils/g2-pg17-harness';
+ 
+ jest.setTimeout(180000);
+@@ -33,7 +33,8 @@ beforeAll(() => {
+     (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
+   // Every DDL/data statement of this proof runs as the NON-superuser, BYPASSRLS, owning
+   // `postgres` role (Supabase shape); the cluster superuser only observes lock waits.
+-  expect(identity).toMatchObject({ database: 'g2_s5_etq0_disposable', address: '127.0.0.1', port: 54325,
++  // The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).
++  expect(identity).toMatchObject({ database: 'g2_s5_etq0_disposable', address: '127.0.0.1', port: target.port,
+     directory, user: 'postgres', super: false, bypassrls: true, owner: 'postgres' });
+   expect(sql(`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`)).toBe('0');
+   expect(Number(identity.version)).toBe(expectedVersion);
+@@ -780,8 +781,10 @@ describe('stage 5: rollout recovery boundaries after T has claimed provenance',
+     expect(tOnNarrow.failure).toMatchObject({ status: 500, message: 'Internal server error' });
+     expect(tOnNarrow.result).toBeUndefined();
+     expect(records()).toHaveLength(3);
+-    // Forward repair is the operator form (psql --single-transaction -f migration.sql), then the
+-    // only truth is the catalog; T reclaims every NULL row without minting new targets.
++    // Forward repair is the operator form (psql -f migration.sql); it applies only while the column is
++    // absent and is NOT idempotent: a rerun on applied E fails closed ('G2-E platform column already
++    // exists', proven above). The only truth signal is the catalog, not Prisma history; afterwards T
++    // reclaims every NULL row without minting new targets.
+     sqlFile(upFile);
+     expect(hasColumn()).toBe('1');
+     expect(prismaMigrateDeploy(root)).toMatch(/No pending migrations/);
+@@ -818,12 +821,18 @@ describe('stage 5: rollout recovery boundaries after T has claimed provenance',
+ 
+   it('characterizes down against an actual T claim transaction paused inside its interactive transaction', async () => {
+     // Prisma interactive transactions have a 5 s default ceiling and E uses lock_timeout=5 s; which
+-    // budget expires first is a race, so only the invariants are asserted and the branch is recorded.
++    // budget expires first is a race. The branch is recorded, and EACH branch's terminal contract is
++    // asserted after the worker has exited: worker result/failure, completion event, ledger rows,
++    // target rows, catalog and history. Neither ordering is asserted to always win.
+     stage('claimrace');
++    const before = { ledger: records(), targets: targets(), catalog: catalog() };
++    expect(before.ledger).toEqual([]);
++    expect(before.targets).toEqual({ persons: [], entities: [] });
+     const paused = worker({ pause: 'claimed' });
+     await paused.ready;
+     let branch = 'down-refused';
+     let message = '';
++    let outcome!: Result; // assigned inside try; the finally only stops the child
+     try {
+       try { sql(down); branch = 'down-applied'; } catch (e) { message = String(e); }
+       console.warn('PG17_CLAIM_RACE', JSON.stringify({ branch, message: message.split('\n').find((l) => l.includes('ERROR')) ?? '' }));
+@@ -831,20 +840,116 @@ describe('stage 5: rollout recovery boundaries after T has claimed provenance',
+         // Either the lock budget fired or the claim was visible and refused; the column survives.
+         expect(message).toMatch(/lock timeout|refuses removal of assigned provenance/);
+         expect(hasColumn()).toBe('1');
++        expect(catalog()).toBe(before.catalog);
+       } else {
+-        // OBSERVED on PG17 (run 20260920T183610Z): Prisma's 5 s interactive-transaction ceiling
+-        // expires before E's 5 s lock_timeout, the paused claim is rolled back, the drained down
+-        // succeeds and the T worker fails closed (500, P2022) leaving no partial ledger row.
+         // down can only have succeeded on a drained ledger: the paused claim must have rolled back.
+         expect(hasColumn()).toBe('0');
+         expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_id='claimrace'`)).toBe('0');
+       }
+       paused.release();
+-      const outcome = await paused.done;
+-      console.warn('PG17_CLAIM_RACE_WORKER', JSON.stringify({ result: outcome.result, failure: outcome.failure }));
++      outcome = await paused.done;
+     } finally { paused.stop(); }
+-    if (branch === 'down-applied') { sqlFile(upFile); }
++    console.warn('PG17_CLAIM_RACE_WORKER', JSON.stringify({ branch, result: outcome.result, failure: outcome.failure, events: outcome.events.length }));
++    const ledger = records();
++    const after = targets();
++    if (branch === 'down-applied') {
++      // OBSERVED on PG17 (runs 20260920T183610Z/184713Z/185210Z): Prisma's 5 s ceiling expires before
++      // E's 5 s lock_timeout, the paused claim (Person + ledger row + claim) is rolled back, the drained
++      // down succeeds, and the released T worker fails closed: its success transaction is already
++      // closed, and the follow-up durable `failed` write hits the now-absent column (P2022) and
++      // propagates instead of minting a row. This CHARACTERIZES a mixed E-down/T-live state that a
++      // real rollout must never enter (T is drained by process control before any down); a 500 to the
++      // caller is not acceptable production behaviour and is not endorsed by this assertion.
++      expect(outcome.result).toBeUndefined();
++      expect(outcome.failure).toEqual({ status: 500, message: 'Internal server error', code: 'P2022' });
++      expect(outcome.events).toEqual([]);
++      // Terminal state: no partial or durable ledger row, no orphan target, column absent, history untouched.
++      expect(ledger).toEqual([]);
++      expect(after).toEqual({ persons: [], entities: [] });
++      expect(hasColumn()).toBe('0');
++      expect(appliedMigrations()).toBe('165');
++      // Forward repair (catalog is the only truth signal) restores the identical E catalog.
++      sqlFile(upFile);
++      expect(catalog()).toBe(before.catalog);
++    } else {
++      // down was refused, so E stayed. Two legal terminal outcomes for the released claim, each with
++      // its own coupled ledger/target invariant:
++      //  (a) the interactive transaction was still open: claim + target + `reconstructed` commit together;
++      //  (b) the client ceiling had expired meanwhile: the success transaction rolled back (no target)
++      //      and the worker recorded ONE durable `failed` row with reason error:Prisma.P2028.
++      expect(outcome.failure).toBeUndefined();
++      expect(hasColumn()).toBe('1');
++      expect(catalog()).toBe(before.catalog);
++      expect(ledger).toHaveLength(1);
++      expect(ledger[0]).toMatchObject({ source_id: 'claimrace', source_platform: 'truecoach' });
++      if (ledger[0].status === 'reconstructed') {
++        expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
++        expect(outcome.events).toHaveLength(1);
++        expect(after.entities).toEqual([]);
++        expect(after.persons.map((p: any) => p.id)).toEqual([ledger[0].target_id]);
++      } else {
++        expect(ledger[0]).toMatchObject({ status: 'failed', target_id: null, reason: 'error:Prisma.P2028' });
++        expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 0, skipped: 0, failed: 1 });
++        expect(outcome.events).toHaveLength(1);
++        expect(after).toEqual({ persons: [], entities: [] });
++      }
++    }
++    // Both branches converge: E applied, history unchanged, and a T replay reclaims the staged row into
++    // exactly one reconstructed ledger row bound to exactly one Person, minting nothing else.
+     expect(hasColumn()).toBe('1');
+     expect(appliedMigrations()).toBe('165');
++    expect((await run()).result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
++    const converged = records();
++    expect(converged.map((r: any) => [r.source_id, r.status, r.source_platform])).toEqual([['claimrace', 'reconstructed', 'truecoach']]);
++    expect(targets().persons.map((p: any) => p.id)).toEqual([converged[0].target_id]);
++    expect(targets().entities).toEqual([]);
++  });
++
++  it('refuses down with a lock timeout while an actual T claim transaction outlives E\'s lock budget, and the released claim then commits intact', async () => {
++    // Deterministic form of the refused branch above. Only the FIXTURE widens this one worker's
++    // Prisma interactive-transaction ceiling (`txTimeout`, test/utils/g2-tq0-worker.cjs), so the
++    // paused claim keeps its table/row locks past E's 5 s lock_timeout. Production T runs with
++    // Prisma's default ceiling: this proves E/down's fail-closed lock budget and the integrity of a
++    // claim that survives a refused down; it is NOT a production guarantee that in-flight T
++    // transactions protect the ledger against a down (they do not; drain is a process boundary).
++    stage('claimrace2');
++    const before = catalog();
++    expect(records()).toEqual([]);
++    const paused = worker({ pause: 'claimed', txTimeout: 30000 });
++    await paused.ready;
++    let outcome!: Result; // assigned inside try; the finally only stops the child
++    try {
++      const t0 = Date.now();
++      refused(down, 'lock timeout');
++      const elapsed = Date.now() - t0;
++      expect(elapsed).toBeGreaterThanOrEqual(5000);
++      expect(elapsed).toBeLessThan(30000);
++      // Refused before any prerequisite check: column, catalog and history untouched; the paused
++      // claim is still uncommitted and invisible to other sessions.
++      expect(hasColumn()).toBe('1');
++      expect(catalog()).toBe(before);
++      expect(appliedMigrations()).toBe('165');
++      expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_id='claimrace2'`)).toBe('0');
++      expect(targets()).toEqual({ persons: [], entities: [] });
++      paused.release();
++      outcome = await paused.done;
++    } finally { paused.stop(); }
++    console.warn('PG17_CLAIM_REFUSED_WORKER', JSON.stringify({ result: outcome.result, failure: outcome.failure, events: outcome.events.length }));
++    // Terminal contract: the claim commits whole (claim + target + reconstructed), one completion event,
++    // and nothing about E changed.
++    expect(outcome.failure).toBeUndefined();
++    expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
++    expect(outcome.events).toEqual([['coach', 'scout.reconstruct.completed',
++      { intent_id: 'intent', entity_type: 'clients', staged: 1, reconstructed: 1, skipped: 0, failed: 0 }]]);
++    const rows = records();
++    expect(rows.map((r: any) => [r.source_id, r.status, r.source_platform, r.reason])).toEqual([['claimrace2', 'reconstructed', 'truecoach', null]]);
++    expect(targets().persons.map((p: any) => p.id)).toEqual([rows[0].target_id]);
++    expect(targets().entities).toEqual([]);
++    expect(hasColumn()).toBe('1');
++    expect(catalog()).toBe(before);
++    expect(appliedMigrations()).toBe('165');
++    // With the claim now committed, down is refused for the data reason, not the lock budget.
++    refused(down, 'G2-E refuses removal of assigned provenance');
++    expect(hasColumn()).toBe('1');
+   });
+ });
+diff --git a/test/utils/g2-pg17-bootstrap.sh b/test/utils/g2-pg17-bootstrap.sh
+index ce8c46f..be6cfd7 100755
+--- a/test/utils/g2-pg17-bootstrap.sh
++++ b/test/utils/g2-pg17-bootstrap.sh
+@@ -10,7 +10,9 @@
+ #   G2_PG17_PASSWORD      disposable local fixture password shared by s5_super/postgres/service_role
+ #                         (never written to a file by this harness; only into process env / in-memory URLs)
+ #   G2_PG17_PSQL          absolute path of a psql binary compatible with the PG17 server
+-#   G2_PG17_OLD_ROOT      checkout of the preserved O source 925780e0 (git worktree)
++#   G2_PG17_OLD_ROOT      DETACHED Git checkout of the preserved O source 925780e0; create/verify it
++#                         offline with test/utils/g2-pg17-old-root.sh (a `git archive` extraction is
++#                         not a repository and cannot pass step 4 below)
+ #   G2_PG17_OLD_CLIENT    directory that receives the independently generated O Prisma client
+ # Optional:
+ #   G2_PG17_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
+diff --git a/test/utils/g2-pg17-harness.ts b/test/utils/g2-pg17-harness.ts
+index c8e0228..243053e 100644
+--- a/test/utils/g2-pg17-harness.ts
++++ b/test/utils/g2-pg17-harness.ts
+@@ -38,7 +38,10 @@ const psqlRun = (url: string, args: string[], input?: string) => execFileSync(
+ ).trim();
+ export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
+ export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
+-/** Operator form from S1's verified recovery guidance: single transaction, stop on error. */
++/** Operator form: `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>`. E's files carry their own
++ *  BEGIN/COMMIT, so --single-transaction is redundant there (psql only emits nested-transaction
++ *  WARNINGs); it is kept so the harness runs the same command the recovery packet documents.
++ *  Recovery semantics themselves are S1-owned; this helper asserts nothing about them. */
+ export const sqlFile = (file: string): string => psqlRun(migrationUrl, ['--single-transaction', '-f', file]);
+ export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+ export const json = (text: string) => JSON.parse(sql(text));
+diff --git a/test/utils/g2-pg17-old-root.sh b/test/utils/g2-pg17-old-root.sh
+new file mode 100755
+index 0000000..b908053
+--- /dev/null
++++ b/test/utils/g2-pg17-old-root.sh
+@@ -0,0 +1,82 @@
++#!/usr/bin/env bash
++# S5 G2 preserved-O fixture: create (or preflight) the detached checkout of the O
++# writer source 925780e0 that test/utils/g2-pg17-bootstrap.sh step 4 requires.
++#
++# Why this exists: a `git archive | tar` extraction is NOT a Git repository, so it can
++# never satisfy bootstrap's identity gate (`git rev-parse HEAD` == O and a clean
++# relevant-path diff). The fixture must be a real detached checkout. This script clones
++# the candidate root itself (which must contain O in its history, e.g. a bundle restore of
++# the candidate on the public base) and checks out O detached, changing no ref, worktree
++# metadata or file of the candidate repository. It then runs the exact offline checks
++# bootstrap will repeat, so the recipe is verified before any database or dependency work.
++#
++# Usage: G2_PG17_OLD_ROOT=<path> bash test/utils/g2-pg17-old-root.sh [create|preflight]
++#   create     (default) clone + detached checkout at O when the path does not exist,
++#              then preflight. Refuses to reuse a path that is not that checkout.
++#   preflight  only verify an existing path.
++# Optional: G2_PG17_OLD_ROOT_SHARED=1 uses `git clone --shared` (objects read through
++#   alternates from the candidate's object store; zero copy). Default is a self-contained
++#   local clone (hardlinked/copied objects) that keeps working if the source moves.
++# Needs git only. Never deletes anything; never touches PostgreSQL, node_modules, hosted
++# or customer resources.
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++OLD_HEAD=925780e0a1906593e5383c618311b6b17364b8dc
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++MODE="${1:-create}"
++[[ -n "${G2_PG17_OLD_ROOT:-}" ]] || { echo "missing G2_PG17_OLD_ROOT" >&2; exit 2; }
++[[ "$MODE" == create || "$MODE" == preflight ]] || { echo "usage: $0 [create|preflight]" >&2; exit 2; }
++case "$G2_PG17_OLD_ROOT" in /*) ;; *) echo "G2_PG17_OLD_ROOT must be absolute" >&2; exit 2;; esac
++[[ "$G2_PG17_OLD_ROOT" != "$ROOT" && "$G2_PG17_OLD_ROOT" != "$ROOT"/* ]] \
++  || { echo "old root must live outside the candidate root $ROOT" >&2; exit 2; }
++
++# The candidate must carry O in its own history; otherwise the shared node_modules
++# rule in bootstrap (identical package.json/lock) has no basis either.
++git -C "$ROOT" cat-file -e "$OLD_HEAD^{commit}" || { echo "candidate root does not contain O $OLD_HEAD" >&2; exit 3; }
++git -C "$ROOT" merge-base --is-ancestor "$OLD_HEAD" HEAD || { echo "O $OLD_HEAD is not an ancestor of candidate HEAD" >&2; exit 3; }
++
++if [[ "$MODE" == create ]]; then
++  if [[ -e "$G2_PG17_OLD_ROOT" ]]; then
++    [[ -f "$G2_PG17_OLD_ROOT/.git" || -d "$G2_PG17_OLD_ROOT/.git" ]] \
++      || { echo "$G2_PG17_OLD_ROOT exists but is not a Git checkout (an archive extraction cannot pass the identity gate); remove it" >&2; exit 4; }
++    echo "old root already exists; verifying only"
++  else
++    # --no-checkout + checkout --detach: HEAD is the exact O commit, on no branch.
++    # Nothing in the source repository changes either way.
++    if [[ "${G2_PG17_OLD_ROOT_SHARED:-0}" == 1 ]]; then
++      git clone --quiet --shared --no-checkout "$ROOT" "$G2_PG17_OLD_ROOT"
++    else
++      git clone --quiet --no-checkout "$ROOT" "$G2_PG17_OLD_ROOT"
++    fi
++    git -C "$G2_PG17_OLD_ROOT" checkout --quiet --detach "$OLD_HEAD"
++  fi
++fi
++
++# ---- Offline preflight: exactly the bootstrap step-4 gate, plus the spec's byte checks.
++[[ "$(git -C "$G2_PG17_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_PG17_OLD_ROOT" symbolic-ref -q HEAD >/dev/null && { echo "old root HEAD must be detached, not a branch" >&2; exit 4; }
++git -C "$G2_PG17_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between O and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ ! -d "$G2_PG17_OLD_ROOT/prisma/migrations/$E_MIGRATION" ]] || { echo "old root unexpectedly contains E" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_PG17_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "164" ]] || { echo "old root has $OLD_COUNT migrations, expected 164" >&2; exit 4; }
++for file in scout-reconstruct.service.ts scout-roster.service.ts scout-entities.service.ts; do
++  cmp -s "$G2_PG17_OLD_ROOT/src/scout/$file" <(git -C "$ROOT" show "$OLD_HEAD:src/scout/$file") \
++    || { echo "old root src/scout/$file is not byte-identical to $OLD_HEAD" >&2; exit 4; }
++done
++# Only the ledger model must lack the E column (the staging model carries source_platform pre-E).
++grep -q 'model ScoutReconstructionLedger' "$G2_PG17_OLD_ROOT/prisma/schema.prisma" || { echo "old schema lacks the ledger model" >&2; exit 4; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_PG17_OLD_ROOT/prisma/schema.prisma" | grep -q source_platform \
++  || { echo "old ledger model unexpectedly has source_platform" >&2; exit 4; }
++# Dependencies are shared read-only by bootstrap through a symlink; report provenance if present.
++if [[ -L "$G2_PG17_OLD_ROOT/node_modules" ]]; then
++  echo "node_modules symlink -> $(readlink "$G2_PG17_OLD_ROOT/node_modules")"
++elif [[ -e "$G2_PG17_OLD_ROOT/node_modules" ]]; then
++  echo "old root has its own node_modules directory (not the shared symlink); bootstrap will not replace it" >&2; exit 4
++fi
++echo "old_root=$G2_PG17_OLD_ROOT head=$(git -C "$G2_PG17_OLD_ROOT" rev-parse HEAD) detached=yes migrations=$OLD_COUNT" \
++  "alternates=$(cat "$(git -C "$G2_PG17_OLD_ROOT" rev-parse --absolute-git-dir)/objects/info/alternates" 2>/dev/null || echo none)"
++echo "G2_PG17_OLD_ROOT_OK"
+diff --git a/test/utils/g2-tq0-worker.cjs b/test/utils/g2-tq0-worker.cjs
+index 30b847f..aa35e7e 100644
+--- a/test/utils/g2-tq0-worker.cjs
++++ b/test/utils/g2-tq0-worker.cjs
+@@ -33,8 +33,14 @@ async function barrier(phase) {
+ function instrument(target) {
+   return new Proxy(target, {
+     get(object, key) {
++      // FIXTURE-ONLY `txTimeout` (ms): widens this process's Prisma interactive-transaction ceiling
++      // (default 5000) so a paused claim can be held past E's lock_timeout deterministically. The
++      // service passes no options itself; the option is added only when it passes none. This is a
++      // test knob, not a production setting, and proves nothing about production T timing.
+       if (key === '$transaction') return (fn, ...options) => object.$transaction(
+-        (tx) => fn(instrument(tx)), ...options,
++        (tx) => fn(instrument(tx)),
++        ...(options.length === 0 && Number.isInteger(input.txTimeout) && input.txTimeout > 0
++          ? [{ timeout: input.txTimeout }] : options),
+       );
+       if (key === 'scoutIngestEntity') return new Proxy(object[key], {
+         get(delegate, method) {
+-- 
+2.53.0
+
