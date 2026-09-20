@@ -1,0 +1,129 @@
+== S1 R3 proof run attempt 4
+start_utc=2026-09-20T23:21:50Z
+worktree=/home/user/workspace/worktrees/s1-r3
+head=b7d7fe5964680050ab441c195055ea946282a9c3
+tree=abc1ac55bd8f93383b7b0075ec9a4c856e4455d9
+branch=execute/20260920-s1-r3
+worktree_clean=yes
+harness_sha256=5b85bf3d4c961acba569c04811cd3307d3171cbf32cd8f090f87baa891037433
+guard_sha256=6f66e43624fd7ad4337b9b4b67e108fc2192230e8b6e8cc4287b193fe997a8ec
+bootstrap_sha256=e8c42d2e6f2173f0d4acbf5cf47316c4aefaad23aee023e6e08171a6e536da60
+verify_sql_sha256=2bbce0d7ca2e2761f6a6b3d5cebe2df752ac47767f9936d0b77357a46996323e
+migration_sql_sha256=72b0ad5a07cd6ccbcc1e88ef94e311606fb1a85d97f0efa6c38cf87de3cae344
+down_sql_sha256=dd7dd6f33f03fb0738e635530e69299741c1ec4d6e6a848e15ed937a74a7bdeb
+package_lock_sha256=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+prisma_cli=/home/user/workspace/worktrees/s1-r3/node_modules/prisma/build/index.js
+prisma_cli_sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+prisma_version=Prisma schema loaded from prisma/schema.prisma prisma                  : 6.19.3 @prisma/client          : 6.19.3 Computed binaryTarget   : debian-openssl-3.0.x Operating System        : linux Architecture            : x64 Node.js                 : v20.20.1 TypeScript              : 5.9.3 Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node) PSL                     : @prisma/prisma-schema-wasm 7.1.1-3.c2990dca591cba766e3b7ef5d9e8a84796e47ab7 Schema Engine           : schema-engine-cli c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x) Default Engines Hash    : c2990dca591cba766e3b7ef5d9e8a84796e47ab7 Studio                  : 0.511.0 
+node_version=v20.20.1
+psql_version=psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+pg_dump_version=pg_dump (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+S1_PG_PORT=54321
+S1_PG_SUPER_URL=postgresql://<redacted>@127.0.0.1:54321/postgres
+S1_PG_DISPOSABLE_CONFIRM=DESTROY-127.0.0.1:54321/s1_rls_proof,s1_rls_proof_lock
+guard_preflight=accepted (offline+preflight passed in wrapper before any tool call; harness re-runs both)
+lock=/home/user/workspace/execution/test-validation.lock held nonblocking by pid 24550
+harness_ceiling_s=1800
+cpu=2
+mem_total_kb=8157184
+disk_free=6.4G
+command=timeout --foreground 1800 bash test/db/s1-rls-close-public-exposure.sh s1_rls_proof
+detail_log=/home/user/workspace/execution/s1-r3/proof-run-04-head-b7d7fe5-harness-detail.log
+== harness output
+== S1-DB-01 proof on 127.0.0.1:54321 db=s1_rls_proof  (log: /home/user/workspace/execution/s1-r3/proof-run-04-head-b7d7fe5-harness-detail.log)
+PASS  replay of parent migration chain (without candidate) as non-superuser postgres
+PASS  out-of-band rls_fitness_backend.sql applies (production pre-state twin)
+PASS  pre-state reproduces exactly the 18 observed RLS-disabled public relations
+PASS  pre-state: anon has full CRUD on DunningAttempt via default privileges
+PASS  pre-state: verify.sql FAILS (detects exposure)
+PASS  pre-state: verify.sql failure names the exposure (not an internal error)
+PASS  synthetic fixtures inserted
+PASS  DB2: parent chain + legacy RLS file replayed for the lock/recovery scenario
+PASS  DB2: pre-state helper catalog recorded (protect_partition absent, search_path unpinned, partition unprotected)
+PASS  DB2 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO on the exposed pre-state
+PASS  DB2: blocker session holds a lock on community_messages_2027_01 (late-stage object)
+PASS  DB2 direct: migration.sql (psql --single-transaction) fails with lock_timeout SQLSTATE 55P03 at the LATE-STAGE lock
+PASS  DB2 direct: lock wait bounded (6s <= 12s)
+PASS  DB2 direct: failed attempt left the 14-table pre-state untouched (18 still exposed)
+PASS  DB2 direct: helper catalog unchanged after the late-stage failure (explicit single transaction)
+PASS  DB2: blocker still alive before the failure-path same-session check
+PASS  DB2 same-session FAILURE path: the aborted attempt raised 55P03 inside the session
+PASS  DB2 same-session FAILURE path: after ROLLBACK the SAME connection shows default timeouts (no leak from the aborted file)
+PASS  DB2: blocker still alive before the Prisma attempt
+PASS  DB2 prisma: migrate deploy fails (non-zero) while the late-stage lock is held
+PASS  DB2 prisma: deploy failure bounded (6s <= 20s)
+PASS  DB2 prisma: failed deploy recorded in _prisma_migrations (finished_at null, rolled_back_at null)
+PASS  DB2 prisma: WHOLE-FILE rollback discriminated — 14-table DO (executed BEFORE the failing statement) is rolled back, 18 still exposed
+PASS  DB2 prisma: WHOLE-FILE rollback discriminated — CREATE OR REPLACE FUNCTION statements (executed BEFORE the failing statement) are rolled back
+PASS  DB2 prisma: verify.sql fails cleanly after the failed attempt
+PASS  DB2: blocker released (no lock left on community_messages_2027_01)
+PASS  DB2: documented recovery step 1 — prisma migrate resolve --rolled-back succeeds after a REAL failure
+PASS  DB2: documented recovery step 2 — prisma migrate deploy succeeds once the lock is gone
+PASS  DB2: verify.sql passes after recovery
+PASS  DB2 (S2 gate route): prisma db execute --file verify.sql exits ZERO on the protected state
+PASS  DB2 verifier classes: service_role losing SELECT fails the gate (exit non-zero)
+PASS  DB2 verifier classes: reported as ALLOWED-PATH with 0 EXPOSURE problems
+PASS  DB2 verifier classes: message names the lost privilege
+PASS  DB2 (S2 gate route): prisma db execute also exits NON-ZERO on the allowed-path drift
+PASS  DB2 verifier classes: restored grant -> verify passes again
+PASS  DB2 verifier classes: RLS disabled on one table is reported as EXPOSURE (1 exposure problem(s); 0 allowed-path)
+PASS  DB2 verifier classes: restored RLS -> verify passes again
+PASS  DB2: down.sql runs (--single-transaction)
+      DB2 observed: resolve --rolled-back after reversal WITH earlier failed row -> exit 0; applied row: 1
+PASS  DB2: applied row still marked applied after resolve (Prisma state unchanged by reversal)
+PASS  DB2: verify.sql FAILS after reversal regardless of Prisma output
+PASS  DB2 same-session SUCCESS path (control): a leaked SET IS observable in the same connection
+PASS  DB2 same-session SUCCESS path: after migration.sql in the SAME connection timeouts are back to defaults (RESET effective)
+PASS  DB2: direct re-apply restored protection (verify passes)
+PASS  DB2 same-session SUCCESS path: down.sql in one connection also leaves default timeouts (RESET effective)
+PASS  prisma migrate deploy applies the candidate (lock released)
+PASS  verify.sql passes after apply
+PASS  verify.sql reports all 18 relations protected (4 partitions)
+PASS  timeouts RESET at end of migration (fresh session defaults)
+PASS  no RLS-disabled relation remains in public that CI's floor would flag among the 18
+PASS  populated data preserved (row counts unchanged)
+PASS  no other table's RLS flags or ACLs changed (catalog snapshot identical)
+PASS  community_messages parent policies untouched
+PASS  idempotent re-run of migration.sql succeeds
+PASS  verify.sql still passes after re-run
+PASS  anon: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations
+PASS  anon: cannot execute community_messages_create_month_partition
+PASS  authenticated: SELECT/INSERT/UPDATE/DELETE denied (42501) on all 18 relations
+PASS  authenticated: cannot execute community_messages_create_month_partition
+PASS  service_role (BYPASSRLS) via authenticator still reads DunningAttempt
+PASS  service_role can write recent_auth_nonce
+PASS  postgres (BYPASSRLS, the source-assumed app role) reads and writes coach_ltv_peak
+PASS  RLS alone (probe role WITH grants): SELECT on DunningAttempt returns 0 rows
+PASS  RLS alone: SELECT on protected partition directly returns 0 rows (1 seeded)
+PASS  RLS alone: INSERT into recent_auth_nonce rejected by policy (42501)
+PASS  RLS alone: FORCE applies to table owner? (owner is postgres BYPASSRLS -> unaffected, expected 00000)
+PASS  parent path: coach (via app.current_user_id) reads both seeded messages through community_messages
+PASS  parent path: cohort member reads cohort messages
+PASS  parent path: non-member reads nothing
+PASS  parent path: member INSERT routes into protected partition 2027_02 and succeeds
+PASS  parent path: inserted row landed in community_messages_2027_02
+PASS  parent path: forged sender rejected by existing parent policy (42501)
+PASS  app.* helpers still resolve with search_path='' (coach check true)
+PASS  new partition created by helper
+PASS  new partition has RLS enabled+forced and no anon/authenticated privileges
+PASS  new partition carries the deny/service_role policies
+PASS  anon denied on new partition
+PASS  helper is idempotent (second call for same month succeeds)
+PASS  down.sql applies (--single-transaction, ON_ERROR_STOP)
+PASS  down.sql restores the exposed pre-state (18 relations RLS off again; new partition also unprotected)
+PASS  down.sql changes the schema dump (reverse is not a no-op)
+PASS  INVARIANT: after out-of-band reversal, prisma migrate status still claims up to date
+PASS  INVARIANT (clean history): prisma migrate resolve --rolled-back refuses with P3012
+PASS  INVARIANT: verify.sql (catalog truth) FAILS while Prisma says up to date
+PASS  recovery: re-running migration.sql with psql --single-transaction restores protection
+PASS  recovery: verify.sql passes again
+PASS  REVERSIBILITY GATE PARITY: schema dump after forward->down->forward is byte-identical
+PASS  prisma migrate status still up to date after direct re-apply (history untouched)
+PASS  data still intact after reversal + re-apply (seeded counts + 1 parent-path insert)
+PASS  row content intact (seeded bodies present, read by BYPASSRLS owner)
+== 89 passed, 0 failed (server 17.6, head b7d7fe5)
+== end
+harness_exit_code=0
+end_utc=2026-09-20T23:22:33Z
+head_after=b7d7fe5964680050ab441c195055ea946282a9c3 clean_after=yes
+log_sha256=b90e0d732debba5cf46b0c8b2ed828158ac30ed31319831bd136aa19fc23f796

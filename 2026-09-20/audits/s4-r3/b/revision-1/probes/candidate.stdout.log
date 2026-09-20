@@ -1,0 +1,117 @@
+{
+  "head": "84471e99b278e964f7cb3f6bf9c78491064c41b7",
+  "root": "/home/user/workspace/worktrees/s4-r3",
+  "cases": "all",
+  "candidateShape": true,
+  "observations": [
+    {
+      "case": "C1 pair: complete JSON, stream never closes, deadline fires",
+      "liveDeadlineBeforeFire": 1,
+      "stateAfterDeadline": "resolved",
+      "value": {
+        "ok": false,
+        "error": "That took too long. Check your connection and try again."
+      },
+      "requestSignalAborted": true,
+      "streamCancelRequested": true,
+      "sessionEstablishedSentAfterSettle": 0,
+      "events": [
+        "pair_timeout"
+      ]
+    },
+    {
+      "case": "C1 refresh: complete JSON, stream never closes, deadline fires",
+      "liveDeadlineBeforeFire": 1,
+      "stateAfterDeadline": "resolved",
+      "value": null,
+      "streamCancelRequested": true,
+      "storedRefreshAfter": "R-c1",
+      "nextGetAccessToken": "A-fresh",
+      "fetchesTotal": 2,
+      "events": [
+        "refresh_timeout"
+      ]
+    },
+    {
+      "case": "C2 pair: body stream errors with AbortError on deadline abort (browser-shaped)",
+      "value": {
+        "ok": false,
+        "error": "That took too long. Check your connection and try again."
+      },
+      "requestSignalAborted": true,
+      "streamErrored": true,
+      "events": [
+        "auth_body_cancel_failed",
+        "auth_body_cancel_failed",
+        "pair_timeout"
+      ],
+      "spuriousCancelFailedLogged": true,
+      "bodyBytesInConsole": false,
+      "sessionEstablishedSent": 0
+    },
+    {
+      "case": "C2 refresh: body stream errors with AbortError on deadline abort",
+      "value": null,
+      "streamErrored": true,
+      "events": [
+        "auth_body_cancel_failed",
+        "auth_body_cancel_failed",
+        "refresh_timeout"
+      ],
+      "spuriousCancelFailedLogged": true,
+      "bodyBytesInConsole": false,
+      "storedRefreshAfter": "R-c2"
+    },
+    {
+      "case": "C3 readBoundedJson: chunked body exceeding MAX_AUTH_BODY_BYTES",
+      "totalBytes": 18022,
+      "chunkCount": 4,
+      "maxAuthBodyBytes": 16384,
+      "errorName": "BodyError",
+      "errorMessage": "body_invalid",
+      "messageCarriesBytes": false,
+      "bodyLockedAfter": false
+    },
+    {
+      "case": "C3b exact bound",
+      "exactBytesParsed": true,
+      "plusOneRejected": true
+    },
+    {
+      "case": "C4 UTF-8 multibyte split across chunks",
+      "parsedAccessToken": "é-ü-€"
+    },
+    {
+      "case": "C4b invalid UTF-8",
+      "errorName": "BodyError",
+      "message": "body_invalid"
+    },
+    {
+      "case": "C5 coalescer: establishSession queued before refresh snapshot, then second caller",
+      "fetchesAfterFirstCaller": [
+        "R-new"
+      ],
+      "fetchesAfterSecondCaller": [
+        "R-new",
+        "R-new"
+      ],
+      "parallelPresentationOfSameRefreshToken": true,
+      "resultA": "A-m0",
+      "resultC": null,
+      "storedRefreshAfter": "R-rot0",
+      "note": "observation only; not asserted"
+    },
+    {
+      "case": "C6 same-epoch coalescing",
+      "vals": [
+        "A-k",
+        "A-k"
+      ],
+      "fetches": 1
+    }
+  ],
+  "unhandledRejections": 0,
+  "pass": true,
+  "failure": null,
+  "scope": "actual shipped modules of the named root; real Response bodies on synthetic ReadableStreams; intercepted timers; single Node process; no browser, no network, no dependencies, no worktree writes"
+}

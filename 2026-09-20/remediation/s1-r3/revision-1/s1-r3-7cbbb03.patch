@@ -1,0 +1,971 @@
+From 7cbbb03977455fcfb5da543bdaffaf5de3c45696 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Sun, 20 Sep 2026 22:57:46 +0000
+Subject: [PATCH] S1-DB-01: enforce disposable-target guard, discriminating
+ recovery proof, verifier failure classes
+
+Harness (test/db/s1-rls-close-public-exposure.sh):
+- Source test/db/_support/s1-target-guard.sh before any psql/pg_dump/node
+  command. Offline layer: literal postgresql://user:pw@127.0.0.1:<port>/postgres
+  grammar, pinned S1_PG_PORT, database namespace ^s1_rls_[a-z0-9_]{1,40}$ with
+  63-byte identifier limit including the derived _lock name, and an explicit
+  S1_PG_DISPOSABLE_CONFIRM that binds endpoint AND both database names.
+  Preflight layer: one bounded read-only connection proving bound address,
+  port, database, superuser session, PG 17.x, fixed cluster_name marker,
+  canonical data_directory under the fixed execution root (exists locally,
+  no symlink escape), no foreign databases, expected fixture role flags.
+  Destructive identifiers are double-quoted. Explicit empty db arg refused.
+- Section 3 rewritten: blocker moves to community_messages_2027_01 (touched
+  only in the second DO block) so both the psql --single-transaction path and
+  the real prisma migrate deploy path fail LATE; the 14-table DO block and the
+  CREATE OR REPLACE FUNCTION statements executed before the failure are
+  asserted rolled back via the exposed-set and helper catalog pre-state.
+  Blocker liveness asserted; blocker released deterministically.
+- Same-session timeout checks: control SET proves observability, then
+  \i migration.sql / down.sql and current_setting read in the same
+  connection; failure path checked after ROLLBACK in one session. Prisma-path
+  session state explicitly not claimed.
+- prisma db execute --file verify.sql exit code asserted non-zero on
+  exposed/drifted state and zero on protected state (S2 gate route).
+- Verifier failure classes exercised: service_role REVOKE -> ALLOWED-PATH
+  only; RLS disable -> EXPOSURE only; both fail the gate; both restored.
+- S1_PRISMA_CLI override for a shared dependency tree.
+
+verify.sql: EXPOSURE vs ALLOWED-PATH classification in the exception text
+(both still fail), service_role policy predicates asserted true/true, exact
+function signatures, exact pinned search_path values, service_role EXECUTE on
+public helpers, explicit list of preconditions the migration relies on but
+does not establish (no GRANT widening, no check demotion).
+
+migration.sql/down.sql comments: whole-file rollback described as asserted by
+the late-stage test rather than pre-declared observed; idempotent re-apply
+advice scoped to this migration only; preconditions stated.
+
+New test/db/s1-harness-guard.spec.sh: offline negative tests with recording
+stubs for psql/pg_dump/node; asserts refusal code, zero destructive commands,
+zero connections for offline refusals, no password in output, and a positive
+control reaching exactly one preflight then the quoted DROP/CREATE step.
+---
+ .../down.sql                                  |   6 +-
+ .../migration.sql                             |  44 ++--
+ .../verify.sql                                | 143 +++++++++----
+ test/db/_support/s1-target-guard.sh           | 188 ++++++++++++++++++
+ test/db/s1-harness-guard.spec.sh              | 161 +++++++++++++++
+ test/db/s1-rls-close-public-exposure.sh       | 150 +++++++++++---
+ 6 files changed, 614 insertions(+), 78 deletions(-)
+ create mode 100644 test/db/_support/s1-target-guard.sh
+ create mode 100755 test/db/s1-harness-guard.spec.sh
+
+diff --git a/prisma/migrations/20261224000000_rls_close_public_exposure/down.sql b/prisma/migrations/20261224000000_rls_close_public_exposure/down.sql
+index 8e4c001..b1990b0 100644
+--- a/prisma/migrations/20261224000000_rls_close_public_exposure/down.sql
++++ b/prisma/migrations/20261224000000_rls_close_public_exposure/down.sql
+@@ -22,8 +22,10 @@
+ -- Consequences:
+ --   * verify.sql is the only truthful signal (it FAILS after this script);
+ --   * to re-apply, run migration.sql again directly with
+---     psql --single-transaction -v ON_ERROR_STOP=1 (it is idempotent) — do
+---     NOT delete or edit the _prisma_migrations row to make Prisma re-run it.
++--     psql --single-transaction -v ON_ERROR_STOP=1 (THIS migration is
++--     idempotent; that is a property of this file, not of migrations in
++--     general) — do NOT delete or edit the _prisma_migrations row to make
++--     Prisma re-run it.
+ -- Same lock/timeout bounds as the forward migration (RESET at the end).
+ 
+ SET lock_timeout = '5s';
+diff --git a/prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql b/prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql
+index 5eecb4e..586ffad 100644
+--- a/prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql
++++ b/prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql
+@@ -48,21 +48,39 @@
+ -- and statement_timeout bounds any single statement (the 14-table DO block is
+ -- ONE statement, so locks taken on earlier tables are held while waiting on
+ -- later ones, worst case ~5 s x 14 + work, capped at 60 s) — schedule in a
+--- low-traffic window. On timeout the statement errors; PostgreSQL runs the
+--- multi-statement file Prisma sends as one implicit transaction, so the whole
+--- migration rolls back (OBSERVED, not assumed: test/db/s1-rls-close-public-exposure.sh
+--- holds a lock, asserts SQLSTATE 55P03 within the bound and asserts the
+--- pre-state is untouched). _prisma_migrations then records the failure and the
+--- Prisma recovery is `prisma migrate resolve --rolled-back 20261224000000_rls_close_public_exposure`
++-- low-traffic window. On timeout the statement errors. Prisma sends this file
++-- as ONE multi-statement simple-protocol query, which PostgreSQL runs in one
++-- implicit transaction, so the WHOLE file is expected to roll back — including
++-- statements that already succeeded before the failing one. That expectation is
++-- ASSERTED (not assumed) by test/db/s1-rls-close-public-exposure.sh §3: it
++-- holds a lock on an object touched only in the SECOND DO block, drives the real
++-- `prisma migrate deploy` into SQLSTATE 55P03 mid-file, and then checks that the
++-- 14-table DO block AND the CREATE OR REPLACE FUNCTION statements executed
++-- before the failure are all gone from the catalog. Read the harness log for the
++-- run that backs any given head; the comment itself is not evidence.
++-- _prisma_migrations then records the failure and the Prisma recovery is
++-- `prisma migrate resolve --rolled-back 20261224000000_rls_close_public_exposure`
+ -- followed by `prisma migrate deploy` (also exercised by the harness).
+ -- The bounds are session-level SET so they also hold when an operator runs
+ -- this file with `psql --single-transaction`; they are RESET at the end so
+--- they do NOT leak into later migrations applied on the same connection.
++-- they do NOT leak into later migrations applied on the same connection. On
++-- a failed attempt the SETs are undone by the transaction rollback (SET is
++-- transactional); the harness checks both paths in one session.
+ --
+--- IDEMPOTENT: every statement is safe to re-run (IF EXISTS / OR REPLACE /
+--- idempotent ALTER/REVOKE), which is the documented recovery path when the
+--- SQL has been reversed out-of-band but _prisma_migrations still says applied
+--- (see the INVARIANT note at the bottom).
++-- IDEMPOTENT — FOR THIS MIGRATION ONLY: every statement here is safe to re-run
++-- (IF EXISTS / OR REPLACE / idempotent ALTER/REVOKE), so re-applying this file
++-- with `psql --single-transaction -f migration.sql` followed by verify.sql is
++-- the documented forward repair when the SQL has been reversed out-of-band but
++-- _prisma_migrations still says applied (see the INVARIANT note at the bottom).
++-- This property is NOT a general rule for the repository: other migrations
++-- (e.g. 20270118000000_scout_ledger_platform_expand deliberately REFUSES a
++-- re-run once its column exists) need their own state-specific recovery.
++--
++-- PRECONDITIONS relied on, not established (verified as ALLOWED-PATH by
++-- verify.sql): service_role already holds SELECT/INSERT/UPDATE/DELETE on every
++-- target relation (Supabase default privileges), and the executing role owns
++-- the relations. "Nothing is granted that was not already granted" below is
++-- exactly that statement — this file adds no table GRANT for service_role.
+ 
+ SET lock_timeout = '5s';
+ SET statement_timeout = '60s';
+@@ -311,7 +329,9 @@ COMMENT ON FUNCTION app.shares_community_cohort(uuid) IS
+ -- (exit non-zero on any drift) after every deploy and after any restore, and
+ -- if it fails re-apply this file with
+ --   psql --single-transaction -v ON_ERROR_STOP=1 -f .../migration.sql
+--- (idempotent; same lock/timeout bounds) and run verify.sql again.
++-- (this file is idempotent; same lock/timeout bounds) and run verify.sql again.
++-- The re-apply advice is specific to this migration; it must not be copied to
++-- non-idempotent migrations.
+ -- =====================================================================
+ 
+ RESET lock_timeout;
+diff --git a/prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql b/prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+index 686756e..2740dfb 100644
+--- a/prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
++++ b/prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+@@ -5,17 +5,56 @@
+ -- manual psql, restore of an older dump) Prisma still prints "Database schema
+ -- is up to date!" and `migrate resolve --rolled-back` refuses (row not failed).
+ -- This script inspects pg_class / pg_policy / ACLs / pg_proc directly and
+--- RAISEs (psql exit 3 with -v ON_ERROR_STOP=1) on any drift.
++-- RAISEs on any drift.
+ --
+ -- Usage (read-only; safe against any environment that has the API roles):
+ --   psql "$DIRECT_URL" -X -v ON_ERROR_STOP=1 -f prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+--- Prisma is NOT a substitute: `prisma db execute --file verify.sql` also works
+--- but exit codes are less precise. Prisma migration folders may contain extra
+--- files; only migration.sql is applied.
++--     -> exit 0 on OK, exit 3 on any problem.
++--   npx prisma db execute --url "$DIRECT_URL" --file prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
++--     -> exit 0 on OK, non-zero on any problem (the RAISE EXCEPTION propagates as a
++--        failed command). The exception text carries the classification below in
++--        both routes. The non-zero/zero exit behaviour of BOTH routes is asserted by
++--        test/db/s1-rls-close-public-exposure.sh on the synthetic fixture.
++-- Prisma migration folders may contain extra files; only migration.sql is applied.
++--
++-- FAILURE CLASSES (all fail the gate; the class tells the operator what kind of
++-- problem it is, it never downgrades one):
++--   EXPOSURE      an API role (anon/authenticated/PUBLIC) can reach a server-only
++--                 relation or helper, or an S1-DB-01 hardening invariant is gone
++--                 (RLS not enabled/forced, deny-all policy missing, permissive
++--                 policy reachable, table privilege held, helper EXECUTE held,
++--                 search_path unpinned). This is the security regression class.
++--   ALLOWED-PATH  the backend path is broken or a PRECONDITION this migration
++--                 relies on but does NOT establish is missing: service_role has
++--                 lost a table privilege or its bypass policy, a partition is
++--                 detached, a relation/function is missing.
++--
++-- PRECONDITIONS this migration RELIES ON and does NOT establish (verified here
++-- as ALLOWED-PATH, never auto-repaired; S1-R2B-03/-04 disposition):
++--   P1 service_role holds SELECT/INSERT/UPDATE/DELETE on every protected
++--      relation. On Supabase this comes from the project's ALTER DEFAULT
++--      PRIVILEGES; on a non-Supabase target from the owner's grants
++--      (test/db/_support/supabase-like-bootstrap.sql reproduces it). The
++--      migration's comment "nothing is granted that was not already granted"
++--      means exactly this: it adds no GRANT for service_role on tables, so a
++--      target that never had the grant fails this verifier and must be fixed by
++--      whoever owns the grant policy — NOT by widening this migration.
++--   P2 the relations are owned by a role the migration runs as (postgres on
++--      Supabase); ALTER TABLE / CREATE POLICY require ownership. Ownership is
++--      not asserted here because it is target-specific; a failed deploy with
++--      SQLSTATE 42501 is the symptom.
++--   P3 roles anon, authenticated and service_role exist (migration raises if not).
++--   P4 public.community_messages exists and is the partitioned parent.
++-- Established BY the migration (and therefore verified as EXPOSURE when absent):
++--   RLS enabled+forced, deny-all RESTRICTIVE policies, service_role PERMISSIVE
++--   policy (verified as ALLOWED-PATH when missing), REVOKE of API-role table
++--   privileges, helper functions with pinned search_path and EXECUTE revoked from
++--   PUBLIC/anon/authenticated (EXECUTE to service_role IS granted by the migration).
+ 
+ DO $verify$
+ DECLARE
+-  problems text[] := ARRAY[]::text[];
++  exposure text[] := ARRAY[]::text[];
++  allowed  text[] := ARRAY[]::text[];
+   t text;
+   r record;
+   fixed_tables text[] := ARRAY[
+@@ -28,6 +67,8 @@ DECLARE
+   api_role text;
+   priv text;
+   fn record;
++  fn_expected int := 0;
++  sp text;
+ BEGIN
+   -- 1) relation set = 14 fixed tables + every current partition of community_messages
+   SELECT fixed_tables || COALESCE(array_agg(c.relname::text ORDER BY c.relname), ARRAY[]::text[])
+@@ -36,33 +77,36 @@ BEGIN
+   WHERE i.inhparent = to_regclass('public.community_messages');
+ 
+   IF to_regclass('public.community_messages') IS NULL THEN
+-    problems := array_append(problems, 'parent public.community_messages missing'::text);
++    allowed := array_append(allowed, 'PRECONDITION P4: parent public.community_messages missing'::text);
+   END IF;
+ 
+   FOREACH t IN ARRAY relations LOOP
+     IF to_regclass(format('public.%I', t)) IS NULL THEN
+-      problems := problems || format('relation public.%I missing', t);
++      allowed := allowed || format('PRECONDITION: relation public.%I missing', t);
+       CONTINUE;
+     END IF;
+ 
+     SELECT c.relrowsecurity, c.relforcerowsecurity INTO r
+     FROM pg_class c WHERE c.oid = to_regclass(format('public.%I', t));
+     IF NOT r.relrowsecurity THEN
+-      problems := problems || format('%I: RLS not enabled', t);
++      exposure := exposure || format('%I: RLS not enabled', t);
+     END IF;
+     IF NOT r.relforcerowsecurity THEN
+-      problems := problems || format('%I: RLS not forced', t);
++      exposure := exposure || format('%I: RLS not forced', t);
+     END IF;
+ 
+-    -- policies: a PERMISSIVE service_role ALL policy, RESTRICTIVE deny-all for anon and authenticated,
+-    -- and NO permissive policy that grants anon/authenticated/public anything on these server-only relations.
++    -- policies: a PERMISSIVE service_role ALL policy with USING (true) WITH CHECK (true),
++    -- RESTRICTIVE deny-all for anon and authenticated, and NO permissive policy that
++    -- grants anon/authenticated/public anything on these server-only relations.
+     IF NOT EXISTS (
+       SELECT 1 FROM pg_policy p
+       WHERE p.polrelid = to_regclass(format('public.%I', t))
+         AND p.polpermissive AND p.polcmd = '*'
+         AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'service_role')]::oid[]
++        AND pg_get_expr(p.polqual, p.polrelid) = 'true'
++        AND pg_get_expr(p.polwithcheck, p.polrelid) = 'true'
+     ) THEN
+-      problems := problems || format('%I: service_role bypass policy missing', t);
++      allowed := allowed || format('%I: service_role bypass policy (ALL, USING true, WITH CHECK true) missing', t);
+     END IF;
+ 
+     FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+@@ -74,7 +118,7 @@ BEGIN
+           AND pg_get_expr(p.polqual, p.polrelid) = 'false'
+           AND pg_get_expr(p.polwithcheck, p.polrelid) = 'false'
+       ) THEN
+-        problems := problems || format('%I: restrictive deny-all policy for %s missing', t, api_role);
++        exposure := exposure || format('%I: restrictive deny-all policy for %s missing', t, api_role);
+       END IF;
+ 
+       IF EXISTS (
+@@ -84,39 +128,42 @@ BEGIN
+           AND (p.polroles = '{0}'::oid[]  -- PUBLIC
+                OR (SELECT oid FROM pg_roles WHERE rolname = api_role) = ANY (p.polroles))
+       ) THEN
+-        problems := problems || format('%I: unexpected PERMISSIVE policy reachable by %s', t, api_role);
++        exposure := exposure || format('%I: unexpected PERMISSIVE policy reachable by %s', t, api_role);
+       END IF;
+ 
+       -- effective table privileges (includes grants inherited via PUBLIC or role membership)
+       FOREACH priv IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+         IF has_table_privilege(api_role, format('public.%I', t), priv) THEN
+-          problems := problems || format('%I: %s still holds %s', t, api_role, priv);
++          exposure := exposure || format('%I: %s still holds %s', t, api_role, priv);
+         END IF;
+       END LOOP;
+     END LOOP;
+   END LOOP;
+ 
+-  -- 1b) allowed path is intact: service_role keeps all four table privileges on
+-  --     every protected relation (deny-only proof is not enough), and every
+-  --     partition is still attached to the parent (parent-path routing intact).
++  -- 1b) allowed path is intact (PRECONDITION P1): service_role keeps all four table
++  --     privileges on every protected relation (deny-only proof is not enough), and
++  --     every partition is still attached to the parent (parent-path routing intact).
+   FOREACH t IN ARRAY relations LOOP
++    IF to_regclass(format('public.%I', t)) IS NULL THEN CONTINUE; END IF;
+     FOREACH priv IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+       IF NOT has_table_privilege('service_role', format('public.%I', t), priv) THEN
+-        problems := problems || format('%s: service_role lost %s', t, priv);
++        allowed := allowed || format('%s: service_role lost %s', t, priv);
+       END IF;
+     END LOOP;
+   END LOOP;
+   IF (SELECT count(*) FROM pg_inherits WHERE inhparent = to_regclass('public.community_messages')) < 1 THEN
+-    problems := array_append(problems, 'community_messages has no attached partitions'::text);
++    allowed := array_append(allowed, 'community_messages has no attached partitions'::text);
+   END IF;
+   IF NOT (SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+     RAISE NOTICE 'S1-DB-01 VERIFY NOTE: current role % is not BYPASSRLS; RLS applies to this session', current_user;
+   END IF;
+ 
+-  -- 2) the four advisor-flagged functions carry a pinned search_path and the
+-  --    partition helpers are not executable by the API roles.
++  -- 2) the five S1-DB-01 functions exist with EXACT signatures, carry the EXACT pinned
++  --    search_path the migration sets, and the public partition helpers are not
++  --    executable by the API roles (EXECUTE was revoked from PUBLIC/anon/authenticated).
+   FOR fn IN
+-    SELECT n.nspname, p.proname, p.oid, p.proconfig
++    SELECT n.nspname, p.proname, p.oid, p.proconfig,
++           pg_get_function_identity_arguments(p.oid) AS args
+     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE (n.nspname, p.proname) IN (
+       ('public', 'community_messages_create_month_partition'),
+@@ -125,33 +172,53 @@ BEGIN
+       ('app', 'is_community_workspace_member'),
+       ('app', 'shares_community_cohort'))
+   LOOP
+-    IF fn.proconfig IS NULL OR NOT EXISTS (SELECT 1 FROM unnest(fn.proconfig) cfg WHERE cfg LIKE 'search_path=%') THEN
+-      problems := problems || format('%s.%s: search_path not pinned', fn.nspname, fn.proname);
++    -- exact signature (any other overload is counted as unexpected, not as the helper)
++    IF (fn.nspname, fn.proname, fn.args) NOT IN (
++        ('public', 'community_messages_create_month_partition', 'p_month date'),
++        ('public', 'community_messages_protect_partition', 'p_partition regclass'),
++        ('app', 'is_community_workspace_coach', 'p_workspace_id uuid'),
++        ('app', 'is_community_workspace_member', 'p_workspace_id uuid'),
++        ('app', 'shares_community_cohort', 'p_cohort_id uuid')) THEN
++      exposure := exposure || format('%s.%s(%s): unexpected overload/signature', fn.nspname, fn.proname, fn.args);
++      CONTINUE;
+     END IF;
+-    IF fn.nspname = 'public' THEN
++    fn_expected := fn_expected + 1;
++
++    SELECT cfg INTO sp FROM unnest(fn.proconfig) cfg WHERE cfg LIKE 'search_path=%' LIMIT 1;
++    IF fn.nspname = 'app' THEN
++      -- migration: SET search_path = ''  (catalog serialises the empty list as "" )
++      IF sp IS NULL OR sp NOT IN ('search_path=""', 'search_path=') THEN
++        exposure := exposure || format('%s.%s: search_path not pinned to '''' (found %s)', fn.nspname, fn.proname, coalesce(sp, 'none'));
++      END IF;
++    ELSE
++      -- migration: SET search_path = pg_catalog, public, pg_temp
++      IF sp IS NULL OR sp <> 'search_path=pg_catalog, public, pg_temp' THEN
++        exposure := exposure || format('%s.%s: search_path not pinned to pg_catalog, public, pg_temp (found %s)', fn.nspname, fn.proname, coalesce(sp, 'none'));
++      END IF;
+       FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+         IF has_function_privilege(api_role, fn.oid, 'EXECUTE') THEN
+-          problems := problems || format('%s.%s: %s can EXECUTE', fn.nspname, fn.proname, api_role);
++          exposure := exposure || format('%s.%s: %s can EXECUTE', fn.nspname, fn.proname, api_role);
+         END IF;
+       END LOOP;
++      IF NOT has_function_privilege('service_role', fn.oid, 'EXECUTE') THEN
++        allowed := allowed || format('%s.%s: service_role cannot EXECUTE (granted by the migration)', fn.nspname, fn.proname);
++      END IF;
+     END IF;
+   END LOOP;
+ 
+-  IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+-      WHERE (n.nspname, p.proname) IN (
+-        ('public', 'community_messages_create_month_partition'),
+-        ('public', 'community_messages_protect_partition'),
+-        ('app', 'is_community_workspace_coach'),
+-        ('app', 'is_community_workspace_member'),
+-        ('app', 'shares_community_cohort'))) <> 5 THEN
+-    problems := array_append(problems, 'one or more S1-DB-01 functions missing'::text);
++  IF fn_expected <> 5 THEN
++    allowed := array_append(allowed, format('PRECONDITION/INSTALL: %s of 5 S1-DB-01 functions present with the expected signature', fn_expected));
+   END IF;
+ 
+-  IF array_length(problems, 1) > 0 THEN
+-    RAISE EXCEPTION 'S1-DB-01 VERIFY FAILED (% problem(s)): %', array_length(problems, 1), array_to_string(problems, '; ');
++  IF array_length(exposure, 1) > 0 OR array_length(allowed, 1) > 0 THEN
++    RAISE EXCEPTION 'S1-DB-01 VERIFY FAILED (% exposure problem(s); % allowed-path problem(s)): %',
++      coalesce(array_length(exposure, 1), 0), coalesce(array_length(allowed, 1), 0),
++      concat_ws(' || ',
++        CASE WHEN array_length(exposure, 1) > 0 THEN 'EXPOSURE: ' || array_to_string(exposure, '; ') END,
++        CASE WHEN array_length(allowed, 1) > 0 THEN 'ALLOWED-PATH: ' || array_to_string(allowed, '; ') END);
+   END IF;
+ 
+-  RAISE NOTICE 'S1-DB-01 VERIFY OK: % relations protected (% community_messages partitions), 5 functions pinned',
++  RAISE NOTICE 'S1-DB-01 VERIFY OK: % relations protected (% community_messages partitions), 5 functions pinned, service_role path intact',
+     array_length(relations, 1), array_length(relations, 1) - array_length(fixed_tables, 1);
+ END
+ $verify$;
+diff --git a/test/db/_support/s1-target-guard.sh b/test/db/_support/s1-target-guard.sh
+new file mode 100644
+index 0000000..2b70abd
+--- /dev/null
++++ b/test/db/_support/s1-target-guard.sh
+@@ -0,0 +1,188 @@
++# S1-DB-01 disposable-target guard — sourced by test/db/s1-rls-close-public-exposure.sh
++# BEFORE that harness runs any psql / pg_dump / node command.
++#
++# The harness is destructive (DROP DATABASE ... WITH (FORCE)). R2 audit finding
++# S1-R2-A-01: the only pre-R3 check was "the URL variable is set". This file
++# makes the target boundary executable and fail-closed in two layers:
++#
++#   s1_guard_offline   — pure string validation, no connection at all:
++#                        literal loopback URL grammar, pinned port, disposable
++#                        database-name namespace, explicit destructive
++#                        confirmation (double entry of the endpoint).
++#   s1_guard_preflight — ONE read-only connection to the superuser URL that must
++#                        prove the server is the disposable synthetic cluster:
++#                        actual bound address/port, database, superuser session,
++#                        PG 17.x, cluster_name marker, no foreign databases, and
++#                        expected flags on any pre-existing fixture role.
++#
++# Every refusal prints "S1-GUARD REFUSED <code>: <reason>" to stderr and exits
++# with S1_GUARD_EXIT (64). Nothing destructive can run before both layers pass.
++# Negative tests: test/db/s1-harness-guard.spec.sh (offline, command stubs).
++#
++# Contract (all inputs are literal; nothing is inferred from the environment):
++#   S1_PG_SUPER_URL          postgresql://<user>:<pw>@127.0.0.1:<port>/postgres
++#                            user/pw: [A-Za-z0-9_]+ ; no query string, percent
++#                            escapes, hostnames, IPv6, sockets or a second '@'.
++#   S1_PG_PORT               pinned TCP port the URL MUST use (default 54321).
++#   dbname argument          ^s1_rls_[a-z0-9_]{1,40}$ ; the harness ALSO destroys the
++#                            derived "<dbname>_lock"; both must fit PostgreSQL's
++#                            63-byte identifier limit (checked in bytes, ASCII only).
++#   S1_PG_DISPOSABLE_CONFIRM must equal exactly
++#                            "DESTROY-127.0.0.1:<port>/<dbname>,<dbname>_lock"
++#                            i.e. the confirmation binds endpoint AND both exact
++#                            database names that will be dropped.
++#   cluster_name marker      FIXED: the server must report cluster_name =
++#                            's1-disposable-pg17' (set only in the synthetic
++#                            cluster's postgresql.conf). Not overridable.
++#   data_directory root      FIXED: the server's data_directory must be a
++#                            canonical absolute path under
++#                            /home/user/pg17/clusters/ (no '.', '..', '//',
++#                            trailing '/'), must exist on THIS host (loopback
++#                            server = same host) and must realpath to itself
++#                            (no symlink escape). Not overridable.
++#   preflight bounds         PGCONNECT_TIMEOUT=5, statement_timeout=5s and an
++#                            outer `timeout 20s` around the psql process.
++# Refusal messages never echo the URL or password.
++
++S1_GUARD_EXIT=64
++S1_GUARD_HOST='127.0.0.1'
++S1_GUARD_DB_RE='^s1_rls_[a-z0-9_]{1,40}$'
++S1_GUARD_NAMEDATALEN=63   # PostgreSQL identifier limit in BYTES (NAMEDATALEN-1)
++S1_GUARD_CLUSTER_MARKER='s1-disposable-pg17'      # fixed, not configurable
++S1_GUARD_DATA_ROOT='/home/user/pg17/clusters/'    # fixed, not configurable
++
++s1_guard_refuse() { # <code> <reason>
++  printf 'S1-GUARD REFUSED %s: %s\n' "$1" "$2" >&2
++  exit "$S1_GUARD_EXIT"
++}
++
++# s1_guard_offline <super_url> <dbname>
++# Exports: S1_GUARD_PORT S1_GUARD_HOSTPORT S1_GUARD_USER
++s1_guard_offline() {
++  local url=$1 db=$2
++  local port=${S1_PG_PORT:-54321}
++  local confirm=${S1_PG_DISPOSABLE_CONFIRM-}
++
++  case "$port" in
++    ''|*[!0-9]*) s1_guard_refuse PORT_PIN "S1_PG_PORT must be a literal TCP port number" ;;
++  esac
++  [ "$port" -ge 1024 ] && [ "$port" -le 65535 ] || s1_guard_refuse PORT_PIN "S1_PG_PORT $port outside 1024-65535"
++
++  [ -n "$url" ] || s1_guard_refuse URL_EMPTY "S1_PG_SUPER_URL is empty"
++  # Whole-string grammar. Anything not matching is refused: hostnames
++  # (including localhost), IPv6, unix sockets, query strings (?sslmode=,
++  # ?host= overrides), percent escapes, a second '@', extra path segments.
++  local re="^postgresql://([A-Za-z0-9_]+):([A-Za-z0-9_]+)@127\.0\.0\.1:([0-9]{4,5})/postgres$"
++  if ! [[ $url =~ $re ]]; then
++    case "$url" in
++      *'?'*)              s1_guard_refuse URL_QUERY   "query string / connection overrides are not allowed in S1_PG_SUPER_URL" ;;
++      *'%'*)              s1_guard_refuse URL_ESCAPE  "percent escapes are not allowed in S1_PG_SUPER_URL" ;;
++      *@*@*)              s1_guard_refuse URL_AT      "more than one '@' in S1_PG_SUPER_URL" ;;
++      *'@127.0.0.1:'*)    s1_guard_refuse URL_SHAPE   "S1_PG_SUPER_URL must be postgresql://<user>:<pw>@127.0.0.1:<port>/postgres (maintenance db 'postgres', simple credentials)" ;;
++      *)                  s1_guard_refuse URL_HOST    "S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no hostnames, localhost, IPv6, sockets, remote endpoints)" ;;
++    esac
++  fi
++  S1_GUARD_USER=${BASH_REMATCH[1]}
++  S1_GUARD_PORT=${BASH_REMATCH[3]}
++  [ "$S1_GUARD_PORT" = "$port" ] || s1_guard_refuse URL_PORT "S1_PG_SUPER_URL port $S1_GUARD_PORT does not match pinned S1_PG_PORT $port"
++  S1_GUARD_HOSTPORT="${S1_GUARD_HOST}:${S1_GUARD_PORT}"
++
++  [ -n "$db" ] || s1_guard_refuse DB_EMPTY "database name argument is empty"
++  [[ $db =~ $S1_GUARD_DB_RE ]] || s1_guard_refuse DB_NAMESPACE "database name is outside the disposable namespace $S1_GUARD_DB_RE (lowercase ASCII; the derived '<name>_lock' is destroyed too)"
++  # byte length (LC_ALL=C makes ${#..} count bytes; the regex already restricts to ASCII)
++  local blen
++  blen=$(LC_ALL=C; printf '%s' "${db}_lock" | wc -c)
++  [ "$blen" -le "$S1_GUARD_NAMEDATALEN" ] || s1_guard_refuse DB_LENGTH "derived database name '<name>_lock' is $blen bytes; PostgreSQL identifiers are limited to $S1_GUARD_NAMEDATALEN bytes (silent truncation would target a different database)"
++  S1_GUARD_DB=$db
++  S1_GUARD_DB_LOCK="${db}_lock"
++
++  local expected="DESTROY-${S1_GUARD_HOSTPORT}/${S1_GUARD_DB},${S1_GUARD_DB_LOCK}"
++  [ -n "$confirm" ] || s1_guard_refuse CONFIRM "S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases '$S1_GUARD_DB' and '$S1_GUARD_DB_LOCK' on $S1_GUARD_HOSTPORT and requires the literal confirmation '$expected'"
++  [ "$confirm" = "$expected" ] || s1_guard_refuse CONFIRM "S1_PG_DISPOSABLE_CONFIRM does not bind this exact endpoint and both database names; required literal: '$expected'"
++  export S1_GUARD_PORT S1_GUARD_HOSTPORT S1_GUARD_USER S1_GUARD_DB S1_GUARD_DB_LOCK
++  return 0
++}
++
++# s1_guard_preflight <super_url> <dbname>
++# One read-only psql connection. Refuses unless the server proves it is the
++# disposable synthetic cluster. Uses only the "psql" found on PATH so the
++# offline spec can stub it.
++s1_guard_preflight() {
++  local url=$1 db=$2
++  local want_cluster=$S1_GUARD_CLUSTER_MARKER
++  local want_root=$S1_GUARD_DATA_ROOT
++  local out rc
++  # All facts in one statement so the check is a single round trip; the
++  # output is a fixed-width field list.
++  local sql
++  sql="select
++    'addr='||coalesce(host(inet_server_addr()),'NULL'),
++    'port='||coalesce(inet_server_port()::text,'NULL'),
++    'db='||current_database(),
++    'super='||(select rolsuper from pg_roles where rolname=current_user),
++    'ver='||current_setting('server_version_num'),
++    'cluster='||coalesce(nullif(current_setting('cluster_name'),''),'NULL'),
++    'datadir='||current_setting('data_directory'),
++    'foreign='||coalesce((select string_agg(datname, '+' order by datname) from pg_database
++        where datname not in ('postgres','template0','template1') and datname !~ '^s1_rls_'),''),
++    'roles='||coalesce((select string_agg(rolname||'/'||rolsuper||rolbypassrls||rolcanlogin||rolinherit, '+' order by rolname)
++        from pg_roles where rolname in ('postgres','authenticator','anon','authenticated','service_role')),'');"
++  # bounded connect; -X (no psqlrc); read-only single statement. The password
++  # never appears in output: psql does not echo it and refusals redact the URL.
++  # bounds: connect 5 s, server-side statement 5 s, and an outer process deadline
++  # of 20 s so a stalled/black-holed server cannot hang the guard.
++  out=$(PGCONNECT_TIMEOUT=5 PGOPTIONS='-c statement_timeout=5s' timeout -k 2 20 psql "$url" -X -qAt -F ' ' -v ON_ERROR_STOP=1 -c "$sql" 2>&1); rc=$?
++  [ $rc -ne 124 ] && [ $rc -ne 137 ] || s1_guard_refuse PREFLIGHT_TIMEOUT "read-only preflight exceeded the 20 s process deadline (server stalled?)"
++  [ $rc -eq 0 ] || s1_guard_refuse PREFLIGHT_CONNECT "read-only preflight query failed (rc=$rc): $(printf '%s' "$out" | sed -E 's#://[^@[:space:]]*@#://<redacted>@#g' | head -3 | tr '\n' ' ')"
++
++  local addr port cdb super ver cluster datadir foreign roles
++  addr=$(s1_guard_field "$out" addr); port=$(s1_guard_field "$out" port); cdb=$(s1_guard_field "$out" db)
++  super=$(s1_guard_field "$out" super); ver=$(s1_guard_field "$out" ver); cluster=$(s1_guard_field "$out" cluster)
++  datadir=$(s1_guard_field "$out" datadir); foreign=$(s1_guard_field "$out" foreign); roles=$(s1_guard_field "$out" roles)
++
++  [ -n "$addr" ] && [ -n "$port" ] && [ -n "$ver" ] || s1_guard_refuse PREFLIGHT_SHAPE "preflight output not understood: $(printf '%s' "$out" | head -1)"
++  [ "$addr" = "$S1_GUARD_HOST" ] || s1_guard_refuse SERVER_ADDR "server bound address is '$addr', not $S1_GUARD_HOST (tunnel or forwarded endpoint?)"
++  [ "$port" = "$S1_GUARD_PORT" ] || s1_guard_refuse SERVER_PORT "server port is '$port', not pinned $S1_GUARD_PORT"
++  [ "$cdb" = "postgres" ] || s1_guard_refuse SERVER_DB "connected database is '$cdb', not postgres"
++  [ "$super" = "t" ] || s1_guard_refuse SERVER_ROLE "session role is not a superuser; the fixture bootstrap needs the disposable cluster's superuser"
++  case "$ver" in
++    17[0-9][0-9][0-9][0-9]) ;;
++    *) s1_guard_refuse SERVER_VERSION "server_version_num '$ver' is not PostgreSQL 17.x (documented fixture is 17.6)" ;;
++  esac
++  [ "$cluster" = "$want_cluster" ] || s1_guard_refuse CLUSTER_MARKER "cluster_name is '$cluster', expected disposable marker '$want_cluster' (set only in the synthetic cluster's postgresql.conf)"
++  # data_directory: canonical string under the fixed root, present on this host,
++  # and resolving to itself (a symlinked directory pointing outside the root is refused).
++  case "$datadir" in
++    "$want_root"?*) ;;
++    *) s1_guard_refuse SERVER_DATADIR "server data_directory '$datadir' is not under the controlled execution root '$want_root'" ;;
++  esac
++  case "$datadir" in
++    *//*|*/./*|*/../*|*/.|*/..|*/) s1_guard_refuse SERVER_DATADIR "server data_directory '$datadir' is not a canonical path" ;;
++  esac
++  local real
++  real=$(realpath -e -- "$datadir" 2>/dev/null) || s1_guard_refuse SERVER_DATADIR "server data_directory '$datadir' does not exist on this host; a 127.0.0.1 disposable cluster must live on this host under '$want_root'"
++  [ "$real" = "$datadir" ] || s1_guard_refuse SERVER_DATADIR "server data_directory '$datadir' resolves to '$real' (symlink escape from the controlled root is refused)"
++  [ -z "$foreign" ] || s1_guard_refuse FOREIGN_DB "cluster holds database(s) outside the disposable namespace: $foreign"
++
++  # Pre-existing fixture roles must already carry the flags the bootstrap
++  # would create them with (rolsuper rolbypassrls rolcanlogin rolinherit).
++  local r name flags want
++  local IFS='+'
++  for r in $roles; do
++    name=${r%%/*}; flags=${r#*/}
++    case "$name" in
++      postgres)      want=ftft ;;
++      authenticator) want=fftf ;;
++      service_role)  want=ftff ;;
++      anon|authenticated) want=ffff ;;
++      *) continue ;;
++    esac
++    [ "$flags" = "$want" ] || s1_guard_refuse ROLE_FLAGS "pre-existing role $name has flags super/bypassrls/login/inherit=$flags, fixture expects $want; not the synthetic fixture (or a stale one) — refuse rather than reuse"
++  done
++  unset IFS
++  return 0
++}
++
++s1_guard_field() { # <output> <name> -> value of "name=value" token
++  printf '%s\n' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p" | head -1
++}
+diff --git a/test/db/s1-harness-guard.spec.sh b/test/db/s1-harness-guard.spec.sh
+new file mode 100755
+index 0000000..e85b9c1
+--- /dev/null
++++ b/test/db/s1-harness-guard.spec.sh
+@@ -0,0 +1,161 @@
++#!/usr/bin/env bash
++# Offline negative tests for the S1-DB-01 harness disposable-target guard
++# (R2 finding S1-R2-A-01). NO database is used or needed.
++#
++# Method: run the REAL harness entry point (test/db/s1-rls-close-public-exposure.sh)
++# with a PATH-first directory of recording stubs for psql, pg_dump and node. Every
++# invocation of those commands is appended to a per-case journal. For each
++# rejected target we assert (a) the harness exits with the guard exit code and
++# the expected refusal code, (b) the journal contains NO destructive or
++# mutating command (DROP DATABASE / CREATE DATABASE / node / pg_dump / -f file),
++# and (c) for offline refusals the journal is completely EMPTY (no connection at
++# all). Preflight cases let the psql stub answer the single read-only preflight
++# query with a crafted server identity and assert the harness still refuses
++# before any destructive command. One positive case proves the guard lets a
++# correct disposable identity through to exactly the first destructive step
++# (which the stub refuses, ending the run) — i.e. the guard is not vacuous.
++#
++# Usage: test/db/s1-harness-guard.spec.sh        (exit 0 only if all cases pass)
++set -u
++cd "$(dirname "$0")/../.."
++HARNESS=test/db/s1-rls-close-public-exposure.sh
++WORK=$(mktemp -d)   # removed by cleanup (set below, after the spec dirs exist)
++STUBS=$WORK/stubs; mkdir -p "$STUBS"
++JOURNAL=$WORK/journal
++PASS=0; FAIL=0
++ok(){ PASS=$((PASS+1)); echo "PASS  $1"; }
++bad(){ FAIL=$((FAIL+1)); echo "FAIL  $1"; }
++
++# --- recording stubs ---------------------------------------------------------
++# psql stub: records argv (redacting anything that looks like a URL credential),
++# then answers ONLY the guard's preflight query using the identity in
++# $STUB_PREFLIGHT; any other invocation is recorded as OTHER and fails.
++cat >"$STUBS/psql" <<'STUB'
++#!/usr/bin/env bash
++args="$*"
++red=$(printf '%s' "$args" | sed -E 's#://[^@[:space:]]*@#://<cred>@#g')
++if printf '%s' "$args" | grep -q "inet_server_addr"; then
++  echo "PSQL PREFLIGHT $red" >>"$STUB_JOURNAL"
++  if [ "${STUB_PREFLIGHT_RC:-0}" != 0 ]; then echo "psql: error: connection refused (stub)" >&2; exit "$STUB_PREFLIGHT_RC"; fi
++  printf '%s\n' "$STUB_PREFLIGHT"; exit 0
++fi
++echo "PSQL OTHER $red" >>"$STUB_JOURNAL"
++echo "stub psql: refusing non-preflight invocation" >&2
++exit 97
++STUB
++for c in pg_dump node; do
++  cat >"$STUBS/$c" <<STUB
++#!/usr/bin/env bash
++echo "$(echo $c | tr a-z A-Z) \$*" >>"\$STUB_JOURNAL"; exit 97
++STUB
++done
++chmod +x "$STUBS"/*
++
++# The guard's data_directory check is host-local (fixed root /home/user/pg17/clusters/, must exist
++# and realpath to itself). The spec creates a throw-away directory under that root for the
++# positive identity and a symlink escaping the root for the negative case; both removed on exit.
++FIXED_ROOT=/home/user/pg17/clusters
++ROOT_PREEXISTED=1; [ -d "$FIXED_ROOT" ] || ROOT_PREEXISTED=0
++SPEC_DIR="$FIXED_ROOT/guard-spec-$$"; SPEC_LINK="$FIXED_ROOT/guard-spec-link-$$"
++mkdir -p "$SPEC_DIR" "$WORK/outside-root" && ln -s "$WORK/outside-root" "$SPEC_LINK" || { echo "cannot create spec dirs"; exit 2; }
++cleanup(){ rm -rf "$SPEC_DIR" "$SPEC_LINK"; [ $ROOT_PREEXISTED -eq 0 ] && rmdir -p "$FIXED_ROOT" 2>/dev/null; rm -rf "$WORK"; }
++trap cleanup EXIT
++GOOD_ID="addr=127.0.0.1 port=54321 db=postgres super=t ver=170006 cluster=s1-disposable-pg17 datadir=$SPEC_DIR foreign= roles="
++GOOD_URL='postgresql://s1_super:s1_local_synthetic@127.0.0.1:54321/postgres'
++GOOD_DB='s1_rls_proof'
++GOOD_CONFIRM='DESTROY-127.0.0.1:54321/s1_rls_proof,s1_rls_proof_lock'
++
++# run_case <name> <expected-refusal-code|ALLOW> <url> <db> <confirm> <port> <preflight-identity> [preflight-rc]
++run_case(){
++  local name=$1 want=$2 url=$3 db=$4 confirm=$5 port=$6 ident=$7 prc=${8:-0}
++  : >"$JOURNAL"
++  local err rc
++  err=$(STUB_JOURNAL="$JOURNAL" STUB_PREFLIGHT="$ident" STUB_PREFLIGHT_RC="$prc" PATH="$STUBS:$PATH" \
++        S1_PG_SUPER_URL="$url" S1_PG_PORT="$port" S1_PG_DISPOSABLE_CONFIRM="$confirm" \
++        S1_PROOF_LOG="$WORK/harness.log" bash "$HARNESS" "$db" 2>&1 >/dev/null); rc=$?
++  local destructive; destructive=$(grep -cE 'DROP DATABASE|CREATE DATABASE|^NODE |^PG_DUMP |-f ' "$JOURNAL")
++  local preflights; preflights=$(grep -c '^PSQL PREFLIGHT' "$JOURNAL")
++  local others; others=$(grep -c '^PSQL OTHER' "$JOURNAL")
++  if [ "$want" = ALLOW ]; then
++    # positive control: guard passes; the first thing the harness does next is the
++    # destructive DROP/CREATE on the stub, which refuses -> harness exits 1 "cannot create db".
++    if [ $rc -eq 1 ] && [ "$preflights" = 1 ] && [ "$others" = 1 ] && grep -q 'PSQL OTHER .*DROP DATABASE IF EXISTS "s1_rls_proof" WITH (FORCE)' "$JOURNAL" \
++       && grep -q 'DROP DATABASE IF EXISTS "s1_rls_proof_lock" WITH (FORCE)' "$JOURNAL" ; then
++      ok "$name: guard passes a correct disposable identity; exactly 1 preflight then the quoted DROP/CREATE step (stub refused, rc=1)"
++    else
++      bad "$name: unexpected flow rc=$rc preflights=$preflights others=$others journal: $(tr '\n' ' ' <"$JOURNAL" | cut -c1-300)"
++    fi
++    return
++  fi
++  local code; code=$(printf '%s\n' "$err" | sed -n 's/^S1-GUARD REFUSED \([A-Z_]*\):.*/\1/p' | head -1)
++  if [ $rc -eq 64 ] && [ "$code" = "$want" ] && [ "$destructive" = 0 ] && [ "$others" = 0 ]; then
++    ok "$name: refused $want, no destructive/mutating command (preflight connections: $preflights)"
++  else
++    bad "$name: rc=$rc code=[$code] want=$want destructive=$destructive others=$others :: $(printf '%s' "$err" | head -2 | tr '\n' ' ')"
++  fi
++  # offline refusals must not have connected at all
++  case "$want" in
++    URL_*|PORT_PIN|DB_*|CONFIRM)
++      [ "$preflights" = 0 ] && ok "$name: refused OFFLINE (zero connections)" || bad "$name: offline refusal made $preflights connection(s)";;
++  esac
++  # never leak the password in refusal output
++  printf '%s' "$err" | grep -q 's1_local_synthetic' && bad "$name: refusal output leaked the URL password" || true
++}
++
++echo "== S1 harness guard offline spec (stubs in $STUBS)"
++# --- offline: URL grammar / endpoint -----------------------------------------
++run_case "remote host"            URL_HOST   'postgresql://postgres:pw@db.example.supabase.co:5432/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "remote host, port pinned" URL_HOST 'postgresql://postgres:pw@10.0.0.5:54321/postgres' "$GOOD_DB" 'DESTROY-127.0.0.1:54321/s1_rls_proof,s1_rls_proof_lock' 54321 "$GOOD_ID"
++run_case "localhost hostname"     URL_HOST   'postgresql://s1_super:pw@localhost:54321/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "IPv6 loopback"          URL_HOST   'postgresql://s1_super:pw@[::1]:54321/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "unix socket via ?host="  URL_QUERY  'postgresql://s1_super:pw@/postgres?host=/tmp' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "unix socket via %2F path" URL_ESCAPE 'postgresql://s1_super:pw@%2Ftmp/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "no host at all"          URL_HOST   'postgresql://s1_super:pw@:54321/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "query-string override"  URL_QUERY  'postgresql://s1_super:pw@127.0.0.1:54321/postgres?host=db.internal' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "sslmode query"          URL_QUERY  'postgresql://s1_super:pw@127.0.0.1:54321/postgres?sslmode=require' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "percent escape"         URL_ESCAPE 'postgresql://s1_super:p%40w@127.0.0.1:54321/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "second @ (host smuggling)" URL_AT  'postgresql://s1_super:pw@evil.example.com@127.0.0.1:54321/postgres' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "wrong maintenance db in URL" URL_SHAPE 'postgresql://s1_super:pw@127.0.0.1:54321/production' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "wrong port vs pin"      URL_PORT   'postgresql://s1_super:pw@127.0.0.1:5432/postgres' "$GOOD_DB" 'DESTROY-127.0.0.1:5432/s1_rls_proof,s1_rls_proof_lock' 54321 "$GOOD_ID"
++run_case "empty URL"              URL_EMPTY  '' "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "non-numeric port pin"   PORT_PIN   "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" '54321;' "$GOOD_ID"
++# --- offline: database identifier --------------------------------------------
++run_case "arbitrary existing db name" DB_NAMESPACE "$GOOD_URL" 'app_production' 'DESTROY-127.0.0.1:54321/app_production,app_production_lock' 54321 "$GOOD_ID"
++run_case "SQL metacharacters"     DB_NAMESPACE "$GOOD_URL" 's1_rls_x" WITH (FORCE); DROP DATABASE "prod' 'DESTROY-127.0.0.1:54321/x,y' 54321 "$GOOD_ID"
++run_case "semicolon in name"      DB_NAMESPACE "$GOOD_URL" 's1_rls_a;b' 'DESTROY-127.0.0.1:54321/s1_rls_a;b,s1_rls_a;b_lock' 54321 "$GOOD_ID"
++run_case "uppercase (quoted-identifier trick)" DB_NAMESPACE "$GOOD_URL" 's1_rls_Proof' 'DESTROY-127.0.0.1:54321/s1_rls_Proof,s1_rls_Proof_lock' 54321 "$GOOD_ID"
++run_case "namespace prefix only"  DB_NAMESPACE "$GOOD_URL" 's1_rls_' 'DESTROY-127.0.0.1:54321/s1_rls_,s1_rls__lock' 54321 "$GOOD_ID"
++run_case "over-long name (>40 tail)" DB_NAMESPACE "$GOOD_URL" "s1_rls_$(printf 'a%.0s' $(seq 41))" 'x' 54321 "$GOOD_ID"
++# harness uses ${1-default}: an EXPLICIT empty argument reaches the guard and is refused
++run_case "explicit empty db name"  DB_EMPTY   "$GOOD_URL" '' 'DESTROY-127.0.0.1:54321/,_lock' 54321 "$GOOD_ID"
++# --- offline: confirmation binding --------------------------------------------
++run_case "missing confirmation"   CONFIRM    "$GOOD_URL" "$GOOD_DB" '' 54321 "$GOOD_ID"
++run_case "confirmation binds port only (R2 shape)" CONFIRM "$GOOD_URL" "$GOOD_DB" 'DESTROY-127.0.0.1:54321' 54321 "$GOOD_ID"
++run_case "confirmation for a different db" CONFIRM "$GOOD_URL" "$GOOD_DB" 'DESTROY-127.0.0.1:54321/s1_rls_other,s1_rls_other_lock' 54321 "$GOOD_ID"
++run_case "confirmation without derived _lock" CONFIRM "$GOOD_URL" "$GOOD_DB" 'DESTROY-127.0.0.1:54321/s1_rls_proof' 54321 "$GOOD_ID"
++run_case "confirmation for a different port" CONFIRM "$GOOD_URL" "$GOOD_DB" 'DESTROY-127.0.0.1:54325/s1_rls_proof,s1_rls_proof_lock' 54321 "$GOOD_ID"
++# --- preflight (stubbed server identity) -----------------------------------
++run_case "preflight: server bound to non-loopback" SERVER_ADDR "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/addr=127.0.0.1/addr=10.1.2.3}"
++run_case "preflight: forwarded port differs"      SERVER_PORT "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/port=54321/port=5432}"
++run_case "preflight: not a superuser session"     SERVER_ROLE "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/super=t/super=f}"
++run_case "preflight: PG 15 server (CI/hosted shape)" SERVER_VERSION "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/ver=170006/ver=150018}"
++run_case "preflight: PG 18 server"                SERVER_VERSION "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/ver=170006/ver=180006}"
++run_case "preflight: missing cluster_name marker" CLUSTER_MARKER "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/cluster=s1-disposable-pg17/cluster=NULL}"
++run_case "preflight: another lane's marker"       CLUSTER_MARKER "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/cluster=s1-disposable-pg17/cluster=s5-disposable-pg17}"
++run_case "preflight: data_directory outside execution root" SERVER_DATADIR "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/datadir=$SPEC_DIR/datadir=\/var\/lib\/postgresql\/17\/main}"
++run_case "preflight: data_directory with ../ escape" SERVER_DATADIR "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/datadir=$SPEC_DIR/datadir=$FIXED_ROOT\/x\/..\/..\/..\/etc}"
++run_case "preflight: data_directory under root but nonexistent" SERVER_DATADIR "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/datadir=$SPEC_DIR/datadir=$FIXED_ROOT\/does-not-exist-$$}"
++run_case "preflight: data_directory is a symlink escaping the root" SERVER_DATADIR "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/datadir=$SPEC_DIR/datadir=$SPEC_LINK}"
++run_case "preflight: foreign database present"   FOREIGN_DB  "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/foreign=/foreign=app_production+s5_tgp}"
++run_case "preflight: stale postgres role is superuser" ROLE_FLAGS "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/roles=/roles=anon\/ffff+postgres\/ttft}"
++run_case "preflight: authenticator can BYPASSRLS" ROLE_FLAGS "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/roles=/roles=authenticator\/fttf}"
++run_case "preflight: connection failure"          PREFLIGHT_CONNECT "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID" 2
++run_case "preflight: garbage output"              PREFLIGHT_SHAPE "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "psql: warning: something unexpected"
++# --- positive control --------------------------------------------------------
++# roles= empty is the truly fresh cluster (bootstrap not yet run); the second case is a
++# re-run against a cluster whose fixture roles already carry exactly the bootstrap flags.
++run_case "positive control: exact disposable identity (fresh cluster, no fixture roles)" ALLOW "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "$GOOD_ID"
++run_case "positive control with existing fixture roles (expected flags)" ALLOW "$GOOD_URL" "$GOOD_DB" "$GOOD_CONFIRM" 54321 "${GOOD_ID/roles=/roles=anon\/ffff+authenticated\/ffff+authenticator\/fftf+postgres\/ftft+service_role\/ftff}"
++
++echo "== $PASS passed, $FAIL failed (guard spec, offline, head $(git rev-parse --short HEAD 2>/dev/null)$(git diff --quiet HEAD -- test/db 2>/dev/null || echo '+dirty'))"
++[ $FAIL -eq 0 ]
+diff --git a/test/db/s1-rls-close-public-exposure.sh b/test/db/s1-rls-close-public-exposure.sh
+index 84b2714..50fe6f7 100755
+--- a/test/db/s1-rls-close-public-exposure.sh
++++ b/test/db/s1-rls-close-public-exposure.sh
+@@ -3,31 +3,48 @@
+ #   prisma/migrations/20261224000000_rls_close_public_exposure
+ #
+ # Runs ONLY against a disposable local PostgreSQL 17.x cluster (never a Supabase
+-# project). It rebuilds the observed production pre-state from source
+-# (Prisma chain at the parent commit + the out-of-band rls_fitness_backend.sql),
+-# proves the exposure exists, applies the candidate through the real
++# project). That boundary is ENFORCED, not assumed: test/db/_support/s1-target-guard.sh
++# validates the literal loopback URL / pinned port / disposable database
++# namespace / explicit destructive confirmation offline, then makes one
++# read-only preflight connection that must prove the server is the synthetic
++# cluster (bound address, port, superuser, PG 17.x, cluster_name marker, no
++# foreign databases, expected fixture role flags) BEFORE any DROP/CREATE.
++# Negative tests for the guard: test/db/s1-harness-guard.spec.sh (no DB needed).
++#
++# The harness rebuilds the observed production pre-state from source (Prisma
++# chain at the parent commit + the out-of-band rls_fitness_backend.sql), proves
++# the exposure exists, applies the candidate through the real
+ # `prisma migrate deploy` path, and then checks behaviour role-by-role,
+-# partition protection, lock bounding, recovery and the reversal invariant.
++# partition protection, lock bounding, late-stage failure atomicity, same-session
++# timeout reset, recovery, verifier failure classes and the reversal invariant.
+ #
+ # Usage:
+ #   S1_PG_SUPER_URL='postgresql://<superuser>:<pw>@127.0.0.1:54321/postgres' \
+-#   test/db/s1-rls-close-public-exposure.sh [dbname]
++#   S1_PG_PORT=54321 S1_PG_DISPOSABLE_CONFIRM='DESTROY-127.0.0.1:54321/s1_rls_proof,s1_rls_proof_lock' \
++#   test/db/s1-rls-close-public-exposure.sh [s1_rls_<name>]   # default name s1_rls_proof
++# The confirmation binds the endpoint AND both databases the harness DROPs
++# (<name> and the derived <name>_lock); the guard refuses anything else.
+ #
+-# Requirements: psql (>=17 client), node + node_modules (prisma CLI), the roles
++# Requirements: psql/pg_dump (>=17 client), node + the prisma CLI (either
++# node_modules/prisma or S1_PRISMA_CLI=/path/to/prisma/build/index.js). The roles
+ # defined by test/db/_support/supabase-like-bootstrap.sql are created by this
+-# script. Exit code 0 only if every check passed.
++# script inside the disposable cluster. Exit code 0 only if every check passed.
+ set -u
+ cd "$(dirname "$0")/../.."
+ ROOT=$(pwd)
+-SUPER_URL=${S1_PG_SUPER_URL:?set S1_PG_SUPER_URL (superuser URL to the isolated cluster, db postgres)}
+-DB=${1:-s1_rls_proof}
++SUPER_URL=${S1_PG_SUPER_URL-}
++DB=${1-s1_rls_proof}   # ${1-...}: an EXPLICIT empty argument is refused by the guard, not defaulted
++# ---------- 0. disposable-target guard: nothing below runs until both layers pass
++. test/db/_support/s1-target-guard.sh
++s1_guard_offline "$SUPER_URL" "$DB"
++s1_guard_preflight "$SUPER_URL" "$DB"
+ MIG=20261224000000_rls_close_public_exposure
+ MIG_DIR=prisma/migrations/$MIG
+-HOST_PART=${SUPER_URL#*@}; HOST_PART=${HOST_PART%%/*}
++HOST_PART=$S1_GUARD_HOSTPORT
+ PG_URL="postgresql://postgres:postgres_local_synthetic@${HOST_PART}/${DB}"
+ AUTHN_URL="postgresql://authenticator:authenticator_local_synthetic@${HOST_PART}/${DB}"
+ SUPER_DB_URL="${SUPER_URL%/*}/${DB}"
+-PRISMA="node node_modules/prisma/build/index.js"
++PRISMA="node ${S1_PRISMA_CLI:-node_modules/prisma/build/index.js}"
+ LOG=${S1_PROOF_LOG:-/tmp/s1-rls-proof.$$.log}
+ PASS=0; FAIL=0
+ ok()   { PASS=$((PASS+1)); echo "PASS  $1"; }
+@@ -45,11 +62,34 @@ sqlstate(){ local url=$1; shift; local out
+ # rc0: prints 0 if the command exit code is 0, else 1 (psql -f exits 3 on error)
+ rc0(){ [ "$1" -eq 0 ] && echo 0 || echo 1; }
+ verify_rc(){ psql "$1" -X -q -v ON_ERROR_STOP=1 -f $MIG_DIR/verify.sql >>"$LOG" 2>&1; rc0 $?; }
++# verify_msg <url>: the single VERIFY FAILED/OK line (for failure-class assertions)
++verify_msg(){ psql "$1" -X -q -v ON_ERROR_STOP=1 -f $MIG_DIR/verify.sql 2>&1 | grep -o 'S1-DB-01 VERIFY [A-Z]*.*' | head -1; }
++# prisma_verify_rc <url>: exit code of the S2 release-gate route (`prisma db execute`), 0 or 1
++prisma_verify_rc(){ $PRISMA db execute --url "$1" --file $MIG_DIR/verify.sql >>"$LOG" 2>&1; rc0 $?; }
++# same_session <url> <file>: ONE psql connection: control SET -> \i file -> read settings
++# in that same session. Prints "<control>|<after>" e.g. "5s|0|0". Fails closed on error.
++same_session(){ psql "$1" -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=verbose 2>>"$LOG" <<EOSQL
++set lock_timeout = '5s';
++select 'CONTROL='||current_setting('lock_timeout');
++\set ON_ERROR_STOP 1
++\i $2
++select 'AFTER='||current_setting('lock_timeout')||'|'||current_setting('statement_timeout');
++EOSQL
++}
++# same_session_failed <url> <file>: ONE psql connection, explicit transaction, the file
++# fails inside (lock held); after ROLLBACK read settings in the same session.
++same_session_failed(){ psql "$1" -X -qAt -v ON_ERROR_STOP=0 -v VERBOSITY=verbose 2>&1 <<EOSQL
++begin;
++\i $2
++rollback;
++select 'AFTER='||current_setting('lock_timeout')||'|'||current_setting('statement_timeout');
++EOSQL
++}
+ DOWN=$MIG_DIR/down.sql
+ export PGOPTIONS='-c client_min_messages=warning'
+ 
+ echo "== S1-DB-01 proof on $HOST_PART db=$DB  (log: $LOG)"
+-psql "$SUPER_URL" -X -qAt -c "DROP DATABASE IF EXISTS $DB WITH (FORCE)" -c "DROP DATABASE IF EXISTS ${DB}_lock WITH (FORCE)" -c "CREATE DATABASE $DB" >/dev/null 2>>"$LOG" || { echo "cannot create db"; exit 1; }
++psql "$SUPER_URL" -X -qAt -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$DB\" WITH (FORCE)" -c "DROP DATABASE IF EXISTS \"${DB}_lock\" WITH (FORCE)" -c "CREATE DATABASE \"$DB\"" >/dev/null 2>>"$LOG" || { echo "cannot create db"; exit 1; }
+ psql "$SUPER_DB_URL" -X -q -v ON_ERROR_STOP=1 -f test/db/_support/supabase-like-bootstrap.sql >/dev/null 2>>"$LOG" || { echo "bootstrap failed"; exit 1; }
+ 
+ # ---------- 1. pre-state: parent chain (without candidate) + out-of-band legacy RLS file
+@@ -93,36 +133,83 @@ SNAP_SQL="select c.relname||':'||c.relrowsecurity||c.relforcerowsecurity||':'||c
+ PRE_SNAP=$(q "$PG_URL" "$SNAP_SQL" | md5sum)
+ POL_PRE=$(q "$PG_URL" "select count(*) from pg_policy where polrelid='community_messages'::regclass")
+ 
+-# ---------- 3. lock bounding + failed-deploy recovery on a SEPARATE database (keeps DB1 history clean)
++# ---------- 3. lock bounding, LATE-STAGE failure atomicity, same-session timeout reset and
++#              failed-deploy recovery on a SEPARATE database (keeps DB1 history clean)
+ DB2=${DB}_lock; PG2_URL="postgresql://postgres:postgres_local_synthetic@${HOST_PART}/${DB2}"
+-psql "$SUPER_URL" -X -qAt -c "DROP DATABASE IF EXISTS $DB2 WITH (FORCE)" -c "CREATE DATABASE $DB2" >/dev/null 2>>"$LOG"
++psql "$SUPER_URL" -X -qAt -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$DB2\" WITH (FORCE)" -c "CREATE DATABASE \"$DB2\"" >/dev/null 2>>"$LOG" || { echo "cannot create db2"; exit 1; }
+ psql "${SUPER_URL%/*}/${DB2}" -X -q -v ON_ERROR_STOP=1 -f test/db/_support/supabase-like-bootstrap.sql >/dev/null 2>>"$LOG"
+ ( export DATABASE_URL="$PG2_URL" DIRECT_URL="$PG2_URL"; $PRISMA migrate deploy --schema "$TMP/prisma/schema.prisma" >>"$LOG" 2>&1 ) \
+   && psql "$PG2_URL" -X -q -v ON_ERROR_STOP=1 -f prisma/migrations/rls_fitness_backend.sql >>"$LOG" 2>&1
+ check "DB2: parent chain + legacy RLS file replayed for the lock/recovery scenario" 0 $?
+-psql "$PG2_URL" -X -qAt -c "begin; select 1 from \"DunningAttempt\" limit 1; select pg_sleep(25);" >/dev/null 2>&1 &
++# pre-state facts of the objects the migration changes AFTER the 14-table DO: these are the
++# discriminators between "first statement rolled back" and "whole file rolled back".
++HELPER_SQL="select coalesce((select 'protect=present' from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='community_messages_protect_partition'),'protect=absent')
++  ||';create_sp='||coalesce((select array_to_string(p.proconfig,',') from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='community_messages_create_month_partition'),'unpinned')
++  ||';app_sp='||(select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app' and p.proname in ('is_community_workspace_coach','is_community_workspace_member','shares_community_cohort') and p.proconfig is not null)
++  ||';policies_2027_01='||(select count(*) from pg_policy where polrelid='public.community_messages_2027_01'::regclass)"
++HELPER_PRE=$(q "$PG2_URL" "$HELPER_SQL")
++check "DB2: pre-state helper catalog recorded (protect_partition absent, search_path unpinned, partition unprotected)" "protect=absent;create_sp=unpinned;app_sp=0;policies_2027_01=0" "$HELPER_PRE"
++check "DB2 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO on the exposed pre-state" 1 "$(prisma_verify_rc "$PG2_URL")"
++# LATE-STAGE blocker: community_messages_2027_01 is protected in the SECOND DO block, i.e. after the
++# 14-table DO and after the CREATE OR REPLACE FUNCTION statements have executed. Holding it makes the
++# failure occur mid-file, so a per-statement (non-transactional) client would leave the 14 tables
++# protected and the helpers replaced; a whole-file rollback leaves everything in pre-state.
++psql "$PG2_URL" -X -qAt -c "begin; select 1 from only community_messages_2027_01 limit 1; select pg_sleep(120);" >/dev/null 2>&1 &
+ BLOCKER=$!; sleep 1
++check "DB2: blocker session holds a lock on community_messages_2027_01 (late-stage object)" 1 "$(q "$PG2_URL" "select count(*) from pg_locks l join pg_class c on c.oid=l.relation where c.relname='community_messages_2027_01' and l.granted")"
++# 3a. direct psql --single-transaction path (the documented operator path)
+ T0=$(date +%s)
+ st=$(sqlstate "$PG2_URL" "\\i $MIG_DIR/migration.sql"); T1=$(date +%s)
+-check "DB2: migration.sql (psql --single-transaction) fails fast with lock_timeout SQLSTATE 55P03 while a lock is held" 55P03 "$st"
+-[ $((T1-T0)) -le 12 ] && ok "DB2: lock wait bounded ($((T1-T0))s <= 12s)" || bad "DB2: lock wait not bounded ($((T1-T0))s)"
+-check "DB2: failed direct attempt left the pre-state untouched (18 still exposed)" "$EXPECTED18" "$(q "$PG2_URL" "$EXPOSED_SQL")"
++check "DB2 direct: migration.sql (psql --single-transaction) fails with lock_timeout SQLSTATE 55P03 at the LATE-STAGE lock" 55P03 "$st"
++[ $((T1-T0)) -le 12 ] && ok "DB2 direct: lock wait bounded ($((T1-T0))s <= 12s)" || bad "DB2 direct: lock wait not bounded ($((T1-T0))s)"
++check "DB2 direct: failed attempt left the 14-table pre-state untouched (18 still exposed)" "$EXPECTED18" "$(q "$PG2_URL" "$EXPOSED_SQL")"
++check "DB2 direct: helper catalog unchanged after the late-stage failure (explicit single transaction)" "$HELPER_PRE" "$(q "$PG2_URL" "$HELPER_SQL")"
++# 3b. FAILURE-PATH same-session settings: one connection, BEGIN, file fails inside at the late lock,
++#     ROLLBACK, then read the settings in that same connection. SET is transactional, so the file's
++#     SET lock_timeout/statement_timeout must be gone even though its RESET lines never executed.
++kill -0 $BLOCKER 2>/dev/null && ok "DB2: blocker still alive before the failure-path same-session check" || bad "DB2: blocker died early; failure-path same-session check is INVALID"
++FS_OUT=$(same_session_failed "$PG2_URL" "$MIG_DIR/migration.sql"); printf '%s\n' "$FS_OUT" >>"$LOG"
++check "DB2 same-session FAILURE path: the aborted attempt raised 55P03 inside the session" 1 "$(printf '%s\n' "$FS_OUT" | grep -c 'ERROR:  55P03')"
++check "DB2 same-session FAILURE path: after ROLLBACK the SAME connection shows default timeouts (no leak from the aborted file)" "AFTER=0|0" "$(printf '%s\n' "$FS_OUT" | grep '^AFTER=' | tail -1)"
++# 3c. the real Prisma path against the same late-stage lock
++kill -0 $BLOCKER 2>/dev/null && ok "DB2: blocker still alive before the Prisma attempt" || bad "DB2: blocker died early; Prisma late-stage atomicity check is INVALID"
+ T0=$(date +%s)
+ ( export DATABASE_URL="$PG2_URL" DIRECT_URL="$PG2_URL"; $PRISMA migrate deploy >>"$LOG" 2>&1 ); rc=$?; T1=$(date +%s)
+-check "DB2: prisma migrate deploy fails (non-zero) while the lock is held" 1 "$(rc0 $rc)"
+-[ $((T1-T0)) -le 20 ] && ok "DB2: prisma deploy failure bounded ($((T1-T0))s <= 20s)" || bad "DB2: prisma deploy failure not bounded ($((T1-T0))s)"
+-check "DB2: failed deploy recorded in _prisma_migrations (finished_at null, rolled_back_at null)" "1" \
++check "DB2 prisma: migrate deploy fails (non-zero) while the late-stage lock is held" 1 "$(rc0 $rc)"
++[ $((T1-T0)) -le 20 ] && ok "DB2 prisma: deploy failure bounded ($((T1-T0))s <= 20s)" || bad "DB2 prisma: deploy failure not bounded ($((T1-T0))s)"
++check "DB2 prisma: failed deploy recorded in _prisma_migrations (finished_at null, rolled_back_at null)" "1" \
+   "$(q "$PG2_URL" "select count(*) from _prisma_migrations where migration_name='$MIG' and finished_at is null and rolled_back_at is null")"
+-check "DB2: failed Prisma attempt is ATOMIC — pre-state untouched (no partially protected tables)" "$EXPECTED18" "$(q "$PG2_URL" "$EXPOSED_SQL")"
+-check "DB2: verify.sql fails cleanly after the failed attempt" 1 "$(verify_rc "$PG2_URL")"
+-check "DB2: session timeout settings did not leak (fresh connection shows defaults)" "0|0" "$(q "$PG2_URL" "select current_setting('lock_timeout')||'|'||current_setting('statement_timeout')")"
+-wait $BLOCKER 2>/dev/null
++check "DB2 prisma: WHOLE-FILE rollback discriminated — 14-table DO (executed BEFORE the failing statement) is rolled back, 18 still exposed" "$EXPECTED18" "$(q "$PG2_URL" "$EXPOSED_SQL")"
++check "DB2 prisma: WHOLE-FILE rollback discriminated — CREATE OR REPLACE FUNCTION statements (executed BEFORE the failing statement) are rolled back" "$HELPER_PRE" "$(q "$PG2_URL" "$HELPER_SQL")"
++check "DB2 prisma: verify.sql fails cleanly after the failed attempt" 1 "$(verify_rc "$PG2_URL")"
++# release the blocker deterministically (do not wait out pg_sleep)
++kill $BLOCKER 2>/dev/null; wait $BLOCKER 2>/dev/null
++for i in 1 2 3 4 5 6 7 8 9 10; do
++  [ "$(q "$PG2_URL" "select count(*) from pg_locks l join pg_class c on c.oid=l.relation where c.relname='community_messages_2027_01'")" = "0" ] && break; sleep 1; done
++check "DB2: blocker released (no lock left on community_messages_2027_01)" 0 "$(q "$PG2_URL" "select count(*) from pg_locks l join pg_class c on c.oid=l.relation where c.relname='community_messages_2027_01'")"
++# 3d. documented failed-attempt recovery
+ ( export DATABASE_URL="$PG2_URL" DIRECT_URL="$PG2_URL"; $PRISMA migrate resolve --rolled-back $MIG >>"$LOG" 2>&1 )
+ check "DB2: documented recovery step 1 — prisma migrate resolve --rolled-back succeeds after a REAL failure" 0 $?
+ ( export DATABASE_URL="$PG2_URL" DIRECT_URL="$PG2_URL"; $PRISMA migrate deploy >>"$LOG" 2>&1 )
+ check "DB2: documented recovery step 2 — prisma migrate deploy succeeds once the lock is gone" 0 $?
+ check "DB2: verify.sql passes after recovery" 0 "$(verify_rc "$PG2_URL")"
+-# reversal with a failed-attempt history: resolve --rolled-back is NOT a recovery (observed behaviour recorded)
++check "DB2 (S2 gate route): prisma db execute --file verify.sql exits ZERO on the protected state" 0 "$(prisma_verify_rc "$PG2_URL")"
++# 3e. verifier failure CLASSES (S1-R2B-03): an allowed-path precondition loss must be reported as
++#     ALLOWED-PATH, with zero EXPOSURE problems, and still fail the gate; then restored.
++q "$PG2_URL" "revoke select on table \"DunningAttempt\" from service_role" >/dev/null
++VM=$(verify_msg "$PG2_URL")
++check "DB2 verifier classes: service_role losing SELECT fails the gate (exit non-zero)" 1 "$(verify_rc "$PG2_URL")"
++check "DB2 verifier classes: reported as ALLOWED-PATH with 0 EXPOSURE problems" 1 "$(printf '%s\n' "$VM" | grep -c '0 exposure problem(s); 1 allowed-path problem(s)')"
++check "DB2 verifier classes: message names the lost privilege" 1 "$(printf '%s\n' "$VM" | grep -c 'ALLOWED-PATH: DunningAttempt: service_role lost SELECT')"
++check "DB2 (S2 gate route): prisma db execute also exits NON-ZERO on the allowed-path drift" 1 "$(prisma_verify_rc "$PG2_URL")"
++q "$PG2_URL" "grant select on table \"DunningAttempt\" to service_role" >/dev/null
++check "DB2 verifier classes: restored grant -> verify passes again" 0 "$(verify_rc "$PG2_URL")"
++q "$PG2_URL" "alter table \"DunningAttempt\" disable row level security" >/dev/null
++VM=$(verify_msg "$PG2_URL")
++check "DB2 verifier classes: RLS disabled on one table is reported as EXPOSURE (1 exposure problem(s); 0 allowed-path)" 1 "$(printf '%s\n' "$VM" | grep -c '1 exposure problem(s); 0 allowed-path problem(s)')"
++q "$PG2_URL" "alter table \"DunningAttempt\" enable row level security" >/dev/null
++check "DB2 verifier classes: restored RLS -> verify passes again" 0 "$(verify_rc "$PG2_URL")"
++# 3f. reversal with a failed-attempt history: resolve --rolled-back is NOT a recovery (observed behaviour recorded)
+ psql "$PG2_URL" -X -1 -q -v ON_ERROR_STOP=1 -f $DOWN >>"$LOG" 2>&1
+ check "DB2: down.sql runs (--single-transaction)" 0 $?
+ ( export DATABASE_URL="$PG2_URL" DIRECT_URL="$PG2_URL"; $PRISMA migrate resolve --rolled-back $MIG >>"$LOG" 2>&1 ); rc=$?
+@@ -130,6 +217,17 @@ echo "      DB2 observed: resolve --rolled-back after reversal WITH earlier fail
+ check "DB2: applied row still marked applied after resolve (Prisma state unchanged by reversal)" "1" \
+   "$(q "$PG2_URL" "select count(*) from _prisma_migrations where migration_name='$MIG' and finished_at is not null and rolled_back_at is null")"
+ check "DB2: verify.sql FAILS after reversal regardless of Prisma output" 1 "$(verify_rc "$PG2_URL")"
++# 3g. SUCCESS-PATH same-session settings, direct operator path: one connection; a control SET first
++#     proves this check CAN observe a leaked session setting; then \i migration.sql; then read.
++SS_OUT=$(same_session "$PG2_URL" "$MIG_DIR/migration.sql"); printf '%s\n' "$SS_OUT" >>"$LOG"
++check "DB2 same-session SUCCESS path (control): a leaked SET IS observable in the same connection" "CONTROL=5s" "$(printf '%s\n' "$SS_OUT" | grep '^CONTROL=' | head -1)"
++check "DB2 same-session SUCCESS path: after migration.sql in the SAME connection timeouts are back to defaults (RESET effective)" "AFTER=0|0" "$(printf '%s\n' "$SS_OUT" | grep '^AFTER=' | tail -1)"
++check "DB2: direct re-apply restored protection (verify passes)" 0 "$(verify_rc "$PG2_URL")"
++SS_OUT=$(same_session "$PG2_URL" "$DOWN"); printf '%s\n' "$SS_OUT" >>"$LOG"
++check "DB2 same-session SUCCESS path: down.sql in one connection also leaves default timeouts (RESET effective)" "CONTROL=5s|AFTER=0|0" "$(printf '%s\n' "$SS_OUT" | grep -E '^(CONTROL|AFTER)=' | paste -sd'|')"
++# NOTE (not claimed): the settings state of the connection Prisma uses for `migrate deploy` is not
++# observable after the process exits; the Prisma-path claim rests on the file's RESET lines plus the
++# success-path evidence above, not on a Prisma-session observation.
+ 
+ # ---------- 4. apply the candidate through the real path
+ ( export DATABASE_URL="$PG_URL" DIRECT_URL="$PG_URL"; $PRISMA migrate deploy >>"$LOG" 2>&1 )
+-- 
+2.53.0
+
