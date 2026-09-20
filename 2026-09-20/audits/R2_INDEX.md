@@ -4,7 +4,7 @@ Current round authorized in [continuation thread](https://www.perplexity.ai/comp
 
 | Lane | Candidate | A | B |
 |---|---|---|---|
-| S1 | 90a6647513f3566393764eee87237d9b5b1f150b | [NOT CLEARED](s1-r2/a/revision-1/REPORT.md) | In progress |
+| S1 | 90a6647513f3566393764eee87237d9b5b1f150b | [NOT CLEARED](s1-r2/a/revision-1/REPORT.md) | [No material source defect found; conditional merge eligibility, live hold](s1-r2/b/revision-1/REPORT.md) |
 | S2 | 0b05fcf5352287109ac88ed2ba3682e441e3a076 | [NOT CLEARED](s2-r2/a/revision-1/REPORT.md) | In progress |
 | S3 | 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 | [Affirmative bounded source/local re-attestation; overall landing/release not cleared](s3-r2/a/revision-1/REPORT.md) | [CLEARED bounded S3-lane merge eligibility only](s3-r2/b/revision-1/REPORT.md) |
 | S4 | c5a5ae12c5b3c3e32a4601c99319ad7c0d980057 | [NOT CLEARED](s4-r2/a/revision-1/REPORT.md) | [CLEARED bounded merge boundary; parent hold remains](s4-r2/b/revision-1/REPORT.md) |
@@ -17,6 +17,8 @@ Original reports and bounded probes are preserved unchanged with per-directory S
 S2-A identifies privileged input-to-shell execution, a machine-start route mislabeled read-only, verifier enumeration failure handling, and recovery wording. These remain independent findings pending parent disposition and peer completion; no remediation has changed the frozen S2 candidate.
 
 S1-A identifies a missing disposable-target guard on the destructive test harness and non-discriminating atomicity/timeout-reset assertions. Its bounded additional-execution request is preserved beside the report; no database test was run by that auditor or by the parent in this round.
+
+**Parent S1 disposition:** NOT CLEARED. B independently confirms both proof limitations but grades them nonmaterial to tightening-only DDL. That narrower source acceptance does not resolve A's destructive harness boundary or justify the broader packet claims. Guard the harness before any new DB execution, then prove late-statement rollback and same-session reset (including explicit failure-path claim limits). B additionally flags verifier grant assumptions and the unproven `prisma db execute` failure exit path for the integrated S1/S2 gate. Do not add broad grants or demote a verifier automatically: establish the actual intended role contract first, preserve fail-closed behavior, and test the exact integrated invocation.
 
 S3-A closes inherited local-evidence gaps but explicitly preserves governance, artifact, database and hosted recovery prerequisites. Its c12 contention explanation remains an inference, not proven causation. One affirmative lens cannot stand in for the other.
 
