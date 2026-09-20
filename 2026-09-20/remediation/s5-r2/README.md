@@ -1,6 +1,6 @@
 # S5 R2: synthetic PostgreSQL E→T/Q0 compatibility proof
 
-Captured 2026-09-20 18:59 UTC. The validation candidate is written and tested; independent R2 audits have not run and no clearance is claimed. No production, hosted or customer action occurred.
+Captured 2026-09-20 18:58 UTC. The validation candidate is written and tested; independent R2 audits have not run and no clearance is claimed. No production, hosted or customer action occurred.
 
 ## Exact source and recoverability
 
@@ -34,7 +34,7 @@ The superseded `run-proof.sh.held-delta` is preserved as `.redacted`, with line 
 
 ## Cross-lane constraints requiring disposition
 
-S1 was sent a bounded documentation-only disposition request; neither frozen candidate may change implicitly.
+S1 returned a [bounded documentation-only disposition with parent applicability cautions](cross-lane/README.md); both frozen candidates remain unchanged. Directions are not implemented changes.
 
 - Successful E reversed out of band cannot be recovered with `migrate resolve --rolled-back`; P3012 was reproduced. Carry S1's independently derived transactional forward repair and verification semantics.
 - The old writer tally includes existing coach/intent/entity-type ledger rows, not just the current batch. Do not describe those totals as per-run completion.

@@ -1,6 +1,6 @@
 # TGP remediation and durable recovery
 
-Bradley authorized S1–S5 remediation after all twelve R1 reports returned. S1/S2/S4/S5 remediation and S3 proof have returned, with independent attestations pending. S1 has a bounded S5 cross-lane disposition request, without source changes. S6 remains held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
+Bradley authorized S1–S5 remediation after all twelve R1 reports returned. S1/S2/S4/S5 remediation and S3 proof have returned, with independent attestations pending. S1's S5 cross-lane dispositions are archived as directions only, without source changes. S6 remains held. All six R1 candidates were **NOT CLEARED**; publication is preservation, not approval, merge, deployment, enablement or customer acceptance.
 
 ## Current checkpoint
 
