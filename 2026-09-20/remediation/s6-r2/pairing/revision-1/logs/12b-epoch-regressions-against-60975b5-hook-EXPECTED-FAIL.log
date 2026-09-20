@@ -1,0 +1,148 @@
+FAIL src/hooks/__tests__/useExtensionPairing.test.tsx
+  useExtensionPairing — flag-off / no-slug fail closed
+    ○ skipped is inert when disabled: no network, stays idle
+    ○ skipped defaults to the OFF kill switch (featureFlags.extensionImport is false in test env)
+    ○ skipped does not mint when the platform slug is null
+  useExtensionPairing — mint
+    ○ skipped mints a code and moves to waiting with the server code
+    ○ skipped treats a mint response missing the code as a retryable failure
+    ○ skipped maps a 401 mint error to authExpired
+    ○ skipped maps a 404 mint error to unavailable
+    ○ skipped maps a generic mint error to failed
+  useExtensionPairing — single-flight / no duplicate intent
+    ○ skipped mints once when start is called twice in the same tick
+    ○ skipped does not re-mint while already waiting
+  useExtensionPairing — poll lifecycle
+    ○ skipped promotes to paired when the poll returns paired
+    ○ skipped moves to expired when the poll returns expired
+    ○ skipped FAILS CLOSED on an unknown status: stays waiting, never promoted to paired
+    ○ skipped FAILS CLOSED on a malformed (empty) status body: stays waiting
+    ○ skipped backs off then eventually pairs (bounded exponential backoff)
+    ○ skipped maps a 401 during polling to authExpired
+    ○ skipped maps a 404 during polling to unavailable
+    ○ skipped tolerates transient errors but fails after the cap of consecutive failures
+    ○ skipped ignores the client clock: a code whose server expires_at is already past stays waiting while polls say pending
+    ○ skipped expires only when the server /status contract returns expired
+    ○ skipped stays waiting on repeated pending polls (never self-promotes)
+    ○ skipped stops polling once paired (paired is terminal)
+    ○ skipped stops polling once expired (expired is terminal)
+    ○ skipped recovers: a transient error followed by pending resets the failure budget
+  useExtensionPairing — cancel / retry / teardown
+    ○ skipped cancel is a local abandon → cancelled, with the cancel event
+    ○ skipped retry re-mints after a failure
+    ○ skipped retry re-mints from an expired terminal
+    ○ skipped retry re-mints from a cancelled state
+    ○ skipped cancel while still minting drops the intent to cancelled with no code
+    ○ skipped cancel from idle is a no-op that emits no cancel event
+    ○ skipped does not throw / no late setState after unmount tears down timers
+  useExtensionPairing — background / foreground
+    ○ skipped pauses polling in the background and resumes on foreground
+    ○ skipped keeps the code alive (stays waiting) while backgrounded
+    ○ skipped foregrounding resumes polling; a server expired terminal on the resume poll resolves to expired
+  useExtensionPairing — single-flight poll (no concurrent /status)
+    ○ skipped a foreground resume while a poll is in flight issues only ONE /status request
+    ○ skipped releases the guard on a poll error so a later poll can still run
+    ○ skipped a stale in-flight poll from an abandoned code cannot mutate the re-minted session
+  useExtensionPairing — PII-free telemetry
+    ○ skipped never emits the pairing code or a token in any tracked event
+    ○ skipped attaches only the platform slug to the started event
+    ○ skipped emits started before code_ready, and code_ready exactly once
+    ○ skipped emits a failed event carrying only a coarse reason — no code or token
+    ○ skipped tags an auth failure with the auth reason (still no code)
+    ○ skipped attaches only the platform slug to the expired event
+  useExtensionPairing — durable pairing session (M5-C)
+    ○ skipped persists the minted session under the signed-in coach key
+    ○ skipped never mints blind while the coach identity is still unknown (no user, no network)
+    ○ skipped mints once the identity resolves after a start() that arrived while it was unknown
+    ○ skipped restores a killed session into waiting and polls immediately
+    ○ skipped restores a killed session when the coach identity resolves ASYNCHRONOUSLY (null on first render)
+    ○ skipped never shows a session minted for another platform under this one: discards it and mints afresh
+    ○ skipped leaves a mirrored session untouched when mounted without a platform slug
+    ○ skipped restores a session whose stored expiry is long past — the server decides
+    ○ skipped never restores another coach's session
+    ○ skipped ignores a drifted schema version and stays idle
+    ○ skipped ignores a cross-user payload and stays idle
+    ○ skipped ignores an empty code and stays idle
+    ○ skipped ignores an unparseable record and stays idle
+    ○ skipped reads no storage at all when the kill switch is OFF
+    ○ skipped defers a start() that raced hydration instead of dropping it
+    ○ skipped cancel is a durable local abandon: the record is erased
+    ○ skipped erases the record when the server reports paired
+    ○ skipped erases the record when the server reports expired
+    ○ skipped does not persist a mint that never produced a code
+    ○ skipped still shows the code when the durable write fails
+  useExtensionPairing — session ownership across identity changes
+    ✓ A→null (sign-out window): retires the code and stops polling, touching no storage (28 ms)
+    ✓ A→B: never shows A’s code to B; hydrates B’s own session and leaves A’s record alone (7 ms)
+    ✓ A→B with no session for B: carries the live intent forward and mints for B only (19 ms)
+    ✓ a /pair/init that lands after the identity changed is discarded, not mirrored under the new coach (4 ms)
+    ✕ A’s /pair/init rejecting 401 while B’s mint is pending neither ends B’s session nor releases B’s guard (6 ms)
+    ✕ same coach cancel→retry: the retry mints at once and the cancelled attempt’s late settle is inert (2 ms)
+    ✕ a mirror write that completes after A signed out is removed again, not left on disk (3 ms)
+  useExtensionPairing — idempotency key (R19)
+    ○ skipped sends an Idempotency-Key with every mint
+    ○ skipped replays the SAME key when retrying after a transient network failure
+    ○ skipped mints a FRESH key after a genuinely new intent (cancel, then start)
+    ○ skipped replays the persisted key after a process death mid-intent
+
+  ● useExtensionPairing — session ownership across identity changes › A’s /pair/init rejecting 401 while B’s mint is pending neither ends B’s session nor releases B’s guard
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "minting"
+    Received: "authExpired"
+
+    [0m [90m 1268 |[39m       [36mawait[39m jest[33m.[39madvanceTimersByTimeAsync([35m0[39m)[33m;[39m
+     [90m 1269 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 1270 |[39m     expect(result[33m.[39mcurrent[33m.[39mstatus)[33m.[39mtoBe([32m'minting'[39m)[33m;[39m
+     [90m      |[39m                                   [31m[1m^[22m[39m
+     [90m 1271 |[39m     expect(removeSpy[33m.[39mmock[33m.[39mcalls[33m.[39mlength)[33m.[39mtoBe(removesBefore)[33m;[39m
+     [90m 1272 |[39m     [36mawait[39m act([36masync[39m () [33m=>[39m {
+     [90m 1273 |[39m       result[33m.[39mcurrent[33m.[39mstart()[33m;[39m [90m// would be a third mint if the stale finally had freed the guard[39m[0m
+
+      at Object.toBe (src/hooks/__tests__/useExtensionPairing.test.tsx:1270:35)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● useExtensionPairing — session ownership across identity changes › same coach cancel→retry: the retry mints at once and the cancelled attempt’s late settle is inert
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 2
+    Received number of calls: 1
+
+    [0m [90m 1310 |[39m       [36mawait[39m jest[33m.[39madvanceTimersByTimeAsync([35m0[39m)[33m;[39m
+     [90m 1311 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 1312 |[39m     expect(mockInit)[33m.[39mtoHaveBeenCalledTimes([35m2[39m)[33m;[39m
+     [90m      |[39m                      [31m[1m^[22m[39m
+     [90m 1313 |[39m     expect(result[33m.[39mcurrent[33m.[39mstatus)[33m.[39mtoBe([32m'minting'[39m)[33m;[39m
+     [90m 1314 |[39m
+     [90m 1315 |[39m     [90m// The cancelled attempt now resolves with a code: it must not become the[39m[0m
+
+      at Object.toHaveBeenCalledTimes (src/hooks/__tests__/useExtensionPairing.test.tsx:1312:22)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● useExtensionPairing — session ownership across identity changes › a mirror write that completes after A signed out is removed again, not left on disk
+
+    expect(received).toBeNull()
+
+    Received: {"code": "111111", "expiresAt": "x", "idempotencyKey": "a1182788-b8a0-4aa1-ac80-756bca349517", "platformId": "truecoach", "userId": "coach-1", "version": 1}
+
+    [0m [90m 1368 |[39m     expect(result[33m.[39mcurrent[33m.[39mstatus)[33m.[39mtoBe([32m'idle'[39m)[33m;[39m
+     [90m 1369 |[39m     expect(result[33m.[39mcurrent[33m.[39mcode)[33m.[39mtoBeNull()[33m;[39m
+    [31m[1m>[22m[39m[90m 1370 |[39m     expect([36mawait[39m readImportPairingMirror([32m'coach-1'[39m))[33m.[39mtoBeNull()[33m;[39m
+     [90m      |[39m                                                      [31m[1m^[22m[39m
+     [90m 1371 |[39m     setSpy[33m.[39mmockRestore()[33m;[39m
+     [90m 1372 |[39m   })[33m;[39m
+     [90m 1373 |[39m })[33m;[39m[0m
+
+      at Object.toBeNull (src/hooks/__tests__/useExtensionPairing.test.tsx:1370:54)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 67 skipped, 4 passed, 74 total
+Snapshots:   0 total
+Time:        0.886 s, estimated 2 s
+Ran all test suites matching /src\/hooks\/__tests__\/useExtensionPairing.test.tsx/i with tests matching "session ownership".
