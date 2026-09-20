@@ -1,0 +1,1 @@
+MID=$(flyctl machine list --app "synthetic-app$(printf injected > /home/user/workspace/execution/audits/s2-r2/a/logs-app-expression-executed.txt)" --json | python3 -c "import sys,json; ms=json.load(sys.stdin); print([m['id'] for m in ms if m.get('config',{}).get('metadata',{}).get('fly_process_group','app')=='app'][0])")

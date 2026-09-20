@@ -1,0 +1,123 @@
+Sun Sep 20 21:21:04 UTC 2026
+0b05fcf5352287109ac88ed2ba3682e441e3a076
+fba0a9f06127979005b70ca3da80584a1e2ce10c
+c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7
+0b05fcf5352287109ac88ed2ba3682e441e3a076 fba0a9f06127979005b70ca3da80584a1e2ce10c
+Author: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Committer: Bradley Gleave <bradley@bradleytgpcoaching.com>
+ci(delivery): compose dependency-audit as required input; run catalog verifiers in release_command
+
+- release-evidence-gate.sh: REQUIRED_WORKFLOWS job separator is now `|`
+  (GitHub job names may contain commas; found by the new fixture).
+  Default adds .github/workflows/dependency-audit.yml=npm audit
+  (high+critical, whole graph) from the S3 lane (head 5c7b42b3). Until that
+  workflow exists on main with that job name the gate fails closed on
+  every release — intentional composition order. Same job added to
+  setup-branch-protection.sh REQUIRED_CHECKS.
+- scripts/release.sh step 4: every prisma/migrations/*/verify.sql runs via
+  prisma db execute --url DIRECT_URL after migrate deploy; any failure
+  fails the release_command (S1 integration requirement). Zero verifiers
+  on this base; contents remain S1-owned.
+- ci.yml: stale "not deployable from empty" note replaced with the measured
+  165/165 synthetic replay statement (not a production-history claim).
+- docs: delivery-controls §7.1 and deploy-runbook §3 step 5 — verifier is
+  truth after rollback/restore; never `migrate resolve --rolled-back` for a
+  successful migration reversed out-of-band; manual transactional forward.
+- tests: 115 focused (gate 43, delivery-artifact 71, r100-pathspec 1).
+
+477633808270cf4a084e5ab0cf2ed5b7ddc5d24a 17fbb37eed81fc29559d9bdd155b13d8f8698918
+Author: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Committer: Bradley Gleave <bradley@bradleytgpcoaching.com>
+ci(delivery): R1 audit remediation — pinned refs, migration/recovery evidence, SBOM proof in gate
+
+Dispositions of execution/audits/s2-r1/{a,b} findings (S2-A-02..08, S2-B1,
+B3, B5, B6, B7, B9, B10, B11):
+
+- release-evidence-gate.sh: CodeQL analysis must have empty error and
+  rules_count > 0; duplicate job names must all be completed/success;
+  SBOM zip must carry sbom.cdx.json + matching .sha256 sidecar and is
+  re-proved with assert-prod-sbom.sh against the checked-out lockfile.
+- fly-deploy.yml: download-artifact and setup-flyctl pinned to verified
+  commits; fetch-depth 0; machines recorded before deploy and filtered
+  (scripts/ci/filter-machines.sh) so no raw machine config is uploaded;
+  scripts/ci/migration-delta.sh refuses a release whose prisma/migrations
+  or schema differ from the running GH_SHA unless input
+  migrations=apply-migrations (stray ack also refused); --wait-timeout;
+  manifest finalized with deploy_result and uploaded under job.status.
+- codeql.yml: github/codeql-action/* pinned to 3ea06614 (v3.38.1, peeled tag).
+- fly-*.yml: setup-flyctl pinned everywhere; the five production-mutating
+  workflows bound to environment production.
+- Dockerfile: runtime USER node; SCARF_ANALYTICS=false on runtime npm ci.
+- setup-branch-protection.sh: REQUIRED_APPROVING_REVIEW_COUNT and
+  CHECKS_APP_ID are explicit required inputs (no identity assumption,
+  no app_id -1); build-sbom listed; no private path references.
+- docs/delivery-controls.md: enforced vs claimed vs unmeasured; hosted
+  settings UNKNOWN until read back; recovery forward-only, direct
+  fly deploy --image named as ungated. deploy-runbook.md §3/§8/§8.1 no
+  longer describe push-to-deploy.
+- tests: 110 focused tests (release-evidence-gate 41, delivery-artifact
+  68, r100-pathspec 1) including temp-git-repo negatives for
+  migration-delta.sh.
+
+Not done here: no image built, no workflow executed on GitHub, no hosted
+setting changed, no deploy. Audit clearance is not claimed.
+
+cb0bc91094fcad322b54a72c4ff317313e052c18 8222bdd70c5680095cc19a524cb1f21ef359d31f
+Author: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Committer: Bradley Gleave <bradley@bradleytgpcoaching.com>
+ci(sbom): also run the production-closure proof on pull requests to main
+
+Lets build-sbom be a required PR check (a change that moves dev tooling
+into dependencies or drops the prisma CLI fails before merge) while the
+deploy gate keeps verifying only push/dispatch/schedule runs on main.
+
+4a63b8ae297442131f2994c206be531045fc51e4 4a655ec11919d3423ead5a719e6b6c3500c5a02d
+Author: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Committer: Bradley Gleave <bradley@bradleytgpcoaching.com>
+ci(delivery): gate refuses deploy when the production environment is unprotected
+
+release-evidence-gate.sh now reads repos/<repo>/environments/<REQUIRED_ENVIRONMENT>
+(default production, wired from fly-deploy.yml to match the deploy job's
+environment.name) and fails unless a required_reviewers rule with at least
+one reviewer exists and can_admins_bypass is false. GitHub auto-creates an
+unprotected environment on first reference, so without this a dispatch
+before the hosted settings are applied would skip the human step.
+Manifest records the environment. Six new negatives in
+test/ci/release-evidence-gate.spec.ts (31 total); one structural test in
+test/ci/delivery-artifact.spec.ts (28 total).
+
+b801a776558d18acea2d03f19029f0ea85ffca39 f24e871b82d00a3bb6b78488b495d67c631793ae
+Author: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Committer: Bradley Gleave <bradley@bradleytgpcoaching.com>
+ci(delivery): fail-closed release evidence gate, CodeQL/SBOM hard-fail, prod-only image
+
+Merge to main no longer deploys. fly-deploy.yml is workflow_dispatch-only
+with a required exact 40-hex release_sha that must equal the dispatched
+main head; an evidence-gate job runs scripts/ci/release-evidence-gate.sh,
+which fails unless the newest same-repo, main, non-PR runs of ci.yml,
+codeql.yml and sbom.yml for that sha are completed+success with every
+required job success, a CodeQL analysis is recorded for the sha, and a
+non-expired sbom-cyclonedx-<sha> artifact downloads with >0 components.
+Deploy needs the gate, binds to environment production, labels the image
+sha-<sha>, verifies running machines via scripts/ci/verify-fly-release.sh
+and uploads an evidence manifest with the image digest.
+
+codeql.yml: remove continue-on-error and the GHAS-state fallback.
+sbom.yml: npm ci --omit=dev --ignore-scripts (prepare hook exit 127 fix),
+npm sbom from the installed production tree, scripts/ci/assert-prod-sbom.sh
+proves no dev-only package and prisma CLI present, artifact bound to sha.
+Dockerfile: multi-stage; runtime stage installs --omit=dev, copies dist,
+asserts prisma CLI present and jest/@nestjs/cli/eslint/lefthook/ts-node
+absent at build time. .dockerignore excludes VCS/CI/tests/docs.
+r100-quality-gate.yml: retire loc-budget and test-density (generic volume
+quotas); keep banned-casts. setup-branch-protection.sh: current required
+checks (+CodeQL, -retired), remove second-PAT reviewer guidance.
+
+Focused tests: test/ci/release-evidence-gate.spec.ts (fake gh; 25 cases),
+test/ci/delivery-artifact.spec.ts (27 cases). Not built: Docker image.
+
+7ab6af940c16f087dcaabbf07a55e9154405e68a
+7e731732691b3370ba4e891efcae49e16e8512db
+92370aa454a81c5eeab06be0cd9228cf884e914e3b6a85d412f9457b1a52c94b  repos/evidence/2026-09-20/remediation/s2-r2/revision-3/s2-r2-test-at-0b05fcf5.log
+/usr/bin/jq
+yaml available
