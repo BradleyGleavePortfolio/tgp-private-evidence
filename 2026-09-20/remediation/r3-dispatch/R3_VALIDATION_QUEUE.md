@@ -4,7 +4,11 @@ Parent owns scheduling. All moderate/heavy commands require an explicit slot and
 
 ## Current slot
 
-S6 combined R2 head `55db31a0`: final two cold exports completing after successful natural-exit full suite. Owner `s6_mobile_fixer_muabkqbw`. R3 workers must not overlap.
+S2 R3 SLOT A granted: verified static shellcheck/actionlint tool acquisition and workflow/shell lint under nonblocking lock. Owner `s2_r3_delivery_fixer_muaeepli`. Await explicit completion/release before granting S4.
+
+S6 combined R2 finished at `55db31a0`: all stages exit 0, packet frozen, lock released. Both final audits are archived; candidate remains NOT CLEARED.
+
+Next reserved slot: S4 deterministic install and focused authentication-body tests. Reservation is not execution authorization; parent grants after S2 releases.
 
 ## Awaiting specific execution requests
 

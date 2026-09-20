@@ -1,6 +1,6 @@
 # TGP R2 audit index
 
-Current round authorized in [continuation thread](https://www.perplexity.ai/computer/tasks/c505dc43-b768-4295-854f-22090ae173a6). All S1–S5 candidates remain frozen while independent A/B reviews complete; S6 remediation is a separate writable lane. No product landing or live action is authorized by a returned report.
+Current round authorized in [continuation thread](https://www.perplexity.ai/computer/tasks/c505dc43-b768-4295-854f-22090ae173a6). All twelve S1–S6 independent A/B reports are complete. Audited candidates remain frozen; R3 repair work uses new isolated successors. No product landing or live action is authorized by a returned report.
 
 | Lane | Candidate | A | B |
 |---|---|---|---|
@@ -9,6 +9,7 @@ Current round authorized in [continuation thread](https://www.perplexity.ai/comp
 | S3 | 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 | [Affirmative bounded source/local re-attestation; overall landing/release not cleared](s3-r2/a/revision-1/REPORT.md) | [CLEARED bounded S3-lane merge eligibility only](s3-r2/b/revision-1/REPORT.md) |
 | S4 | c5a5ae12c5b3c3e32a4601c99319ad7c0d980057 | [NOT CLEARED](s4-r2/a/revision-1/REPORT.md) | [CLEARED bounded merge boundary; parent hold remains](s4-r2/b/revision-1/REPORT.md) |
 | S5 | 485c67973b56758fb9b8404579f5ddaec87136bd | [Accept bounded synthetic E→T/Q0 evidence; cumulative G2 NOT CLEARED](s5-r2/a/revision-1/REPORT.md) | [CLEARED bounded validation evidence; E/T releases NOT CLEARED](s5-r2/b/revision-1/REPORT.md) |
+| S6 | 55db31a0696ebd07d0cb9abb18ffd31dce29457d | [NOT CLEARED: real identity composition and customer-copy blockers](s6-r2/a/revision-1/REPORT.md) | [NOT CLEARED for S6 acceptance; export content accepted, identity blocker](s6-r2/b/revision-1/REPORT.md) |
 
 ## Interpretation and recovery
 
@@ -38,4 +39,12 @@ S5-B independently accepts the same bounded validation evidence and preserves th
 
 Original R1 reports and all superseded evidence remain available in their existing paths. The historical R1 index's hold statements describe that capture, not the current authorization. See [dispatch record](r2-dispatch/README.md).
 
-All ten independent reports are complete. See [parent disposition and narrow next slices](R2_PARENT_DISPOSITION.md). No frozen S1–S5 candidate was changed in this audit round.
+## S6 final disposition
+
+Both reviewers independently confirmed that actual AsyncStorage fallback identity reads fail after the cache writes its namespaced key. A additionally identifies unsupported import-outcome copy; B identifies an unbounded preparing state while identity remains unresolved. Parent S6 outcome is NOT CLEARED for the affected merge/acceptance boundary. Default-off pairing does not cure the global identity-cache defect. The bounded export repair and exact-head 308-suite/3,839-test natural-exit evidence are accepted for what they prove, not as a waiver.
+
+The [preliminary A packet](s6-r2/a/preliminary-1/REPORT.md) is preserved separately. B's [provenance addendum](s6-r2/b/addendum-1/ADDENDUM-1.md) establishes that its only read of parent combined status was the pre-findings 22:31 version; its own identity probe preceded A's parent-summary publication. It discloses incidental parent-summary exposure after the report was frozen, and completes its initially omitted G21/G22 reading without a verdict change. Parent accepts the independence of the original frozen verdict, not a claim of no later exposure.
+
+Publication qualifications: combined ON/unset bundles differ in Sentry debug identifiers as well as the expected flag value; “solely flags” is too strong, as A-03 demonstrates. B's broad historical claim that no build/export could occur since 2026-05-09 is source inference, not a verified history of every build environment; parent attests only the preserved exact baseline/candidate executions. Original reports remain unchanged.
+
+All twelve independent reports are complete. See [parent disposition and narrow next slices](R2_PARENT_DISPOSITION.md) and the [R3 mandate](../remediation/r3-dispatch/R3_FIX_AUDIT_BRIEF.md). No frozen audited candidate was changed during its review.
