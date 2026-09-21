@@ -1,0 +1,128 @@
+diff --git a/test/rls-g2-pg17-etq0.spec.ts b/test/rls-g2-pg17-etq0.spec.ts
+index 840c2c68..8aaeed76 100644
+--- a/test/rls-g2-pg17-etq0.spec.ts
++++ b/test/rls-g2-pg17-etq0.spec.ts
+@@ -12,6 +12,7 @@ import {
+   hasColumn, holdAdvisory, holdTransaction, json, legacy, legacyEntityCursor, oldClient, oldRoot, OLD_HEAD, prisma, prismaMigrateDeploy,
+   quote, records, refused, resetData, root, run, settle, sql, sqlAdmin, sqlFile, stage, stageMany, target, targets, up, upFile, v2, worker,
+ } from './utils/g2-pg17-harness';
++import { G2_PG17_CLUSTER_MARKER, G2_PG17_DATABASE_MARKER } from './utils/g2-pg17-db';
+ 
+ jest.setTimeout(180000);
+ const E = '20270118000000_scout_ledger_platform_expand';
+@@ -41,6 +42,11 @@ beforeAll(() => {
+   expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
+   expect(Number(identity.version)).toBeLessThan(180000);
+   expect(directory).toMatch(/\/pg17\/clusters\/s5$/);
++  // Distinctive S5 fixture markers (pinned literals, not environment): the lane's cluster_name and
++  // the disposable database's comment stamped by bootstrap. Proves the run used the marked fixture.
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_PG17_CLUSTER_MARKER);
++  expect(sql(`SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`))
++    .toBe(G2_PG17_DATABASE_MARKER);
+   console.warn('PG17_DATABASE', JSON.stringify(identity));
+   // Bootstrap leaves the full 164-migration O history and NO E column/history.
+   expect(appliedMigrations()).toBe('164');
+diff --git a/test/scout/g2-pg17-db-guard.spec.ts b/test/scout/g2-pg17-db-guard.spec.ts
+index 16985be8..582bf92d 100644
+--- a/test/scout/g2-pg17-db-guard.spec.ts
++++ b/test/scout/g2-pg17-db-guard.spec.ts
+@@ -1,4 +1,6 @@
+-import { g2Pg17TestTarget, withFixturePassword } from '../utils/g2-pg17-db';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import { G2_PG17_CLUSTER_MARKER, G2_PG17_DATABASE_MARKER, g2Pg17TestTarget, withFixturePassword } from '../utils/g2-pg17-db';
+ 
+ const base = 'postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable';
+ const ack = 'g2_s5_etq0_disposable:55417';
+@@ -45,6 +47,20 @@ describe('S5 G2 PG17 disposable target guard', () => {
+     expect(() => g2Pg17TestTarget(base, 'g2_s5_etq0_disposable:55418')).toThrow();
+     expect(() => g2Pg17TestTarget(base, 'g2_tq0_disposable:55417')).toThrow();
+   });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_PG17_CLUSTER_MARKER).toBe('s5-disposable-pg17');
++    expect(G2_PG17_DATABASE_MARKER).toBe('s5-g2-etq0-synthetic-disposable-fixture-safe-to-drop');
++    for (const marker of [G2_PG17_CLUSTER_MARKER, G2_PG17_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^s5-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-pg17-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_PG17_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_PG17_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
+   it('attaches the fixture password only from the environment and only in plain form', () => {
+     expect(withFixturePassword(base, 'local_fixture')).toBe('postgresql://s5_super:local_fixture@127.0.0.1:55417/g2_s5_etq0_disposable');
+     expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe('postgresql://service_role:local_fixture@127.0.0.1:55417/g2_s5_etq0_disposable');
+diff --git a/test/utils/g2-pg17-bootstrap.sh b/test/utils/g2-pg17-bootstrap.sh
+index be6cfd77..ac1fcfc5 100755
+--- a/test/utils/g2-pg17-bootstrap.sh
++++ b/test/utils/g2-pg17-bootstrap.sh
+@@ -22,6 +22,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ OLD_HEAD=925780e0a1906593e5383c618311b6b17364b8dc
+ E_MIGRATION=20270118000000_scout_ledger_platform_expand
+ EXPECTED_VERSION="${G2_PG17_SERVER_VERSION:-170006}"
++# Distinctive S5 fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-pg17-db.ts G2_PG17_CLUSTER_MARKER / G2_PG17_DATABASE_MARKER, kept identical by
++# test/scout/g2-pg17-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's5-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s5-disposable-pg17
++DB_MARKER=s5-g2-etq0-synthetic-disposable-fixture-safe-to-drop
+ 
+ for name in G2_PG17_DATABASE_URL G2_PG17_CONFIRM G2_PG17_PASSWORD G2_PG17_PSQL G2_PG17_OLD_ROOT G2_PG17_OLD_CLIENT; do
+   [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
+@@ -51,6 +57,12 @@ ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
+ [[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
+ [[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
+   || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S5 lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S5 fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
+ 
+ # 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
+ #    mirrors S1's Supabase-like fixture and the hosted role model):
+@@ -79,9 +91,17 @@ done
+ # 3. Dedicated database owned by the migration role (create once; never drop anything).
+ #    Single-shot: a database that already carries migration history must be reset explicitly
+ #    by the operator (DROP DATABASE g2_s5_etq0_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
+ if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s5_etq0_disposable'")" == "0" ]]; then
+   psql_maint -c 'CREATE DATABASE g2_s5_etq0_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s5_etq0_disposable IS :'marker';
++SQL
+ fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s5_etq0_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s5_etq0_disposable exists without the S5 disposable marker comment; refusing to reuse it" >&2; exit 3; }
+ psql_maint -c 'ALTER DATABASE g2_s5_etq0_disposable OWNER TO postgres'
+ [[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
+   || { echo "g2_s5_etq0_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
+diff --git a/test/utils/g2-pg17-db.ts b/test/utils/g2-pg17-db.ts
+index 4ad39125..f8b1936b 100644
+--- a/test/utils/g2-pg17-db.ts
++++ b/test/utils/g2-pg17-db.ts
+@@ -25,6 +25,18 @@ export const G2_PG17_RUNTIME_ROLE = 'service_role';
+ export const G2_PG17_LOGIN_ROLES = new Set([G2_PG17_ADMIN_ROLE, G2_PG17_MIGRATION_ROLE, G2_PG17_RUNTIME_ROLE]);
+ /** Fixture password is supplied only through this environment variable, never in a URL or file. */
+ export const G2_PG17_PASSWORD_ENV = 'G2_PG17_PASSWORD';
++/**
++ * Distinctive S5 fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's5-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s5_etq0_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-pg17-bootstrap.sh and execution/s5-r3/run-proof.sh must carry the same literals.
++ */
++export const G2_PG17_CLUSTER_MARKER = 's5-disposable-pg17';
++export const G2_PG17_DATABASE_MARKER = 's5-g2-etq0-synthetic-disposable-fixture-safe-to-drop';
+ // 54321 is S1's own cluster; 55439 was the earlier Agent83 environment.
+ const REFUSED_PORTS = new Set(['5432', '5433', '6543', '54321', '54322', '55439']);
+ const PRISMA_ONLY = new Set(['schema', 'connection_limit']);

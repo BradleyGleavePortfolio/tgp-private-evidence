@@ -1,0 +1,92 @@
+# S5 R3 runner rev3 connected-preflight controls via offline psql stub 20260921T233236Z (no real server; stub at /home/user/workspace/execution/s5-r3/stubs/psql-stub.sh; back-to-back, no sleeps, after fd-9 fix)
+## C1-ok-absent stage=preflight scenario=ok-absent
+PREFLIGHT_OK target_exists=0
+PROOF_EXIT=0 STAGE=preflight TS=20260921T233236Z START=2026-09-21T23:32:36Z END=2026-09-21T23:32:37Z
+rc=0 stub_calls=2 drop_executed=0
+## C2-blank-cluster stage=reset scenario=blank-cluster
+preflight: cluster_name '' is not the S5 marker 's5-disposable-pg17' (blank/foreign cluster refused)
+PROOF_EXIT=3 STAGE=reset TS=20260921T233237Z START=2026-09-21T23:32:37Z END=2026-09-21T23:32:37Z
+rc=3 stub_calls=2 drop_executed=0
+## C3-foreign-cluster stage=reset scenario=foreign-cluster
+preflight: cluster_name 's1-disposable-pg17' is not the S5 marker 's5-disposable-pg17' (blank/foreign cluster refused)
+PROOF_EXIT=3 STAGE=reset TS=20260921T233237Z START=2026-09-21T23:32:37Z END=2026-09-21T23:32:38Z
+rc=3 stub_calls=2 drop_executed=0
+## C4-hosted-roles stage=reset scenario=hosted-roles
+preflight: hosted-platform roles present (2); not a synthetic fixture
+PROOF_EXIT=3 STAGE=reset TS=20260921T233238Z START=2026-09-21T23:32:38Z END=2026-09-21T23:32:39Z
+rc=3 stub_calls=2 drop_executed=0
+## C5-foreign-db stage=reset scenario=foreign-db
+preflight: unexpected database 'tgp_production' on the cluster; foreign server refused
+PROOF_EXIT=3 STAGE=reset TS=20260921T233239Z START=2026-09-21T23:32:39Z END=2026-09-21T23:32:39Z
+rc=3 stub_calls=2 drop_executed=0
+## C6-wrong-version stage=preflight scenario=wrong-version
+preflight: server_version_num 160004 != 170006
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233239Z START=2026-09-21T23:32:39Z END=2026-09-21T23:32:40Z
+rc=3 stub_calls=2 drop_executed=0
+## C7-wrong-datadir stage=preflight scenario=wrong-datadir
+preflight: data_directory /var/lib/postgresql/17/main != /home/user/pg17/clusters/s5
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233240Z START=2026-09-21T23:32:40Z END=2026-09-21T23:32:41Z
+rc=3 stub_calls=2 drop_executed=0
+## C8-not-loopback stage=preflight scenario=not-loopback
+preflight: listen_addresses '*' is not loopback-only
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233241Z START=2026-09-21T23:32:41Z END=2026-09-21T23:32:41Z
+rc=3 stub_calls=2 drop_executed=0
+## C9-wrong-port stage=preflight scenario=wrong-port
+preflight: server port 5432 != 54325
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233241Z START=2026-09-21T23:32:41Z END=2026-09-21T23:32:42Z
+rc=3 stub_calls=2 drop_executed=0
+## C10-not-super stage=preflight scenario=not-super
+preflight: s5_super is not superuser on this cluster
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233242Z START=2026-09-21T23:32:42Z END=2026-09-21T23:32:42Z
+rc=3 stub_calls=2 drop_executed=0
+## C11-exists-unmarked stage=reset scenario=exists-unmarked
+preflight: g2_s5_etq0_disposable exists WITHOUT the S5 disposable marker comment; refusing (operator must inspect/remove it explicitly)
+PROOF_EXIT=3 STAGE=reset TS=20260921T233242Z START=2026-09-21T23:32:42Z END=2026-09-21T23:32:43Z
+rc=3 stub_calls=2 drop_executed=0
+## C12-exists-wrong-marker stage=reset scenario=exists-wrong-marker
+preflight: g2_s5_etq0_disposable exists WITHOUT the S5 disposable marker comment; refusing (operator must inspect/remove it explicitly)
+PROOF_EXIT=3 STAGE=reset TS=20260921T233243Z START=2026-09-21T23:32:43Z END=2026-09-21T23:32:44Z
+rc=3 stub_calls=2 drop_executed=0
+## C13-exists-marked-busy stage=reset scenario=exists-marked-busy
+PREFLIGHT_OK target_exists=1
+reset: 1 session(s) still attached to g2_s5_etq0_disposable; refusing to drop
+PROOF_EXIT=3 STAGE=reset TS=20260921T233244Z START=2026-09-21T23:32:44Z END=2026-09-21T23:32:44Z
+rc=3 stub_calls=2 drop_executed=0
+## C14-exists-marked-idle stage=reset scenario=exists-marked-idle
+PREFLIGHT_OK target_exists=1
+RESET_OK
+PROOF_EXIT=0 STAGE=reset TS=20260921T233244Z START=2026-09-21T23:32:44Z END=2026-09-21T23:32:45Z
+rc=0 stub_calls=4 drop_executed=1
+## C15-reset-absent-noop stage=reset scenario=ok-absent
+PREFLIGHT_OK target_exists=0
+reset: g2_s5_etq0_disposable absent; nothing to drop
+PROOF_EXIT=0 STAGE=reset TS=20260921T233245Z START=2026-09-21T23:32:45Z END=2026-09-21T23:32:45Z
+rc=0 stub_calls=2 drop_executed=0
+## C16-connect-fail stage=preflight scenario=connect-fail
+preflight: connection or query failed (see /home/user/workspace/execution/s5-r3/logs/run-preflight-20260921T233245Z.log)
+PROOF_EXIT=3 STAGE=preflight TS=20260921T233245Z START=2026-09-21T23:32:45Z END=2026-09-21T23:32:46Z
+rc=3 stub_calls=2 drop_executed=0
+## C17-bootstrap-needs-deps stage=bootstrap scenario=ok-absent
+REFUSED rc=2: node_modules missing in /home/user/workspace/worktrees/s5-r3 (run execution/s5-r3/npm-ci.sh under the canonical lock first)
+PROOF_EXIT=2 STAGE=bootstrap TS=20260921T233246Z START=2026-09-21T23:32:46Z END=2026-09-21T23:32:46Z REFUSED
+rc=2 stub_calls=0 drop_executed=0
+## C18 lock busy (held by another process) -> rc 75, no connection attempt
+test-validation.lock busy; not queueing
+PROOF_EXIT=75 STAGE=preflight TS=20260921T233246Z START=2026-09-21T23:32:46Z END=2026-09-21T23:32:46Z LOCK_BUSY
+rc=75 stub_calls=0
+## C19 lock free immediately after a run
+rc=0
+LOCK_FREE_IMMEDIATELY
+## C20 password never appears in any log
+no log contains the fixture password
+## C21 C14 call order (preflight batch, then DROP, then count)
+CALL: --version
+CALL: -X -w -qAt -v ON_ERROR_STOP=1 postgresql://s5_super@127.0.0.1:54325/postgres?connect_timeout=5
+CALL: -X -w -qAt -v ON_ERROR_STOP=1 postgresql://s5_super@127.0.0.1:54325/postgres?connect_timeout=5 -c DROP DATABASE g2_s5_etq0_disposable
+DROP-EXECUTED
+CALL: -X -w -qAt -v ON_ERROR_STOP=1 postgresql://s5_super@127.0.0.1:54325/postgres?connect_timeout=5 -c SELECT count(*) FROM pg_database WHERE datname='g2_s5_etq0_disposable'
+## C22 lock log tail
+2026-09-21T23:32:45Z HOLDER=s5-r3 PURPOSE=g2-pg17-proof-preflight pid=7153
+2026-09-21T23:32:46Z RELEASE=s5-r3 stage=preflight rc=3
+2026-09-21T23:32:51Z HOLDER=s5-r3 PURPOSE=g2-pg17-proof-preflight pid=7360
+2026-09-21T23:32:51Z RELEASE=s5-r3 stage=preflight rc=0

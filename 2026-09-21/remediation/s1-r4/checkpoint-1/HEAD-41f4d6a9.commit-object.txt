@@ -1,0 +1,25 @@
+tree 8ab0eb9e942686896a0039038a2d3bbbe2aa4b06
+parent b7d7fe5964680050ab441c195055ea946282a9c3
+author Bradley Gleave <bradley@bradleytgpcoaching.com> 1790033560 +0000
+committer Bradley Gleave <bradley@bradleytgpcoaching.com> 1790033560 +0000
+
+S1-DB-01 verifier: treat effective TRUNCATE held by an API role as EXPOSURE (S1-R3-A-01)
+
+Row security governs SELECT/INSERT/UPDATE/DELETE only. TRUNCATE is a separate
+table privilege that a FORCE-RLS deny-all table does not defend against, so a
+TRUNCATE-only grant (direct or PUBLIC-only) on a server-only relation let the
+CRUD-only verifier at b7d7fe59 report protected. verify.sql now includes
+TRUNCATE in the has_table_privilege loop for anon/authenticated (effective
+semantics: direct, PUBLIC, inherited). No grant, migration or down.sql change;
+service_role allowed-path checks unchanged; OK notice unchanged.
+
+Regression controls (test/db/_support/s1-truncate-controls.sh, shared by the
+full harness section 4b and the standalone narrow entry point
+test/db/s1-r4-truncate-discriminator.sh): direct anon grant, direct
+authenticated grant and PUBLIC-only grant on the seeded standalone
+"MuxProcessedEvent", each asserted through psql and `prisma db execute`,
+each with the frozen b7d7fe59 verifier (extracted from history, sha256-pinned)
+exiting 0 while the current verifier exits non-zero with the EXPOSURE class and
+role/privilege named, a rollback-only behavioural probe, restore and positive
+control after every step. The standalone script reuses the two-layer disposable
+target guard unchanged and never drops, creates or replays anything.
