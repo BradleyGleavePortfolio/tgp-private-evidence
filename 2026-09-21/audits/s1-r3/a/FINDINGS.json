@@ -1,0 +1,100 @@
+{
+  "audit": "S1 R3 independent auditor A",
+  "source_head": "b7d7fe5964680050ab441c195055ea946282a9c3",
+  "source_tree": "abc1ac55bd8f93383b7b0075ec9a4c856e4455d9",
+  "verdict": "NOT_CLEARED_FOR_UNQUALIFIED_PRIVILEGED_CATALOG_RELEASE_GATE",
+  "scope": "Read-only source/static inspection and attributable historical exact-head evidence; no new DB execution",
+  "actual_observable_model": "API assistant; concrete runtime model/version/reasoning setting not exposed",
+  "requested_auditor_model": "No auditor-specific model selector exposed in task",
+  "independence": {
+    "implemented_candidate": false,
+    "read_current_b_report_or_messages": false,
+    "read_prior_b_report_directly": false,
+    "source_modified": false,
+    "heavy_tests_or_db_run": false
+  },
+  "findings": [
+    {
+      "id": "S1-R3-A-01",
+      "title": "Catalog gate misses effective TRUNCATE privilege",
+      "type": "material_source_verifier_defect",
+      "severity": "medium",
+      "status": "OPEN",
+      "owner": "Parent-designated sole S1 fixer",
+      "affected_file": "prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql",
+      "affected_lines": [134, 139],
+      "consequence": "An API role may retain destructive SQL TRUNCATE capability while the verifier reports protected; RLS does not apply to TRUNCATE.",
+      "proof_scope": "Static counterexample plus PostgreSQL17 documentation; not reproduced by this auditor and not a claim of production grants or HTTP exploitability.",
+      "counterexample": "On the passing fixture grant only TRUNCATE on public.\"MuxProcessedEvent\" to anon. All verifier-tested invariants remain unchanged; verifier is predicted to exit 0.",
+      "smallest_evidence": "Guarded disposable direct and PUBLIC-only TRUNCATE grant controls, effective privilege observations, psql and real Prisma verifier child exits, restore and positive control; no actual truncation required.",
+      "closure": "Effective TRUNCATE denial checked for both API roles; exact successor-head positive and direct/PUBLIC negative evidence through both verifier routes; scoped independent follow-up.",
+      "public_semantic_sources": [
+        "https://www.postgresql.org/docs/17/ddl-rowsecurity.html",
+        "https://www.postgresql.org/docs/17/sql-truncate.html"
+      ]
+    },
+    {
+      "id": "S1-R3-A-E01",
+      "title": "Real S1+S2 release composition is pending",
+      "type": "missing_dependent_evidence_not_source_defect",
+      "status": "RESERVED",
+      "owner": "S2 builder and parent",
+      "proof_scope": "Historical S1 child verifier routes are supported; actual separately built composition is unrun in supplied brief.",
+      "closure": "Exact integrated source/applicability, real 164-parent replay plus candidate165 through release.sh, trusted verifier selection/discovery and faithful positive/refusal/failure exit propagation."
+    },
+    {
+      "id": "S1-A-06",
+      "title": "Serving-role, live applicability, and recovery prerequisites",
+      "type": "inherited_external_prerequisite",
+      "status": "OPEN",
+      "proof_scope": "No live serving role or hosted grants/owners/history/backup/restore observation; PG17.6 synthetic evidence is not PG15 or hosted clearance."
+    },
+    {
+      "id": "S1-A-07",
+      "title": "Future partition creation and topology scope",
+      "type": "inherited_scope_reservation",
+      "status": "BOUNDED_SOURCE_FIX_ACCEPTED_BROADER_SCOPE_RESERVED",
+      "proof_scope": "Public direct-parent guard and helper-created future partition proven historically. No universal future-object or complete topology proof.",
+      "additional_observation": "Verifier discards child namespace/OID and resolves public name; checks at least one attached child, not preservation of every child.",
+      "affected_file": "prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql",
+      "affected_lines": [[73, 90], [143, 155]],
+      "smallest_evidence": "Required exact namespace/parentage inventory, helper owner/job caller, and scoped wrong-parent/wrong-schema/detach controls before claiming broader topology/restore clearance."
+    }
+  ],
+  "closed_prior_findings": [
+    {
+      "id": "S1-R2-A-01",
+      "disposition": "CLOSED_BOUNDED",
+      "scope": "Original missing disposable-target-selection guard; archived exact-head offline72 and real preflight plus controlled lock-bearing wrapper; current execution ownership remains separate."
+    },
+    {
+      "id": "S1-R2-A-02",
+      "disposition": "CLOSED_BOUNDED",
+      "scope": "Late-stage failure discriminates rollback of earlier statements; same-connection timeout checks on direct path, exact PG17.6/Prisma6.19.3 evidence; Prisma-session cleanup not directly observable."
+    },
+    {
+      "id": "S1-A-03",
+      "disposition": "CLOSED_BOUNDED",
+      "scope": "Direct-session timeout cleanup source and nonvacuous evidence."
+    }
+  ],
+  "historical_evidence": {
+    "pass": 89,
+    "fail": 0,
+    "child_exit": 0,
+    "rerun_by_auditor": false,
+    "source_stamp_hashes_match": 7,
+    "archive_manifest_hashes_match": 48,
+    "parent_replay_apply_lines": 328,
+    "parent_replays": 2,
+    "parent_migrations_per_replay": 164,
+    "forward_dump_parity": true,
+    "dump_excludes_acl_and_owner": true
+  },
+  "artifacts": [
+    "REPORT.md",
+    "NARROW_EVIDENCE_REQUEST.md",
+    "static-evidence.json",
+    "collect_static_evidence.py"
+  ]
+}
