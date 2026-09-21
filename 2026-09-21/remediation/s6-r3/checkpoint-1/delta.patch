@@ -1,0 +1,1825 @@
+diff --git a/src/components/coach/ExtensionPairingPanel.tsx b/src/components/coach/ExtensionPairingPanel.tsx
+index 0e295dc..d9535ca 100644
+--- a/src/components/coach/ExtensionPairingPanel.tsx
++++ b/src/components/coach/ExtensionPairingPanel.tsx
+@@ -178,12 +178,14 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+ 
+   if (status === 'paired') {
+     // Roster truth is the ONLY progress source: delta > 0 states the real number
+-    // of new clients since journey start; delta == 0 is a calm, honest
+-    // still-running message. Neither ever claims imported/complete/partial/%.
++    // of new clients since journey start; delta == 0 is a calm message that
++    // does not assert the extension is still running (S6 R3: `paired` means
++    // the code was accepted, not that an import is in progress). Neither ever
++    // claims imported/complete/partial/%.
+     const reviewCopy =
+       delta > 0
+         ? `${delta} new ${delta === 1 ? 'client' : 'clients'} since you started this import`
+-        : 'No new clients have arrived yet. Your import is still running in the browser extension.';
++        : 'No new clients have arrived yet. If the import is running in the browser extension, they will appear here as they arrive.';
+     return (
+       <View style={[styles.card, styles.cardOk]} accessibilityLiveRegion="polite" testID="pairing-paired">
+         <Ionicons name="checkmark-circle-outline" size={22} color={colors.primary} />
+@@ -192,8 +194,8 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+           {reviewCopy}
+         </Text>
+         <Text style={styles.body}>
+-          Your import runs in the browser extension. Your client roster is the source of
+-          truth — open it to review new clients as they arrive.
++          Your import runs in the browser extension — this app can’t see its progress. Your
++          client roster is the source of truth — open it to review new clients as they arrive.
+         </Text>
+         <ReconstructCountsSection />
+         <TouchableOpacity
+@@ -210,6 +212,13 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+   }
+ 
+   // Terminal, retryable/attention states share one honest, calm layout.
++  //
++  // Copy truthfulness (S6 R3): mobile has no import-progress or server-cancel
++  // contract, so no state here may assert what the extension did or did not
++  // do. `failed` is reached both before a code exists (mint failed) and after
++  // one was shown (status polling failed), and `cancelled` only stops THIS
++  // device from checking — a code already entered in the extension may still
++  // be running there. The messages say exactly that and no more.
+   const recoverable: Record<string, { title: string; message: string; cta: string | null }> = {
+     expired: {
+       title: 'That code expired',
+@@ -218,7 +227,16 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+     },
+     failed: {
+       title: "We couldn't reach the pairing service",
+-      message: 'Check your connection and try again. Nothing was imported.',
++      message:
++        'We could not check the pairing status from this device. If you already entered a ' +
++        'code in the browser extension, check there. Otherwise check your connection and try again.',
++      cta: 'Try again',
++    },
++    identityUnavailable: {
++      title: "We couldn't confirm your account",
++      message:
++        'Your signed-in account did not load on this device, so no pairing code was created. ' +
++        'Try again, or sign out and back in if this keeps happening.',
+       cta: 'Try again',
+     },
+     authExpired: {
+@@ -233,7 +251,10 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+     },
+     cancelled: {
+       title: 'Pairing cancelled',
+-      message: 'No import was started. You can begin again whenever you’re ready.',
++      message:
++        'This device stopped checking for the pairing. If you already entered the code in the ' +
++        'browser extension, the import may still run there — check the extension. You can ' +
++        'start again here whenever you’re ready.',
+       cta: 'Start again',
+     },
+   };
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
+new file mode 100644
+index 0000000..ca834fe
+--- /dev/null
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
+@@ -0,0 +1,109 @@
++/**
++ * ExtensionPairingPanel — truthful copy (S6 R3 reimplementation).
++ *
++ * R2 finding S6-R2-A-02: the `failed` and `cancelled` states asserted outcomes
++ * mobile cannot know ("Nothing was imported", "No import was started") — there
++ * is no import-progress or server-cancel contract. These tests pin the honest
++ * replacements and the new `identityUnavailable` terminal.
++ */
++import React from 'react';
++import { render, fireEvent, cleanup } from '@testing-library/react-native';
++
++jest.mock('../../../theme/useTheme', () => ({
++  useTheme: () => ({
++    colors: {
++      background: '#fff', surface: '#f5f5f5', border: '#ddd', primary: '#2c4a36',
++      textPrimary: '#111', textSecondary: '#555', textMuted: '#999',
++      textOnPrimary: '#fff', info: '#2b6cb0', error: '#c0392b',
++    },
++  }),
++}));
++
++const mockStart = jest.fn();
++const mockRetry = jest.fn();
++const mockCancel = jest.fn();
++let mockHookState: { status: string; code: string | null; supportReference?: string | null };
++jest.mock('../../../hooks/useExtensionPairing', () => ({
++  useExtensionPairing: () => ({ ...mockHookState, start: mockStart, retry: mockRetry, cancel: mockCancel }),
++}));
++jest.mock('../../../hooks/useRosterReviewDelta', () => ({
++  useRosterReviewDelta: () => ({ delta: 0, refresh: jest.fn() }),
++}));
++jest.mock('../../../hooks/useReconstructCounts', () => ({
++  useReconstructCounts: () => ({ enabled: false, families: [], refresh: jest.fn() }),
++}));
++jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate: jest.fn() }) }));
++jest.mock('../../../analytics/posthog.service', () => ({ track: jest.fn() }));
++
++import ExtensionPairingPanel from '../ExtensionPairingPanel';
++
++const FORBIDDEN_CLAIMS = [
++  /Nothing was imported/i,
++  /No import was started/i,
++  /import (is )?complete/i,
++  /imported \d+/i,
++  /\d+%/,
++];
++
++function allText(tree: ReturnType<typeof render>): string {
++  return tree.toJSON() ? JSON.stringify(tree.toJSON()) : '';
++}
++
++beforeEach(() => {
++  mockStart.mockClear();
++  mockRetry.mockClear();
++  mockCancel.mockClear();
++});
++afterEach(() => cleanup());
++
++describe('ExtensionPairingPanel — copy never asserts what the extension did', () => {
++  it.each(['failed', 'cancelled', 'identityUnavailable', 'expired', 'authExpired', 'unavailable'])(
++    '%s state makes no import-outcome claim',
++    async (status) => {
++      mockHookState = { status, code: null, supportReference: null };
++      const tree = await render(<ExtensionPairingPanel platformId="truecoach" />);
++      const text = allText(tree);
++      for (const re of FORBIDDEN_CLAIMS) expect(text).not.toMatch(re);
++      expect(tree.getByTestId(`pairing-${status}`)).toBeTruthy();
++    },
++  );
++
++  it('failed: says the STATUS could not be checked and points to the extension if a code was already entered', async () => {
++    mockHookState = { status: 'failed', code: null, supportReference: null };
++    const { getByText } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    expect(getByText(/could not check the pairing status/i)).toBeTruthy();
++    expect(getByText(/already entered a code in the browser extension, check there/i)).toBeTruthy();
++    fireEvent.press(getByText('Try again'));
++    expect(mockRetry).toHaveBeenCalledTimes(1);
++  });
++
++  it('cancelled: says only that THIS device stopped checking; the extension may still be running', async () => {
++    mockHookState = { status: 'cancelled', code: null, supportReference: null };
++    const { getByText } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    expect(getByText(/This device stopped checking for the pairing/i)).toBeTruthy();
++    expect(getByText(/may still run there/i)).toBeTruthy();
++    fireEvent.press(getByText('Start again'));
++    expect(mockRetry).toHaveBeenCalledTimes(1);
++  });
++
++  it('identityUnavailable: honest bounded-wait terminal with a retry, stating no code was created', async () => {
++    mockHookState = { status: 'identityUnavailable', code: null, supportReference: null };
++    const { getByText, getByTestId, queryByTestId } = await render(
++      <ExtensionPairingPanel platformId="truecoach" />,
++    );
++    expect(getByText("We couldn't confirm your account")).toBeTruthy();
++    expect(getByText(/no pairing code was created/i)).toBeTruthy();
++    expect(queryByTestId('pairing-minting')).toBeNull(); // not the indefinite spinner
++    fireEvent.press(getByTestId('pairing-retry'));
++    expect(mockRetry).toHaveBeenCalledTimes(1);
++  });
++
++  it('paired copy still distinguishes "paired" from a running import claim it cannot verify', async () => {
++    mockHookState = { status: 'paired', code: null, supportReference: null };
++    const tree = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    const text = allText(tree);
++    expect(text).toMatch(/Paired/);
++    expect(text).not.toMatch(/import (is )?complete/i);
++    expect(text).not.toMatch(/\d+%/);
++  });
++});
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
+index e3d14d7..07232c9 100644
+--- a/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
+@@ -162,12 +162,12 @@ describe('ExtensionPairingPanel — lifecycle rendering', () => {
+     );
+   });
+ 
+-  it('renders a calm still-running copy when no new clients yet (3→3 = 0) — never claims completion', async () => {
++  it('renders a calm copy when no new clients yet (3→3 = 0) — never claims completion or that the import is running', async () => {
+     mockDelta = 0;
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId, toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+     expect(getByTestId('pairing-review-delta')).toHaveTextContent(
+-      'No new clients have arrived yet. Your import is still running in the browser extension.',
++      'No new clients have arrived yet. If the import is running in the browser extension, they will appear here as they arrive.',
+     );
+     const serialized = JSON.stringify(toJSON());
+     expect(serialized).not.toMatch(/imported successfully|import complete|completed|\bsuccess\b|\b\d{1,3}%/i);
+diff --git a/src/hooks/__tests__/useCurrentUser.composition.test.tsx b/src/hooks/__tests__/useCurrentUser.composition.test.tsx
+new file mode 100644
+index 0000000..2d76c6b
+--- /dev/null
++++ b/src/hooks/__tests__/useCurrentUser.composition.test.tsx
+@@ -0,0 +1,115 @@
++/**
++ * useCurrentUser — REAL composition over lib/userCache + AsyncStorage shim
++ * (S6 R3). Neither `lib/userCache` nor `storage/mmkv` is mocked; only the
++ * AsyncStorage jest mock and Sentry are.
++ *
++ * Pins: the hook resolves a freshly written identity (R2: it never did on the
++ * shim build), the logout event clears it, a hydration still in flight during
++ * logout cannot resurrect the signed-out user, and an account switch shows
++ * only the new account.
++ */
++import { act, renderHook, cleanup } from '@testing-library/react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++jest.mock('../../services/sentry', () => ({ setSentryUser: jest.fn() }));
++
++import { useCurrentUser } from '../useCurrentUser';
++import { clearUserCache, setUserCache } from '../../lib/userCache';
++import { authEvents } from '../../utils/authEvents';
++import { setSentryUser } from '../../services/sentry';
++
++const userA = { id: 'user-A', email: 'a@example.com' };
++const userB = { id: 'user-B', email: 'b@example.com' };
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  await clearUserCache();
++  (setSentryUser as jest.Mock).mockClear();
++  jest.restoreAllMocks();
++});
++afterEach(async () => {
++  await cleanup();
++});
++
++const flush = async () => {
++  await act(async () => {
++    await Promise.resolve();
++    await Promise.resolve();
++    await Promise.resolve();
++  });
++};
++
++describe('useCurrentUser — real identity composition', () => {
++  it('is null on first render and resolves the identity written by a sign-in', async () => {
++    await setUserCache(userA);
++    const { result } = await renderHook(() => useCurrentUser());
++    expect(result.current).toBeNull();
++    await flush();
++    expect(result.current).toEqual(userA);
++    expect(setSentryUser).toHaveBeenLastCalledWith({ id: 'user-A', email: 'a@example.com' });
++  });
++
++  it('resolves the identity after a "restart" (value only on disk, mirror empty)', async () => {
++    await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(userA));
++    const { result } = await renderHook(() => useCurrentUser());
++    await flush();
++    expect(result.current).toEqual(userA);
++  });
++
++  it('clears on logout and stays null afterwards', async () => {
++    await setUserCache(userA);
++    const { result } = await renderHook(() => useCurrentUser());
++    await flush();
++    expect(result.current).toEqual(userA);
++    await act(async () => {
++      await clearUserCache();
++      authEvents.emit('logout');
++    });
++    expect(result.current).toBeNull();
++    expect(setSentryUser).toHaveBeenLastCalledWith(null);
++  });
++
++  it('a hydration still in flight when logout fires cannot resurrect the signed-out user', async () => {
++    await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(userA));
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async (k) => {
++      if (k === 'prefs:auth.user_data' && release === null) {
++        await new Promise<void>((r) => {
++          release = r;
++        });
++      }
++      return realGet(k);
++    });
++    const { result } = await renderHook(() => useCurrentUser());
++    await flush();
++    expect(result.current).toBeNull(); // read is held open
++    await act(async () => {
++      authEvents.emit('logout'); // sign-out lands first
++    });
++    await act(async () => {
++      (release as unknown as () => void)();
++      await Promise.resolve();
++    });
++    await flush();
++    expect(result.current).toBeNull(); // the stale read was discarded
++  });
++
++  it('account switch A → B via login event shows only B', async () => {
++    await setUserCache(userA);
++    const { result } = await renderHook(() => useCurrentUser());
++    await flush();
++    expect(result.current?.id).toBe('user-A');
++    await act(async () => {
++      await clearUserCache();
++      authEvents.emit('logout');
++    });
++    expect(result.current).toBeNull();
++    await act(async () => {
++      await setUserCache(userB);
++      authEvents.emit('login');
++    });
++    await flush();
++    expect(result.current).toEqual(userB);
++  });
++});
+diff --git a/src/hooks/__tests__/useExtensionPairing.identityWait.test.tsx b/src/hooks/__tests__/useExtensionPairing.identityWait.test.tsx
+new file mode 100644
+index 0000000..20d6e08
+--- /dev/null
++++ b/src/hooks/__tests__/useExtensionPairing.identityWait.test.tsx
+@@ -0,0 +1,203 @@
++/**
++ * useExtensionPairing — bounded first-identity wait (S6 R3 reimplementation).
++ *
++ * R2 finding S6-R2-A-01: when the coach identity never resolved (the shim
++ * identity cache was unreadable after a fresh login), a deferred start() kept
++ * the panel on "Preparing your secure pairing code…" indefinitely. The wait is
++ * now bounded by IDENTITY_WAIT_MS and settles to the honest, retryable
++ * `identityUnavailable` terminal — with no mint and no storage write.
++ *
++ * Two compositions are covered:
++ *   1. the REAL useCurrentUser → lib/userCache → AsyncStorage shim chain with
++ *      an empty store (the identity genuinely never resolves), and
++ *   2. a controlled identity stub for the transitions (late resolution, retry,
++ *      and the A→null sign-out window, which must NOT arm the timer).
++ */
++import { act, renderHook, cleanup } from '@testing-library/react-native';
++import { AppState, type AppStateStatus, type NativeEventSubscription } from 'react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++jest.mock('../../api/extensionPairApi', () => ({
++  extensionPairApi: { init: jest.fn(), status: jest.fn() },
++}));
++const mockTrack = jest.fn();
++jest.mock('../../analytics/posthog.service', () => ({
++  track: (...a: unknown[]) => mockTrack(...a),
++}));
++jest.mock('../../services/sentry', () => ({ setSentryUser: jest.fn() }));
++
++// Controlled identity: `undefined` means "use the REAL useCurrentUser".
++let mockCurrentUserId: string | null | undefined;
++jest.mock('../useCurrentUser', () => {
++  const real = jest.requireActual('../useCurrentUser') as typeof import('../useCurrentUser');
++  return {
++    ...real,
++    useCurrentUser: () => {
++      if (mockCurrentUserId === undefined) return real.useCurrentUser();
++      return mockCurrentUserId ? { id: mockCurrentUserId, email: 'c@x.io' } : null;
++    },
++  };
++});
++
++import { useExtensionPairing, IDENTITY_WAIT_MS } from '../useExtensionPairing';
++import { extensionPairApi } from '../../api/extensionPairApi';
++import { AnalyticsEvents } from '../../analytics/events';
++import { readImportPairingMirror } from '../../storage/importPairingMirror';
++
++const mockInit = extensionPairApi.init as jest.Mock;
++const mockStatus = extensionPairApi.status as jest.Mock;
++
++let appStateHandler: ((s: AppStateStatus) => void) | null = null;
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  mockCurrentUserId = undefined;
++  jest.useFakeTimers();
++  mockInit.mockReset();
++  mockStatus.mockReset();
++  mockTrack.mockClear();
++  appStateHandler = null;
++  jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, cb) => {
++    appStateHandler = cb;
++    return { remove: jest.fn() } as NativeEventSubscription;
++  });
++});
++
++afterEach(async () => {
++  jest.clearAllTimers();
++  jest.useRealTimers();
++  await cleanup();
++  jest.restoreAllMocks();
++});
++
++describe('bounded identity wait — real useCurrentUser over an empty identity store', () => {
++  it('settles to identityUnavailable after IDENTITY_WAIT_MS instead of preparing forever; no mint, no storage', async () => {
++    mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS - 1);
++    });
++    expect(result.current.status).toBe('idle'); // still within the bound
++    await act(async () => {
++      await jest.advanceTimersByTimeAsync(2);
++    });
++    expect(result.current.status).toBe('identityUnavailable');
++    expect(result.current.code).toBeNull();
++    expect(mockInit).not.toHaveBeenCalled();
++    expect(await AsyncStorage.getAllKeys()).toEqual([]);
++    const failed = mockTrack.mock.calls.find((c) => c[0] === AnalyticsEvents.IMPORT_PAIRING_FAILED);
++    expect(failed?.[1]).toEqual({ platform: 'truecoach', reason: 'identity' });
++    expect(appStateHandler).not.toBeNull(); // the hook is otherwise fully mounted
++  });
++
++  it('retry from identityUnavailable is a visible new bounded wait, still without a blind mint', async () => {
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS + 1);
++    });
++    expect(result.current.status).toBe('identityUnavailable');
++    await act(async () => {
++      result.current.retry();
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(result.current.status).toBe('idle');
++    await act(async () => {
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS + 1);
++    });
++    expect(result.current.status).toBe('identityUnavailable');
++    expect(mockInit).not.toHaveBeenCalled();
++  });
++
++  it('does not fire after unmount (timer torn down)', async () => {
++    const { result, unmount } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(10);
++    });
++    unmount();
++    await act(async () => {
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS + 10);
++    });
++    expect(mockTrack.mock.calls.find((c) => c[0] === AnalyticsEvents.IMPORT_PAIRING_FAILED)).toBeUndefined();
++  });
++});
++
++describe('bounded identity wait — transitions', () => {
++  it('identity arriving within the bound cancels the timer and mints the deferred intent', async () => {
++    mockCurrentUserId = null;
++    mockInit.mockResolvedValue({ data: { pairing_code: '777777', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result, rerender } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS / 2);
++    });
++    mockCurrentUserId = 'coach-1';
++    await act(async () => {
++      rerender({});
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(result.current.status).toBe('waiting');
++    expect(result.current.code).toBe('777777');
++    await act(async () => {
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS * 2);
++    });
++    expect(result.current.status).toBe('waiting'); // the bounded-wait timer never fired
++    expect(mockTrack.mock.calls.find((c) => c[0] === AnalyticsEvents.IMPORT_PAIRING_FAILED)).toBeUndefined();
++  });
++
++  it('identity arriving AFTER the bound supersedes identityUnavailable and mints once', async () => {
++    mockCurrentUserId = null;
++    mockInit.mockResolvedValue({ data: { pairing_code: '555555', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result, rerender } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS + 1);
++    });
++    expect(result.current.status).toBe('identityUnavailable');
++    mockCurrentUserId = 'coach-1';
++    await act(async () => {
++      rerender({});
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(mockInit).toHaveBeenCalledTimes(1);
++    expect(result.current.status).toBe('waiting');
++    expect((await readImportPairingMirror('coach-1'))?.code).toBe('555555');
++  });
++
++  it('A→null (sign-out window) after a resolved identity does NOT arm the bounded wait: stays idle', async () => {
++    mockCurrentUserId = 'coach-1';
++    mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result, rerender } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(result.current.status).toBe('waiting');
++    mockCurrentUserId = null;
++    await act(async () => {
++      rerender({});
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS * 3);
++    });
++    expect(result.current.status).toBe('idle');
++    expect(mockTrack.mock.calls.find((c) => c[0] === AnalyticsEvents.IMPORT_PAIRING_FAILED)).toBeUndefined();
++  });
++
++  it('cancel from identityUnavailable is a plain local cancel', async () => {
++    mockCurrentUserId = null;
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(IDENTITY_WAIT_MS + 1);
++    });
++    await act(async () => {
++      result.current.cancel();
++    });
++    expect(result.current.status).toBe('cancelled');
++    expect(mockInit).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/hooks/useCurrentUser.ts b/src/hooks/useCurrentUser.ts
+index c3f729a..982aba8 100644
+--- a/src/hooks/useCurrentUser.ts
++++ b/src/hooks/useCurrentUser.ts
+@@ -40,40 +40,58 @@ export interface CurrentUser {
+ }
+ 
+ /**
+- * Hook that reads the authenticated user from AsyncStorage (user_data key).
+- * This replaces useAuthStore().currentUser which was from the OLD SQLite system
+- * and always returns null for Supabase-authenticated users.
++ * Hook that reads the authenticated user from the persistent user cache
++ * (`lib/userCache`). The first render is always `null`; the value resolves
++ * after an asynchronous storage read. This replaces useAuthStore().currentUser
++ * which was from the OLD SQLite system and always returns null for
++ * Supabase-authenticated users.
++ *
++ * S6 R3: every load carries an epoch. A read that started before a logout (or
++ * before a newer login-triggered load) is discarded when it settles, so a
++ * stale hydration can neither resurrect a signed-out user nor overwrite a
++ * newer identity; nothing is applied after unmount.
+  */
+ export function useCurrentUser(): CurrentUser | null {
+   const [user, setUser] = useState<CurrentUser | null>(null);
+ 
+-  const loadUser = async () => {
+-    try {
+-      // readUserCache handles the one-time AsyncStorage → MMKV migration
+-      // transparently on first call.
+-      const parsed = await readUserCache();
+-      if (parsed) {
+-        setUser(parsed);
+-        // Tag Sentry events with the current user so crash reports are
+-        // attributable. No-op when Sentry is not configured.
+-        setSentryUser({ id: parsed.id, email: parsed.email });
+-      } else {
+-        setUser(null);
+-        setSentryUser(null);
++  useEffect(() => {
++    let mounted = true;
++    let epoch = 0;
++
++    const apply = (next: CurrentUser | null) => {
++      setUser(next);
++      // Tag Sentry events with the current user so crash reports are
++      // attributable. No-op when Sentry is not configured.
++      setSentryUser(next ? { id: next.id, email: next.email } : null);
++    };
++
++    const loadUser = async () => {
++      const mine = ++epoch;
++      let next: CurrentUser | null = null;
++      try {
++        // readUserCache reads the namespaced key asynchronously and runs the
++        // verified legacy `user_data` migration when needed.
++        next = await readUserCache();
++      } catch {
++        next = null;
+       }
+-    } catch {
+-      setUser(null);
+-      setSentryUser(null);
+-    }
+-  };
++      // Superseded by a logout or a newer load, or unmounted → discard.
++      if (!mounted || mine !== epoch) return;
++      apply(next);
++    };
+ 
+-  useEffect(() => {
+-    loadUser();
+-    const onLogout = () => setUser(null);
+-    const onLogin = () => loadUser();
++    void loadUser();
++    const onLogout = () => {
++      epoch += 1; // any read still in flight belongs to the previous account
++      apply(null);
++    };
++    const onLogin = () => {
++      void loadUser();
++    };
+     authEvents.on('logout', onLogout);
+     authEvents.on('login', onLogin);
+     return () => {
++      mounted = false;
+       authEvents.off('logout', onLogout);
+       authEvents.off('login', onLogin);
+     };
+diff --git a/src/hooks/useExtensionPairing.ts b/src/hooks/useExtensionPairing.ts
+index d42cdc3..d7db463 100644
+--- a/src/hooks/useExtensionPairing.ts
++++ b/src/hooks/useExtensionPairing.ts
+@@ -33,7 +33,12 @@
+  * extension. Inside CoachNavigator the cached user is always present (the
+  * navigator mounts only after RootNavigator read it), so the wait is bounded by
+  * one storage read. ImportDataScreen performs the matching screen-level peek so
+- * the panel that hosts this hook is mounted again after a process restart. The
++ * the panel that hosts this hook is mounted again after a process restart.
++ * S6 R3: that wait is now BOUNDED. If the identity has never resolved on this
++ * mount within IDENTITY_WAIT_MS of a deferred start(), the hook settles to
++ * `identityUnavailable` — a retryable, honest terminal ("we could not confirm
++ * your account") instead of an indefinite "preparing" spinner; no mint and no
++ * storage write happen on that path. The
+  * persisted `expires_at` is provenance only and is never compared to a client
+  * clock (Rule 16). The idempotency key minted before the first /pair/init is
+  * persisted with it and replayed on retry (Rule 19). NOTE: the current backend
+@@ -80,7 +85,9 @@ export type PairingStatus =
+   | 'authExpired'
+   | 'unavailable'
+   | 'failed'
+-  | 'cancelled';
++  | 'cancelled'
++  /** Coach identity never resolved within the bounded wait; nothing was minted. */
++  | 'identityUnavailable';
+ 
+ export interface PairingState {
+   status: PairingStatus;
+@@ -111,8 +118,15 @@ const POLL_BASE_MS = 2000;
+ const POLL_MAX_MS = 15000;
+ const POLL_BACKOFF = 1.5;
+ const MAX_POLL_FAILURES = 5;
++/**
++ * Upper bound on waiting for the FIRST identity resolution on a mount before a
++ * deferred start() is surfaced as `identityUnavailable`. Generous relative to
++ * one AsyncStorage read (tens of ms) so it only fires when hydration truly
++ * failed, never during normal boot.
++ */
++export const IDENTITY_WAIT_MS = 8000;
+ 
+-type FailReason = 'auth' | 'unavailable' | 'network';
++type FailReason = 'auth' | 'unavailable' | 'network' | 'identity';
+ 
+ function axiosStatus(err: unknown): number | undefined {
+   return err instanceof AxiosError ? err.response?.status : undefined;
+@@ -158,6 +172,10 @@ export function useExtensionPairing(
+   const hydratedRef = useRef(false);
+   /** A start() that arrived before hydration finished, deferred not dropped. */
+   const pendingStartRef = useRef(false);
++  /** Bounded wait for the first identity resolution (S6 R3). */
++  const identityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
++  /** True once a resolved coach id has been seen on this mount. */
++  const identityEverResolvedRef = useRef(false);
+   const startRef = useRef<(() => void) | null>(null);
+   /**
+    * Coach id the CURRENT in-memory session (code, key, poll) belongs to. In
+@@ -180,6 +198,11 @@ export function useExtensionPairing(
+     pollTimerRef.current = null;
+   }, []);
+ 
++  const clearIdentityTimer = useCallback(() => {
++    if (identityTimerRef.current) clearTimeout(identityTimerRef.current);
++    identityTimerRef.current = null;
++  }, []);
++
+   /**
+    * Move to a codeless terminal/reset status and tear down timers.
+    * `supportReference` is the server's correlation id for the request that
+@@ -287,6 +310,28 @@ export function useExtensionPairing(
+     // extension. Defer until hydrated so we resume it instead; never drop.
+     if (!hydratedRef.current) {
+       pendingStartRef.current = true;
++      // A retry from the bounded-wait terminal is a visible new wait, not a
++      // silent no-op: return to idle so the panel shows it and the timer below
++      // may settle it again.
++      if (statusRef.current === 'identityUnavailable') {
++        statusRef.current = 'idle';
++        setState({ status: 'idle', code: null, supportReference: null });
++      }
++      // Bounded wait: only while the identity has NEVER resolved on this mount
++      // (cold start / failed hydration). The A→null sign-out window is a
++      // different case: RootNavigator tears the coach tree down, so no timer.
++      if (!identityEverResolvedRef.current && !identityTimerRef.current) {
++        identityTimerRef.current = setTimeout(() => {
++          identityTimerRef.current = null;
++          if (!mountedRef.current) return;
++          if (identityEverResolvedRef.current || !pendingStartRef.current) return;
++          if (statusRef.current !== 'idle') return;
++          pendingStartRef.current = false;
++          statusRef.current = 'identityUnavailable';
++          setState({ status: 'identityUnavailable', code: null, supportReference: null });
++          emitFailed('identity');
++        }, IDENTITY_WAIT_MS);
++      }
+       return;
+     }
+     let key = idempotencyKeyRef.current;
+@@ -429,6 +474,15 @@ export function useExtensionPairing(
+       ownerRef.current = userId;
+     }
+     if (!userId) return; // identity unknown: stay unhydrated, start() keeps deferring
++    identityEverResolvedRef.current = true;
++    clearIdentityTimer();
++    // A bounded wait that already gave up is superseded by the identity
++    // arriving: return to idle so the deferred intent below can proceed.
++    if (statusRef.current === 'identityUnavailable') {
++      statusRef.current = 'idle';
++      setState({ status: 'idle', code: null, supportReference: null });
++      pendingStartRef.current = true;
++    }
+     let abandoned = false;
+     void (async () => {
+       const restored = enabled ? await readImportPairingMirror(userId) : null;
+@@ -469,7 +523,7 @@ export function useExtensionPairing(
+     return () => {
+       abandoned = true;
+     };
+-  }, [enabled, doPoll, clearTimers, userId]);
++  }, [enabled, doPoll, clearTimers, clearIdentityTimer, userId]);
+ 
+   const cancel = useCallback(() => {
+     const wasActive = statusRef.current === 'minting' || statusRef.current === 'waiting';
+@@ -501,8 +555,9 @@ export function useExtensionPairing(
+     return () => {
+       mountedRef.current = false;
+       clearTimers();
++      clearIdentityTimer();
+     };
+-  }, [clearTimers]);
++  }, [clearTimers, clearIdentityTimer]);
+ 
+   return { ...state, start, retry: start, cancel };
+ }
+diff --git a/src/lib/__tests__/userCache.composition.test.ts b/src/lib/__tests__/userCache.composition.test.ts
+new file mode 100644
+index 0000000..3fa2b0e
+--- /dev/null
++++ b/src/lib/__tests__/userCache.composition.test.ts
+@@ -0,0 +1,233 @@
++/**
++ * lib/userCache — REAL composition tests (S6 R3 reimplementation).
++ *
++ * Nothing in the storage path is mocked except the AsyncStorage jest mock
++ * that every build relies on: `storage/mmkv` resolves to the AsyncStorage shim
++ * (react-native-mmkv is undeclared and `NODE_ENV=test` short-circuits the
++ * optional require), exactly as in every shipped build. These tests pin the
++ * findings closed in R3:
++ *
++ *   S6-R2-A-01 / S6-B2-1 — a freshly written identity was unreadable because
++ *   the read path never consulted the shim asynchronously, and the legacy
++ *   migration deleted the only copy before confirming the new one.
++ *
++ * "Restart" is modelled with `jest.isolateModules`, which yields a fresh module
++ * instance (empty in-memory mirror) over the SAME AsyncStorage contents.
++ */
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import type { CurrentUser } from '../../hooks/useCurrentUser';
++
++type UserCacheModule = typeof import('../userCache');
++
++function freshModule(): UserCacheModule {
++  let mod: UserCacheModule | undefined;
++  jest.isolateModules(() => {
++    mod = require('../userCache') as UserCacheModule;
++  });
++  if (!mod) throw new Error('module load failed');
++  return mod;
++}
++
++const userA: CurrentUser = { id: 'user-A', email: 'a@example.com', role: 'client' };
++const userB: CurrentUser = { id: 'user-B', email: 'b@example.com', role: 'coach' };
++
++const NAMESPACED_KEY = 'prefs:auth.user_data';
++const LEGACY_KEY = 'user_data';
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  jest.restoreAllMocks();
++});
++
++describe('userCache — hydration through the AsyncStorage shim', () => {
++  it('starts unhydrated: the synchronous view is null and says so', () => {
++    const uc = freshModule();
++    expect(uc.isUserCacheHydrated()).toBe(false);
++    expect(uc.readUserCacheSync()).toBeNull();
++  });
++
++  it('set → read round-trip within one process (the R2 defect)', async () => {
++    const uc = freshModule();
++    await uc.setUserCache(userA);
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBe(JSON.stringify(userA));
++    expect(await uc.readUserCache()).toEqual(userA);
++    expect(uc.readUserCacheSync()).toEqual(userA);
++    expect(uc.isUserCacheHydrated()).toBe(true);
++  });
++
++  it('set → restart → read: the namespaced value survives a fresh module instance', async () => {
++    const first = freshModule();
++    await first.setUserCache(userA);
++
++    const restarted = freshModule();
++    expect(restarted.readUserCacheSync()).toBeNull(); // truthful: not yet hydrated
++    expect(await restarted.readUserCache()).toEqual(userA);
++    expect(restarted.readUserCacheSync()).toEqual(userA);
++  });
++
++  it('shares one in-flight storage read across concurrent boot-time callers', async () => {
++    await AsyncStorage.setItem(NAMESPACED_KEY, JSON.stringify(userA));
++    const getItem = jest.spyOn(AsyncStorage, 'getItem');
++    const uc = freshModule();
++    const [a, b, c] = await Promise.all([uc.readUserCache(), uc.readUserCache(), uc.readUserCache()]);
++    expect(a).toEqual(userA);
++    expect(b).toEqual(userA);
++    expect(c).toEqual(userA);
++    expect(getItem.mock.calls.filter(([k]) => k === NAMESPACED_KEY)).toHaveLength(1);
++  });
++
++  it('treats an unparseable namespaced value as no user, without throwing', async () => {
++    await AsyncStorage.setItem(NAMESPACED_KEY, '{not json');
++    const uc = freshModule();
++    expect(await uc.readUserCache()).toBeNull();
++    expect(uc.isUserCacheHydrated()).toBe(true);
++  });
++});
++
++describe('userCache — legacy `user_data` migration', () => {
++  it('migrates the legacy key into the namespaced key and removes it only after verifying the copy', async () => {
++    await AsyncStorage.setItem(LEGACY_KEY, JSON.stringify(userA));
++    const uc = freshModule();
++    expect(await uc.readUserCache()).toEqual(userA);
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBe(JSON.stringify(userA));
++    expect(await AsyncStorage.getItem(LEGACY_KEY)).toBeNull();
++    // And is readable after a restart without the legacy key present.
++    expect(await freshModule().readUserCache()).toEqual(userA);
++  });
++
++  it('keeps the legacy key when the namespaced write cannot be read back (repeatable migration)', async () => {
++    await AsyncStorage.setItem(LEGACY_KEY, JSON.stringify(userA));
++    // Simulate a write that does not land: setItem for the namespaced key is swallowed.
++    const realSet = AsyncStorage.setItem.bind(AsyncStorage);
++    jest.spyOn(AsyncStorage, 'setItem').mockImplementation(async (k, v) => {
++      if (k === NAMESPACED_KEY) return;
++      return realSet(k, v);
++    });
++    const uc = freshModule();
++    expect(await uc.readUserCache()).toEqual(userA); // this read still answers truthfully
++    expect(await AsyncStorage.getItem(LEGACY_KEY)).toBe(JSON.stringify(userA)); // not deleted
++    jest.restoreAllMocks();
++    // Next process: migration simply runs again and now completes.
++    const again = freshModule();
++    expect(await again.readUserCache()).toEqual(userA);
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBe(JSON.stringify(userA));
++    expect(await AsyncStorage.getItem(LEGACY_KEY)).toBeNull();
++  });
++
++  it('prefers the namespaced value over a stale legacy value', async () => {
++    await AsyncStorage.setItem(NAMESPACED_KEY, JSON.stringify(userB));
++    await AsyncStorage.setItem(LEGACY_KEY, JSON.stringify(userA));
++    const uc = freshModule();
++    expect(await uc.readUserCache()).toEqual(userB);
++  });
++});
++
++describe('userCache — mutation generation fences', () => {
++  it('a hydration that started before setUserCache cannot overwrite the newer value', async () => {
++    await AsyncStorage.setItem(NAMESPACED_KEY, JSON.stringify(userA));
++    // Hold the storage read open until the set has landed.
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async (k) => {
++      if (k === NAMESPACED_KEY && release === null) {
++        await new Promise<void>((r) => {
++          release = r;
++        });
++      }
++      return realGet(k);
++    });
++    const uc = freshModule();
++    const staleRead = uc.readUserCache();
++    await Promise.resolve();
++    await uc.setUserCache(userB); // newer truth lands while the read is outstanding
++    expect(uc.readUserCacheSync()).toEqual(userB);
++    (release as unknown as () => void)();
++    expect(await staleRead).toEqual(userB); // stale result discarded, newer truth returned
++    expect(uc.readUserCacheSync()).toEqual(userB);
++  });
++
++  it('a hydration that started before clearUserCache cannot resurrect the signed-out user', async () => {
++    await AsyncStorage.setItem(NAMESPACED_KEY, JSON.stringify(userA));
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async (k) => {
++      if (k === NAMESPACED_KEY && release === null) {
++        await new Promise<void>((r) => {
++          release = r;
++        });
++      }
++      return realGet(k);
++    });
++    const uc = freshModule();
++    const staleRead = uc.readUserCache();
++    await Promise.resolve();
++    await uc.clearUserCache();
++    (release as unknown as () => void)();
++    expect(await staleRead).toBeNull();
++    expect(uc.readUserCacheSync()).toBeNull();
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBeNull();
++  });
++
++  it('patchUserCache merges against the current mirror and deep-merges profile', async () => {
++    const uc = freshModule();
++    await uc.setUserCache({ ...userA, profile: { calorie_target: 2000, sex: 'f' } });
++    await uc.patchUserCache({ profile: { calorie_target: 2200 } });
++    const merged = await uc.readUserCache();
++    expect(merged).toEqual({ ...userA, profile: { calorie_target: 2200, sex: 'f' } });
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBe(JSON.stringify(merged));
++  });
++
++  it('patchUserCache on a cold process hydrates first, so it never wipes unseen fields', async () => {
++    await AsyncStorage.setItem(
++      NAMESPACED_KEY,
++      JSON.stringify({ ...userA, name: 'Ann', profile: { protein_target: 150 } }),
++    );
++    const uc = freshModule();
++    await uc.patchUserCache({ profile: { day_one_completed: true } });
++    expect(await uc.readUserCache()).toEqual({
++      ...userA,
++      name: 'Ann',
++      profile: { protein_target: 150, day_one_completed: true },
++    });
++  });
++
++  it('a patch that raced a newer set respects the set (merge is against the mirror at merge time)', async () => {
++    const uc = freshModule();
++    await uc.setUserCache(userA);
++    const p = uc.patchUserCache({ name: 'patched' });
++    await uc.setUserCache(userB);
++    await p;
++    // The patch merged against whatever the mirror held when it ran; the
++    // last write to storage is the last mutation applied, never a stale one.
++    const final = await freshModule().readUserCache();
++    expect(final).toEqual(uc.readUserCacheSync());
++    expect(final?.id).toBe(final?.id === 'user-B' ? 'user-B' : 'user-A');
++  });
++});
++
++describe('userCache — logout and account switch isolation', () => {
++  it('clearUserCache empties the mirror synchronously and removes namespaced + legacy keys', async () => {
++    await AsyncStorage.setItem(LEGACY_KEY, JSON.stringify(userA));
++    const uc = freshModule();
++    await uc.setUserCache(userA);
++    const clearing = uc.clearUserCache();
++    expect(uc.readUserCacheSync()).toBeNull(); // before the storage delete settles
++    await clearing;
++    expect(await AsyncStorage.getItem(NAMESPACED_KEY)).toBeNull();
++    expect(await AsyncStorage.getItem(LEGACY_KEY)).toBeNull();
++    expect(await uc.readUserCache()).toBeNull();
++    expect(await freshModule().readUserCache()).toBeNull();
++  });
++
++  it('A → clear → B: B is the only identity visible, in-process and after restart', async () => {
++    const uc = freshModule();
++    await uc.setUserCache(userA);
++    await uc.clearUserCache();
++    await uc.setUserCache(userB);
++    expect(uc.readUserCacheSync()).toEqual(userB);
++    expect(await uc.readUserCache()).toEqual(userB);
++    expect(await freshModule().readUserCache()).toEqual(userB);
++    const keys = await AsyncStorage.getAllKeys();
++    expect(keys).toEqual([NAMESPACED_KEY]);
++  });
++});
+diff --git a/src/lib/finalizeLeanOnboarding.ts b/src/lib/finalizeLeanOnboarding.ts
+index 8971ddb..6b19f98 100644
+--- a/src/lib/finalizeLeanOnboarding.ts
++++ b/src/lib/finalizeLeanOnboarding.ts
+@@ -128,8 +128,8 @@ function tryComputeMacros(d: {
+ async function refreshLocalProfile(payload: Record<string, unknown>): Promise<void> {
+   try {
+     // patchUserCache deep-merges profile fields without overwriting unrelated
+-    // user fields and writes synchronously to MMKV — no async/bridge required.
+-    patchUserCache({ profile: payload as never });
++    // user fields; the write is asynchronous (AsyncStorage shim) and awaited.
++    await patchUserCache({ profile: payload as never });
+   } catch {
+     // Cache refresh is best-effort; the next /auth/me will resync.
+   }
+diff --git a/src/lib/userCache.ts b/src/lib/userCache.ts
+index 517067f..3f8bb51 100644
+--- a/src/lib/userCache.ts
++++ b/src/lib/userCache.ts
+@@ -1,15 +1,34 @@
+ /**
+- * userCache — MMKV-backed persistent cache for the authenticated user object.
++ * userCache — persistent cache for the authenticated user object, reached
++ * through `prefsStorage` (native MMKV when the optional module is present,
++ * otherwise the AsyncStorage shim — which is EVERY current build, because
++ * `react-native-mmkv` is intentionally undeclared).
+  *
+- * Previously stored in plain AsyncStorage under 'user_data'. Migrated to
+- * MMKV (prefsStorage) for:
+- *  - Synchronous reads (no async waterfall on boot)
+- *  - No serialization to the AsyncStorage RN bridge
+- *  - No data loss on AsyncStorage corruption (separate storage domain)
++ * S6 R3 reimplementation (identity hydration / mutation generation fences).
++ * The previous revision assumed a synchronous store: `readUserCache()` read
++ * `prefsStorage.getString()` — which the shim can only ever answer with
++ * `undefined` — and then fell straight through to the legacy AsyncStorage key,
++ * so a freshly written namespaced value (`prefs:auth.user_data`) was never read
++ * back and every `readUserCacheSync()` consumer saw `null`. The one-shot legacy
++ * migration also deleted the legacy key before confirming the new value was
++ * readable. This module now:
+  *
+- * Migration: on first read, if the MMKV key is absent but the old AsyncStorage
+- * key is present, we migrate the value and delete the old key. This is a
+- * one-time no-op migration that requires no manual operator action.
++ *   • reads the namespaced key ASYNCHRONOUSLY (`getStringAsync`) before ever
++ *     consulting the legacy `user_data` key, so the shim path is truthful;
++ *   • migrates the legacy key only after verifying the namespaced write reads
++ *     back, and keeps the legacy key when it does not (repeatable migration);
++ *   • exposes `set/patch/clear` as the async operations they really are — the
++ *     shim writes over the AsyncStorage bridge and callers must await them;
++ *   • keeps an in-memory mirror so `readUserCacheSync()` is a truthful
++ *     "last hydrated / last written" view (null until hydrated — see
++ *     `isUserCacheHydrated()`), never a hidden bridge call;
++ *   • fences every read against a mutation generation counter: a hydration
++ *     that started before a `set`/`patch`/`clear` can never overwrite the
++ *     newer value, and a `patch` always merges against the current mirror.
++ *
++ * Logout / account switch: `clearUserCache()` bumps the generation and empties
++ * the mirror synchronously (before its storage delete settles), so any read
++ * still in flight for the previous account resolves to the post-logout truth.
+  *
+  * SECURITY NOTE: user_data contains email + name + role but NOT tokens.
+  * Tokens live in SecureStore (via auth.service). MMKV is app-sandboxed and
+@@ -24,92 +43,169 @@ import type { CurrentUser } from '../hooks/useCurrentUser';
+ const MMKV_KEY = 'auth.user_data';
+ const LEGACY_AS_KEY = 'user_data';
+ 
+-// ── Read ────────────────────────────────────────────────────────────────────
++// ── In-memory mirror + generation fence ──────────────────────────────────────
+ 
+-/**
+- * Read the cached user synchronously. Returns null if not present or unparseable.
+- * No async / no bridge call on the happy path.
+- */
+-export function readUserCacheSync(): CurrentUser | null {
+-  const raw = prefsStorage.getString(MMKV_KEY);
++/** Last hydrated or last written user. Null until hydrated or when signed out. */
++let mirror: CurrentUser | null = null;
++/** True once a full read has completed or any mutation has been applied. */
++let hydrated = false;
++/** Bumped by every mutation; a read that started under an older generation is stale. */
++let generation = 0;
++/** Single-flight hydration so N boot-time consumers share one storage read. */
++let inflightRead: Promise<CurrentUser | null> | null = null;
++
++function parseUser(raw: string | null | undefined): CurrentUser | null {
+   if (!raw) return null;
+   try {
+-    return JSON.parse(raw) as CurrentUser;
++    const parsed = JSON.parse(raw) as unknown;
++    return parsed && typeof parsed === 'object' ? (parsed as CurrentUser) : null;
+   } catch {
+     return null;
+   }
+ }
+ 
+ /**
+- * Async read — identical result to readUserCacheSync but also runs the
+- * one-time AsyncStorage migration if the MMKV key is empty and the legacy
+- * key is present.
++ * Apply the result of a read that started under `startedAt`. If a mutation
++ * landed in the meantime the read is stale: keep the mirror (the newer truth)
++ * and hand that back instead of the stale value.
++ */
++function commitRead(startedAt: number, value: CurrentUser | null): CurrentUser | null {
++  hydrated = true;
++  if (generation !== startedAt) return mirror;
++  mirror = value;
++  return value;
++}
++
++function applyMutation(next: CurrentUser | null): void {
++  generation += 1;
++  mirror = next;
++  hydrated = true;
++}
++
++/** True once the cache has been read from storage (or written) in this process. */
++export function isUserCacheHydrated(): boolean {
++  return hydrated;
++}
++
++// ── Read ────────────────────────────────────────────────────────────────────
++
++/**
++ * Synchronous view of the cached user. On native MMKV this is the stored
++ * value; on the AsyncStorage shim it is the in-memory mirror, which is `null`
++ * until `readUserCache()` has completed once (or a write has happened). It
++ * never performs a hidden bridge read — callers that need storage truth on a
++ * cold start must await `readUserCache()`.
++ */
++export function readUserCacheSync(): CurrentUser | null {
++  const raw = prefsStorage.getString(MMKV_KEY);
++  if (raw !== undefined) return parseUser(raw);
++  return mirror;
++}
++
++/**
++ * Hydrating read. Order: synchronous native value → asynchronous namespaced
++ * value (the shim's real answer) → legacy `user_data` migration. Always
++ * consults storage (legacy writers such as Google/Apple sign-in still write
++ * the raw `user_data` key), and is fenced so a mutation that lands while the
++ * read is outstanding wins.
+  */
+ export async function readUserCache(): Promise<CurrentUser | null> {
+-  const mmkvRaw = prefsStorage.getString(MMKV_KEY);
+-  if (mmkvRaw) {
++  if (inflightRead) return inflightRead;
++  const run = (async (): Promise<CurrentUser | null> => {
++    const startedAt = generation;
++
++    const syncRaw = prefsStorage.getString(MMKV_KEY);
++    if (syncRaw !== undefined) return commitRead(startedAt, parseUser(syncRaw));
++
++    let namespacedRaw: string | undefined;
+     try {
+-      return JSON.parse(mmkvRaw) as CurrentUser;
++      namespacedRaw = await prefsStorage.getStringAsync(MMKV_KEY);
+     } catch {
+-      return null;
++      namespacedRaw = undefined;
+     }
+-  }
++    if (namespacedRaw !== undefined) return commitRead(startedAt, parseUser(namespacedRaw));
+ 
+-  // One-time migration from legacy AsyncStorage key.
+-  try {
+-    const legacyRaw = await AsyncStorage.getItem(LEGACY_AS_KEY);
+-    if (legacyRaw) {
+-      // Write to MMKV and delete legacy key atomically (best-effort).
+-      prefsStorage.set(MMKV_KEY, legacyRaw);
+-      await AsyncStorage.removeItem(LEGACY_AS_KEY).catch(() => {
+-        // Non-fatal: the MMKV value is already written; the legacy key will
+-        // be overwritten on the next setUserCache call.
+-      });
+-      return JSON.parse(legacyRaw) as CurrentUser;
++    // Legacy AsyncStorage key → namespaced key. Verified before the legacy key
++    // is removed, so an interrupted or failed migration is simply retried on
++    // the next read instead of losing the only copy.
++    try {
++      const legacyRaw = await AsyncStorage.getItem(LEGACY_AS_KEY);
++      const legacyUser = parseUser(legacyRaw);
++      if (legacyRaw && legacyUser) {
++        if (generation !== startedAt) return commitRead(startedAt, legacyUser);
++        await prefsStorage.set(MMKV_KEY, legacyRaw);
++        const verify = await prefsStorage.getStringAsync(MMKV_KEY);
++        if (verify === legacyRaw) {
++          await AsyncStorage.removeItem(LEGACY_AS_KEY).catch(() => {
++            // Non-fatal: the namespaced copy is authoritative from here on;
++            // the stale legacy key is swept by signOut.
++          });
++        }
++        return commitRead(startedAt, legacyUser);
++      }
++    } catch {
++      // Migration failure is non-fatal: report "no user" for this read.
+     }
+-  } catch {
+-    // Migration failure is non-fatal.
++    return commitRead(startedAt, null);
++  })();
++  inflightRead = run;
++  try {
++    return await run;
++  } finally {
++    if (inflightRead === run) inflightRead = null;
+   }
+-  return null;
+ }
+ 
+ // ── Write ───────────────────────────────────────────────────────────────────
+ 
+ /**
+- * Persist a user object. Synchronous — no async bridge call.
++ * Persist a user object. The mirror is updated synchronously (so subsequent
++ * `readUserCacheSync()` calls see it at once); the returned promise settles
++ * when the storage write has landed. Rejections propagate — a sign-in that
++ * could not persist its identity must not look successful.
+  */
+-export function setUserCache(user: CurrentUser): void {
+-  prefsStorage.set(MMKV_KEY, JSON.stringify(user));
++export async function setUserCache(user: CurrentUser): Promise<void> {
++  applyMutation(user);
++  await prefsStorage.set(MMKV_KEY, JSON.stringify(user));
+ }
+ 
+ /**
+  * Merge new fields into the existing cached user without overwriting fields
+- * not present in `patch`. Safe to call with a partial object.
++ * not present in `patch`. Hydrates first when needed so a patch can never
++ * wipe fields it has not seen; merges against the CURRENT mirror at merge
++ * time, so a patch that raced a newer `set`/`clear` respects it.
+  */
+-export function patchUserCache(patch: Partial<CurrentUser>): void {
+-  const existing = readUserCacheSync();
+-  if (!existing) {
+-    // If there's no user yet, just write what we have.
+-    prefsStorage.set(MMKV_KEY, JSON.stringify(patch));
+-    return;
+-  }
+-  const merged: CurrentUser = {
+-    ...existing,
+-    ...patch,
+-    // Deep-merge profile so a partial profile update doesn't wipe fields.
+-    profile:
+-      patch.profile !== undefined
+-        ? { ...existing.profile, ...patch.profile }
+-        : existing.profile,
+-  };
+-  prefsStorage.set(MMKV_KEY, JSON.stringify(merged));
++export async function patchUserCache(patch: Partial<CurrentUser>): Promise<void> {
++  if (!hydrated) await readUserCache();
++  const existing = mirror;
++  const merged: CurrentUser = existing
++    ? {
++        ...existing,
++        ...patch,
++        // Deep-merge profile so a partial profile update doesn't wipe fields.
++        profile:
++          patch.profile !== undefined
++            ? { ...existing.profile, ...patch.profile }
++            : existing.profile,
++      }
++    : // Pre-existing contract: with no cached user, persist what we have.
++      (patch as CurrentUser);
++  applyMutation(merged);
++  await prefsStorage.set(MMKV_KEY, JSON.stringify(merged));
+ }
+ 
+ // ── Delete ──────────────────────────────────────────────────────────────────
+ 
+ /**
+- * Clear the user cache on logout. Synchronous.
++ * Clear the user cache on logout / before an account switch. The mirror is
++ * emptied and the generation bumped synchronously, so an in-flight hydration
++ * for the previous account cannot resurrect it; the namespaced and legacy
++ * keys are then removed (best-effort for the legacy key).
+  */
+-export function clearUserCache(): void {
+-  prefsStorage.delete(MMKV_KEY);
++export async function clearUserCache(): Promise<void> {
++  applyMutation(null);
++  await prefsStorage.delete(MMKV_KEY);
++  await AsyncStorage.removeItem(LEGACY_AS_KEY).catch(() => {
++    // Non-fatal: signOut also sweeps the legacy key.
++  });
+ }
+diff --git a/src/navigation/RootNavigator.tsx b/src/navigation/RootNavigator.tsx
+index bbb36eb..3b5217d 100644
+--- a/src/navigation/RootNavigator.tsx
++++ b/src/navigation/RootNavigator.tsx
+@@ -596,7 +596,7 @@ export default function RootNavigator() {
+         user = parsedUser;
+       } catch (err) {
+         logger.warn('RootNavigator', 'non-fatal', err);
+-        clearUserCache();
++        await clearUserCache();
+         setAuthState('unauthenticated');
+         return;
+       }
+diff --git a/src/offline/database.ts b/src/offline/database.ts
+index 8278c40..ae61018 100644
+--- a/src/offline/database.ts
++++ b/src/offline/database.ts
+@@ -77,22 +77,14 @@ async function bootstrap(db: SQLite.SQLiteDatabase): Promise<void> {
+     await db.execAsync(
+       `ALTER TABLE workout_logs ADD COLUMN user_id TEXT;`,
+     );
+-    // Backfill from readUserCacheSync at the time the migration runs.
+-    // Loaded via a dynamic import so the static graph doesn't pull userCache
+-    // (which pulls MMKV) into the bootstrap path.
+-    try {
+-      const { readUserCacheSync } = await import('../lib/userCache');
+-      const currentUserId: string | undefined = readUserCacheSync()?.id;
+-      if (currentUserId) {
+-        await db.runAsync(
+-          `UPDATE workout_logs SET user_id = ? WHERE user_id IS NULL`,
+-          [currentUserId],
+-        );
+-      }
+-    } catch {
+-      // No cached user (cold start before login) — leave existing rows with
+-      // NULL user_id; pushPending will refuse to send them until reassigned.
+-    }
++    // S6 R3: pre-v2 rows have NO recorded owner and are deliberately left
++    // with `user_id IS NULL`. An earlier revision backfilled them with
++    // whichever user happened to be cached when the migration ran; that was
++    // inert on the AsyncStorage-shim build (the synchronous identity read
++    // was always null) and would have become a blind attribution of unowned
++    // rows to the current account once the identity mirror hydrates. Unowned
++    // rows are never pushed (`pushPending` selects `user_id = ?`) and never
++    // shown as another user's data; they are simply not claimed.
+     await db.execAsync(
+       `CREATE INDEX IF NOT EXISTS idx_workout_logs_user_id ON workout_logs(user_id);`,
+     );
+diff --git a/src/screens/auth/CreateAccountScreen.tsx b/src/screens/auth/CreateAccountScreen.tsx
+index 68ddc7a..f55d20e 100644
+--- a/src/screens/auth/CreateAccountScreen.tsx
++++ b/src/screens/auth/CreateAccountScreen.tsx
+@@ -221,7 +221,7 @@ export default function CreateAccountScreen({ navigation, route }: Props) {
+ 
+       await secureStorage.setItem('supabase_token', access_token);
+       if (refresh_token) await secureStorage.setItem('supabase_refresh_token', refresh_token);
+-      setUserCache(user);
++      await setUserCache(user);
+       // P1-1 (PR #192): purge any orphan persisted cache blobs written under a
+       // stale boot-time key before the first persistence pass for this user.
+       await purgePersistedQueryCacheForAllUsers();
+diff --git a/src/screens/auth/LoginScreen.tsx b/src/screens/auth/LoginScreen.tsx
+index c53c87e..4de705e 100644
+--- a/src/screens/auth/LoginScreen.tsx
++++ b/src/screens/auth/LoginScreen.tsx
+@@ -84,7 +84,7 @@ export default function LoginScreen({ navigation, route }: Props) {
+       // readable from the plain app sandbox.
+       await secureStorage.setItem('supabase_token', access_token);
+       if (refresh_token) await secureStorage.setItem('supabase_refresh_token', refresh_token);
+-      setUserCache(user);
++      await setUserCache(user);
+       // P1-1 (PR #192): the asyncStoragePersister key is resolved once at
+       // module load (boot-time user id). Purge ALL persisted cache blobs here
+       // so any orphan blob written under a stale key by a prior session is
+@@ -136,7 +136,7 @@ export default function LoginScreen({ navigation, route }: Props) {
+       } else {
+         // P1-1 (PR #192 INF-1): purge any orphan persisted cache blobs before
+         // this user's first persistence pass, matching the email sign-in path.
+-        if (result.user) setUserCache(result.user);
++        if (result.user) await setUserCache(result.user);
+         await purgePersistedQueryCacheForAllUsers();
+         // Psych Report #4: Analytics
+         if (result.user?.id) identify(result.user.id, { role: result.user.role });
+@@ -173,7 +173,7 @@ export default function LoginScreen({ navigation, route }: Props) {
+       } else {
+         // P1-1 (PR #192 INF-1): purge any orphan persisted cache blobs before
+         // this user's first persistence pass, matching the email sign-in path.
+-        if (result.user) setUserCache(result.user);
++        if (result.user) await setUserCache(result.user);
+         await purgePersistedQueryCacheForAllUsers();
+         if (result.user?.id) identify(result.user.id, { role: result.user.role });
+         track(AnalyticsEvents.LOGIN_COMPLETED, { method: 'apple' });
+diff --git a/src/screens/auth/RoleSelectionScreen.tsx b/src/screens/auth/RoleSelectionScreen.tsx
+index 6242c02..4aa8f96 100644
+--- a/src/screens/auth/RoleSelectionScreen.tsx
++++ b/src/screens/auth/RoleSelectionScreen.tsx
+@@ -138,7 +138,7 @@ export default function RoleSelectionScreen(_: Props) {
+       if (user) {
+         user.role = res.data.role;
+         if (res.data.coach_id) user.coach_id = res.data.coach_id;
+-        setUserCache(user);
++        await setUserCache(user);
+         // P1-1 (PR #192): purge any orphan persisted cache blobs written under a
+         // stale boot-time key before the first persistence pass for this user.
+         await purgePersistedQueryCacheForAllUsers();
+diff --git a/src/screens/client/EditProfileScreen.tsx b/src/screens/client/EditProfileScreen.tsx
+index 4dea43b..7f142a4 100644
+--- a/src/screens/client/EditProfileScreen.tsx
++++ b/src/screens/client/EditProfileScreen.tsx
+@@ -364,7 +364,7 @@ export default function EditProfileScreen() {
+       // Refresh local user_data so Home + Profile reflect the change without
+       // requiring a /auth/me round-trip.
+       try {
+-        patchUserCache({ profile: payload as never });
++        await patchUserCache({ profile: payload as never });
+       } catch (err) {
+         console.warn('EditProfile: failed to refresh local user_data', err);
+       }
+diff --git a/src/screens/day-one/ReadyScreen.tsx b/src/screens/day-one/ReadyScreen.tsx
+index 11c1c3b..337bff9 100644
+--- a/src/screens/day-one/ReadyScreen.tsx
++++ b/src/screens/day-one/ReadyScreen.tsx
+@@ -86,7 +86,7 @@ export default function ReadyScreen(_props: Props) {
+ 
+   const markLocalComplete = async () => {
+     await AsyncStorage.setItem('day_one_completed', 'true');
+-    patchUserCache({ profile: { day_one_completed: true } });
++    await patchUserCache({ profile: { day_one_completed: true } });
+   };
+ 
+   const handleFinish = async () => {
+diff --git a/src/services/__tests__/authActions.signOut.test.ts b/src/services/__tests__/authActions.signOut.test.ts
+index 2fa0de4..5039f07 100644
+--- a/src/services/__tests__/authActions.signOut.test.ts
++++ b/src/services/__tests__/authActions.signOut.test.ts
+@@ -25,6 +25,8 @@ jest.mock('../../lib/analytics', () => ({ reset: jest.fn() }));
+ 
+ jest.mock('../../lib/userCache', () => ({
+   readUserCacheSync: jest.fn(() => ({ id: 'user-A' })),
++  readUserCache: jest.fn(async () => ({ id: 'user-A' })),
++  clearUserCache: jest.fn(async () => undefined),
+ }));
+ 
+ jest.mock('../../offline/sync/sync-engine', () => ({
+diff --git a/src/services/__tests__/authActions.test.ts b/src/services/__tests__/authActions.test.ts
+index 2e88894..0aa452a 100644
+--- a/src/services/__tests__/authActions.test.ts
++++ b/src/services/__tests__/authActions.test.ts
+@@ -21,6 +21,8 @@ jest.mock('../../lib/analytics', () => ({ reset: jest.fn() }));
+ 
+ jest.mock('../../lib/userCache', () => ({
+   readUserCacheSync: jest.fn(() => ({ id: 'user-A' })),
++  readUserCache: jest.fn(async () => null),
++  clearUserCache: jest.fn(async () => undefined),
+ }));
+ 
+ jest.mock('../../offline/sync/sync-engine', () => ({
+diff --git a/src/services/__tests__/foodLogQueue.ownerFence.test.ts b/src/services/__tests__/foodLogQueue.ownerFence.test.ts
+new file mode 100644
+index 0000000..ebd9fd1
+--- /dev/null
++++ b/src/services/__tests__/foodLogQueue.ownerFence.test.ts
+@@ -0,0 +1,105 @@
++/**
++ * foodLogQueue — captured-owner fence, REAL identity composition (S6 R3).
++ *
++ * Unlike foodLogQueue.test.ts, `lib/userCache` and `storage/mmkv` are NOT
++ * mocked: the queue reads the owner from the real in-process identity mirror
++ * (AsyncStorage shim underneath), and owner changes are produced by the real
++ * `setUserCache` / `clearUserCache` calls a sign-in / sign-out performs.
++ */
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { clearUserCache, setUserCache } from '../../lib/userCache';
++import { enqueue, flush, getQueueLength } from '../foodLogQueue';
++
++jest.mock('../api', () => {
++  const create = jest.fn();
++  const logFood = jest.fn();
++  return { __create: create, __logFood: logFood, foodApi: { create }, logApi: { logFood } };
++});
++
++const api = jest.requireMock('../api') as { __create: jest.Mock; __logFood: jest.Mock };
++
++const userA = { id: 'user-A', email: 'a@example.com' };
++const userB = { id: 'user-B', email: 'b@example.com' };
++
++const searchEntry = (foodItemId: string) =>
++  ({
++    kind: 'search',
++    foodItemId,
++    log: { date: '2026-09-21', meal_type: 'lunch', quantity_multiplier: 1 },
++  }) as const;
++
++async function queueFor(userId: string | null): Promise<string[]> {
++  const raw = await AsyncStorage.getItem(
++    userId ? `pending_food_logs_${userId}` : 'pending_food_logs_anonymous',
++  );
++  return raw ? (JSON.parse(raw) as Array<{ foodItemId: string }>).map((q) => q.foodItemId) : [];
++}
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  await clearUserCache();
++  api.__create.mockReset();
++  api.__logFood.mockReset();
++});
++
++describe('foodLogQueue — owner captured from the real identity mirror', () => {
++  it('before hydration/sign-in the queue is anonymous; after sign-in it is the user’s (no re-attribution)', async () => {
++    await enqueue(searchEntry('anon-1'));
++    expect(await queueFor(null)).toEqual(['anon-1']);
++
++    await setUserCache(userA);
++    await enqueue(searchEntry('a-1'));
++    expect(await queueFor('user-A')).toEqual(['a-1']);
++    // The anonymous item is NOT silently attributed to A.
++    expect(await queueFor(null)).toEqual(['anon-1']);
++    expect(await getQueueLength()).toBe(1);
++  });
++
++  it('enqueue refuses to write back when the owner changed between read and write', async () => {
++    await setUserCache(userA);
++    // Make the queue read slow enough for a sign-out to land in between.
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    let once = true;
++    jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async (k) => {
++      if (once && k === 'pending_food_logs_user-A') {
++        once = false;
++        await clearUserCache(); // sign-out mid-operation
++      }
++      return realGet(k);
++    });
++    await expect(enqueue(searchEntry('late'))).rejects.toThrow(/owner changed/);
++    jest.restoreAllMocks();
++    expect(await queueFor('user-A')).toEqual([]);
++    expect(await queueFor(null)).toEqual([]);
++  });
++
++  it('flush stops when A signs out and B signs in mid-flush: nothing posted for B, nothing written to B’s key', async () => {
++    await setUserCache(userA);
++    await enqueue(searchEntry('a-1'));
++    await enqueue(searchEntry('a-2'));
++
++    api.__logFood.mockImplementationOnce(async () => {
++      await clearUserCache();
++      await setUserCache(userB); // account switch while a-1's POST is in flight
++      return { data: {} };
++    });
++    api.__logFood.mockResolvedValue({ data: {} });
++
++    const res = await flush();
++    expect(api.__logFood).toHaveBeenCalledTimes(1); // a-2 never posted under B's session
++    expect(res.flushed).toBe(0);
++    expect(res.remaining).toBe(2);
++    expect(await queueFor('user-A')).toEqual(['a-1', 'a-2']); // untouched, retried by A later
++    expect(await queueFor('user-B')).toEqual([]);
++    expect(await AsyncStorage.getItem('pending_food_logs_user-B')).toBeNull();
++  });
++
++  it('flush with a stable owner drains the owner’s queue normally', async () => {
++    await setUserCache(userA);
++    await enqueue(searchEntry('a-1'));
++    api.__logFood.mockResolvedValue({ data: {} });
++    const res = await flush();
++    expect(res).toEqual({ flushed: 1, remaining: 0, dropped: 0 });
++    expect(await queueFor('user-A')).toEqual([]);
++  });
++});
+diff --git a/src/services/__tests__/foodLogQueue.test.ts b/src/services/__tests__/foodLogQueue.test.ts
+index 05e3cdc..4b209c1 100644
+--- a/src/services/__tests__/foodLogQueue.test.ts
++++ b/src/services/__tests__/foodLogQueue.test.ts
+@@ -170,7 +170,7 @@ describe('foodLogQueue — offline enqueue + flush on reconnect', () => {
+     expect(dropped).toBe(0);
+   });
+ 
+-  it('captures userId once at the top of flush — sign-out mid-flush does not retarget the queue key', async () => {
++  it('captures userId once at the top of flush — sign-out mid-flush neither retargets the queue key nor keeps posting (S6 R3 owner fence)', async () => {
+     mockUserCache.id = 'user-A';
+     await enqueue({
+       kind: 'search',
+@@ -190,14 +190,20 @@ describe('foodLogQueue — offline enqueue + flush on reconnect', () => {
+     });
+     api.__logFood.mockResolvedValueOnce({ data: {} });
+ 
+-    const { flushed } = await flush();
+-    expect(flushed).toBe(2);
++    const { flushed, remaining } = await flush();
+ 
+-    // The user-A queue should be drained — not the anonymous one. If we had
+-    // re-read userId mid-flush, the second write would have landed in the
+-    // anonymous key and left user-A's queue with one stale row.
+-    const userAQueue = await AsyncStorage.getItem('pending_food_logs_user-A');
+-    expect(userAQueue).toBe('[]');
++    // Item `a` was accepted by the server before the owner changed, but the
++    // write-back is refused: the owner is no longer user-A, so user-A's
++    // on-disk queue is left exactly as it was (a retry is idempotent by
++    // client_uuid) and item `b` is NEVER posted under whatever credentials
++    // the device now holds. Nothing lands in the anonymous key.
++    expect(flushed).toBe(0);
++    expect(remaining).toBe(2);
++    expect(api.__logFood).toHaveBeenCalledTimes(1);
++    const userAQueue = JSON.parse(
++      (await AsyncStorage.getItem('pending_food_logs_user-A')) ?? '[]',
++    ) as Array<{ foodItemId?: string }>;
++    expect(userAQueue.map((q) => q.foodItemId)).toEqual(['a', 'b']);
+     expect(
+       await AsyncStorage.getItem('pending_food_logs_anonymous'),
+     ).toBeNull();
+diff --git a/src/services/__tests__/queryClient.signout.test.ts b/src/services/__tests__/queryClient.signout.test.ts
+index b163044..82ee020 100644
+--- a/src/services/__tests__/queryClient.signout.test.ts
++++ b/src/services/__tests__/queryClient.signout.test.ts
+@@ -17,6 +17,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
+ 
+ jest.mock('../../lib/userCache', () => ({
+   readUserCacheSync: jest.fn(() => ({ id: 'user-A' })),
++  readUserCache: jest.fn(async () => ({ id: 'user-A' })),
++  clearUserCache: jest.fn(async () => undefined),
+ }));
+ 
+ jest.mock('../api', () => ({
+diff --git a/src/services/authActions.ts b/src/services/authActions.ts
+index 16610a8..386a780 100644
+--- a/src/services/authActions.ts
++++ b/src/services/authActions.ts
+@@ -11,7 +11,7 @@ import { setSentryUser } from './sentry';
+ import { purgePersistedQueryCacheForAllUsers, queryClient } from './queryClient';
+ import { reset as analyticsReset } from '../lib/analytics';
+ import { logger } from '../utils/logger';
+-import { readUserCacheSync } from '../lib/userCache';
++import { clearUserCache, readUserCache, readUserCacheSync } from '../lib/userCache';
+ import { clearAllStorage, prefsStorage, cacheStorage } from '../storage/mmkv';
+ import { deleteWorkoutLogsForUser } from '../offline/sync/sync-engine';
+ import { AUTOSAVE_MIRROR_KEY_PREFIX } from '../storage/autosaveMirror';
+@@ -219,6 +219,15 @@ async function resolveSigningOutUserId(explicit?: string | null): Promise<string
+   try {
+     const cached = readUserCacheSync();
+     if (cached?.id) return cached.id;
++  } catch {
++    // Fall through to the hydrating read.
++  }
++  try {
++    // S6 R3: on the AsyncStorage shim the synchronous view is only the
++    // in-memory mirror; a sign-out on a cold process must hydrate first or the
++    // per-user wipe below is silently skipped.
++    const hydrated = await readUserCache();
++    if (hydrated?.id) return hydrated.id;
+   } catch {
+     // Fall through to AsyncStorage legacy read.
+   }
+@@ -299,6 +308,12 @@ export async function signOut(userId?: string | null): Promise<void> {
+ 
+   try {
+     await Promise.all([
++      // S6 R3: empty the in-memory identity mirror (generation bump happens
++      // synchronously on call) and remove the namespaced/legacy user keys, so
++      // no hydration still in flight for this account can resurrect it after
++      // `logout` is emitted below. clearAllStorage() also wipes the namespace;
++      // this is the explicit, mirror-aware path.
++      clearUserCache(),
+       ...SECURE_SIGN_OUT_KEYS.map((k) => secureStorage.removeItem(k)),
+       AsyncStorage.removeMany([...ASYNC_SIGN_OUT_KEYS, ...prefixedKeys, ...perUserKeys]),
+       // R15 (PR #161): route new user-scoped MMKV keys through proper storage
+diff --git a/src/services/foodLogQueue.ts b/src/services/foodLogQueue.ts
+index 7966511..41f68f9 100644
+--- a/src/services/foodLogQueue.ts
++++ b/src/services/foodLogQueue.ts
+@@ -97,18 +97,44 @@ async function writeQueueForKey(
+   await AsyncStorage.setItem(key, JSON.stringify(queue));
+ }
+ 
+-async function readQueue(): Promise<PendingFoodLog[]> {
+-  return readQueueForKey(getQueueKey(readUserCacheSync()?.id));
++// ─── Owner capture / fence (S6 R3) ────────────────────────────────────────
++//
++// Every operation resolves the owning user id ONCE, up front, and keeps
++// reading and writing the queue keyed by that captured owner. Before any
++// write-back it re-checks that the owner is unchanged: if a sign-out or an
++// account switch landed between the read and the write, the write is refused
++// (the entry is NOT re-keyed to whoever is signed in now and never folded into
++// another account's queue). `readUserCacheSync()` is the in-process identity
++// mirror: on the AsyncStorage-shim build it is null until the cache has been
++// hydrated, in which case the entry lands in the anonymous queue, exactly as
++// before — this fence narrows attribution, it never widens it.
++
++/** Current owner id, or undefined for the anonymous queue. */
++function currentOwnerId(): string | undefined {
++  return readUserCacheSync()?.id || undefined;
++}
++
++export class FoodLogQueueOwnerChangedError extends Error {
++  constructor() {
++    super('food-log queue owner changed during operation; write refused');
++    this.name = 'FoodLogQueueOwnerChangedError';
++  }
+ }
+ 
+-async function writeQueue(queue: PendingFoodLog[]): Promise<void> {
+-  await writeQueueForKey(getQueueKey(readUserCacheSync()?.id), queue);
++/** Write the queue for `owner` only if `owner` is still the signed-in identity. */
++async function writeQueueFenced(
++  owner: string | undefined,
++  queue: PendingFoodLog[],
++): Promise<void> {
++  if (currentOwnerId() !== owner) throw new FoodLogQueueOwnerChangedError();
++  await writeQueueForKey(getQueueKey(owner), queue);
+ }
+ 
+ export async function enqueue(
+   entry: PendingSearchLog | PendingManualLog,
+ ): Promise<void> {
+-  const queue = await readQueue();
++  const owner = currentOwnerId();
++  const queue = await readQueueForKey(getQueueKey(owner));
+   const item: PendingFoodLog = {
+     ...entry,
+     // Crypto UUID instead of Math.random so two parallel enqueues on a fast
+@@ -117,16 +143,16 @@ export async function enqueue(
+     createdAt: Date.now(),
+   };
+   queue.push(item);
+-  await writeQueue(queue);
++  await writeQueueFenced(owner, queue);
+ }
+ 
+ export async function getQueueLength(): Promise<number> {
+-  return (await readQueue()).length;
++  return (await readQueueForKey(getQueueKey(currentOwnerId()))).length;
+ }
+ 
+ export async function clearQueue(): Promise<void> {
+-  const key = getQueueKey(readUserCacheSync()?.id);
+-  await AsyncStorage.removeItem(key);
++  // Removes only the queue of the owner captured here and now.
++  await AsyncStorage.removeItem(getQueueKey(currentOwnerId()));
+ }
+ 
+ // ─── Anonymous-queue handover ─────────────────────────────────────────────
+@@ -186,7 +212,10 @@ function classifyFlushError(err: unknown): FlushErrorClass {
+ export async function flush(): Promise<{ flushed: number; remaining: number; dropped: number }> {
+   // P2-1: capture the userId once at the top of flush so a sign-out mid-flush
+   // cannot cause us to read from user A's key and write back into user B's.
+-  const userId = readUserCacheSync()?.id;
++  // S6 R3: additionally, every write-back below is fenced on that captured
++  // owner still being the signed-in identity; an owner change mid-flush stops
++  // the flush and leaves the remaining items where they are.
++  const userId = currentOwnerId();
+   const key = getQueueKey(userId);
+ 
+   let queue = await readQueueForKey(key);
+@@ -196,8 +225,34 @@ export async function flush(): Promise<{ flushed: number; remaining: number; dro
+   let dropped = 0;
+   let stopped = false;
+ 
++  /**
++   * Remove `item` from the on-disk queue for the captured owner. Returns false
++   * (and leaves memory + disk untouched) when the owner changed: the item stays
++   * queued for its real owner and the flush stops.
++   */
++  const commitRemoval = async (item: PendingFoodLog): Promise<boolean> => {
++    const next = queue.filter((q) => q.id !== item.id);
++    try {
++      await writeQueueFenced(userId, next);
++    } catch (err) {
++      if (!(err instanceof FoodLogQueueOwnerChangedError)) throw err;
++      logger.warn('FoodLogQueue', 'flush stopped: queue owner changed');
++      stopped = true;
++      return false;
++    }
++    queue = next;
++    return true;
++  };
++
+   for (const item of [...queue]) {
+     if (stopped) break;
++    // Owner changed since capture (sign-out / account switch): the item must
++    // not be POSTed under another account's JWT, and nothing is written back.
++    if (currentOwnerId() !== userId) {
++      logger.warn('FoodLogQueue', 'flush stopped: queue owner changed');
++      stopped = true;
++      break;
++    }
+     try {
+       let foodItemId: string | undefined;
+       if (item.kind === 'search' && item.foodItemId) {
+@@ -218,9 +273,10 @@ export async function flush(): Promise<{ flushed: number; remaining: number; dro
+         // the backend upserts on retry rather than creating a duplicate row.
+         client_uuid: item.id,
+       });
+-      flushed++;
+-      queue = queue.filter((q) => q.id !== item.id);
+-      await writeQueueForKey(key, queue);
++      // The server accepted the item. If the owner changed before the local
++      // write-back, the item stays queued for its owner (idempotent by
++      // `client_uuid` on retry) rather than touching another account's key.
++      if (await commitRemoval(item)) flushed++;
+     } catch (err) {
+       const cls = classifyFlushError(err);
+       if (cls === 'drop') {
+@@ -228,9 +284,7 @@ export async function flush(): Promise<{ flushed: number; remaining: number; dro
+           id: item.id,
+           err,
+         });
+-        queue = queue.filter((q) => q.id !== item.id);
+-        await writeQueueForKey(key, queue);
+-        dropped++;
++        if (await commitRemoval(item)) dropped++;
+         continue;
+       }
+       logger.warn('FoodLogQueue', 'flush stopped on transient error', err);
+diff --git a/src/services/queryClient.ts b/src/services/queryClient.ts
+index 3745db3..8a3f282 100644
+--- a/src/services/queryClient.ts
++++ b/src/services/queryClient.ts
+@@ -103,6 +103,20 @@ function resolveBootUserId(): string | null {
+   }
+ }
+ 
++// S6 R3 assessment (identity mirror): readUserCacheSync() is now a truthful
++// in-process mirror that is null until lib/userCache has hydrated. This module
++// is evaluated at import time, BEFORE any hydration, so on every AsyncStorage-
++// shim build resolveBootUserId() is null and the persister key is always
++// ':anonymous' for the whole process lifetime (identical to the pre-R3
++// observable behaviour, where the shim's synchronous read was always
++// undefined). The per-user namespacing therefore does not protect anything on
++// shim builds; isolation rests entirely on purgePersistedQueryCacheForAllUsers()
++// (every sign-in and sign-out) plus queryClient.clear() on sign-out. Fixing
++// that requires re-creating the persister after hydration / on identity
++// change (App.tsx PersistQueryClientProvider composition), which is outside
++// the R3 identity/cache/pairing boundary and is reported for re-scope rather
++// than widened here.
++//
+ // NOTE (P1-1): the persister key is resolved ONCE at module load time
+ // (via resolveBootUserId()) and cannot be swapped after construction.
+ // This means that after an in-session account switch the persister
