@@ -1,0 +1,32 @@
+# Active TGP execution register
+
+Updated 2026-09-21 23:18 UTC. EXECUTE active; reconnaissance closed. This register tracks current workers, not historical session labels. Parent: GPT 6 Astra, orchestrator only.
+
+## Current ownership
+
+| Lane / round | Worker ID | Requested model | Owned writes | State |
+|---|---|---|---|---|
+| S1 R3 audit A | `s1_r3_independent_audit_a_mubv6s64` | Inherited orchestrator model | `execution/audits/s1-r3/a/` only | Independent source/proof review; composition-dependent conclusion pending |
+| S1 R3 audit B | `s1_r3_independent_audit_b_mubv6s76` | Claude Fable 5 / High | `execution/audits/s1-r3/b/` only | Independent source/proof review; composition-dependent conclusion pending |
+| S2 R3 composition builder | `s2_r3_release_composition_mubv6s70` | Claude Fable 5 / High | `worktrees/s2-composition`, `execution/s2-composition` | Preparing exact composition and guarded execution plan |
+| S4 R4 fixer | `s4_r4_auth_race_fixer_mubv6s6j` | Claude Fable 5 / High | `worktrees/s4-r4`, `execution/s4-r4` | Repairing two R3 session findings |
+| S5 R3 validation fixer | `s5_r3_validation_fixer_mubv6s6r` | Claude Fable 5 / High | `worktrees/s5-r3`, `execution/s5-r3` | Runner safety and pending terminal/race proof |
+| S6 R3 fixer | `s6_r3_identity_fixer_mubv6s7c` | Claude Fable 5 / High | `worktrees/s6-r3`, `execution/s6-r3` | Reimplementing only unpreserved identity/cache delta |
+
+All cumulative lanes are T4 under `EXECUTION_MANDATE.md`. No source writer is assigned to S1 while its frozen head is reviewed. Schema/migration/generator ownership is reserved to the sole S1 owner; S2 and S5 have no authority to modify it. S3 is unchanged and not redundantly dispatched.
+
+## Validation slot
+
+**NONE currently granted.** Canonical lock: `/home/user/workspace/execution/test-validation.lock`, nonblocking.
+
+Source edits and cheap static checks can proceed in isolated lanes. Parent grants dependency installs, tests, builds, browser or synthetic DB execution only after reviewing the minimal attributable request and required safety evidence. First critical-path preference: guarded S1+S2 composition. Read-only auditors do not hold a heavy slot by default.
+
+## Evidence and review
+
+Parent is the only private-evidence publisher and maintains `LAST_OPERATOR_STATE.md`. Worker reports/bundles must identify exact source, tested inputs, failures, unknowns and requested next action. No T4 lane is cleared by this dispatch; changed final heads require two independent attestations. No current audit A/B conclusions may be shared between reviewers before both freeze.
+
+## Closed intake items
+
+- Missing historical Agent-83 DOCX: unavailable/superseded supporting evidence by Bradley's explicit instruction, not a blocker.
+- Prior continuation-session delta recovery: one direct attempt returned no entries; exhausted without declaring global loss. No repeated archaeology.
+- Old worker IDs and SLOT E: historical, not running here.
