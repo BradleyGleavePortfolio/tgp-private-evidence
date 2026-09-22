@@ -1,0 +1,67 @@
+{
+  "slice": "OP88-S4-V6-B",
+  "role": "independent non-builder auditor B (T4); reviewer model/settings not exposed, not asserted",
+  "frozen_at_utc": "2026-09-22T22:16:00Z",
+  "mode": "read/hash/diff/text-count only; no syntax check, probe, control, lock, install, network, browser, worktree, product or code edit; sole writes execution/op88/audits/s4-v6-b",
+  "peer_not_read": "execution/op88/audits/s4-v6-a (appeared during review)",
+  "candidate": {
+    "root": "execution/op88/s4-v6",
+    "manifest_sha256": "8b04adaf7d4f0a511ee68e960d880e0ec386187335b7da9fde9c44c1c74a050b",
+    "manifest_check": "sha256sum -c 12/12 OK, non-self-including",
+    "diff_reproduced": "diff -u V5->V6 six pairs in packet order == V5_TO_V6.diff body modulo ---/+++ headers",
+    "lib_runner_delta": "header comments only after v5->v6 name substitution; pipe byte-identical c261ffb4",
+    "text_counts": {"launcher_argv_vs_tuple": "56/56", "driver_TERM_ACTIVE_PID": 1, "driver_KILL_ACTIVE_PID": 0, "driver_bare_exit_0": 0, "launcher_census_sites_outside_wallclock_loops_longest_path": "15 <= CENSUS_CALLS_MAX 16"},
+    "cosmetic": "launcher +160/-67 (request +159), predicates +71/-10 (request +70)"
+  },
+  "ruling_read": {"first_sha256": "7e6cd999b298b5e9d93fe36077d0e8a71441fe6753d106b96b5cd9907c6d346f", "final_sha256": "f05993ec9409cd0929824f3897347394ab78d6ffbe8ff5215a2bd54dc881502c", "note": "owner correction 22:03 paragraph appended between reads; both read entirely"},
+  "closure_ledger": [
+    {"prior_id": "S4-V5-A-01 / S4-V5-B-01", "status": "CLOSED_AT_SOURCE", "lines": {"driver": "75-82,90,98,100,174-175,198,202,239,243"}, "nit": "V6B-04 oldest-match glob"},
+    {"prior_id": "S4-V5-A-02 / S4-V5-B-03 / S4-V5-B-04", "status": "CLOSED_AT_SOURCE", "lines": {"driver": "56-58,83-107,196-209,211-227"}, "note": "arithmetic re-derived 1445<=1500; reserve 115; POST 77; qualification accepted"},
+    {"prior_id": "S4-V5-A-03 / S4-V5-B-08", "status": "CLOSED_AT_SOURCE_WITH_WINDOW_V6B-02", "lines": {"launcher": "140-159,153-159,161-167,198-204,224-239,262-296"}, "note": "exit 10 removed; receipt failure keeps holder (11); SELF-HOLD recorded; trap installed after lease/holder"},
+    {"prior_id": "S4-V5-A-04 / S4-V5-B-02", "status": "CLOSED", "lines": {"driver": "172-189,243,284", "request": "31,71"}},
+    {"prior_id": "S4-V5-A-05", "status": "CLOSED", "lines": {"driver": "109-114,149-169,181,252", "launcher": "102-115,189,299,318", "predicates": "94"}, "nit": "V6B-05 unreachable 98 branch"},
+    {"prior_id": "S4-V5-B-06 (private fault discrimination)", "status": "DISCRIMINATES_DECLARED_FACTS_WITH_HAZARD_V6B-01", "lines": {"launcher": "97,107-110,145,284,303", "driver": "117-143,260-270", "predicates": "75-76,84-85,95-137"}},
+    {"prior_id": "S4-V5-B-05 / S4-V4-B-06", "status": "TRUTHFULLY_LABELLED_NOT_CLOSED", "lines": {"map": "74-79"}},
+    {"prior_id": "S4-V5-B-07 (bound qualification)", "status": "QUALIFIED_IN_TEXT_ACCEPTED", "lines": {"launcher": "190,194", "request": "55-56,79"}},
+    {"prior_id": "S4-V5-B-10 / A exit legend", "status": "ADDRESSED_MINOR_RESIDUALS", "note": "V6B-03/05/06"}
+  ],
+  "material_findings": [
+    {
+      "id": "S4-V6-B-01",
+      "severity": "MEDIUM",
+      "applies_to": ["stage1 fault-survivors-quarantine", "stage1 fault-receipt-unwritable"],
+      "title": "census-members-persist seam makes stale deadline pids the signal target set",
+      "locations": {"launcher": ["107-110", "127-132", "255", "310"]},
+      "mechanism": "after runner exit, signal_session censuses through the seamed census whose MEMBERS are MEMBERS_AT_DEADLINE (dead pids); lines 129-130/310 then ps/kill -SIG -- -pgid and kill pid on those pids ~7-12 s after death",
+      "counterexample": "a dead stub/timeout/sleep pid reallocated to a foreign process within the window receives TERM then KILL (and its process group); record field signal_route 'never outside the session' and ruling 'no unowned signalling' become false",
+      "probability": "requires pid counter wrap within ~10 s (practically impossible at pid_max 4194304; plausible at 32768 under heavy forking); inherited TOCTOU class widened from ms to s, deterministic, two controls only",
+      "smallest_correction": "signal_session: disarm faults around its two census calls (FAULT_ARMED=false; census; restore) so injected survivors affect classification only (2 launcher lines)"
+    },
+    {
+      "id": "S4-V6-B-02",
+      "severity": "MEDIUM",
+      "applies_to": ["A-03 closure completeness", "stage2 canonical consequence", "stage1 fail-closed"],
+      "title": "lease and standby holder exist before the INTERRUPT trap is installed",
+      "locations": {"launcher": ["224", "225", "230-235", "239"], "driver": ["180"]},
+      "mechanism": "TERM/INT between 224 and 239 (up to QH_VERIFY_S=5 s) kills the launcher by default disposition; the standby holder (own session, fd 9) keeps the lease indefinitely with no SUPERVISOR_RECORD/OWNED_SID and, before line 232, no console identity line",
+      "consequence": "Stage 1: driver finish -> 99 (NO_SESSION) with private_lease_free=false live_quarantine_holder='' ; next run refuses 95; holder identifiable only via pgrep token + /proc. Stage 2: canonical lock held by an identifiable but unrecorded process",
+      "smallest_correction": "install INTERRUPT traps before line 224; after 235: [[ -n $INTERRUPT ]] && { release_standby_holder; publish_and_exit INTERRUPTED 143; } (<=3 launcher lines)"
+    }
+  ],
+  "nonmaterial": [
+    {"id": "S4-V6-B-03", "where": "driver 31,57", "note": "stale header (960/956) and 'never used for admission' vs 58/233"},
+    {"id": "S4-V6-B-04", "where": "driver 78", "note": "oldest-match glob; pid reuse across preserved control-runs binds a stale dir; fails closed via predicates"},
+    {"id": "S4-V6-B-05", "where": "driver 181-182, 264; request 68", "note": "finish-level 98 unreachable (181 pre-empts); MEMBERS-after-reap reported as 99 'nothing reaped'; reachable 98 (264) has a different meaning than the legend"},
+    {"id": "S4-V6-B-06", "where": "driver 183; request 67", "note": "96 'bound run clean' not implied when a live holder exists on the cancel path"},
+    {"id": "S4-V6-B-07", "where": "launcher 191; predicates 89", "note": "quarantine_holder_pid carries the standby pid on normal runs; naming only"},
+    {"id": "S4-V6-B-08", "where": "launcher 202-203", "note": "SELF-HOLD exec failure exits 12 releasing fd 9 while record says retained; exec -a / fd inheritance unmeasured; exotic, not a gate"}
+  ],
+  "verdicts": {
+    "stage1_private_controls_exact_v6": "GRANTABLE_SAFE_BOUNDED_EVIDENTIALLY_CORRECT_WITH_TWO_DISCLOSED_RESIDUALS (V6B-01, V6B-02); alternatively <=5-line additive V6.1 launcher correction with delta-only re-review if the run must be spent once on final bytes",
+    "stage2_native": "NOT_GRANTABLE_NOW: Stage 1 pass on final bytes; both V6 reviews; restored paths (absent); canonical-lock grant; V6B-02 corrected; narrow native caller correction for SELF-HOLD bounded observer return; unverified environment inputs; pipe_v6_sha256 downstream",
+    "self_hold_standby_loss": "unexercised, stated; not a gate per owner correction; no new harness demanded",
+    "inert_seams_and_joins": "preserved (runner 62 gate; has_fault KIND==CONTROL; lib seam unchanged; runner/lib name-only; pipe identical)"
+  },
+  "not_proven": "no execution; no bash/uutils/util-linux behaviour measured; no environment verified; no canonical lock/gate/Vitest/gitleaks/package/browser/pipe observation; no artifact or native attestation; hooks 0/6 inherited; product acceptance unchanged",
+  "smallest_next_action": "Parent decides V6B-01/02: grant Stage 1 on exact 8b04adaf... with both residuals recorded, or request the <=5-line additive V6.1 launcher correction and grant after delta-only dual confirmation; Stage 2 waits for that pass plus native prerequisites"
+}
