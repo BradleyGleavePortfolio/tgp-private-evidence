@@ -1,0 +1,193 @@
+--- a/run-c5-resource-inventory.v3.1.sh (frozen b7b328a5, unchanged)
++++ b/c6/run-c6-hazard-v5-conly.sh (C6 additive wrapper)
+@@ -1,4 +1,26 @@
+ #!/usr/bin/env bash
++# C6-S6-HAZARD-V5-C-ONLY — additive wrapper derived from the frozen V3.1 runner (b7b328a5…0776), which is NOT altered.
++#   Purpose (OP88-S6-C6-PREP, after frozen S6_C5_REVIEW_B.md §8): one C step only, hazard v5 (= v4 ee9b94df + `await
++#   qc.queryClient.cancelQueries()` before the existing clear() in afterEach and afterAll; nothing else) with the UNCHANGED
++#   adapter 3796be8f… and the UNCHANGED v3.1 instrument set (main.js cf470101…, hooks, summarize) verified by MANIFEST.c6.sha256.
++#   Differences from V3.1, all declared (see ../DIFF_runner_v3.1_to_c6.patch and ../S6_C6_PREP.md §4):
++#     paths  : packet dir C6=/home/user/workspace/execution/op88/s6-c6-prep/c6 (inputs/, diag/, MANIFEST.c6.sha256, c6classify.js);
++#              logs in /home/user/workspace/execution/op88/s6-c6-prep/logs/c6 with prefix `c6.`; WT and LOCK unchanged.
++#     steps  : selftest (instrument fit in the fresh install) then C only. A/B/D are NOT repeated (C5 A/B/D clean exits stand).
++#     inputs : two declared untracked copies (hazard v5 + adapter); v5 fingerprint a91bb732… replaces the v4 gate ee9b94df….
++#     budget : C 90 s + 20 s grace and selftest 15 s + 5 s UNCHANGED; inner BUDGET 180 (was 360, five steps); external 240 + 30.
++#     outcome: the V3.1 line "C exited on its own => C-PERTURBATION-DIVERGENCE" is REPLACED by the pre-declared C6 outcome
++#              classifier (c6classify.js): (i) 2 residual 600000 ms removeObserver timers + hang; (ii) 0 + clean exit;
++#              (iii) 5 + hang; (iv) six-assertion/overlap/mode divergence = STOP; else UNCLASSIFIED. FINAL rc semantics unchanged
++#              (primary rc preserved; any cleanup evidence forces nonzero). Neither FINAL 143 nor FINAL 0 is acceptance.
++#   Unchanged from V3.1: lock fd 9 held by the runner, 9>&- in children, owned setsid groups, zombie-aware poll, TERM/KILL reaping,
++#   M-1 stop after cleanup survivors, M-2 rm-failure count + porcelain gate, ancestor inventory gate, strict 20-module resolution,
++#   hash-guarded copy removal, provenance HEAD gate d51a1910, no --forceExit/--detectOpenHandles, no install, no product edit.
++#   Invoke (parent-granted only; after a separately granted positive setup; see ../C6_EXECUTION_REQUEST.md):
++#     mkdir -p /home/user/workspace/execution/op88/s6-c6-prep/logs/c6 && \
++#     setsid nohup timeout -k 30 240 bash /home/user/workspace/execution/op88/s6-c6-prep/c6/run-c6-hazard-v5-conly.sh \
++#       > /home/user/workspace/execution/op88/s6-c6-prep/logs/c6/run-c6.out 2>&1 < /dev/null &
++# (V3.1/V3/V2 headers kept below for lineage; their Invoke/Steps lines describe V3.1, not this wrapper.)
+ # C5-S6-RESOURCE-INVENTORY V3.1 — execution-only successor of V3 (1664fd47…) closing reviewer-B addendum-2 M-1/M-2:
+ #   M-1: a nonzero per-step cleanup_exit (owned group still has members after TERM/KILL) now STOPS the run immediately
+ #        (die rc 90) before any further child is spawned; the step's real first exit is preserved in FIRST_EXIT.
+@@ -32,27 +54,27 @@
+ # No --forceExit, no --detectOpenHandles, no install, no product/adapter/hazard-test byte change, no assertion change.
+ set -u
+ WT=/home/user/workspace/worktrees/s6-diagnostic
+-EX=/home/user/workspace/execution/s6-diagnostic
+-V3=$EX/v3
+-DIAG=$V3/diag
+-IN=$EX/inputs
+-LOGS=$EX/logs/v3.1
++C6=/home/user/workspace/execution/op88/s6-c6-prep/c6
++DIAG=$C6/diag
++IN=$C6/inputs
++LOGS=/home/user/workspace/execution/op88/s6-c6-prep/logs/c6
+ LOCK=/home/user/workspace/execution/test-validation.lock
+-EXIT_RECORD=$LOGS/c5v3.EXIT_RECORD
++EXIT_RECORD=$LOGS/c6.EXIT_RECORD
+ START=$(date +%s)
+-BUDGET=360            # inner budget (s): steps refuse to start if remaining < their own budget+grace
++BUDGET=180            # inner budget (s): steps refuse to start if remaining < their own budget+grace (selftest 25 + C 115 + preflight)
+ export CI=1 NODE_OPTIONS=--max-old-space-size=2048 TZ=UTC
+ export EXPO_PUBLIC_FF_EXTENSION_IMPORT= EXPO_PUBLIC_FF_IMPORT_REVIEW=
+ export S6DIAG_WT=$WT
+ CPU="taskset -c 0,1"
+-CONTINUE_AFTER_D_HANG=${S6DIAG_CONTINUE_AFTER_D_HANG:-0}
+ TESTDIR=src/services/__tests__
+ OWNED_PGIDS=""        # every child group this runner created (space separated)
+ CUR_PID=""; CUR_PGID=""; CUR_STEP=""
+ FIRST_EXIT=""         # "<step> rc=<n> how=<exited|budget-TERM|budget-KILL|runner-signal>"
+ CLEANUP_FAILURES=0    # any nonzero cleanup_exit / survivor / ancestor change / retained copy -> FINAL cannot be 0
+ ACCOUNTED=0
+-COPIES="persistedQueryCache.hazardControls.test.tsx persistedQueryCache.hazardAdapter.tsx s6diag.A.noop.test.js s6diag.B.importOnly.test.js s6diag.D.persisterLifecycle.test.js"
++COPIES="persistedQueryCache.hazardControls.test.tsx persistedQueryCache.hazardAdapter.tsx"
++HAZARD_V5_SHA=a91bb732716b500122e291714bf437872cb81930c020812042f84ed87f6a184d   # v5 = v4 ee9b94df… + two-hook cancelQueries delta
++ADAPTER_SHA=3796be8fae738993bcc5c30dd7d4cf9b303329b8faa990ca03e31c2460cd35f3     # unchanged
+ 
+ ts() { date -u +%FT%TZ; }
+ ancestor_inventory() { ( cd /home/user/node_modules 2>/dev/null && ls -A --time-style=+%s -l | awk '{print $6, $7}' | sort ) | sha256sum | cut -d' ' -f1; }
+@@ -82,7 +104,7 @@
+   if [ -n "$members" ]; then echo "$(ts) cleanup label=$label pgid=$pg SURVIVORS=[${members//$'\n'/,}] cleanup_exit=1 (quarantine: report, do not retry)" >> "$EXIT_RECORD"; return 1; fi
+   echo "$(ts) cleanup label=$label pgid=$pg members=none cleanup_exit=0" >> "$EXIT_RECORD"; return 0
+ }
+-copy_source() { case "$1" in persistedQueryCache.*) echo "$IN/$1";; *) echo "$DIAG/specs/$1";; esac; }
++copy_source() { echo "$IN/$1"; } # C6: both declared copies come from the packet inputs/ (no diag specs are placed)
+ cleanup_copies() { # B-03: remove a declared copy only if its bytes still equal the frozen source; else retain + report
+   local f src dst; for f in $COPIES; do src=$(copy_source "$f"); dst=$WT/$TESTDIR/$f
+     [ -e "$dst" ] || { echo "$(ts) copy $f absent (never placed or already removed)" >> "$EXIT_RECORD"; continue; }
+@@ -162,10 +184,10 @@
+ }
+ jest_step() { # $1 step $2 budget $3 grace $4 spec → RUN_RC/RUN_HOW, summary written
+   local step=$1
+-  S6DIAG_LOG=$LOGS/c5v3.$step.inventory.jsonl S6DIAG_STEP=$step \
+-    run_owned "$step" "$2" "$3" "$LOGS/c5v3.$step.jest.log" -- $CPU node node_modules/jest/bin/jest.js $(JEST_ARGS "$4")
+-  node "$DIAG/s6diag.summarize.js" "$LOGS/c5v3.$step.inventory.jsonl" "$LOGS/c5v3.$step.jest.log" "$step" "$RUN_RC" > "$LOGS/c5v3.$step.summary.txt" 2>&1
+-  echo "$(ts) step=$step summary: $(head -1 "$LOGS/c5v3.$step.summary.txt")" >> "$EXIT_RECORD"
++  S6DIAG_LOG=$LOGS/c6.$step.inventory.jsonl S6DIAG_STEP=$step \
++    run_owned "$step" "$2" "$3" "$LOGS/c6.$step.jest.log" -- $CPU node node_modules/jest/bin/jest.js $(JEST_ARGS "$4")
++  node "$DIAG/s6diag.summarize.js" "$LOGS/c6.$step.inventory.jsonl" "$LOGS/c6.$step.jest.log" "$step" "$RUN_RC" > "$LOGS/c6.$step.summary.txt" 2>&1
++  echo "$(ts) step=$step summary: $(head -1 "$LOGS/c6.$step.summary.txt")" >> "$EXIT_RECORD"
+ }
+ 
+ mkdir -p "$LOGS"
+@@ -181,17 +203,18 @@
+   echo "node=$(node -v) npm=$(npm -v)"; echo "node_modules_present=$([ -d node_modules ] && echo yes || echo no)"
+   echo "ancestor_package_json_absent=$([ ! -e /home/user/package.json ] && echo yes || echo NO)"
+   echo "ancestor_node_modules=$(ls -ld /home/user/node_modules 2>&1) entries=$(ls -A /home/user/node_modules 2>/dev/null | wc -l) (platform-owned, pre-existing Sep 20; never touched by this runner)"
+-  git status --porcelain | sed 's/^/status: /'; } > "$LOGS/c5v3.provenance.txt" 2>&1
++  git status --porcelain | sed 's/^/status: /'; } > "$LOGS/c6.provenance.txt" 2>&1
+ # ancestor inventory snapshot (read-only): names + mtimes of /home/user/node_modules entries; compared again at the end
+-ANCESTOR_BEFORE=$(ancestor_inventory); echo "ancestor_inventory_before=$ANCESTOR_BEFORE" >> "$LOGS/c5v3.provenance.txt"
++ANCESTOR_BEFORE=$(ancestor_inventory); echo "ancestor_inventory_before=$ANCESTOR_BEFORE" >> "$LOGS/c6.provenance.txt"
+ [ "$(git rev-parse HEAD)" = "d51a191098f483cea9abec6cc7e9f3beffd18c06" ] || die provenance-head 2
+ [ -d node_modules ] || die provenance-node-modules-absent-setup-not-granted 2
+-grep -q "ancestor_package_json_absent=yes" "$LOGS/c5v3.provenance.txt" || die provenance-ancestor-package-json 2
++grep -q "ancestor_package_json_absent=yes" "$LOGS/c6.provenance.txt" || die provenance-ancestor-package-json 2
+ [ "$(git status --porcelain | grep -vc -E '^\?\? src/services/__tests__/(persistedQueryCache\.hazard|s6diag\.)')" = "0" ] || die provenance-clean 2
+ rec provenance 0
+ 
+-# 1. frozen V2 bytes
+-(cd "$V3" && sha256sum -c --quiet MANIFEST.v3.1.sha256) > "$LOGS/c5v3.manifest-check.txt" 2>&1 || die manifest-mismatch-reattribution-required 3
++# 1. frozen C6 packet bytes: unchanged v3.1 instrument set (diag/*, same hashes as MANIFEST.v3.1.sha256), inputs/ (v5 + adapter),
++#    c6classify.js and this runner. Non-self-including (the manifest file itself is not listed).
++(cd "$C6" && sha256sum -c --quiet MANIFEST.c6.sha256) > "$LOGS/c6.manifest-check.txt" 2>&1 || die manifest-mismatch-reattribution-required 3
+ rec manifest 0
+ 
+ # 2. STRICT module resolution: every relevant module must resolve to $WT/node_modules (the ancestor /home/user/node_modules
+@@ -202,53 +225,41 @@
+   let r; try { r=require.resolve(m+"/package.json",{paths:[wt]}); } catch(e){ console.log(`BAD ${m} unresolved: ${e.code||e.message}`); bad++; continue; }
+   const v=require(r).version; const inside=r.startsWith(p.join(wt,"node_modules")+p.sep);
+   console.log(`${inside?"OK ":"BAD"} ${m}@${v} ${r}`); if(!inside) bad++; }
+-process.exit(bad?1:0)' "$WT" > "$LOGS/c5v3.module-paths.txt" 2>&1 || die module-paths 5
++process.exit(bad?1:0)' "$WT" > "$LOGS/c6.module-paths.txt" 2>&1 || die module-paths 5
+ rec module-paths 0
+ 
+ # 3. exact inputs (untracked copies, declared) and digests
+ COPIES_PLACED=1
+ cp "$IN/persistedQueryCache.hazardControls.test.tsx" "$IN/persistedQueryCache.hazardAdapter.tsx" "$TESTDIR/"
+-cp "$DIAG/specs/s6diag.A.noop.test.js" "$DIAG/specs/s6diag.B.importOnly.test.js" "$DIAG/specs/s6diag.D.persisterLifecycle.test.js" "$TESTDIR/"
+-[ "$(sha $TESTDIR/persistedQueryCache.hazardControls.test.tsx)" = "ee9b94df1ceae5d90ad53700f119b75b0a2e9a6640339c27e2dca29d1f51bba6" ] || die fingerprint-v4-hazard 4
+-[ "$(sha $TESTDIR/persistedQueryCache.hazardAdapter.tsx)" = "3796be8fae738993bcc5c30dd7d4cf9b303329b8faa990ca03e31c2460cd35f3" ] || die fingerprint-adapter 4
+-{ sha256sum $TESTDIR/persistedQueryCache.hazard* $TESTDIR/s6diag.*; git status --porcelain; } > "$LOGS/c5v3.fingerprint.txt" 2>&1
++[ "$(sha $TESTDIR/persistedQueryCache.hazardControls.test.tsx)" = "$HAZARD_V5_SHA" ] || die fingerprint-v5-hazard 4
++[ "$(sha $TESTDIR/persistedQueryCache.hazardAdapter.tsx)" = "$ADAPTER_SHA" ] || die fingerprint-adapter 4
++{ sha256sum $TESTDIR/persistedQueryCache.hazard*; git status --porcelain; } > "$LOGS/c6.fingerprint.txt" 2>&1
+ [ "$(git status --porcelain | grep -vc -E '^\?\? src/services/__tests__/(persistedQueryCache\.hazard|s6diag\.)')" = "0" ] || die fingerprint-clean 4
+ rec copy-inputs 0
+ 
+-# 4. step 0: instrument self-check (pure node, no node_modules, no product code)
+-S6DIAG_LOG=$LOGS/c5v3.selftest.inventory.jsonl S6DIAG_STEP=selftest run_owned selftest 15 5 "$LOGS/c5v3.selftest.out" -- $CPU node "$DIAG/s6diag.selftest.js"
++# 4. step 0: instrument self-check (pure node, no node_modules, no product code) — kept: the install is fresh, the instrument must
++#    still fit this process before its C observation is trusted.
++S6DIAG_LOG=$LOGS/c6.selftest.inventory.jsonl S6DIAG_STEP=selftest run_owned selftest 15 5 "$LOGS/c6.selftest.out" -- $CPU node "$DIAG/s6diag.selftest.js"
+ rec selftest "$RUN_RC" "how=$RUN_HOW"; [ "$RUN_RC" -eq 0 ] || die selftest-instrument-unfit "$RUN_RC"
+ 
+-# 5. step A: preset + instrument negative control — must exit on its own
+-jest_step A 45 15 "$TESTDIR/s6diag.A.noop.test.js"; rec A-noop "$RUN_RC" "how=$RUN_HOW"
+-[ "$RUN_RC" -eq 0 ] || die A-noop-HANG_OR_FAIL-runner_or_preset_or_instrument "$RUN_RC"
+-grep -q 'PROCESS_EXITED_ON_ITS_OWN' "$LOGS/c5v3.A.summary.txt" || die A-noop-no-beforeExit 9
+-
+-# 6. step B: production import-only control
+-jest_step B 45 15 "$TESTDIR/s6diag.B.importOnly.test.js"; rec B-importOnly "$RUN_RC" "how=$RUN_HOW"
+-[ "$RUN_HOW" = "exited" ] || die B-importOnly-HANG-production_import_time_ownership "$RUN_RC"
+-[ "$RUN_RC" -eq 0 ] || die B-importOnly "$RUN_RC"
+-
+-# 7. step D: production persistence lifecycle without React/signOut
+-jest_step D 60 15 "$TESTDIR/s6diag.D.persisterLifecycle.test.js"; rec D-persisterLifecycle "$RUN_RC" "how=$RUN_HOW"
+-if [ "$RUN_HOW" != "exited" ]; then
+-  echo "D-HANG: production persistence lifecycle retains a resource without any harness" >> "$EXIT_RECORD"
+-  [ "$CONTINUE_AFTER_D_HANG" = "1" ] || die D-persisterLifecycle-HANG-production_lifecycle_ownership "$RUN_RC"
+-elif [ "$RUN_RC" -ne 0 ]; then die D-persisterLifecycle "$RUN_RC"; fi
+-
+-# 8. step C: unchanged v4 hazard file + adapter under the inventory. Expected: 6/6, 0 overlapping act, then the
+-#    C2/C3/C4 hang preserved: how=budget-TERM (rc 143, SIGTERM snapshot + re-raise) or how=budget-KILL (rc 137 if a
+-#    foreign SIGTERM listener kept the process alive; then only teardown/tick snapshots exist) — both are the preserved hang.
+-jest_step C 90 20 "$TESTDIR/persistedQueryCache.hazardControls.test.tsx"; rec C-hazard-v4-inventory "$RUN_RC" "how=$RUN_HOW"
+-{ echo "tests_line: $(grep -m1 '^Tests:' "$LOGS/c5v3.C.jest.log")"
+-  echo "overlapping_act: $(grep -c 'overlapping act' "$LOGS/c5v3.C.jest.log")"
+-  echo "mode_line_present: $(grep -c '\[mode=d51-singleton\]' "$LOGS/c5v3.C.jest.log")"
+-  echo "did_not_exit_line: $(grep -c 'did not exit one second' "$LOGS/c5v3.C.jest.log")"
+-  echo "first_exit_rc: $RUN_RC how: $RUN_HOW"; } > "$LOGS/c5v3.C.checks.txt"
+-grep -q '^Tests:       6 passed, 6 total' "$LOGS/c5v3.C.jest.log" || echo "C-BEHAVIOURAL-DIVERGENCE: six assertions not preserved under instrument" >> "$EXIT_RECORD"
+-[ "$(grep -c 'overlapping act' "$LOGS/c5v3.C.jest.log")" = "0" ] || echo "C-OVERLAPPING-ACT under instrument" >> "$EXIT_RECORD"
+-[ "$RUN_HOW" = "exited" ] && echo "C-PERTURBATION-DIVERGENCE: hazard file exited on its own under instrument (C2/C3/C4 hung) — not acceptance" >> "$EXIT_RECORD"
++# 5. (V3.1 steps A/B/D are NOT repeated: their C5 clean exits stand; brief non-goal.)
++
++# 6. step C: hazard v5 (cancelQueries before clear in afterEach/afterAll) + unchanged adapter under the unchanged inventory.
++#    Same budget/grace as C5's C step (90 s + 20 s) so tick snapshots (+1/3/6/10/20/40/70 s) are comparable.
++#    Pre-declared outcomes (S6_C5_REVIEW_B.md §8): (i) 2 residual 600000 ms removeObserver timers + budget-TERM/KILL;
++#    (ii) 0 timers + clean exit (rc 0, beforeExit); (iii) 5 timers + hang; (iv) six-assertion/overlap/mode divergence = STOP.
++#    A clean exit here is a pre-declared outcome, NOT the V3.1 "perturbation divergence" and NOT acceptance.
++jest_step C 90 20 "$TESTDIR/persistedQueryCache.hazardControls.test.tsx"; rec C-hazard-v5-cancel-before-clear "$RUN_RC" "how=$RUN_HOW"
++{ echo "tests_line: $(grep -m1 '^Tests:' "$LOGS/c6.C.jest.log")"
++  echo "overlapping_act: $(grep -c 'overlapping act' "$LOGS/c6.C.jest.log")"
++  echo "mode_line_present: $(grep -c '\[mode=d51-singleton\]' "$LOGS/c6.C.jest.log")"
++  echo "did_not_exit_line: $(grep -c 'did not exit one second' "$LOGS/c6.C.jest.log")"
++  echo "first_exit_rc: $RUN_RC how: $RUN_HOW"
++  node "$C6/c6classify.js" "$LOGS/c6.C.inventory.jsonl" "$LOGS/c6.C.jest.log" "$RUN_RC" "$RUN_HOW" 2>&1; } > "$LOGS/c6.C.checks.txt"
++grep -q '^Tests:       6 passed, 6 total' "$LOGS/c6.C.jest.log" || echo "C-BEHAVIOURAL-DIVERGENCE: six assertions not preserved under instrument — outcome (iv), STOP" >> "$EXIT_RECORD"
++[ "$(grep -c 'overlapping act' "$LOGS/c6.C.jest.log")" = "0" ] || echo "C-OVERLAPPING-ACT under instrument — outcome (iv), STOP" >> "$EXIT_RECORD"
++echo "$(ts) $(grep -m1 '^C6-OUTCOME=' "$LOGS/c6.C.checks.txt" || echo 'C6-OUTCOME=CLASSIFIER-ABSENT')" >> "$EXIT_RECORD"
+ FIRST_EXIT="C rc=$RUN_RC how=$RUN_HOW"
+ echo "FIRST_EXIT $FIRST_EXIT" >> "$EXIT_RECORD"
+-echo "$(ts) C real first exit rc=$RUN_RC how=$RUN_HOW (budget-TERM/143 or budget-KILL/137 = EXPECTED preserved hang, not success)" >> "$EXIT_RECORD"
++echo "$(ts) C real first exit rc=$RUN_RC how=$RUN_HOW (interpret ONLY via the C6-OUTCOME line and raw c6.C.* files; neither 143 nor 0 is acceptance)" >> "$EXIT_RECORD"
+ finish "$RUN_RC"

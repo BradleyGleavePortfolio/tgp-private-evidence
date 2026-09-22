@@ -132,3 +132,17 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Evidence allowed now: source reasoning, manual edits, hashes/diffs/syntax only. No controls/probes/lock acquisition/install/network/DB/browser.
 - Recovery: refuse nonzero and preserve evidence when identity/cleanup/publication is uncertain; one owned writer and immutable V4 packets. New meaningful architecture/ownership requirements require parent rescope, not freestyling.
 - Success does not prove: runtime control pass, native gates, artifact/browser correctness, remote revocation, native completion or release.
+
+## S5: OP88-S5-V8-T0-SETUP-PREP
+
+- Repository/PR/base/head: inherited backend #528/#529 S5 contract; publicc23b9d9f, exact143d451ead6ccdbebd92ca3031ba7a89867d6cfc/tree d0e122d3 + preserved patchc36258b3. No product change.
+- Purpose: close new independent S5-V7-A02/A03 startup/caller-group/deadline finding on T0 control and same parent-identified startup class P88-S5-SETUP-01 in setup74736a58.
+- Non-goals: no spec/fake-harness/schema/assertion/lockfile changes; no general supervisor; no install/Jest/DB/control execution or commit.
+- Dependencies: frozen V7, independent s5-v7-a report, original setup74736a58, exact restored source. R1 read-only checker is separate and must not be repeated.
+- Sole writer/canonical builder: existing Fable s5_selective_v7_fixer_mud58q6n, execution/op88/s5-v8-t0 and worktrees/s5-r4 configuration only. All new work T4; "T0" names the predecessor control, NOT risk tier.
+- Required review: independent narrow exact-successor ownership/deadline applicability and deterministic controls before any install/T0 runtime; two final product attestations remain later.
+- Acceptance/evidence: immediately owned spawned child, fail-closed checked session/group adoption and no caller-group signals; deterministic interruption/startup/publication/caller-decoy controls prepared; cleanup inside stated phase/grace allowances, no unconditional wait after unconfirmed termination; exact minimal T0/setup diffs and hashes, raw status preserved. Reuse proven original behavior where applicable, no assertion dilution.
+- Recovery: retain failed/uncertain control state and nonzero receipt; no unowned signals, hidden retries or misleading setup success.
+- Success does not prove: installed dependencies, T0 result, real DB behavior, hooks/final candidate clearance.
+
+Restoration correction approved: repo-local core.abbrev=8 at worktrees/s5-r4 only, to reproduce original diff-encoding fingerprint6850b32e without repinning or changing source. Original restoration report stays frozen; additive verification required.

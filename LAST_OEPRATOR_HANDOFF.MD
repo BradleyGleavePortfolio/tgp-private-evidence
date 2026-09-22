@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September22,2026 2:07PM PDT / 21:07UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
+Updated September22,2026 2:22PM PDT / 21:22UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -10,24 +10,24 @@ Bradley explicitly instructed all six existing continuations in parallel IF SAFE
 
 ## Active lanes
 
-- S5 / T4: independent V7 review frozen157b6ab5, checker logic closed; exact read-only R1 grant issued with corrected caller/budget. T0+setup held on startup/caller-group/deadline finding; same Fable prepares V8, no install. Source143d+patch restored; localcore.abbrev8 authorized to reproduce original fingerprint. V6 remains failed;12PASS includesI0/partialT3.
-- S6 / T4: independent C5 B frozen2398cc9d; five timers observed, initiating clear inferred, test-only complete-fix claim held for two predicted in-case orphans. New non-auditor Fable prepares smallest two-hook C6 discriminator, no product fix/runtime; predeclared2/0/5/divergence outcomes.
+- S5 / T4: R1 checker passed once21:06:42Z, outer0/11PASS0FAIL with discriminating negatives; bounded T3 gap CLOSED, V6 remains FAIL. V8 primitive and two S5 consumers frozen12files under independent A/B; no runtime. Single S5/S6 primitive owner, S6 adaptation paused pending exact primitive review to avoid multiplying an unresolved boundary.
+- S6 / T4: C6 frozen19/19, exact two-hook hazardv5a91bb732/C-only746e244d/unchangedinstrumentcf470101, under independent B narrow review. No product fix/runtime. Shared launch correction owned only by S5, with TWO independent primitive/consumer reviews before controls. C6 builder idle; original packet frozen.
 - S2 / T4: Fable V5.6 minimal fixer against BOTH frozen55 reports, unchanged productd5cd9b8b. No control or real DB grant; dual exact-successor reviews after freeze.
 - S4 / T4: both V4 reports independently frozen; parent HOLD both stages despite B's narrower opinion. New Fable V5 fixer closes A01-A06 plus B03, no product change/control execution. Product91990 source closure remains narrow; artifact held.
 - S1/S3 / T4: S1/S2 identities/blobs verified; S3 bundle restored offline, PREP2 reproduced exactly from BOTH parents, matrix86/86. Source gap closed without reimplementation. Runtime/integration remain dependency-gated.
 
 ## Resource and evidence truth
 
-Fresh workspace2CPUs/about8GB,9.9GB free observed20:43 before restoration. Public baselines and named packets restored; old PG/application/tool installs not inherited. Only fresh read-only S5 R1 checker granted once, no lock/install/Jest/DB; its result pending. Heavy validation remains serialized when granted; source/review preparation continues in parallel.
+Fresh workspace2CPUs/about8GB,9.9GB free observed20:43 before restoration. Public baselines and named packets restored; old PG/application/tool installs not inherited. S5 R1 grant consumed with bounded positive evidence; no fresh runtime/install allocation. Heavy validation stays serialized; source/review preparation continues in parallel.
 
-All prior failures, audit reports, source bundles and missing-evidence qualifications remain immutable. No new product code, validation pass, audit clearance, merge, deployment, enablement or customer outcome is claimed.
+All prior failures, audit reports, source bundles and missing-evidence qualifications remain immutable. No new product code, product-wide validation/audit clearance, merge, deployment, enablement or customer outcome is claimed; only the bounded S5 checker result is newly proven.
 
 ## Immediate next steps
 
-1. Inspect S5 frozen selective packet, assign narrow independent applicability review, then grant only validated checker/T0 scope.
-2. Disposition S6 independent C5 result and authorize only smallest justified discriminator or repair.
+1. Collect both independent V8 primitive/S5-consumer verdicts; consolidate concrete findings before S6 adaptation or controls. Never repeat the completed R1 checker.
+2. Complete S6 C6 hazard/classifier/observer narrow review separately from the held launch primitive; final exact runtime still needs setup/grant.
 3. Inspect S2 V5.6 delta and assign independent A/B; resolve concrete findings before controls/realproof.
-4. Collect both S4 V4 reports independently; remediate material findings or grant bounded controls if justified, then native/artifact/browser evidence.
+4. Collect S4 V5 fixer packet, then dual exact-delta review and separately granted private controls before native/artifact/browser evidence.
 5. Complete unchanged-d5cd/S1 real composition/discriminator after runner and environment gates, then dual evidence-bound attestations.
 6. Advance S3 exact PREP2 integration/composed-lock proof only after upstream readiness.
 

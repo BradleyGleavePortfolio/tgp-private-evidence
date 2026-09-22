@@ -1,0 +1,15 @@
+--- a/persistedQueryCache.hazardControls.test.tsx (v4 ee9b94df)
++++ b/persistedQueryCache.hazardControls.test.tsx (v5)
+@@ -137,9 +137,11 @@
+ afterEach(async () => {
+   await cleanup(); // unmount providers → persist subscriptions end
+   jest.restoreAllMocks();
++  await qc.queryClient.cancelQueries(); // v5 (C6 discriminator): settle in-flight fetches while their Query is still cached, so fetch()'s finally→scheduleGc re-arms on a Query that clear() will destroy
+   qc.queryClient.clear(); // destroys queries → clears 10-min gc timers (hang owner)
+ });
+-afterAll(() => {
++afterAll(async () => {
++  await qc.queryClient.cancelQueries(); // v5 (C6 discriminator): same ordering as afterEach, for symmetry
+   qc.queryClient.clear();
+   qc.queryClient.unmount();
+ });
