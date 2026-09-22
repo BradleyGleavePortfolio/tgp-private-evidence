@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 21:40 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
+Updated: 2026-09-22 21:44 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
 
 ## Mission and authority
 
@@ -35,7 +35,7 @@ Current dispatch: S2 V5.6 and shared-launch V9 each have two independent exact-c
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
-| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups frozen; no new source defect. Exact composition/discriminator inputs restored. Upstream builder now restores source-only CONTROL_REQUEST_10 prerequisites at s2-runner53/s2-setup-prep, no install/runtime. Next: execution after S2 review/setup clearance, then dual evidence-bound auditors. TRUNCATE/membership/final dynamic proof pending; 56fb IS composed in21ea/d5cd. Prior offline24/24 remains qualified. No schema change. |
+| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups frozen; no new source defect. Source-only CONTROL_REQUEST_10 prerequisites restored: s2-runner53 exact clean d5cd/treec0ab87d4 and s2-setup-prep37/37 verified, no path amendment needed. Proof packet upstream-prereqs-2 manifestc6bb412c; parent verified21:44. No install/runtime. Next: execution after S2 review/setup clearance, then dual auditors. TRUNCATE/membership dynamic proof pending; 56fb IS composed in21ea/d5cd. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Product R3 unchanged; runner V5.6 frozen outer41cd5371401f9eb8636670df43aaf5b535b21bbd565ecb8eaac23809d5c9cac8,19/19 verified; runner8980bca0/driver10c48b69. TWO independent A/B reviews active against both V5.5 HOLD reports. Next: auditors, then fixer only for concrete material findings; controls and real proof unrun. Historical setup05 is not a current install. |
 | S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source ready, not runtime-cleared. S3 bundle940ce711/manifest8646c075 verified34/34; head/tree/23commits restored offline. PREP2 treea584a1b9 reproduced from BOTH parents; parent2 matrix86/86, no missing objects. Three recorded resolutions/six formatting-only changes attributed. Runtime/hooks/composed-lock/final reviews pending. |
 | S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V5 manifest73c2dbbe12/12 verified. A audit0adc4d6b frozen: Stage1/2 HOLD, five material residuals. B still independent. Next role: sole fixer V6 on frozen A; must incorporate frozen B before final successor freeze/review. No controls/native grant; productsource/artifact distinction unchanged. |
@@ -46,7 +46,7 @@ Four advertised bundle identities were checked against current packet heads: S2 
 
 ## Resource and truth boundaries
 
-Fresh op88 workspace: 2 CPUs/about8GB; disk9.9GB free observed20:43 before packet/baseline restoration. Prior PG17.6/tooling/application dependency installations and PIDs are not inherited. Backend/mobile/extension public baselines restored read-only; only named private packets hydrated. Platform-owned `/home/user/node_modules` remains outside worker ownership. Any installation requires separate reviewed scope, capacity check and serialized grant.
+Fresh op88 workspace: 2 CPUs/about8GB; disk9.6GB free observed21:44 after source/packet restoration. Prior PG17.6/tooling/application dependency installations and PIDs are not inherited. Backend/mobile/extension public baselines restored read-only; only named private packets hydrated. Platform-owned `/home/user/node_modules` remains outside worker ownership. Canonical lock absent21:44, no allocation implied. Any installation requires separate reviewed scope, capacity check and serialized grant.
 
 Source/preparation/review lanes remain parallel and isolated. S5 R1 read-only grant is CONSUMED with positive bounded result; do not rerun. No heavy allocation. S2realproof/S4native/S6runtime/S5T0/setup and S3integration remain held. Canonical lock is not itself permission.
 

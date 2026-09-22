@@ -1,6 +1,6 @@
 # Active TGP execution register
 
-Updated 2026-09-22 21:40 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
+Updated 2026-09-22 21:44 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
 
 User directed the existing six-slice continuation in parallel IF SAFE. Full current contracts: `execution/OP88_WAVE1.md`. All assignments T4; canonical builder Claude Fable 5. Requested High policy is not observed runtime telemetry. All prior-session worker IDs/processes/installations/grants are historical. Earlier register retained in Git at ad3568a9.
 
@@ -24,7 +24,7 @@ User directed the existing six-slice continuation in parallel IF SAFE. Full curr
 | S4 V5 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | frozen execution/op88/audits/s4-v5-a | COMPLETE audit0adc4d6b: both stages HOLD, five material residuals. No B access or execution; now distinct V9 review. |
 | S4 V5 independent B | s4_v5_independent_audit_b_mud6selv | Claude Fable 5 | execution/op88/audits/s4-v5-b | Independent same frozen candidate; separate Stage1/Stage2 verdicts, no peer sharing/probes. |
 | S1/S3 upstream integration preparation | s1_s3_gated_integration_preparation_mud58q6v | Claude Fable 5 | frozen prep/addendum; worktrees/op88-upstream | COMPLETE source restoration: S3 bundle940ce711, PREP2 both parents exact, matrix86/86. No runtime/install/hooks/commit. Idle pending S2/runtime gates. |
-| S1/S2 static control prerequisites | s1_s3_gated_integration_preparation_mud58q6v | Claude Fable 5 | execution/op88/upstream-prereqs-2; absent-only worktrees/s2-runner53 and execution/s2-setup-prep | ACTIVE exact offline source/packet restoration per CONTROL_REQUEST_10; no product edits/install/client execution/lock/runtime. Prior upstream outputs immutable. |
+| S1/S2 static control prerequisites | s1_s3_gated_integration_preparation_mud58q6v | Claude Fable 5 | frozen execution/op88/upstream-prereqs-2; restored worktrees/s2-runner53 and execution/s2-setup-prep | COMPLETE manifestc6bb412c, exact clean d5cd and predecessor37/37 parent verified21:44; no path amendment/install/client execution/lock/runtime. Idle pending S2 gates; earlier outputs immutable. |
 
 ## Ownership and grants
 
