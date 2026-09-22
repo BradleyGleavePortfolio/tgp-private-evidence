@@ -1,0 +1,590 @@
+
+FILE worktrees/s5-r3/test/rls-g2-pg17-etq0.spec.ts
+SHA256 54c85d8de38a2b1972d758a333a207984e9f6483f0ba962f65e40ecfd8ee48f1
+28: beforeAll(() => {
+29:   // data_directory is readable only by pg_read_all_settings/superuser: observed via the admin connection.
+30:   const identity = json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
+31:     'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
+32:     'version',current_setting('server_version_num'),'user',current_user,'super',
+33:     (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
+34:     (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
+35:     (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
+36:   // Every DDL/data statement of this proof runs as the NON-superuser, BYPASSRLS, owning
+37:   // `postgres` role (Supabase shape); the cluster superuser only observes lock waits.
+38:   // The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).
+39:   expect(identity).toMatchObject({ database: 'g2_s5_etq0_disposable', address: '127.0.0.1', port: target.port,
+40:     directory, user: 'postgres', super: false, bypassrls: true, owner: 'postgres' });
+41:   expect(sql(`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`)).toBe('0');
+42:   expect(Number(identity.version)).toBe(expectedVersion);
+43:   expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
+44:   expect(Number(identity.version)).toBeLessThan(180000);
+45:   expect(directory).toMatch(/\/pg17\/clusters\/s5$/);
+46:   // Distinctive S5 fixture markers (pinned literals, not environment): the lane's cluster_name and
+47:   // the disposable database's comment stamped by bootstrap. Proves the run used the marked fixture.
+48:   expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_PG17_CLUSTER_MARKER);
+49:   expect(sql(`SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`))
+50:     .toBe(G2_PG17_DATABASE_MARKER);
+51:   console.warn('PG17_DATABASE', JSON.stringify(identity));
+52:   // Bootstrap leaves the full 164-migration O history and NO E column/history.
+53:   expect(appliedMigrations()).toBe('164');
+54:   expect(sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`)).toBe('0');
+55:   expect(hasColumn()).toBe('0');
+56:   expect(readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8'))
+57:     .not.toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform/);
+58:   expect(readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8'))
+59:     .toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/);
+60:   // Actual O service source, byte-identical to the preserved head, in the old root.
+61:   for (const file of ['scout-reconstruct.service.ts', 'scout-roster.service.ts', 'scout-entities.service.ts']) {
+62:     expect(readFileSync(resolve(oldRoot!, 'src/scout', file), 'utf8')).toBe(gitShow(`${OLD_HEAD}:src/scout/${file}`));
+63:   }
+64:   expect(sql(`SELECT rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='service_role'`)).toBe('true:true');
+65:   expect(sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
+66:     FROM pg_roles WHERE rolname IN ('anon','authenticated')`)).toBe('false:false,false:false');
+67:   // Table privileges are granted (owner statement) so that the RLS stage proves POLICY denial,
+68:   // not missing GRANTs; the fixture's Supabase-like default privileges are recorded, not relied on.
+69:   sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
+70:     GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
+71:       public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
+72:   console.warn('PG17_API_ROLE_TABLE_PRIVILEGES', sql(`SELECT string_agg(table_name||'='||privileges,' ' ORDER BY table_name) FROM (
+73:     SELECT table_name, string_agg(privilege_type,',' ORDER BY privilege_type) privileges
+74:     FROM information_schema.role_table_grants WHERE grantee='anon' AND table_schema='public'
+75:     AND table_name IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity') GROUP BY 1) g`));
+76:   sql(`ALTER TABLE "Person" ADD CONSTRAINT g2p_target_refusal CHECK (display_name IS DISTINCT FROM 'FAIL');
+77:     ALTER TABLE "ScoutReconstructedEntity" ADD CONSTRAINT g2p_entity_refusal CHECK (label IS DISTINCT FROM 'FAIL');`);
+78:   resetData();
+79: });
+80: afterAll(() => {
+81:   sql(`ALTER TABLE "Person" DROP CONSTRAINT IF EXISTS g2p_target_refusal;
+82:     ALTER TABLE "ScoutReconstructedEntity" DROP CONSTRAINT IF EXISTS g2p_entity_refusal;`);
+83:   resetData();
+84:   sql('DELETE FROM "ScoutImport"');
+85: });
+829:   it('characterizes down against an actual T claim transaction paused inside its interactive transaction', async () => {
+830:     // Prisma interactive transactions have a 5 s default ceiling and E uses lock_timeout=5 s; which
+831:     // budget expires first is a race. The branch is recorded, and EACH branch's terminal contract is
+832:     // asserted after the worker has exited: worker result/failure, completion event, ledger rows,
+833:     // target rows, catalog and history. Neither ordering is asserted to always win.
+834:     stage('claimrace');
+835:     const before = { ledger: records(), targets: targets(), catalog: catalog() };
+836:     expect(before.ledger).toEqual([]);
+837:     expect(before.targets).toEqual({ persons: [], entities: [] });
+838:     const paused = worker({ pause: 'claimed' });
+839:     await paused.ready;
+840:     let branch = 'down-refused';
+841:     let message = '';
+842:     let outcome!: Result; // assigned inside try; the finally only stops the child
+843:     try {
+844:       try { sql(down); branch = 'down-applied'; } catch (e) { message = String(e); }
+845:       console.warn('PG17_CLAIM_RACE', JSON.stringify({ branch, message: message.split('\n').find((l) => l.includes('ERROR')) ?? '' }));
+846:       if (branch === 'down-refused') {
+847:         // Either the lock budget fired or the claim was visible and refused; the column survives.
+848:         expect(message).toMatch(/lock timeout|refuses removal of assigned provenance/);
+849:         expect(hasColumn()).toBe('1');
+850:         expect(catalog()).toBe(before.catalog);
+851:       } else {
+852:         // down can only have succeeded on a drained ledger: the paused claim must have rolled back.
+853:         expect(hasColumn()).toBe('0');
+854:         expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_id='claimrace'`)).toBe('0');
+855:       }
+856:       paused.release();
+857:       outcome = await paused.done;
+858:     } finally { paused.stop(); }
+859:     console.warn('PG17_CLAIM_RACE_WORKER', JSON.stringify({ branch, result: outcome.result, failure: outcome.failure, events: outcome.events.length }));
+860:     const ledger = records();
+861:     const after = targets();
+862:     if (branch === 'down-applied') {
+863:       // OBSERVED on PG17 (runs 20260920T183610Z/184713Z/185210Z): Prisma's 5 s ceiling expires before
+864:       // E's 5 s lock_timeout, the paused claim (Person + ledger row + claim) is rolled back, the drained
+865:       // down succeeds, and the released T worker fails closed: its success transaction is already
+866:       // closed, and the follow-up durable `failed` write hits the now-absent column (P2022) and
+867:       // propagates instead of minting a row. This CHARACTERIZES a mixed E-down/T-live state that a
+868:       // real rollout must never enter (T is drained by process control before any down); a 500 to the
+869:       // caller is not acceptable production behaviour and is not endorsed by this assertion.
+870:       expect(outcome.result).toBeUndefined();
+871:       expect(outcome.failure).toEqual({ status: 500, message: 'Internal server error', code: 'P2022' });
+872:       expect(outcome.events).toEqual([]);
+873:       // Terminal state: no partial or durable ledger row, no orphan target, column absent, history untouched.
+874:       expect(ledger).toEqual([]);
+875:       expect(after).toEqual({ persons: [], entities: [] });
+876:       expect(hasColumn()).toBe('0');
+877:       expect(appliedMigrations()).toBe('165');
+878:       // Forward repair (catalog is the only truth signal) restores the identical E catalog.
+879:       sqlFile(upFile);
+880:       expect(catalog()).toBe(before.catalog);
+881:     } else {
+882:       // down was refused, so E stayed. Two legal terminal outcomes for the released claim, each with
+883:       // its own coupled ledger/target invariant:
+884:       //  (a) the interactive transaction was still open: claim + target + `reconstructed` commit together;
+885:       //  (b) the client ceiling had expired meanwhile: the success transaction rolled back (no target)
+886:       //      and the worker recorded ONE durable `failed` row with reason error:Prisma.P2028.
+887:       expect(outcome.failure).toBeUndefined();
+888:       expect(hasColumn()).toBe('1');
+889:       expect(catalog()).toBe(before.catalog);
+890:       expect(ledger).toHaveLength(1);
+891:       expect(ledger[0]).toMatchObject({ source_id: 'claimrace', source_platform: 'truecoach' });
+892:       if (ledger[0].status === 'reconstructed') {
+893:         expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+894:         expect(outcome.events).toHaveLength(1);
+895:         expect(after.entities).toEqual([]);
+896:         expect(after.persons.map((p: any) => p.id)).toEqual([ledger[0].target_id]);
+897:       } else {
+898:         expect(ledger[0]).toMatchObject({ status: 'failed', target_id: null, reason: 'error:Prisma.P2028' });
+899:         expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 0, skipped: 0, failed: 1 });
+900:         expect(outcome.events).toHaveLength(1);
+901:         expect(after).toEqual({ persons: [], entities: [] });
+902:       }
+903:     }
+904:     // Both branches converge: E applied, history unchanged, and a T replay reclaims the staged row into
+905:     // exactly one reconstructed ledger row bound to exactly one Person, minting nothing else.
+906:     expect(hasColumn()).toBe('1');
+907:     expect(appliedMigrations()).toBe('165');
+908:     expect((await run()).result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+909:     const converged = records();
+910:     expect(converged.map((r: any) => [r.source_id, r.status, r.source_platform])).toEqual([['claimrace', 'reconstructed', 'truecoach']]);
+911:     expect(targets().persons.map((p: any) => p.id)).toEqual([converged[0].target_id]);
+912:     expect(targets().entities).toEqual([]);
+913:   });
+914: 
+915:   it('refuses down with a lock timeout while an actual T claim transaction outlives E\'s lock budget, and the released claim then commits intact', async () => {
+916:     // Deterministic form of the refused branch above. Only the FIXTURE widens this one worker's
+917:     // Prisma interactive-transaction ceiling (`txTimeout`, test/utils/g2-tq0-worker.cjs), so the
+918:     // paused claim keeps its table/row locks past E's 5 s lock_timeout. Production T runs with
+919:     // Prisma's default ceiling: this proves E/down's fail-closed lock budget and the integrity of a
+920:     // claim that survives a refused down; it is NOT a production guarantee that in-flight T
+921:     // transactions protect the ledger against a down (they do not; drain is a process boundary).
+922:     stage('claimrace2');
+923:     const before = catalog();
+924:     expect(records()).toEqual([]);
+925:     const paused = worker({ pause: 'claimed', txTimeout: 30000 });
+926:     await paused.ready;
+927:     let outcome!: Result; // assigned inside try; the finally only stops the child
+928:     try {
+929:       const t0 = Date.now();
+930:       refused(down, 'lock timeout');
+931:       const elapsed = Date.now() - t0;
+932:       expect(elapsed).toBeGreaterThanOrEqual(5000);
+933:       expect(elapsed).toBeLessThan(30000);
+934:       // Refused before any prerequisite check: column, catalog and history untouched; the paused
+935:       // claim is still uncommitted and invisible to other sessions.
+936:       expect(hasColumn()).toBe('1');
+937:       expect(catalog()).toBe(before);
+938:       expect(appliedMigrations()).toBe('165');
+939:       expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_id='claimrace2'`)).toBe('0');
+940:       expect(targets()).toEqual({ persons: [], entities: [] });
+941:       paused.release();
+942:       outcome = await paused.done;
+943:     } finally { paused.stop(); }
+944:     console.warn('PG17_CLAIM_REFUSED_WORKER', JSON.stringify({ result: outcome.result, failure: outcome.failure, events: outcome.events.length }));
+945:     // Terminal contract: the claim commits whole (claim + target + reconstructed), one completion event,
+946:     // and nothing about E changed.
+947:     expect(outcome.failure).toBeUndefined();
+948:     expect(outcome.result).toEqual({ intent_id: 'intent', staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+949:     expect(outcome.events).toEqual([['coach', 'scout.reconstruct.completed',
+950:       { intent_id: 'intent', entity_type: 'clients', staged: 1, reconstructed: 1, skipped: 0, failed: 0 }]]);
+951:     const rows = records();
+952:     expect(rows.map((r: any) => [r.source_id, r.status, r.source_platform, r.reason])).toEqual([['claimrace2', 'reconstructed', 'truecoach', null]]);
+953:     expect(targets().persons.map((p: any) => p.id)).toEqual([rows[0].target_id]);
+954:     expect(targets().entities).toEqual([]);
+955:     expect(hasColumn()).toBe('1');
+956:     expect(catalog()).toBe(before);
+957:     expect(appliedMigrations()).toBe('165');
+958:     // With the claim now committed, down is refused for the data reason, not the lock budget.
+959:     refused(down, 'G2-E refuses removal of assigned provenance');
+960:     expect(hasColumn()).toBe('1');
+961:   });
+962: });
+
+FILE worktrees/s5-r3/test/utils/g2-pg17-harness.ts
+SHA256 6f464eacd76947111cff2c6ed853f12f004916876c61249904de8ce761569f76
+118: export function resetData() {
+119:   sql(`DELETE FROM "ScoutReconstructionLedger"; DELETE FROM "ScoutIngestEntity";
+120:     DELETE FROM "Person"; DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutImport";`);
+121:   settle();
+122: }
+123: 
+124: export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
+
+FILE worktrees/s5-r3/node_modules/jest-circus/build/jestAdapterInit.js
+SHA256 f64ef94daa71293d875d497f692c48de6f8cc72a70d1935449da6610aa9438d1
+159:     case 'hook_failure':
+160:       {
+161:         const {
+162:           test,
+163:           describeBlock,
+164:           error,
+165:           hook
+166:         } = event;
+167:         const {
+168:           asyncError,
+169:           type
+170:         } = hook;
+171:         if (type === 'beforeAll') {
+172:           (0, _jestUtil.invariant)(describeBlock, 'always present for `*All` hooks');
+173:           (0, _utils.addErrorToEachTestUnderDescribe)(describeBlock, error, asyncError);
+174:         } else if (type === 'afterAll') {
+175:           // Attaching `afterAll` errors to each test makes execution flow
+176:           // too complicated, so we'll consider them to be global.
+177:           state.unhandledErrors.push([error, asyncError]);
+178:         } else {
+179:           (0, _jestUtil.invariant)(test, 'always present for `*Each` hooks');
+180:           test.errors.push([error, asyncError]);
+181:         }
+182:         break;
+183:       }
+792: const _runTestsForDescribeBlock = async (describeBlock, rng) => {
+793:   await (0, _state.dispatch)({
+794:     describeBlock,
+795:     name: 'run_describe_start'
+796:   });
+797:   const {
+798:     beforeAll,
+799:     afterAll
+800:   } = (0, _utils.getAllHooksForDescribe)(describeBlock);
+801:   const isSkipped = describeBlock.mode === 'skip';
+802:   if (!isSkipped) {
+803:     for (const hook of beforeAll) {
+804:       await _callCircusHook({
+805:         describeBlock,
+806:         hook
+807:       });
+808:     }
+809:   }
+889:   // Re-run failed tests n-times if configured
+890:   for (const test of deferredRetryTests) {
+891:     await rerunTest(test);
+892:   }
+893:   if (!isSkipped) {
+894:     for (const hook of afterAll) {
+895:       await _callCircusHook({
+896:         describeBlock,
+897:         hook
+898:       });
+899:     }
+900:   }
+901:   await (0, _state.dispatch)({
+902:     describeBlock,
+903:     name: 'run_describe_finish'
+904:   });
+905: };
+968: const _callCircusHook = async ({
+969:   hook,
+970:   test,
+971:   describeBlock,
+972:   testContext = {}
+973: }) => {
+974:   await (0, _state.dispatch)({
+975:     hook,
+976:     name: 'hook_start'
+977:   });
+978:   const timeout = hook.timeout || (0, _state.getState)().testTimeout;
+979:   try {
+980:     await (0, _utils.callAsyncCircusFn)(hook, testContext, {
+981:       isHook: true,
+982:       timeout
+983:     });
+984:     await (0, _state.dispatch)({
+985:       describeBlock,
+986:       hook,
+987:       name: 'hook_success',
+988:       test
+989:     });
+990:   } catch (error) {
+991:     await (0, _state.dispatch)({
+992:       describeBlock,
+993:       error,
+994:       hook,
+995:       name: 'hook_failure',
+996:       test
+997:     });
+998:   }
+999: };
+
+FILE execution/s5-r3/checkpoint-5-B3/run-proof.sh
+SHA256 7c290311be7263a99ee88ed2b7585ad2baa2540e1954bb2b6feb7f1a5f3b787c
+172: SERVER_STARTED_HERE=0
+173: # Any process other than this runner holding the lock file open (e.g. a daemon that inherited fd 9)
+174: # is a defect: report it and fail rather than let the lock outlive the run.
+175: lock_exclusive_check() {
+176:   local p pid others=""
+177:   for p in /proc/[0-9]*; do pid=${p#/proc/}; [ "$pid" = "$$" ] && continue
+178:     if ls -l "$p/fd" 2>/dev/null | grep -q "$LOCK"; then others="$others $pid:$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null | cut -c1-60)"; fi
+179:   done
+180:   if [ -n "$others" ]; then say "LOCK_FD_LEAK other holders:$others"; return 1; fi
+181:   say "LOCK_EXCLUSIVE_OK pid=$$"; return 0
+182: }
+183: finish() { # $1 rc  — records END, releases the lock by exiting (fd 9 closes with this process)
+184:   local rc="$1"
+185:   local stop_rc=na daemon=none
+186:   if [ "$SERVER_STARTED_HERE" = 1 ]; then
+187:     # Cleanup-stop status is recorded separately and never masks the first failure; a surviving
+188:     # postmaster (partial start, failed stop) turns any rc 0 into a failure.
+189:     child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" stop; stop_rc=$?
+190:     if [ -f "$PIN_DATA_DIRECTORY/postmaster.pid" ] && kill -0 "$(head -1 "$PIN_DATA_DIRECTORY/postmaster.pid")" 2>/dev/null; then daemon="alive pid=$(head -1 "$PIN_DATA_DIRECTORY/postmaster.pid")"; fi
+191:     if [ "$stop_rc" != 0 ] || [ "$daemon" != none ]; then say "CLEANUP_STOP_FAILED stop_rc=$stop_rc daemon=$daemon"; [ "$rc" = 0 ] && rc=3; fi
+192:   fi
+193:   { echo "# npm-root facts AFTER stage=$STAGE"; npm_root_facts; } >> "$L/env-$STAGE-$TS.log" 2>/dev/null
+194:   echo "$(date -u +%FT%TZ) RELEASE=s5-r3 stage=$STAGE rc=$rc stop_rc=$stop_rc daemon=$daemon" >> "$X/test-validation.lock.log"
+195:   echo "PROOF_EXIT=$rc STAGE=$STAGE STOP_RC=$stop_rc DAEMON=$daemon TS=$TS START=$START END=$(date -u +%FT%TZ)" | tee "$L/exit-$STAGE-$TS.log" | tee -a "$RUNLOG" 9>&-
+196:   exit "$rc"
+197: }
+198: # Run a child from an explicit directory with the lock fd closed; stdout/stderr appended to a log.
+199: child() { # child <dir> <log> <cmd...>   (never pass secrets as arguments; they would be logged)
+200:   local dir="$1" log="$2"; shift 2
+201:   echo "CMD (cwd=$dir) $(date -u +%FT%TZ): $*" | tee -a "$log" >> "$RUNLOG"
+202:   ( cd "$dir" && exec "$@" 9>&- ) 2>&1 | tee -a "$log"
+203:   return "${PIPESTATUS[0]}"
+209: preflight() {
+210:   local out
+211:   out="$(psql_maint <<'SQL' 2>>"$RUNLOG"
+212: SELECT current_setting('server_version_num');
+213: SELECT current_setting('cluster_name');
+214: SELECT current_setting('data_directory');
+215: SELECT current_setting('listen_addresses');
+216: SELECT host(inet_server_addr());
+217: SELECT inet_server_port();
+218: SELECT current_user;
+219: SELECT rolsuper FROM pg_roles WHERE rolname=current_user;
+220: SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer');
+221: SELECT string_agg(datname,' ' ORDER BY datname) FROM pg_database;
+222: SELECT count(*) FROM pg_database WHERE datname='g2_s5_etq0_disposable';
+223: SELECT COALESCE((SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname='g2_s5_etq0_disposable'),'<absent>');
+224: SELECT count(*) FROM pg_stat_activity WHERE datname='g2_s5_etq0_disposable';
+225: SQL
+226: )" || { say "preflight: connection or query failed (see $RUNLOG)"; return 3; }
+227:   local -a f; mapfile -t f <<<"$out"
+228:   [ "${#f[@]}" = 13 ] || { say "preflight: expected 13 identity lines, got ${#f[@]}"; return 3; }
+229:   printf 'PREFLIGHT version=%s cluster=%s datadir=%s listen=%s addr=%s port=%s user=%s super=%s hosted_roles=%s dbs=[%s] target_exists=%s target_marker=%s target_sessions=%s\n' "${f[@]}" | tee -a "$RUNLOG" | tee "$L/preflight-$STAGE-$TS.log"
+230:   [ "${f[0]}" = "$PIN_SERVER_VERSION" ] || { say "preflight: server_version_num ${f[0]} != $PIN_SERVER_VERSION"; return 3; }
+231:   [ "${f[1]}" = "$PIN_CLUSTER_MARKER" ] || { say "preflight: cluster_name '${f[1]}' is not the S5 marker '$PIN_CLUSTER_MARKER' (blank/foreign cluster refused)"; return 3; }
+232:   [ "${f[2]}" = "$PIN_DATA_DIRECTORY" ] || { say "preflight: data_directory ${f[2]} != $PIN_DATA_DIRECTORY"; return 3; }
+233:   [ "${f[3]}" = "$PIN_HOST" ] || { say "preflight: listen_addresses '${f[3]}' is not loopback-only"; return 3; }
+234:   [ "${f[4]}" = "$PIN_HOST" ] || { say "preflight: server address ${f[4]} is not loopback"; return 3; }
+235:   [ "${f[5]}" = "$PIN_PORT" ] || { say "preflight: server port ${f[5]} != $PIN_PORT"; return 3; }
+236:   [ "${f[6]}" = "$PIN_ADMIN" ] || { say "preflight: connected as ${f[6]}, not $PIN_ADMIN"; return 3; }
+237:   [ "${f[7]}" = "t" ] || { say "preflight: $PIN_ADMIN is not superuser on this cluster"; return 3; }
+238:   [ "${f[8]}" = "0" ] || { say "preflight: hosted-platform roles present (${f[8]}); not a synthetic fixture"; return 3; }
+239:   local d; for d in ${f[9]}; do case "$PIN_ALLOWED_DBS" in *" $d "*) ;; *) say "preflight: unexpected database '$d' on the cluster; foreign server refused"; return 3;; esac; done
+240:   TARGET_EXISTS="${f[10]}"; TARGET_MARKER="${f[11]}"; TARGET_SESSIONS="${f[12]}"
+241:   if [ "$TARGET_EXISTS" = 1 ]; then
+242:     [ "$TARGET_MARKER" = "$PIN_DB_MARKER" ] || { say "preflight: $PIN_DB exists WITHOUT the S5 disposable marker comment; refusing (operator must inspect/remove it explicitly)"; return 3; }
+243:   fi
+244:   say "PREFLIGHT_OK target_exists=$TARGET_EXISTS"
+245:   return 0
+259: # ---- Canonical lock: nonblocking; held from here until finish() for every remaining stage.
+260: exec 9>"$LOCK"
+261: flock -n 9 || { say "test-validation.lock busy; not queueing"; echo "PROOF_EXIT=75 STAGE=$STAGE TS=$TS START=$START END=$(date -u +%FT%TZ) LOCK_BUSY" | tee "$L/exit-$STAGE-$TS.log"; exit 75; }
+262: echo "$(date -u +%FT%TZ) HOLDER=s5-r3 PURPOSE=g2-pg17-proof-$STAGE pid=$$" >> "$X/test-validation.lock.log"
+263: say "LOCK_HELD $LOCK stage=$STAGE pid=$$"
+264: # Every helper runs with fd 9 closed: only THIS process may hold the lock. (Observed 2026-09-21:
+265: # the sandbox git is a wrapper that lingers ~1 s after exit; with fd 9 inherited it kept the
+266: # lock busy for the next runner, rc 75 — fixed by closing 9 for stamp/preflight/finish children.)
+267: stamp 9>&-
+268: 
+269: case "$STAGE" in
+270:   init)    child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" init; finish $? ;;
+271:   start)   child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" start; rc=$?; [ "$rc" = 0 ] && { lock_exclusive_check 9>&- || rc=3; }; finish "$rc" ;;
+272:   stop)    child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" stop; finish $? ;;
+273:   destroy) child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" destroy; finish $? ;;
+274: esac
+275: 
+276: if [ "$STAGE" = genctl ]; then
+277:   # Negative control (offline, no DB, no network): with auto-install off, generating into a directory that
+278:   # resolves no @prisma/client must FAIL, must not create package.json/node_modules anywhere, and the
+279:   # positive path must resolve to the pinned tree. Uses the same env the bootstrap uses.
+280:   T="$(mktemp -d /tmp/s5-genctl-XXXXXX)"; mkdir -p "$T/no-root/out"
+281:   sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$T/no-root/out\"|" "$W/prisma/schema.prisma" > "$T/schema.prisma"
+282:   before="$(ls -t /home/user/.npm/_logs 2>/dev/null | head -1)"
+283:   (cd "$T/no-root" && PRISMA_GENERATE_SKIP_AUTOINSTALL=1 timeout 120 "$W/node_modules/.bin/prisma" generate --schema "$T/schema.prisma") > "$L/genctl-negative-$TS.log" 2>&1 9>&-; nrc=$?
+284:   after="$(ls -t /home/user/.npm/_logs 2>/dev/null | head -1)"
+285:   say "GENCTL negative: prisma generate outside any package root rc=$nrc (expected non-zero) npm_log_before=$before npm_log_after=$after"
+286:   [ "$nrc" != 0 ] || { say "GENCTL_FAIL generate succeeded without a resolvable @prisma/client"; finish 3; }
+287:   [ ! -e "$T/package.json" ] && [ ! -e "$T/no-root/package.json" ] && [ ! -e /tmp/package.json ] && [ ! -d "$T/node_modules" ] && [ ! -d "$T/no-root/node_modules" ] || { say "GENCTL_FAIL auto-install artefacts created under $T or /tmp"; finish 3; }
+288:   [ "$before" = "$after" ] || { say "GENCTL_FAIL a new npm invocation was logged during the negative control"; finish 3; }
+289:   pos="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_PG17_OLD_CLIENT" 2>/dev/null)"
+290:   exp="$(cd "$W" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
+291:   say "GENCTL positive: @prisma/client from $G2_PG17_OLD_CLIENT -> $pos (pinned $exp)"
+292:   [ "$pos" = "$exp" ] || { say "GENCTL_FAIL O client output does not resolve to the pinned @prisma/client (old root present? $([ -L "$G2_PG17_OLD_ROOT/node_modules" ] && echo symlink || echo no-symlink))"; finish 3; }
+293:   say "GENCTL_OK"; finish 0
+310: if [ "$STAGE" = full ] || [ "$STAGE" = resume ]; then
+311:   SERVER_STARTED_HERE=1   # set BEFORE start so a partial/failed start is still cleaned up in finish
+312:   child "$S" "$L/fixture-$TS.log" env S5_RUNNER_PID=$$ bash "$FIXTURE" start; rc=$?
+313:   [ "$rc" = 0 ] || { say "start failed rc=$rc"; finish "$rc"; }
+314:   lock_exclusive_check 9>&- || finish 3
+315: fi
+316: 
+317: # ---- Connected identity proof precedes every mutation (reset/bootstrap/live/all).
+318: preflight 9>&- || finish 3
+319: [ "$STAGE" = preflight ] && finish 0
+320: if [ "$STAGE" = resume ]; then
+321:   # Bootstrap already proven for this cluster (G2_PG17_BOOTSTRAP_OK); the marked target must exist and the spec's
+322:   # beforeAll re-asserts 164 applied migrations + both markers before any test mutates it.
+323:   [ "$TARGET_EXISTS" = 1 ] || { say "resume: marked target $PIN_DB absent; use full on a fresh directory instead"; finish 3; }
+324:   # Re-exercise the closed-provenance client generation (bootstrap steps 4, 6, 7; no migration, no connection)
+325:   # so the O client consumed by live comes from the pinned tree with auto-install off.
+326:   child "$W" "$L/generate-only-$TS.log" bash test/utils/g2-pg17-bootstrap.sh generate-only; rc=$?
+327:   [ "$rc" = 0 ] || { say "generate-only failed rc=$rc; live proof NOT started"; finish "$rc"; }
+328: fi
+329: 
+330: if [ "$STAGE" = reset ]; then
+331:   if [ "$TARGET_EXISTS" = 0 ]; then say "reset: $PIN_DB absent; nothing to drop"; finish 0; fi
+332:   [ "$TARGET_SESSIONS" = 0 ] || { say "reset: $TARGET_SESSIONS session(s) still attached to $PIN_DB; refusing to drop"; finish 3; }
+333:   # Marker verified in preflight under the same lock; the DROP names the pinned database literally.
+334:   echo "CMD: DROP DATABASE g2_s5_etq0_disposable (marker-verified, lane s5, as $PIN_ADMIN)" | tee -a "$RUNLOG" | tee "$L/reset-$TS.log"
+335:   psql_maint -c 'DROP DATABASE g2_s5_etq0_disposable' 2>&1 | tee -a "$L/reset-$TS.log"; rc=${PIPESTATUS[0]}
+336:   [ "$rc" = 0 ] || { say "reset: DROP DATABASE failed rc=$rc"; finish "$rc"; }
+337:   [ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s5_etq0_disposable'")" = 0 ] || { say "reset: database still present after DROP"; finish 3; }
+338:   say "RESET_OK"; finish 0
+339: fi
+340: if [ "$STAGE" = all ] || [ "$STAGE" = full ] || [ "$STAGE" = bootstrap ]; then
+341:   [ "$TARGET_EXISTS" = 0 ] || say "bootstrap: $PIN_DB already exists with the marker; bootstrap will refuse if it carries tables"
+342:   child "$W" "$L/bootstrap-$TS.log" bash test/utils/g2-pg17-bootstrap.sh; rc=$?
+343:   [ "$rc" = 0 ] || { say "bootstrap failed rc=$rc; live proof NOT started"; finish "$rc"; }
+344: fi
+345: if [ "$STAGE" = all ] || [ "$STAGE" = full ] || [ "$STAGE" = resume ] || [ "$STAGE" = live ]; then
+346:   child "$W" "$L/live-etq0-$TS.log" npx jest --config jest.rls.config.js test/rls-g2-pg17-etq0.spec.ts --runInBand --testTimeout=180000; rc=$?
+347:   [ "$rc" = 0 ] || finish "$rc"
+348: fi
+349: finish 0
+
+FILE execution/s5-r3/checkpoint-5-B3/launch-full.sh
+SHA256 a1a5de19c7b4879e075303257189fb53f42483ed5f560e89c076c2a9bac82fbf
+1: #!/usr/bin/env bash
+2: # Durable detached launcher for the granted `full` run: survives the shell-tool lifetime (setsid),
+3: # outer wall-clock bound (timeout 1800 s, SIGKILL +60 s), real PID file and a sentinel with the
+4: # runner's exit AND the cleanup-stop status. If the outer bound kills the runner, a bounded `stop`
+5: # stage is run afterwards so no postmaster outlives the slot; its rc is recorded in the sentinel.
+6: # Usage: G2_PG17_PASSWORD=<fixture pw> [STAGE=full|resume] bash execution/s5-r3/launch-full.sh   (returns immediately)
+7: set -uo pipefail
+8: S=/home/user/workspace/execution/s5-r3; L=$S/logs; TS=$(date -u +%Y%m%dT%H%M%SZ)
+9: PIDFILE=$L/full-$TS.pid; SENTINEL=$L/full-$TS.sentinel; OUT=$L/full-$TS.launcher.log
+10: [ -n "${G2_PG17_PASSWORD:-}" ] || { echo "G2_PG17_PASSWORD required" >&2; exit 2; }
+11: setsid -f bash -c '
+12:   echo "$$" > "$1"; echo "LAUNCH $(date -u +%FT%TZ) pid=$$ stage=${STAGE:-full} bound=1800s" >> "$3"
+13:   timeout --kill-after=60 1800 bash "$4/run-proof.sh" "${STAGE:-full}" >> "$3" 2>&1; rc=$?
+14:   stop_rc=na
+15:   if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then
+16:     echo "OUTER_BOUND_HIT rc=$rc $(date -u +%FT%TZ); running bounded cleanup stop" >> "$3"
+17:     timeout --kill-after=15 90 bash "$4/run-proof.sh" stop >> "$3" 2>&1; stop_rc=$?
+18:   fi
+19:   echo "FULL_EXIT=$rc CLEANUP_STOP_RC=$stop_rc END=$(date -u +%FT%TZ) pid=$$" | tee -a "$3" > "$2"
+20: ' _ "$PIDFILE" "$SENTINEL" "$OUT" "$S" < /dev/null
+21: sleep 1; echo "launched: pid=$(cat "$PIDFILE" 2>/dev/null) sentinel=$SENTINEL log=$OUT"
+
+FILE execution/s5-r3/checkpoint-5-B3/s5-fixture.sh
+SHA256 a3292ccaa451b3e5efe854e048dc71bea24f0f8cd4cc4bb93662df2e4a99bae1
+47:   start)
+48:     grep -q "^cluster_name = '$MARKER'" "$DATA/postgresql.conf" || { echo "REFUSED: $DATA lacks the S5 marker; not starting a foreign cluster" >&2; exit 3; }
+49:     if pgbin pg_ctl -D "$DATA" status >/dev/null 2>&1; then echo "already running"; else
+50:       pgbin pg_ctl -D "$DATA" -l "$LOG" -w -t 60 start </dev/null >>"$LOG.pg_ctl" 2>&1; fi
+51:     echo "S5_FIXTURE_START_OK pid=$(head -1 "$DATA/postmaster.pid")" ;;
+52:   stop)    pgbin pg_ctl -D "$DATA" -m fast -w -t 60 stop </dev/null >>"$LOG.pg_ctl" 2>&1 && echo "S5_FIXTURE_STOP_OK" ;;
+53:   status)  pgbin pg_ctl -D "$DATA" status || true ;;
+54:   destroy)
+55:     grep -q "^cluster_name = '$MARKER'" "$DATA/postgresql.conf" 2>/dev/null || { echo "REFUSED: $DATA is not the marked S5 cluster; not destroying" >&2; exit 3; }
+56:     pgbin pg_ctl -D "$DATA" -m immediate stop </dev/null >>"$LOG.pg_ctl" 2>&1 || true; rm -rf "$DATA"; echo "S5_FIXTURE_DESTROY_OK $DATA" ;;
+57:   *) echo "unknown cmd $cmd" >&2; exit 2 ;;
+58: esac
+
+FILE worktrees/s5-r3/test/utils/g2-pg17-bootstrap.sh
+SHA256 0ff77d8b13066c09dae950c39b5171be53e3bf02ebc8c09c6b5609830233aa51
+160: # 6. Independent O client generated from the O schema into its own directory.
+161: mkdir -p "$G2_PG17_OLD_CLIENT"
+162: PINNED_CLIENT_PKG="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
+163: RESOLVED_CLIENT_PKG="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_PG17_OLD_CLIENT")"
+164: [[ "$RESOLVED_CLIENT_PKG" == "$PINNED_CLIENT_PKG" ]] \
+165:   || { echo "@prisma/client does not resolve from $G2_PG17_OLD_CLIENT to the pinned tree ($RESOLVED_CLIENT_PKG != $PINNED_CLIENT_PKG); refusing to generate" >&2; exit 6; }
+166: echo "O_CLIENT_RESOLUTION pinned=$PINNED_CLIENT_PKG version=$(node -p 'require(process.argv[1]).version' "$PINNED_CLIENT_PKG") skip_autoinstall=$PRISMA_GENERATE_SKIP_AUTOINSTALL"
+167: OLD_SCHEMA_COPY="$G2_PG17_OLD_CLIENT/.schema-for-generate.prisma"
+168: sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$G2_PG17_OLD_CLIENT\"|" \
+169:   "$G2_PG17_OLD_ROOT/prisma/schema.prisma" > "$OLD_SCHEMA_COPY"
+170: (cd "$G2_PG17_OLD_ROOT" && "$ROOT/node_modules/.bin/prisma" generate --schema "$OLD_SCHEMA_COPY" >/dev/null)
+171: grep -q 'model ScoutReconstructionLedger' "$G2_PG17_OLD_CLIENT/schema.prisma"
+172: ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
+173: [[ "$(sha256sum "$G2_PG17_OLD_CLIENT/$ENGINE" | cut -c1-64)" == "$(sha256sum "$ROOT/node_modules/@prisma/engines/$ENGINE" | cut -c1-64)" ]] \
+174:   || { echo "generated O client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
+175: echo "O_CLIENT_GENERATED dir=$G2_PG17_OLD_CLIENT engine_sha256=$(sha256sum "$G2_PG17_OLD_CLIENT/$ENGINE" | cut -c1-64) runtime_sha256=$(sha256sum "$G2_PG17_OLD_CLIENT/runtime/library.js" | cut -c1-64)"
+176: ! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_PG17_OLD_CLIENT/schema.prisma" | grep -q source_platform \
+177:   || { echo "generated O client unexpectedly knows source_platform" >&2; exit 6; }
+178: 
+179: # 7. Candidate (E/T) client in the candidate root.
+180: (cd "$ROOT" && ./node_modules/.bin/prisma generate >/dev/null)
+181: echo "CANDIDATE_CLIENT_GENERATED dir=$ROOT/node_modules/.prisma/client engine_sha256=$(sha256sum "$ROOT/node_modules/.prisma/client/$ENGINE" | cut -c1-64) runtime_sha256=$(sha256sum "$ROOT/node_modules/.prisma/client/runtime/library.js" | cut -c1-64)"
+182: awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -q 'source_platform' \
+183:   || { echo "candidate client lacks source_platform" >&2; exit 7; }
+184: 
+185: if [[ "$MODE" == generate-only ]]; then echo "G2_PG17_GENERATE_OK"; exit 0; fi   # no connection in this mode
+
+FILE execution/s5-r3/logs/generate-only-20260922T002932Z.log
+SHA256 753eb7bfc7c4a030d7d87878f6d5929c5d8073ba1ed20e2334f4cec5b8e87763
+1: CMD (cwd=/home/user/workspace/worktrees/s5-r3) 2026-09-22T00:29:43Z: bash test/utils/g2-pg17-bootstrap.sh generate-only
+2: O_CLIENT_RESOLUTION pinned=/home/user/workspace/worktrees/s5-r3/node_modules/@prisma/client/package.json version=6.19.3 skip_autoinstall=1
+3: O_CLIENT_GENERATED dir=/home/user/workspace/execution/s5-r3/old-root-925780e0/.g2-old-client engine_sha256=a2924eab1c78a0a7bb67edac5738939fa10589ef073af5542f53812a22e4a7d8 runtime_sha256=5a72b6f69474641f48a0f5ffee45802dc939c6333467371ebbd9102353eb7aae
+4: sha256sum: /home/user/workspace/worktrees/s5-r3/node_modules/.prisma/client/runtime/library.js: No such file or directory
+5: CANDIDATE_CLIENT_GENERATED dir=/home/user/workspace/worktrees/s5-r3/node_modules/.prisma/client engine_sha256=a2924eab1c78a0a7bb67edac5738939fa10589ef073af5542f53812a22e4a7d8 runtime_sha256=
+6: G2_PG17_GENERATE_OK
+
+FILE execution/s5-r3/logs/live-etq0-20260922T001045Z.log
+SHA256 d7197d404fec21e9e7c4eebb27f1f3660a4d13ab75d4b3a466314d7f1c0f3321
+1: CMD (cwd=/home/user/workspace/worktrees/s5-r3) 2026-09-22T00:11:43Z: npx jest --config jest.rls.config.js test/rls-g2-pg17-etq0.spec.ts --runInBand --testTimeout=180000
+2: FAIL rls-live test/rls-g2-pg17-etq0.spec.ts
+3:   ● Test suite failed to run
+4: 
+5:     [96mtest/rls-g2-pg17-etq0.spec.ts[0m:[93m841[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'Result'.
+6: 
+7:     [7m841[0m     let outcome!: Result; // assigned inside try; the finally only stops the child
+8:     [7m   [0m [91m                  ~~~~~~[0m
+9:     [96mtest/rls-g2-pg17-etq0.spec.ts[0m:[93m926[0m:[93m19[0m - [91merror[0m[90m TS2304: [0mCannot find name 'Result'.
+10: 
+11:     [7m926[0m     let outcome!: Result; // assigned inside try; the finally only stops the child
+12:     [7m   [0m [91m                  ~~~~~~[0m
+13: 
+14: Test Suites: 1 failed, 1 total
+15: Tests:       0 total
+16: Snapshots:   0 total
+17: Time:        17.021 s
+18: Ran all test suites matching test/rls-g2-pg17-etq0.spec.ts.
+
+FILE execution/s5-r3/logs/live-etq0-20260922T002932Z.log
+SHA256 3daacdac84bd0825cbef08ba52329ec2f1f84df070dd65f8264cf62d4fb0b56c
+2505:   console.warn
+2506:     PG17_CLAIM_RACE {"branch":"down-applied","message":""}
+2518:   console.warn
+2519:     PG17_PROCESS {"name":"g2p17_168","old":false,"options":{"pause":"claimed"},"failure":{"status":500,"message":"Internal server error","code":"P2022"},"queries":14,"pid":4695}
+2532:   console.warn
+2533:     PG17_CLAIM_RACE_WORKER {"branch":"down-applied","failure":{"status":500,"message":"Internal server error","code":"P2022"},"events":0}
+2573:   console.warn
+2574:     PG17_CLAIM_REFUSED_WORKER {"result":{"intent_id":"intent","staged":1,"reconstructed":1,"skipped":0,"failed":0},"events":1}
+2639:   stage 5: rollout recovery boundaries after T has claimed provenance
+2640:     ✓ refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back (8129 ms)
+2641:     ✓ E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it (11325 ms)
+2642:     ✓ characterizes down against an actual T claim transaction paused inside its interactive transaction (7450 ms)
+2643:     ✓ refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact (6495 ms)
+2644: 
+2645: Test Suites: 1 passed, 1 total
+2646: Tests:       51 passed, 51 total
+2647: Snapshots:   0 total
+2648: Time:        225.618 s
+2649: Ran all test suites matching test/rls-g2-pg17-etq0.spec.ts.
+
+FILE execution/s5-r3/RECREATE.md
+SHA256 d8f03f15d68b4a7bf7f6b1ce15fdb6c5902ae3dbada93a5a2ad634c16c476f2e
+1: # S5 R3 checkpoint 2 — recreate the candidate from the frozen bundle
+2: 
+3: ```bash
+4: git clone /home/user/workspace/repos/growth-project-backend s5-r3-restore   # or any clone containing public main c23b9d9f
+5: cd s5-r3-restore
+6: git bundle verify /home/user/workspace/execution/s5-r3/checkpoint-2/s5-r3-candidate.bundle   # "is okay"
+7: git fetch /home/user/workspace/execution/s5-r3/checkpoint-2/s5-r3-candidate.bundle execute/20260921-s5-r3:execute/20260921-s5-r3
+8: git checkout execute/20260921-s5-r3
+9: git rev-parse HEAD HEAD^{tree}     # cf3e72f90ad63d40c1831d8b86141f2d16b7ba05 / 85d57e9d41dd9cce5699b32b669f90ea459fc01b
+10: git log -1 --format='%an <%ae> | %cn <%ce>'   # Bradley Gleave <bradley@bradleytgpcoaching.com> | same
+11: sha256sum -c /home/user/workspace/execution/s5-r3/checkpoint-2/SHA256SUMS   # run from checkpoint-2/
+12: ```
+13: 
+14: Alternative: `git -C <clone-with-9f38ab03> apply --index checkpoint-2/delta-9f38ab03..cf3e72f9.patch` (test-only, 4 files).
+15: 
+16: Runner, install script, lane fixture script and the offline psql stand-in are copied verbatim into `checkpoint-2/`
+17: (hashes in `SHA256SUMS`); the live copies used by the plan are `execution/s5-r3/{run-proof.sh,npm-ci.sh,s5-fixture.sh,stubs/psql-stub.sh}`.
+18: 
+19: Old-root fixture: `bash execution/s5-r3/run-proof.sh oldroot` (offline; creates or verifies
+20: `execution/s5-r3/old-root-925780e0`, a self-contained clone detached at O `925780e0…`, 164 migrations).

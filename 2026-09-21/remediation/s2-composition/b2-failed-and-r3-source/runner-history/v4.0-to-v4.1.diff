@@ -1,0 +1,11 @@
+52c52,54
+<   SURVIVORS=$( { pgrep -af "/home/user/pg17/dist/bin/postgres|s1s2-composition.sh|s1-r4-truncate-discriminator.sh|prisma_migrate|psql .*54321" 2>/dev/null | grep -v "pgrep" ; ss -ltnH 2>/dev/null | grep -E ':54321\b'; } | sed 's/^/  survivor: /' )
+---
+>   # Anchored to how the children are actually exec'd (start of cmdline) so a tool-call shell or log reader whose
+>   # command text merely CONTAINS these names (observed false positive in stub run 00:34Z) is not counted.
+>   SURVIVORS=$( { pgrep -af "^/home/user/pg17/dist/bin/postgres|^postgres: s1-disposable-pg17|^bash test/release/s1s2-composition.sh|^bash test/db/s1-r4-truncate-discriminator.sh|^psql .*(127\.0\.0\.1:54321|-p 54321)|^node .*prisma/build/index.js" 2>/dev/null | grep -v "pgrep" ; ss -ltnH 2>/dev/null | grep -E ':54321\b'; } | sed 's/^/  survivor: /' )
+108a111,114
+>   # release.sh writes fixed /tmp paths; the harness refuses if they pre-exist (e.g. left by another lane's jest run of the
+>   # fake-prisma spec). Preserve them into evidence with metadata instead of deleting, then proceed.
+>   PRE=$(ls -1 /tmp/prisma_migrate.log /tmp/prisma_status.log /tmp/prisma_verify.log /tmp/prisma_verifier.log /tmp/release_verifiers_discovered.txt 2>/dev/null)
+>   if [ -n "$PRE" ]; then mkdir -p "$OUT/preexisting-tmp"; ls -l --time-style=+%FT%TZ $PRE > "$OUT/preexisting-tmp/LISTING.txt"; for f in $PRE; do head -c 400 "$f" > "$OUT/preexisting-tmp/$(basename "$f").head"; mv "$f" "$OUT/preexisting-tmp/"; done; stamp "30 precheck: pre-existing release.sh /tmp scratch files preserved to $OUT/preexisting-tmp (not deleted): $(echo $PRE | tr '\n' ' ')"; else stamp "30 precheck: no pre-existing release.sh /tmp scratch files"; fi

@@ -1,0 +1,56 @@
+[release] ────────────────────────────────────────────────────────────
+[release] starting release_command
+[release]   machine_id   = local-1790037595
+[release]   git_sha      = 21ea3252de90cab66c591cf907b65a0ee7eef879
+[release]   release_ver  = s1s2-composition-C5
+[release]   node_version = v20.20.1
+[release]   prisma_cli   = prisma 6.19.3
+[release] ────────────────────────────────────────────────────────────
+[release] step 0: verifier contract preflight (no database contact)...
+[release]   verifiers_discovered = 1
+[release]   required verifier present: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+[release]   verifiers_required = 1 (all present)
+[release] step 1: checking migration status...
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r2", schema "public" at "127.0.0.1:54321"
+
+165 migrations found in prisma/migrations
+
+Database schema is up to date!
+[release]   pending_migrations_detected = 0
+[release] step 2: applying pending migrations (prisma migrate deploy)...
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r2", schema "public" at "127.0.0.1:54321"
+
+165 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+[release] step 3: verifying database is up-to-date...
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r2", schema "public" at "127.0.0.1:54321"
+
+165 migrations found in prisma/migrations
+
+Database schema is up to date!
+[release] step 4: running catalog verifiers (prisma/migrations/*/verify.sql)...
+[release]   verifier: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+[release] catalog verifier FAILED: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+[release]   Error: ERROR: S1-DB-01 VERIFY FAILED (0 exposure problem(s); 1 allowed-path problem(s)): ALLOWED-PATH: DunningAttempt: service_role lost SELECT
+[release]   
+[release]   
+[release] Refusing to mark this release green (schema drift or incomplete migration).
+[release] NOTE: migrate deploy already ran; the database may now be ahead of the running code.
+[release] ❌ FAIL at line 1 (exit=1)
+[release] ─── last prisma output ─────────────────────────────────
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r2", schema "public" at "127.0.0.1:54321"
+
+165 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+[release] ────────────────────────────────────────────────────────
+[release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+[release] Machines keep the previous image; if step 2 (migrate deploy) already ran,
+[release] the DATABASE may have changed — see docs/deploy-runbook.md §11.4 (stage-specific recovery).

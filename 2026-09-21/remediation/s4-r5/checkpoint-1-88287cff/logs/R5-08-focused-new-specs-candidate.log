@@ -1,0 +1,60 @@
+[2026-09-22T00:41:28Z] R5-08-focused-new-specs-candidate wt=/home/user/workspace/worktrees/s4-r5 head=2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3 tree=3e23f91824689d1f179a116af948eae0ed5ae170 dirty_paths=4 diff_sha256=13ccda7b072d290656edc26c99567881f1e5e0c10e52c938f00180ccbc5a9cb4 cmd: /home/user/workspace/worktrees/s4-r4/node_modules/.bin/vitest run --root /home/user/workspace/worktrees/s4-r5 --passWithNoTests=false test/refresh-admission-epoch.spec.js test/session-ownership-preflight.spec.js
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/workspace/worktrees/s4-r5[39m
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2maccepted Start binds its owner before the cold preflight refresh (S4-R4-A-01)[2m > [22m[2mstart_import: preflight refresh TIMEOUT after the replacement landed → replaced, not 'login required'
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2ma refresh on behalf of an obsolete run never presents the replacement's token (S4-R4-A-02)[2m > [22m[2mcontrol — rotation persist FAILURE for the current session: no new token published, auth_required exactly once, no replacement involved
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+ [31m❯[39m test/session-ownership-preflight.spec.js [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 4382[2mms[22m[39m
+     [32m✓[39m start_import: replacement queued behind the preflight refresh's rotation persist (C3 barrier) → run stops, replacement never used[32m 215[2mms[22m[39m
+     [32m✓[39m start_import: replacement acknowledged while the preflight refresh is on the wire (C1) → no false "login required", run stops[32m 12[2mms[22m[39m
+     [32m✓[39m start_ingest: replacement queued behind the preflight refresh's rotation persist (C3 barrier) → run stops, replacement never used[32m 13[2mms[22m[39m
+     [32m✓[39m start_ingest: replacement acknowledged while the preflight refresh is on the wire (C1) → no false "login required", run stops[32m 6[2mms[22m[39m
+     [32m✓[39m start_import: preflight refresh REJECTED (401) after the replacement landed → replaced, not 'login required'[32m 7[2mms[22m[39m
+     [32m✓[39m start_import: preflight refresh TIMEOUT after the replacement landed → replaced, not 'login required'[32m 8[2mms[22m[39m
+     [32m✓[39m start_import: session CLEARED then re-established while the preflight refresh is on the wire → run stops, new session untouched[32m 7[2mms[22m[39m
+     [33m[2m✓[22m[39m control — start_import cold preflight with no transition: mints once and imports under the minted bearer [33m 1018[2mms[22m[39m
+     [32m✓[39m control — cold preflight refresh REJECTED with no transition still reports 'login required' exactly once (both entrypoints)[32m 12[2mms[22m[39m
+     [33m[2m✓[22m[39m control — pending establish FAILURE during the preflight refresh: the OLD session stays current and the run proceeds under it [33m 1008[2mms[22m[39m
+     [32m✓[39m ingest 401 → refresh queued behind the replacement's establish (persist held, C2): nothing presented, replacement not rotated, run stops[32m 10[2mms[22m[39m
+     [32m✓[39m ingest 401 fired from inside the replacement's persist (P-C pending admission): nothing presented, replacement not rotated, run stops[32m 9[2mms[22m[39m
+     [33m[2m✓[22m[39m settlement (complete) 401 → refresh queued behind the replacement's establish: nothing presented, run left unsettled, replacement intact [33m 1012[2mms[22m[39m
+     [32m✓[39m ingest 401 → refresh queued behind a CLEAR then re-establish: nothing presented, new session intact, run stops[32m 17[2mms[22m[39m
+[31m     [31m×[31m control — ingest 401 → refresh with no transition: OLD presented once, retry under the minted bearer, success[39m[33m 1012[2mms[22m[39m
+     [32m✓[39m control — rotation persist FAILURE for the current session: no new token published, auth_required exactly once, no replacement involved[32m 11[2mms[22m[39m
+ [32m✓[39m test/refresh-admission-epoch.spec.js [2m([22m[2m14 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/session-ownership-preflight.spec.js[2m > [22ma refresh on behalf of an obsolete run never presents the replacement's token (S4-R4-A-02)[2m > [22mcontrol — ingest 401 → refresh with no transition: OLD presented once, retry under the minted bearer, success
+[31m[1mAssertionError[22m: expected [ 'Bearer OLD_SYNTHETIC_ACCESS', …(2) ] to deeply equal [ 'Bearer OLD_SYNTHETIC_ACCESS', …(1) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "Bearer OLD_SYNTHETIC_ACCESS",[22m
+[2m    "Bearer OLD_MINTED_ACCESS",[22m
+[31m+   "Bearer OLD_MINTED_ACCESS",[39m
+[2m  ][22m
+
+[36m [2m❯[22m test/session-ownership-preflight.spec.js:[2m595:49[22m[39m
+    [90m593|[39m     )[33m.[39m[34mtoEqual[39m([[33mOLD[39m[33m.[39mrefreshToken])[33m;[39m
+    [90m594|[39m     [35mconst[39m ingests [33m=[39m routes[33m.[39mcalls[33m.[39m[34mfilter[39m((c) [33m=>[39m c[33m.[39murl [33m===[39m [33mINGEST_URL[39m)[33m;[39m
+    [90m595|[39m     [34mexpect[39m(ingests[33m.[39m[34mmap[39m((c) [33m=>[39m c[33m.[39mauthorization))[33m.[39m[34mtoEqual[39m([
+    [90m   |[39m                                                 [31m^[39m
+    [90m596|[39m       [32m`Bearer [39m[36m${[39m[33mOLD[39m[33m.[39maccessToken[36m}[39m[32m`[39m[33m,[39m
+    [90m597|[39m       [32m`Bearer [39m[36m${[39m[33mOLD_MINTED[39m[36m}[39m[32m`[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m29 passed[39m[22m[90m (30)[39m
+[2m   Start at [22m 00:41:29
+[2m   Duration [22m 4.79s[2m (transform 193ms, setup 0ms, import 96ms, tests 4.46s, environment 0ms)[22m
+
+[2026-09-22T00:41:33Z] R5-08-focused-new-specs-candidate exit=1

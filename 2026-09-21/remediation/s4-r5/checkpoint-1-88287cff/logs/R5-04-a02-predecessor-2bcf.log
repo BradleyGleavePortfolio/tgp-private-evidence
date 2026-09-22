@@ -1,0 +1,248 @@
+[2026-09-22T00:30:15Z] R5-04-a02-predecessor-2bcf wt=/home/user/workspace/worktrees/s4-r4 head=2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3 tree=3e23f91824689d1f179a116af948eae0ed5ae170 dirty_paths=0 diff_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 cmd: node /home/user/workspace/execution/s4-r5/scripts/a02-queued-refresh-discriminator.mjs /home/user/workspace/worktrees/s4-r4 --expect defect
+{
+  "probe": "a02-queued-refresh-discriminator",
+  "derivedFrom": [
+    "execution/audits/s4-r4/a/independent-race-probe.mjs sha256 1a9201602bd34e88a103967f34da03733c975cf8161143b7ec4ddfe728761a1d (C1, C2)",
+    "execution/audits/s4-r4/b/probes/pending-admission-replacement-probe.mjs sha256 545d04c9ece12c6f07bbc196864de9558c22d185810d55d1b30962138bd6db0c (P-C schedule; verdict inverted to the identity invariant)"
+  ],
+  "root": "/home/user/workspace/worktrees/s4-r4",
+  "head": "2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3",
+  "expectation": "defect",
+  "started": "2026-09-22T00:30:15.607Z",
+  "ended": "2026-09-22T00:30:15.721Z",
+  "durationMs": 112,
+  "node": "v20.20.1",
+  "network": false,
+  "pass": true,
+  "failures": [],
+  "checks": {
+    "C1.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "C2.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "C2.nothing_presented_while_B_persist_held": {
+      "pass": true,
+      "detail": 0
+    },
+    "PC.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "PC.nothing_presented_while_B_persist_held": {
+      "pass": true,
+      "detail": 0
+    },
+    "C1.predecessor_broadcasts_auth_required_while_B_remains": {
+      "pass": true,
+      "detail": {
+        "authRequired": 1,
+        "lastError": "login required to import",
+        "session": [
+          [
+            "tgp_refresh_token",
+            "NEW_R"
+          ]
+        ]
+      }
+    },
+    "C2.predecessor_obsolete_run_presented_B_refresh_token": {
+      "pass": true,
+      "detail": [
+        "NEW_R"
+      ]
+    },
+    "C2.predecessor_rotated_B_token": {
+      "pass": true,
+      "detail": [
+        [
+          "tgp_refresh_token",
+          "ROTATED_FROM_NEW_R"
+        ]
+      ]
+    },
+    "PC.predecessor_obsolete_run_presented_B_refresh_token": {
+      "pass": true,
+      "detail": [
+        "NEW_RT"
+      ]
+    },
+    "PC.predecessor_rotated_B_token": {
+      "pass": true,
+      "detail": [
+        [
+          "tgp_refresh_token",
+          "ROTATED_FROM_NEW_RT"
+        ]
+      ]
+    }
+  },
+  "scenarios": {
+    "C1": {
+      "replacementAck": {
+        "ok": true
+      },
+      "calls": [
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "authorization": null,
+          "refreshToken": "OLD_R"
+        }
+      ],
+      "refreshTokensPresented": [
+        "OLD_R"
+      ],
+      "ingestBearers": [],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "NEW_R"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 1,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": null,
+        "progress": [],
+        "lastError": "login required to import",
+        "workerActive": true
+      },
+      "expiredSeen": false
+    },
+    "C2": {
+      "pendingReplacementAck": {
+        "ok": true
+      },
+      "refreshesWhilePersistHeld": 0,
+      "calls": [
+        {
+          "url": "https://app.truecoach.co/proxy/api/clients?per_page=25&page=1",
+          "authorization": "Bearer SOURCE",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/scout/ingest",
+          "authorization": "Bearer OLD_A",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "authorization": null,
+          "refreshToken": "NEW_R"
+        }
+      ],
+      "refreshTokensPresented": [
+        "NEW_R"
+      ],
+      "ingestBearers": [
+        "Bearer OLD_A"
+      ],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "ROTATED_FROM_NEW_R"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 0,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": {
+          "intentId": "imp-1790037015690",
+          "platform": "truecoach",
+          "status": "ingest_failed"
+        },
+        "progress": [],
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "pendingTransfer": {
+          "entityType": "clients",
+          "count": 1
+        },
+        "workerActive": true
+      },
+      "expiredSeen": false
+    },
+    "PC": {
+      "first": {
+        "ok": true
+      },
+      "startedAck": {
+        "ok": true
+      },
+      "replacementAck": {
+        "ok": true
+      },
+      "refreshesBeforeRelease": 0,
+      "calls": [
+        {
+          "url": "https://app.truecoach.co/proxy/api/clients?per_page=25&page=1",
+          "authorization": "Bearer SOURCE",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/scout/ingest",
+          "authorization": "Bearer OLD_ACCESS",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "authorization": null,
+          "refreshToken": "NEW_RT"
+        }
+      ],
+      "refreshTokensPresented": [
+        "NEW_RT"
+      ],
+      "ingestBearers": [
+        "Bearer OLD_ACCESS"
+      ],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "ROTATED_FROM_NEW_RT"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 0,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": {
+          "intentId": "imp-1790037015712",
+          "platform": "truecoach",
+          "status": "ingest_failed"
+        },
+        "progress": [],
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "pendingTransfer": {
+          "entityType": "clients",
+          "count": 1
+        },
+        "workerActive": true
+      },
+      "expiredSeen": false
+    }
+  }
+}
+[2026-09-22T00:30:15Z] R5-04-a02-predecessor-2bcf exit=0

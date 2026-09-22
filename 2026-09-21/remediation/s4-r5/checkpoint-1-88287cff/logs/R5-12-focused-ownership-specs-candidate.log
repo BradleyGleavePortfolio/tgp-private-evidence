@@ -1,0 +1,30 @@
+[2026-09-22T00:45:16Z] R5-12-focused-ownership-specs-candidate wt=/home/user/workspace/worktrees/s4-r5 head=2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3 tree=3e23f91824689d1f179a116af948eae0ed5ae170 dirty_paths=6 diff_sha256=1373c70f2e7a8ce49215c9492ce8096685b7cac5c126c264601d811e4d018ed4 cmd: /home/user/workspace/worktrees/s4-r5/node_modules/.bin/vitest run --root /home/user/workspace/worktrees/s4-r5 --passWithNoTests=false test/refresh-admission-epoch.spec.js test/session-ownership-preflight.spec.js test/session-ownership.spec.js test/refresh-coalesce.spec.js test/ingest-auth.spec.js
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/workspace/worktrees/s4-r5[39m
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2maccepted Start binds its owner before the cold preflight refresh (S4-R4-A-01)[2m > [22m[2mstart_import: preflight refresh TIMEOUT after the replacement landed → replaced, not 'login required'
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2ma refresh on behalf of an obsolete run never presents the replacement's token (S4-R4-A-02)[2m > [22m[2mcontrol — rotation persist FAILURE for the current session: no new token published, auth_required exactly once, no replacement involved
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+ [32m✓[39m test/session-ownership-preflight.spec.js [2m([22m[2m16 tests[22m[2m)[22m[33m 4334[2mms[22m[39m
+     [33m[2m✓[22m[39m control — start_import cold preflight with no transition: mints once and imports under the minted bearer [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m control — pending establish FAILURE during the preflight refresh: the OLD session stays current and the run proceeds under it [33m 1009[2mms[22m[39m
+     [33m[2m✓[22m[39m settlement (complete) 401 → refresh queued behind the replacement's establish: nothing presented, run left unsettled, replacement intact [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m control — ingest 401 → refresh with no transition: OLD presented once, retry under the minted bearer, success [33m 1006[2mms[22m[39m
+[90mstderr[2m | test/session-ownership.spec.js[2m > [22m[2ma run whose session is replaced mid-refresh (S4-R3-A-02)[2m > [22m[2mstale refresh TIMEOUT after replacement: no clear, no auth_required, run stops
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+ [32m✓[39m test/session-ownership.spec.js [2m([22m[2m7 tests[22m[2m)[22m[33m 1137[2mms[22m[39m
+     [33m[2m✓[22m[39m replacement with NO 401 at all: the next batch is not sent under the replacement's bearer [33m 1007[2mms[22m[39m
+ [32m✓[39m test/refresh-admission-epoch.spec.js [2m([22m[2m14 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m test/ingest-auth.spec.js [2m([22m[2m4 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m test/refresh-coalesce.spec.js [2m([22m[2m1 test[22m[2m)[22m[32m 39[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m42 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 00:45:17
+[2m   Duration [22m 6.34s[2m (transform 182ms, setup 0ms, import 124ms, tests 5.64s, environment 0ms)[22m
+
+[2026-09-22T00:45:23Z] R5-12-focused-ownership-specs-candidate exit=0

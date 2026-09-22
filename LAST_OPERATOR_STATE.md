@@ -1,12 +1,14 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 00:39 UTC. Operator: GPT 6 Astra, executive orchestrator only.
+Updated: 2026-09-22 00:55 UTC / September 21, 5:55 PM PDT. Operator: GPT 6 Astra, executive orchestrator only.
 
 ## Mission and authority
 
 Finish the importer as a native, reconciled, usable customer journey, then the remaining retained TGP V1 scope. Bradley issued **EXECUTE** on September 21 at approximately 23:13 UTC and accepted/closed reconnaissance. S1/S2/S4/S5/S6 canonical T4 builders and S1 independent review are active; live ownership is in `execution/DISPATCHES.md`. Parent is orchestration-only and never personally implements product code. No product landing or production action has occurred.
 
 Current operational handoff: this file locally and at the **private evidence repository root**; current worker/slot ownership is `execution/DISPATCHES.md` alongside it. Historical immutable packets remain under `2026-09-20/` and `2026-09-21/`. This state is shared with the user, **not pushed to public context**; its pre-EXECUTE state remains at context main `1ebbed76188e33c970fc17c1e7b252f535d040d0`.
+
+User-requested check-in handoff: `LAST_OEPRATOR_HANDOFF.MD` (filename retained exactly as requested). It is a concise continuation companion to this canonical state and the dispatch register, not a replacement for immutable evidence.
 
 G01–G22 remain effective. The supplied PDF explicitly preserves Bradley's September 19 routing amendment: Claude Fable 5 replaces Fable 5.1 for T4; these names are not treated as aliases. Current S1–S6 lanes remain T4, builders requested Fable 5 / High, with two independent final-head attestations. Parent coordinates, never self-audits.
 
@@ -18,7 +20,7 @@ G01–G22 remain effective. The supplied PDF explicitly preserves Bradley's Sept
 | Mobile | `a5933fd6de5616493de75f0db907098b149b955c` |
 | Extension | `0111be661922234d670bbf23e23d270eec1b4a4e` |
 | Context | `1ebbed76188e33c970fc17c1e7b252f535d040d0` |
-| Private evidence | `f1eaf57b1f4cd8f3bfcac15418dbc4f3fbafa181` (before this handoff publication; query GitHub for newer evidence commits) |
+| Private evidence | `344ce2a39587a1157bcf3d82ade689dc93bb7da3` (last verified publication; newer local work is distinguished below) |
 
 Product mains and importer-critical PR heads are unchanged; context/evidence advanced beyond the previous state's pre-refresh references. Main remains staging/generic reconstruction, not proven native reconciled completion. No real-source acceptance, zero-touch proof, five-minute native completion or pilot acceptance was established.
 
@@ -32,16 +34,20 @@ Five current source bundles were hash-checked, verified, and restored clean unde
 
 | Lane | Last preserved head | Exact next exit |
 |---|---|---|
-| S1 containment | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Test-only quoted-diagnostic and precondition-before-seed correction frozen; SQL/guard unchanged from41f4. Offline message spec24/24, unquoted predecessor needles17/7. Those are not DB proof. S2 will compose this head; real discriminator and both independent follow-ups remain pending. |
-| S2 delivery/composition | `21ea3252de90cab66c591cf907b65a0ee7eef879` | Genuine merge of S2 repair3f49ffc8 and exact S1 successor56fb, tree5aa6630b. B1 at974 remains63/4. Final-head offline message24/24 and guard72/72 passed; fresh real composition plus discriminator granted as the sole heavy slot. No aggregate clearance or real result yet. |
+| S1 containment | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Test-only quoted-diagnostic and precondition-before-seed correction frozen; SQL/guard unchanged from41f4. Offline message spec24/24, unquoted predecessor needles17/7. Composed into21ea and its successor; real discriminator and both independent follow-ups remain pending. |
+| S2 delivery/composition | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | B2 at21ea66/2, C0 historical-export error; discriminator NOTRUN. d5cd fixes only C0, cheap controls discriminate. v5.1 corrected a pre-grant namespace mismatch, but a new timeout control left an owned step alive after cleanup. v5.1 NOT authorized; execution-only v5.2 repair/control scope dispatched. No new DB grant; B1/B2 retained. |
 | S3 reliability | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Preserve accepted bounded R2 proof unchanged. Recheck only material integration applicability; landing still depends on S1/S2. |
-| S4 extension | `2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3` | A3 focused113/full1714/gates/package passed; browser aborted before checks, negative NOTRUN. Both R4 reviews frozen; A-01 late preflight ownership and A-02 replacement-token consumption are material. After freeze B acknowledged the missed preflight schedule and accepted the token-authority disposition; original report retained. Isolated R5 repair underway, no heavy/browser grant. |
-| S5 provenance validation | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | B3 genctl passed intended no-auto-install refusal and pinned resolution; resume00:29:32–00:33:40 passed guard27 and real51/51, STOP_RC0/DAEMONnone. Parent verified lock free/no survivors/no server and ancestor package roots absent. Fresh full bootstrap at143d was not rerun; generate-only+resume is the proven path. Final packet frozen, dual independent T4 audits active; no self-clearance. |
-| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C1 install passed; hazard baseline4 passed/2 failed, then hung and was terminated143. T1 reproduced anonymous-key restore; async RNTL lifecycle misuse corrupted later controls, so no whole-baseline acceptance. Test-only v3 lifecycle/throttle/cleanup correction authorized, product fix held, no retry slot yet. Original C1 and v2 preserved; local dependency resolution recorded after quarantine. |
+| S4 extension | `88287cff47240aa58b5f0fea5da08670f1e87df6` | R5 frozen, treea2879859; both entrypoints bind owner before async preflight and refresh checks expected owner under lock. Builder reports candidate/predecessor discriminators, focused42/42 and commit hooks; exact receipts retained, not full acceptance. Two independent R5 source reviews now active. Fresh full suite/gates/package and positive/negative browser proof pending; R4's1714 and zip do not validate changed shipping bytes. |
+| S5 provenance validation | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | Both R3 reviews frozen: A NOT CLEARED, B bounded resume acceptance with conditions. Parent holds cumulative acceptance on A's concrete refused-setup mutation/lock-cleanup/destroy defects; guard27/live51 remain valid observations. Narrow isolated R4 validation-surface repair authorized, no control execution/DB/destruction yet. Final-head fresh full remains unrun; see S5_R3_PARENT_DISPOSITION.md. |
+| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C2 and C3 both6/6 behavioral passes, T1–T3 hazards reproduced/T4 held, but Jest open handles persisted after v4 temporary-client cleanup. C3 exact-child TERM00:49:33 yielded143/runner7; group empty and lockfree parent-verified00:50. Existing controls NOTRUN. C4 single-file detectOpenHandles request prepared, not granted; no speculative edits/retries. Product P1 remains held. |
 
 At initialization, the prior session's S4 R4 and dirty S6 R3 deltas were absent from the inspected archive; the targeted session recovery returned "Session has no entries to load." That bounded route is exhausted, not proof of global loss. Their new source checkpoints above are explicitly reimplementations and privately preserved. Both new S1 R3 reviews are preserved. Actual S1/S2 composition has now run and FAILED overall, as above. No further historical reconnaissance.
 
-Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. A1/A2 completed; A3/B1/B2 and S6 C1 failed at their stated boundaries, with failures retained. S5 B3 completed successfully00:33:40 and released cleanly. S2 now owns B2-S1S2-COMPOSITION-R2 on21ea; S6 C2 baseline-only is queued for a separate grant after verified cleanup. No worker may infer a grant from a free lock. One moderate/heavy slot at a time; independent source reviews and bounded lightweight probes proceed in parallel. Real composition used **164 parent migrations plus candidate =165**, never ledger-only baselining.
+Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. S2 B2 ended00:40:31 exit1, clean stop/no survivors; S6 C2 ended00:44:09 runner7 and C3 ended00:49:33 runner7. Canonical lock free and no validation listeners/processes parent-verified00:50. No heavy slot is currently granted. S2 B3 awaits v5.2 abnormal-cleanup controls; S6 C4 diagnostic awaits separate allocation; S4 R5 full validation awaits source-review disposition. S5 R4 is source preparation only. A free lock is never a grant. Independent source reviews proceed in parallel. Real composition used **164 parent migrations plus candidate =165**, never ledger-only baselining.
+
+Evidence qualifications: S2 B2 actually used runner14ca1e85, while the grant quoted earlier7642c3c4 because the builder changed readiness bytes before grant. Actual as-run bytes, a hash-matching reconstructed predecessor and the chronology are retained; the historical grant is not rewritten. S5's original auto-install npm debug logs are no longer at their cited paths and were not found in the inspected lane/quarantine/private archive; retained bootstrap warning and quarantined packages corroborate the incident, but raw argv/cwd cannot currently be independently rechecked.
+
+S2's `SHA256SUMS.b2-frozen` repeats the stale self-hash defect: its own entry fails, while every other listed artifact verifies. Preserve that original and qualify it with a non-self-including outer archive manifest; do not silently repair historical evidence.
 
 ## Current blockers and reserved boundaries
 
