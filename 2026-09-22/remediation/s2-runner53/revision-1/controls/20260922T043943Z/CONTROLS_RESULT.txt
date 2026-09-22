@@ -1,0 +1,67 @@
+S2-RUNNER-53 controls start 2026-09-22T04:39:43Z runner_sha256=fbc8b9af592b370429a66bf164d3c5ac0f0b1bac0f57474c50ac293ebebd1bfc stubs=e76499c0f6b59e04 7bb21592e437b239 6dc98ce0d2539daf c23c19ce6ea861e0 
+pre-snapshot owned-pattern processes: [] (must be empty for attributable survivors)
+pre-snapshot 54321 listener: [] pg17 postgres: []
+
+== K1 predecessor-mechanism (v5.1 shape) under timeout --foreground -k 5 2 — expect: outer 124, fixture stop ran, step-40 child tree SURVIVES runner exit  [t=0.04s]
+  K1 outer exit=124; stamp:
+    K1 start pid=11557 2026-09-22T04:39:43Z
+    50 fixture-stop exit=0 (v5.1 shape: stop runs whether or not step 40's child tree is alive)
+    end composition=notrun
+  K1 step-40 child tree after runner exit: [11561 11562 11568 ] 11561 11518 timeout --foreground 1500 bash /home/user/workspace/execution/s2-runner53/controls/stubs/harness.sh k1db;11562 11518 bash /home/user/workspace/execution/s2-runner53/controls/stubs/harness.sh k1db;11568 11518 sleep 20;
+  PASS: outer timeout fired (124)
+  PASS(counterexample): fixture stop ran under a live step-40 child (predecessor defect reproduced)
+  PASS(counterexample): step-40 child tree survived the runner (predecessor defect reproduced)
+  owned cleanup: TERM pids [11561 11562 11568] 11561 11518 timeout --foreground 1500 bash /home/user/workspace/execution/s2-runner53/controls/stubs/harness.sh k1db;11562 11518 bash /home/user/workspace/execution/s2-runner53/controls/stubs/harness.sh k1db;11568 11518 sleep 20;
+  owned processes after cleanup: []
+
+== K2 v5.3 stub success — expect exit 0, first_exit=0 cleanup_exit=0 reap=ok survivors=none, refusals 64/64  [t=2.74s]
+  K2 exit=0 out=/home/user/workspace/execution/s2-runner53/runner-selftest-r53/20260922T043945Z/
+  PASS: K2 result registers
+  PASS: K2 all steps reached, refusals 64/64, stop 0
+  PASS: K2 stub banner present
+  PASS: K2 real head/tree/clean check at restored d5cd
+  PASS: K2 owned-work scan clean before fixture stop
+  PASS: K2 real harness offline refusal (hosted URL) — string layer, no connection
+  PASS: K2 real harness offline refusal (no confirm)
+  PASS: K2 fixture init inherited fd 9 (private lock)
+  PASS: K2 harness saw fd 9 closed
+  owned processes after cleanup: []
+
+== K3 v5.3 SIGTERM during step 40 under timeout --foreground -k 20 3 — expect: halt+reap BEFORE fixture stop, composition=interrupted(TERM), first_exit=143, no survivors  [t=4.32s]
+  K3 outer exit=124 out=/home/user/workspace/execution/s2-runner53/runner-selftest-r53/20260922T043947Z/
+  K3 owned-pattern processes after runner exit: []
+  PASS: K3 signal exit recorded as first exit; cleanup class 0
+  PASS: K3 step labelled interrupted, stop 0, no survivors
+  PASS: no step-40 child survives the runner (predecessor defect closed)
+  PASS: ordering SIGNAL(17) < REAP ok(20) < fixture stop(22)
+  PASS: K3 lock held through cleanup
+  K3 cleanup timing: cleanup_seconds=0.39
+  owned processes after cleanup: []
+
+== K4 v5.3 SIGTERM with a group-escaping child (setsid) — expect: reap FAILED after TERM+KILL budget (≤15 s), fixture stop REFUSED, cleanup_exit=72, QUARANTINE.txt, lock not handed off  [t=7.91s]
+  K4 outer exit=124 out=/home/user/workspace/execution/s2-runner53/runner-selftest-r53/20260922T043951Z/
+  K4 escapee still alive after runner exit (expected; it is the quarantined survivor): [12670 ]
+  PASS: K4 quarantine class 72 recorded separately from first exit 143
+  PASS: K4 fixture stop REFUSED, survivors present
+  PASS: K4 QUARANTINE.txt lists the escapee
+  PASS: K4 lock not declared handed off
+  PASS: no fixture stop attempted after failed reap
+  K4 cleanup timing: cleanup_seconds=17.00 (budget worst 48 s; TERM+KILL reap waits 10+5 s)
+  owned cleanup: TERM pids [12670] 12670 12670 s2r53-stub-escapee 40;
+  owned processes after cleanup: []
+
+== K5 v5.3 stub fixture stop rc=1 on the normal path — expect first_exit=0 cleanup_exit=71 final=71  [t=28.50s]
+  K5 exit=71 out=/home/user/workspace/execution/s2-runner53/runner-selftest-r53/20260922T044011Z/
+  PASS: K5 cleanup failure class with first exit preserved as 0
+  PASS: K5 stop exit 1 recorded
+  owned processes after cleanup: []
+
+== K6 v5.3 stub guard-spec rc=3 — expect final=3 first_exit=3 cleanup_exit=0 fixture=notrun fixture_stop=notrun  [t=30.05s]
+  K6 exit=3 out=/home/user/workspace/execution/s2-runner53/runner-selftest-r53/20260922T044013Z/
+  PASS: K6 first failure is the process exit
+  PASS: K6 later steps notrun, no stop attempted
+  owned processes after cleanup: []
+
+ALL SIX CONTROLS EXECUTED; strike=0
+  owned processes after cleanup: []
+TOTAL wall clock: 30.85s of 60s budget; lane lock: FREE; canonical lock file exists: no (never touched)

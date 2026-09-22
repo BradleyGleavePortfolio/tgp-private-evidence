@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 04:38 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
+Updated: 2026-09-22 04:49 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
 
 ## Mission and authority
 
@@ -34,9 +34,9 @@ Full independently executable slice records, writer surfaces, acceptance, recove
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
 | S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Frozen tree79ebf175, clean. R4 reviewer A frozen04:41:58 accepts narrow source follow-up; quoted/pre-seed findings source-closed, effective TRUNCATE source-fixed/behavior pending. No new material source blocker within scope. B still independently reviewing. Real discriminator/composition and final dynamic attestation held; historical24/24 and predecessor17/7 remain limited message evidence. |
-| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | S2-RUNNER-53 dispatched to Fable. Execution-only child/cleanup-budget repair; product source stays frozen. Last archived named runner is v5.1; verify current packet before claiming later bytes recovered. At most 60s of bounded private-lock fake-process controls allowed; no DB/heavy grant. |
+| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Clean treec0ab87d4 unchanged. v5.3 runnerfbc8b9af is an explicit reimplementation from archivedv5.1;30.85s bounded fake controls, no DB. Intended48s cleanup budget/60s grace still requires independent review. Exact6062 fixture and PG/dependencies absent. S2-SETUP-FIXTURE-PREP authorized for frozen setup/fixture/launcher preparation only, no execution. |
 | S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Unchanged, retained bounded R2 acceptance. Fresh Fable integration-applicability analyst compares exact5c7b/d5cd ancestry, overlap and prior proof; no duplicate R2 audit/tests or product composition authorized. S3 not yet included in S2 composition. |
-| S4 / T4 | `88287cff47240aa58b5f0fea5da08670f1e87df6` | S4-R6-REPORTING dispatched to Fable. Frozen R5 A counterexample remains material despite B not observing it. Minimal synchronous reporting-generation repair and bounded dependency-free probes allowed; no full/package/browser slot. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 frozen clean tree840fb285, parent88287 preserved. Offline predecessor4 stale/candidate0 across82; Vitest NOTRUN, shim18/19 not framework proof;0/6 historical hooks. Dual independent source follow-up ACTIVE. Authentic head stays unaccepted pending real gates/scans/artifact proof. Builder prepares native runner only; related runtime-reporting observation remains unproven. |
 | S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | S5-R4-VALIDATION-SAFETY dispatched to Fable. Refusal cleanup, lock ownership, destroy failure, busy-session, provenance and recreation repair. Preparation/static/syntax only; no control execution, install, DB or destruction yet. |
 | S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | S6-DIAGNOSTIC-PROPOSAL dispatched to Fable. Restore unchanged source and prepare one causal ownership diagnostic. No test/install/product P1 execution. C4 remains inconclusive. |
 
@@ -46,7 +46,7 @@ Four advertised bundle identities were checked against current packet heads: S2 
 
 Fresh workspace: 2 CPUs, about 8 GB memory; baseline clones and private archive restored. No previous DB clusters, installed dependency trees, quarantine or prior process groups are assumed present. No heavy slot is currently granted. Canonical nonblocking lock: `/home/user/workspace/execution/test-validation.lock`.
 
-Source reads/edits are parallel in isolated areas. Only the brief's bounded S2 fake-process and S4 dependency-free probes have execution permission. S5/S6 require separate proposed and reviewed allocations. A free lock is not a grant; changed source/runner bytes invalidate a prior grant's attribution.
+Source reads/edits are parallel in isolated areas. Original bounded S2/S4 builder probes are complete; no repeat permission is implied. S2 setup preparation and S4 native-runner preparation are non-executing. S5/S6 require separate proposed and reviewed allocations. New S4 auditors have only their explicitly bounded offline-probe allowance. A free lock is not a grant; changed source/runner bytes invalidate a prior grant's attribution.
 
 Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 R4 A returned a frozen source-only acceptance with dynamic attestation pending; B remains independent and active. Other current-round candidate reviews await frozen builder evidence. All original reports remain unchanged. All six S-lanes have appropriately staged work.
 
@@ -54,7 +54,7 @@ Current truth: preserved and partially implemented/tested candidates, not overal
 
 - S1 effective TRUNCATE gap prompted 41f4/56fb successors; real final discriminator remains unrun. PG15 and hosted serving-role/grant boundaries remain unproven.
 - S2 B1 exact9742037b: 63 pass/4 fail, real release telemetry defects. B2 exact21ea3252: 66 pass/2 fail in C0 historical-export fixture; d5cd corrects that harness path only. Discriminator NOTRUN. Actual B2 runner14ca1e85 differed from grant7642c3c4; actual bytes, reconstructed predecessor and chronology retained without rewriting authorization. Stale self-hash in `SHA256SUMS.b2-frozen` remains qualified by separate outer manifest.
-- S2 v5.2 reportedly controlled an observed child-survival schedule, but cleanup could exceed outer grace and stop could follow failed reap. Those claims do not establish preserved v5.2 bytes; current worker must distinguish recovery from reimplementation.
+- S2 v5.2 bytes were not preserved in the named packet. New v5.3 explicitly reimplements from v5.1; stub controls cover success,TERM,reap refusal,stop failure and guard failure. Actual30.85s, not real PG evidence. Missing6062 fixture requires separately versioned preparation. uutils timeout returns15 under one group-TERM control; actual implementation must be stamped, not assumed GNU.
 - S4 R4: focused113/full1714/gates/package passed, but browser run aborted before checks and negative control did not run. R5 original credential defects narrowly source-closed; S4-R5-A-01 late preflight classification/reporting is material. Four offline interleavings occur after B becomes current but before acknowledgement continuation, not proven post-ack, credential misuse or browser impact. A known-good base ZIP is not an expected-failing control.
 - S5 B2 live suite did not compile; unexpected Prisma auto-install occurred outside pinned package root. Historical quarantine and bootstrap warnings were preserved, but original npm debug logs were not recovered; raw argv/cwd are not independently reverified. B3 final143d observed guard27/live51 after pinned generate-only/resume, not a fresh final-head 164-migration bootstrap. Its old cluster was mutated, not pristine.
 - S5-R3-A-01/02/03: refused setup can still mutate in teardown; abnormal cleanup can lose lock ownership; destroy masks stop failure. A-04 busy sessions not enforced, A-05 provenance failures/weak negative, A-06 stale recreation. These do not erase B3 observed assertions. A-07 missing original logs remains a qualification, not a reason to fabricate history.
@@ -94,6 +94,7 @@ NO for these local engineering and independent-review slices. Concrete hosted-re
 - Intake truth and original continuation: Git commit `4aeacc694fb8ca8b6e0302e3c184fc57e15059f2`.
 - Current slice contracts: `execution/CONTINUATION_20260922.md`.
 - S1/S3 stage-correct follow-up contracts: `execution/S1_S3_CONTINUATION_BRIEF.md`.
+- S4 current review: `execution/S4_R6_REVIEW_BRIEF.md`; S2 setup preparation: `execution/S2_SETUP_PREPARATION_BRIEF.md`.
 - Fresh worker ownership: `execution/DISPATCHES.md`, identical root mirror.
 - Immutable prior source/tests/reports: `2026-09-20/` and `2026-09-21/`.
 - Governance: `BradleyGleavePortfolio/tgp-agent-context/AGENT_RULES.md`, effective G01–G22.

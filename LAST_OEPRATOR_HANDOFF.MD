@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September21,2026 9:38PM PDT / September22 04:38UTC. Exact requested filename preserved.
+Updated September21,2026 9:49PM PDT / September22 04:49UTC. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -10,14 +10,14 @@ EXECUTE continues without a new Bradley decision. No product code is authored by
 
 ## Material transition
 
-Four fresh canonical Fable builders are dispatched in isolated areas: S2 cleanup-runner repair, S4 R6 final-reporting ownership repair, S5 R4 fixture/runner/provenance safety repair, S6 causal resource-diagnostic preparation. All cumulative and child slices are T4; requested High policy is not claimed as exposed runtime telemetry. Full bounded contracts: `execution/CONTINUATION_20260922.md`; actual worker IDs: `execution/DISPATCHES.md`. All64 open PRs in the four preserved repositories now have explicit individual grades/full heads in `execution/pr-grades/PUBLIC_PR_GRADES.{md,json}`, including retained inactive work with honestly provisional consequence assessments.
+S2 runnerv5.3 is frozen with bounded stub controls; its builder now prepares the missing exact-fixture successor and setup/launcher packet, without execution. S4 R6 candidate91990ae9 is frozen and has two independent source follow-ups active; its builder prepares native validation only. S5 R4 validation-safety repair and S6 resource-diagnostic preparation remain active. All child/cumulative S-lanes remain T4. All64 open public PRs have explicit individual grades/full heads, including honest provisional ratings for inactive unrefreshed scope. Current worker/grant truth is synchronized in `execution/DISPATCHES.md`.
 
 All six lanes are moving at their actual stage. S1 `56fb0d22` R4 reviewer A has frozen narrow source acceptance, quoted/pre-seed source closure and TRUNCATE source-fixed/behavior-pending disposition; B continues independently. Real proof/final dynamic attestation remains pending. S3 `5c7b42b3` has a Fable integration-applicability analyst, not an unnecessary fixer or repeated R2 audit. Both sources remain unchanged; contracts are in `execution/S1_S3_CONTINUATION_BRIEF.md`. No old worker ID, process, fixture, dependency installation or slot is presumed live in this fresh workspace.
 
 ## Preserved source and failed evidence
 
 - S2 `d5cd9b8b`: B1 63/4 and B2 66/2 remain failed overall. Historical runner mismatch and stale manifest self-hash retained. v5.2 behavior is described in prior handoff, but latest located runner bytes are v5.1; distinguish any required execution-only reimplementation.
-- S4 `88287cff`: earlier credential findings narrowly source-closed, but frozen R5-A-01 reporting race blocks clearance. It is before replacement acknowledgement continuation, not proved post-ack, credential misuse or browser behavior.
+- S4 `91990ae9` successor preserves88287 and original R5-A-01 failure. Offline predecessor4/candidate0 across82 schedules is source evidence only; actual Vitest not run, custom shim18/19 is not framework proof,0/6 hooks ran at commit. Do not rewrite the commit to imply hooks ran; require real exact gates/scans. Related runtime reporting suspicion is under independent scrutiny, not a proved finding yet.
 - S5 `143d451e`: guard27/live51 are bounded observed results, not fresh final-head bootstrap or safety clearance. Refused-setup mutation, abnormal lock cleanup and masked destroy failure block use; original npm logs remain missing evidence.
 - S6 `d51a1910`: C4 retained six passing behavioral cases but timeout124 without handle-owner evidence. Cause unresolved; controls NOTRUN, P1 held, no speculative teardown or forceExit.
 

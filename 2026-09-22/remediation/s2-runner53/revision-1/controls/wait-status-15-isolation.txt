@@ -1,0 +1,8 @@
+isolation control 2026-09-22T04:41:51Z: why the runner's HALT stamp shows 'wait status 15' after a group SIGTERM
+coreutils: timeout (uutils coreutils) 0.8.0; GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+setsid+timeout --foreground, TERM to GROUP  -> wait status=15 (observed in runner HALT stamp)
+timeout --foreground, TERM to timeout pid only -> wait status=143
+setsid sleep, TERM to group (no timeout)      -> wait status=143
+conclusion: deterministic property of GNU timeout --foreground when its own process group is signalled (child and timeout both receive TERM): timeout exits 15 instead of 143. Diagnostic label only; the runner's step register is interrupted(TERM) and first_exit=143 come from the runner's own trap, not from this value.
+
+CORRECTION appended 2026-09-22T04:42:09Z: the sandbox 'timeout' is uutils coreutils 0.8.0, NOT GNU coreutils — the 'GNU timeout' wording in the conclusion above is wrong; the observed 15-vs-143 property is of uutils timeout 0.8.0 --foreground under a group TERM. GNU behaviour was not observed here.

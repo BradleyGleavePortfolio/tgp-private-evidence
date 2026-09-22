@@ -1,0 +1,343 @@
+{
+  "probe": "a02-queued-refresh-discriminator",
+  "derivedFrom": [
+    "execution/audits/s4-r4/a/independent-race-probe.mjs sha256 1a9201602bd34e88a103967f34da03733c975cf8161143b7ec4ddfe728761a1d (C1, C2)",
+    "execution/audits/s4-r4/b/probes/pending-admission-replacement-probe.mjs sha256 545d04c9ece12c6f07bbc196864de9558c22d185810d55d1b30962138bd6db0c (P-C schedule; verdict inverted to the identity invariant)"
+  ],
+  "root": "/home/user/workspace/worktrees/s4-r6",
+  "head": "88287cff47240aa58b5f0fea5da08670f1e87df6",
+  "expectation": "fixed",
+  "started": "2026-09-22T04:34:07.983Z",
+  "ended": "2026-09-22T04:34:08.063Z",
+  "durationMs": 79,
+  "node": "v20.20.1",
+  "network": false,
+  "pass": true,
+  "failures": [],
+  "checks": {
+    "C1.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "C2.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "C2.nothing_presented_while_B_persist_held": {
+      "pass": true,
+      "detail": 0
+    },
+    "PC.replacement_acknowledged": {
+      "pass": true,
+      "detail": {
+        "ok": true
+      }
+    },
+    "PC.nothing_presented_while_B_persist_held": {
+      "pass": true,
+      "detail": 0
+    },
+    "C1.old_run_never_presented_B_refresh_token": {
+      "pass": true,
+      "detail": [
+        "OLD_R"
+      ]
+    },
+    "C1.B_refresh_token_stored_unrotated": {
+      "pass": true,
+      "detail": [
+        [
+          "tgp_refresh_token",
+          "NEW_R"
+        ]
+      ]
+    },
+    "C1.no_request_under_B_or_B_minted_bearer": {
+      "pass": true,
+      "detail": [
+        [
+          "auth/extension/refresh",
+          null
+        ]
+      ]
+    },
+    "C1.no_complete_call": {
+      "pass": true,
+      "detail": 0
+    },
+    "C1.no_auth_required": {
+      "pass": true,
+      "detail": 0
+    },
+    "C1.no_expired_message": {
+      "pass": true,
+      "detail": false
+    },
+    "C1.session_state_has_session": {
+      "pass": true,
+      "detail": {
+        "ok": true,
+        "hasSession": true
+      }
+    },
+    "C1.old_run_stopped_with_replaced_detail": {
+      "pass": true,
+      "detail": {
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "status": null
+      }
+    },
+    "C2.old_run_never_presented_B_refresh_token": {
+      "pass": true,
+      "detail": []
+    },
+    "C2.B_refresh_token_stored_unrotated": {
+      "pass": true,
+      "detail": [
+        [
+          "tgp_refresh_token",
+          "NEW_R"
+        ]
+      ]
+    },
+    "C2.no_request_under_B_or_B_minted_bearer": {
+      "pass": true,
+      "detail": [
+        [
+          "clients?per_page=25&page=1",
+          "Bearer SOURCE"
+        ],
+        [
+          "scout/ingest",
+          "Bearer OLD_A"
+        ]
+      ]
+    },
+    "C2.no_complete_call": {
+      "pass": true,
+      "detail": 0
+    },
+    "C2.no_auth_required": {
+      "pass": true,
+      "detail": 0
+    },
+    "C2.no_expired_message": {
+      "pass": true,
+      "detail": false
+    },
+    "C2.session_state_has_session": {
+      "pass": true,
+      "detail": {
+        "ok": true,
+        "hasSession": true
+      }
+    },
+    "C2.old_run_stopped_with_replaced_detail": {
+      "pass": true,
+      "detail": {
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "status": "ingest_failed"
+      }
+    },
+    "PC.old_run_never_presented_B_refresh_token": {
+      "pass": true,
+      "detail": []
+    },
+    "PC.B_refresh_token_stored_unrotated": {
+      "pass": true,
+      "detail": [
+        [
+          "tgp_refresh_token",
+          "NEW_RT"
+        ]
+      ]
+    },
+    "PC.no_request_under_B_or_B_minted_bearer": {
+      "pass": true,
+      "detail": [
+        [
+          "clients?per_page=25&page=1",
+          "Bearer SOURCE"
+        ],
+        [
+          "scout/ingest",
+          "Bearer OLD_ACCESS"
+        ]
+      ]
+    },
+    "PC.no_complete_call": {
+      "pass": true,
+      "detail": 0
+    },
+    "PC.no_auth_required": {
+      "pass": true,
+      "detail": 0
+    },
+    "PC.no_expired_message": {
+      "pass": true,
+      "detail": false
+    },
+    "PC.session_state_has_session": {
+      "pass": true,
+      "detail": {
+        "ok": true,
+        "hasSession": true
+      }
+    },
+    "PC.old_run_stopped_with_replaced_detail": {
+      "pass": true,
+      "detail": {
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "status": "ingest_failed"
+      }
+    }
+  },
+  "scenarios": {
+    "C1": {
+      "replacementAck": {
+        "ok": true
+      },
+      "calls": [
+        {
+          "url": "https://api.tgp.coach/api/auth/extension/refresh",
+          "authorization": null,
+          "refreshToken": "OLD_R"
+        }
+      ],
+      "refreshTokensPresented": [
+        "OLD_R"
+      ],
+      "ingestBearers": [],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "NEW_R"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 0,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": null,
+        "progress": [],
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "workerActive": true
+      },
+      "expiredSeen": false
+    },
+    "C2": {
+      "pendingReplacementAck": {
+        "ok": true
+      },
+      "refreshesWhilePersistHeld": 0,
+      "calls": [
+        {
+          "url": "https://app.truecoach.co/proxy/api/clients?per_page=25&page=1",
+          "authorization": "Bearer SOURCE",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/scout/ingest",
+          "authorization": "Bearer OLD_A",
+          "refreshToken": null
+        }
+      ],
+      "refreshTokensPresented": [],
+      "ingestBearers": [
+        "Bearer OLD_A"
+      ],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "NEW_R"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 0,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": {
+          "intentId": "imp-1790051648044",
+          "platform": "truecoach",
+          "status": "ingest_failed"
+        },
+        "progress": [],
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "pendingTransfer": {
+          "entityType": "clients",
+          "count": 1
+        },
+        "workerActive": true
+      },
+      "expiredSeen": false
+    },
+    "PC": {
+      "first": {
+        "ok": true
+      },
+      "startedAck": {
+        "ok": true
+      },
+      "replacementAck": {
+        "ok": true
+      },
+      "refreshesBeforeRelease": 0,
+      "calls": [
+        {
+          "url": "https://app.truecoach.co/proxy/api/clients?per_page=25&page=1",
+          "authorization": "Bearer SOURCE",
+          "refreshToken": null
+        },
+        {
+          "url": "https://api.tgp.coach/api/scout/ingest",
+          "authorization": "Bearer OLD_ACCESS",
+          "refreshToken": null
+        }
+      ],
+      "refreshTokensPresented": [],
+      "ingestBearers": [
+        "Bearer OLD_ACCESS"
+      ],
+      "completeCalls": 0,
+      "session": [
+        [
+          "tgp_refresh_token",
+          "NEW_RT"
+        ]
+      ],
+      "sessionState": {
+        "ok": true,
+        "hasSession": true
+      },
+      "authRequired": 0,
+      "lastSnapshot": {
+        "kind": "status_snapshot",
+        "intent": {
+          "intentId": "imp-1790051648056",
+          "platform": "truecoach",
+          "status": "ingest_failed"
+        },
+        "progress": [],
+        "lastError": "import stopped — your TGP session changed during the import. Start the import again.",
+        "pendingTransfer": {
+          "entityType": "clients",
+          "count": 1
+        },
+        "workerActive": true
+      },
+      "expiredSeen": false
+    }
+  }
+}

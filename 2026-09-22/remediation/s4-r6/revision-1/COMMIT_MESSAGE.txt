@@ -1,0 +1,27 @@
+S4 R6: revalidate the preflight owner synchronously at the notification (S4-R5-A-01)
+
+Isolated successor to 88287cff for the frozen R5 finding S4-R5-A-01 (independent
+audit A, revision 1): the preflight failure was CLASSIFIED ("not replaced")
+while the run's own session was still current, but the classification travelled
+back into handleStartImport / handleStartIngest across an await boundary. A
+replacement whose establish was queued on the state lock could commit inside
+that gap (microtask offsets 10 and 11 in the finite enumeration, both
+entrypoints), so the worker broadcast auth_required / "login required to
+import" while the replacement B was already current and locally valid.
+
+reportPreflightFailure now receives the accepted Start's generation and
+re-checks getSessionGeneration() synchronously, immediately before any
+notification: an obsolete preflight reports the replaced detail (no
+auth_required, nothing cleared); "login required" is broadcast only when the
+run's OWN session is still current and could not mint. Both entrypoints pass
+their admission-time generation. Nothing of the current session is read,
+presented or cleared on either branch; refresh admission (shared/session.js) is
+unchanged.
+
+Regression: test/session-ownership-preflight.spec.js gains a describe block
+that enumerates the replacement-commit offset (0..40 microtask turns) on both
+start_import and start_ingest, asserting no auth_required is ever emitted while
+a session other than the run's own is current, that the genuine OLD-current
+failure remains visible exactly once, that B's refresh token is never
+presented/rotated/removed, and that the single-flight guard is released; plus a
+control where the replacement pairs only after the genuine report.
