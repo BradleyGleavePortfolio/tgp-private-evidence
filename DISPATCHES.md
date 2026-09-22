@@ -1,12 +1,14 @@
 # Active TGP execution register
 
-Updated 2026-09-22 21:53 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
+Updated 2026-09-22 22:03 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
 
 User directed the existing six-slice continuation in parallel IF SAFE. Full current contracts: `execution/OP88_WAVE1.md`. All assignments T4; canonical builder Claude Fable 5. Requested High policy is not observed runtime telemetry. All prior-session worker IDs/processes/installations/grants are historical. Earlier register retained in Git at ad3568a9.
 
 | Slice | Fresh worker ID | Requested model | Sole writes | Current state |
 |---|---|---|---|---|
-| S5/S6 shared launch V10 correction | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozenV8/V9/closure; new execution/op88/s5-v10-t0 | ACTIVE exact repair against BOTH frozen V9 reports; current-census race included. S6 adaptation paused, no runtime. |
+| S5 setup-only exclusion successor | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozen s5-v10-t0; new execution/op88/s5-setup-exclusion | V10 COMPLETEfdc99771,20/20. ACTIVE only concrete A04 outer-lease correction; no generic refinement or V10 mutation. |
+| S5 V10 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | execution/op88/audits/owned-launch-v10-a | ACTIVE exact-scope next-proof review; separate private controls/T0/setup verdicts, no current B access. |
+| S5 V10 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | execution/op88/audits/owned-launch-v10-b | ACTIVE independently on same frozen bytes; no current A access. |
 | Owned launch V9 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | frozen execution/op88/audits/owned-launch-v9-a | COMPLETE audit104a6bba/manifest56d46b9f, R6/setup/T0 HOLD, five material findings. No peer access/execution; idle. |
 | Owned launch V9 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | frozen execution/op88/audits/owned-launch-v9-b | COMPLETE manifestcceedc52, five material findings, setup/T0 not grantable, no known-invalid controls recommended. No peer access/execution; idle. |
 | Owned launch V8 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | frozen execution/op88/audits/owned-launch-v8-a | COMPLETE manifest9f54e9d7: all execution HOLD, six concrete findings. No peer access/probes; frozen report released to fixer only. |
@@ -20,7 +22,9 @@ User directed the existing six-slice continuation in parallel IF SAFE. Full curr
 | S2 V5.6 independent B | s6_independent_c5_review_mud58q6k | Claude Fable 5 | frozen execution/op88/audits/s2-v56-b | COMPLETE54f0382a: controls/proof not grantable, narrower runner-source view retained without waiving A. No peer access/execution; idle. |
 | S4 V4 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent; actual runtime identity unexposed | frozen execution/op88/audits/s4-v4-a | COMPLETE/FROZEN: Stage1/Stage2 HOLD; six material source counterexamples, manifest63de35c3 verified. No peer access or probes. V5 consolidated successor now independently under review. |
 | S4 V4 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | frozen execution/op88/audits/s4-v4-b | COMPLETE independent7a26681d: Stage2 HOLD, narrower Stage1 opinion. Parent retains A material findings; both readable to fixer now, never cross-shared before freezing. |
-| S4 V6 additive fixer | s4_consolidated_v5_runner_fixer_mud5vjls | Claude Fable 5 | frozen s4-v5; new execution/op88/s4-v6 | ACTIVE bounded corrections against both frozen V5 reports, including A containment/census/budget findings and private fault-path controls. No runtime or ownership expansion without parent ruling. |
+| S4 V6 additive fixer | s4_consolidated_v5_runner_fixer_mud5vjls | Claude Fable 5 | frozen execution/op88/s4-v6 | COMPLETE8b04adaf12/12, no runtime; idle for concrete findings or safe execution grant. |
+| S4 V6 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | execution/op88/audits/s4-v6-a | ACTIVE exact-scope next-proof review, no current B access; no generalized coverage expansion. |
+| S4 V6 independent B | s4_v5_independent_audit_b_mud6selv | Claude Fable 5 | execution/op88/audits/s4-v6-b | ACTIVE independent same frozen candidate, no current A access. |
 | S4 V5 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | frozen execution/op88/audits/s4-v5-a | COMPLETE audit0adc4d6b: both stages HOLD, five material residuals. No B access or execution; now distinct V9 review. |
 | S4 V5 independent B | s4_v5_independent_audit_b_mud6selv | Claude Fable 5 | frozen execution/op88/audits/s4-v5-b | COMPLETE manifest1bf4653c, both stages HOLD with narrower closure assessment; no peer access/probes. Private failure-path discriminator required. Idle. |
 | S1/S3 upstream integration preparation | s1_s3_gated_integration_preparation_mud58q6v | Claude Fable 5 | frozen prep/addendum; worktrees/op88-upstream | COMPLETE source restoration: S3 bundle940ce711, PREP2 both parents exact, matrix86/86. No runtime/install/hooks/commit. Idle pending S2/runtime gates. |
@@ -29,6 +33,8 @@ User directed the existing six-slice continuation in parallel IF SAFE. Full curr
 ## Ownership and grants
 
 Parent alone writes current telemetry and privately publishes. Archive and baseline repos are read-only to workers. S1 remains sole reserved schema/migration/generator owner; no schema changes assigned. Auditors do not implement their candidates, share current conclusions before freezing, or execute heavy duplicate proofs.
+
+Owner correction22:03 governs every worker: execute next safe bounded proof after exact-scope material closure. New cycles only for concrete material defect, attributable failed execution, changed head or true previously uncovered T4 boundary. No invented harness requirements, broadened closed audit, rerun of valid evidence or speculative refinement. All active workers notified.
 
 S5 R1 read-only checker grant is consumed, bounded positive result frozen; no repetition. All heavy/setup/native allocations held. Canonical nonblocking lock `/home/user/workspace/execution/test-validation.lock` is not itself permission. Every later execution needs frozen commands/inputs, expected positive/negative results, current ownership, resource/timeout/cleanup bounds, raw exits and cleanup evidence.
 

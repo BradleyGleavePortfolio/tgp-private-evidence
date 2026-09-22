@@ -1,0 +1,36 @@
+SYNTAX-ONLY CHECKS, V6 packet (post-B incorporation), 2026-09-22T21:55:47Z. No script executed.
+launcher/s4-r6-launch-v6.sh: bash -n OK
+runner/s4-r6-lib-v6.sh: bash -n OK
+runner/s4-r6-validate-v6.sh: bash -n OK
+controls/s4-r6-control-stub-v6.sh: bash -n OK
+controls/run-controls-v6.sh: bash -n OK
+controls/control-predicates-v6.py: py_compile OK
+runner/chrome-pipe-discriminator-v6.mjs: node --check OK
+pipe byte-identical to V5/V4 (c261ffb4)
+lib: identical to V5 modulo names/added header line
+launcher SUPERVISOR_RECORD writer: shell args 56 == python tuple 56: OK
+lib EXIT_RECORD writer: fixed args 27 == tuple 27 == slice 27 == rest offset 27: OK
+launcher/s4-r6-launch-v6.sh: quoted heredocs 1, unquoted 0
+runner/s4-r6-lib-v6.sh: quoted heredocs 1, unquoted 0
+runner/s4-r6-validate-v6.sh: quoted heredocs 5, unquoted 0
+controls/s4-r6-control-stub-v6.sh: quoted heredocs 0, unquoted 0
+controls/run-controls-v6.sh: quoted heredocs 0, unquoted 0
+launcher/s4-r6-launch-v6.sh block0: embedded-python undefined names: none
+runner/s4-r6-lib-v6.sh block0: embedded-python undefined names: none
+runner/s4-r6-validate-v6.sh block0: embedded-python undefined names: none
+runner/s4-r6-validate-v6.sh block1: embedded-python undefined names: none
+runner/s4-r6-validate-v6.sh block2: embedded-python undefined names: none
+runner/s4-r6-validate-v6.sh block3: embedded-python undefined names: none
+runner/s4-r6-validate-v6.sh block4: embedded-python undefined names: none
+controls/control-predicates-v6.py: embedded-python undefined names: none
+stale code references (session_members/hold_quarantine_lease/LEFT_INITIAL/QUARANTINE_HOLDER_FAILED): 0
+driver: TERM sends to ACTIVE_PID: 1 (1 expected, inside the CANCEL_SENT-empty branch)
+driver: KILL of ACTIVE_PID: 0 (0 expected)
+driver: bare 'exit 0': 0 (0 expected; success goes through finish 0)
+driver: KILL sites: ['kill -KILL "$pid" 2>/dev/null', 'if [[ $C_STATE == MEMBERS ]]; then for p in $C_MEMBERS; do kill -KILL "$p" 2>/dev/null; do']
+launcher: holder KILL sites: ['if kill -0 "$QUARANTINE_HOLDER" 2>/dev/null && tr \'\\0\' \' \' < "/proc/$QUARANTINE_HOLDER/cmdline" 2>/d', 'if [[ $(proc_start "$QUARANTINE_HOLDER") == "$QUARANTINE_HOLDER_START" ]] && holder_ok "$QUARANTINE_']
+launcher: has_fault gates (all KIND==CONTROL via has_fault): 4 uses; has_fault() def gated on KIND == CONTROL: True
+launcher: LEASE_RELEASED_AT_EXIT=true assignments in code: ['LEASE_HELD=false; LEASE_RELEASED_AT_EXIT=true; QUARANTINE_HOLDER=""; QUARANTINE_']
+driver scenarios: ['fault-census-unknown', 'fault-holder-unverifiable', 'fault-receipt-unwritable', 'fault-survivors-quarantine', 'lease-held-by-supervisor', 'live-step-double-term', 'live-step-interrupt', 'nested-orphan-after-exit', 'predicate-rc0', 'record-without-sentinel', 'refuse']
+driver - stub cases: ['refuse'] (refuse handled by early exit; fault-holder-unverifiable never spawned)
+driver - predicates: []

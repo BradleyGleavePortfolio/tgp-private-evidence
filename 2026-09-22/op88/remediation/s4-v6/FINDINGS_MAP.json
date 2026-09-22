@@ -1,0 +1,127 @@
+{
+ "packet": "execution/op88/s4-v6 (V6)",
+ "basis": {
+  "v5_manifest": "73c2dbbe\u2026",
+  "audit_a_v5": "execution/op88/audits/s4-v5-a/AUDIT.json 0adc4d6b\u2026",
+  "audit_b_v5": "execution/op88/audits/s4-v5-b/FINDINGS.json 430ae71d\u2026 / REPORT.md 2bcf6cf5\u2026 (manifest 1bf4653c\u2026)"
+ },
+ "truth": {
+  "implemented": true,
+  "syntax_checked": true,
+  "hashed": true,
+  "diffed": true,
+  "tested": false,
+  "executed": false
+ },
+ "closures": [
+  {
+   "id": "S4-V5-A-01 / S4-V5-B-01",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "controls/run-controls-v6.sh",
+   "change": "resolve_active_run binds ACTIVE_RUN_DIR by launcher pid in RUN_ID during run_bounded polling and inside cancel_active/finish; RUN_IDENTITY NONE/UNKNOWN_NO_SPAWN/BOUND; LAST_RUN_DIR only from a bound run",
+   "discriminator": "cancel receipt run= names the dir containing the ACTIVE launcher pid (current-first) and never the previous control's (next-run); no dir => identity=UNKNOWN_NO_SPAWN, exit 99"
+  },
+  {
+   "id": "S4-V5-A-02 / S4-V5-B-03 / S4-V5-B-04",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "controls/run-controls-v6.sh",
+   "change": "one TERM per launcher (CANCEL_SENT) against one absolute CANCEL_DEADLINE = grace+77+5 slack; re-entry waits only the remainder; launcher alive at deadline => UNRESOLVED even if starttime cannot be compared (never an unconditional wait); reserve 115 itemised",
+   "discriminator": "exactly one 'CANCEL active launcher' line; source has 1 kill -TERM \"$ACTIVE_PID\" and 0 kill -KILL \"$ACTIVE_PID\"; 're-entered ... waiting only the remaining' on second call"
+  },
+  {
+   "id": "S4-V5-A-03 / S4-V5-B-08 (parent: exit 10 not containment)",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "launcher/s4-r6-launch-v6.sh",
+   "change": "standby tokenized holder spawned+verified after flock and BEFORE the runner (failure => STANDBY_HOLDER_FAILED 8, nothing owned); released identity-checked only after verified-EMPTY census; quarantine: re-verify holder, ONE respawn if lost, receipt tmp+mv; receipt failure keeps the holder (QUARANTINED_RECEIPT_FAILED 11); no verified holder at all => SELF-HOLD (launcher exec -a <token>-SELF, TERM/INT/HUP ignored, would-be 12, does not exit). LEASE_RELEASED_AT_EXIT is never set true after init.",
+   "discriminator": "creation failure: exit 8, standby_holder_verified=false, no OWNED_SID, spawned_pid null, lease free. publication failure: exit 11, receipt absent, quarantine_ok=true, quarantine_receipt_ok=false, released_at_launcher_exit=false, holder alive with token + fd9. self-hold: launcher pid alive, cmdline s4r6-quarantine-holder-<RUN_ID>-SELF, driver 97 with lease_held_by_it=true",
+   "exercised_by_stage1": "8 (fault-holder-unverifiable), 5 (fault-survivors-quarantine, fault-census-unknown), 11 (fault-receipt-unwritable); NOT exercised: SELF-HOLD, standby loss/respawn"
+  },
+  {
+   "id": "S4-V5-A-04 / S4-V5-B-02",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": [
+    "controls/run-controls-v6.sh",
+    "SLOT_REQUEST_V6.md"
+   ],
+   "change": "success path ends in finish 0; finish re-checks census/lease/LIVE holder and downgrades 0 => 94/98/99/97; DRIVER-TERMINAL-*.txt written (checked; 90 if unwritable on a 0 path) then identical EXIT code= line",
+   "discriminator": "raw exit 0 AND DRIVER-TERMINAL receipt 'EXIT code=0 ... identity=BOUND leftovers_first=\\'\\' (state=EMPTY) ... private_lease_free=true live_quarantine_holder=\\'\\''"
+  },
+  {
+   "id": "S4-V5-A-05",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": [
+    "controls/run-controls-v6.sh",
+    "launcher/s4-r6-launch-v6.sh",
+    "controls/control-predicates-v6.py"
+   ],
+   "change": "census keeps PIPESTATUS[0]: 0 MEMBERS / 1 EMPTY / else UNKNOWN:<rc>; driver: LEFT_FIRST* set once per run, LEFT_FINAL* separate, UNKNOWN => no reap, exit 99, NO_SESSION distinct (allowed only for refusal class); launcher: wait_session_empty true only on EMPTY, SURVIVORS_STATE != EMPTY => quarantine, owned_session.census_state recorded; predicate requires EMPTY for normal controls",
+   "discriminator": "driver 'census=UNKNOWN:124' + EXIT code=99; launcher record census_state UNKNOWN:124 with overall QUARANTINED_* (fault-census-unknown control exercises exactly this)"
+  },
+  {
+   "id": "S4-V5-B-06",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": [
+    "launcher/s4-r6-launch-v6.sh",
+    "controls/run-controls-v6.sh",
+    "controls/s4-r6-control-stub-v6.sh",
+    "controls/control-predicates-v6.py"
+   ],
+   "change": "CONTROL-only fault seams (has_fault: KIND==CONTROL AND S4R6_FAULT list): holder-unverifiable, census-members-persist (armed only after the runner really exited), receipt-unwritable, census-unknown; four fault controls with classes refusal/quarantine; driver verifies LIVE identity-checked holder + lease held + real session EMPTY, then recover_holder (\u00a76 rule) and verifies release; predicates specify exit 8/5/11 facts",
+   "discriminator": "see SLOT_REQUEST_V6.md \u00a72 B-06 row",
+   "note": "parent required private exercise before canonical first use; not asked to accept the residual"
+  },
+  {
+   "id": "S4-V5-B-05 / S4-V4-B-06",
+   "status": "PRIOR_NONBLOCKING_QUALIFICATION_NOT_CLOSED",
+   "file": "controls/s4-r6-control-stub-v6.sh (unchanged lines 21,56 in V5 numbering)",
+   "change": "none (map corrected: control lease-held-by-supervisor cannot distinguish the launcher's hold from the stub's inherited fd 9; V5 map wrongly grouped it with budget/receipt items)",
+   "discriminator": "n/a; optional exec 9>&- before the probe remains open, no new consequence identified"
+  },
+  {
+   "id": "S4-V5-B-07 / A publication qualification",
+   "status": "PARTIAL",
+   "file": "launcher/s4-r6-launch-v6.sh",
+   "change": "post-writer JSON re-parse under timeout READ_S; census under CENSUS_S; bounds.bound_qualification states mv/log/ps/sha256sum are not enclosed; worst_case_s is a sum of allowances, not an externally enforced deadline",
+   "discriminator": "record bounds.bound_qualification string"
+  },
+  {
+   "id": "S4-V5-B-09",
+   "status": "ACCEPTED_UNCHANGED",
+   "change": "driver reaps only a session whose launcher has exited; judged fact stays LEFT_FIRST (renamed from LEFT_INITIAL)"
+  },
+  {
+   "id": "S4-V5-B-10 (cosmetic)",
+   "status": "ADDRESSED_IN_TEXT",
+   "change": "exit legend rewritten from actual branches (no runner-hash exit; 73 topology, 75 lease busy, 6 orphans, 7 publication, 9 handshake); 70 collision noted; pipe_v6_sha256 key rename noted for downstream; '94 covers recorded holder' now 'LIVE holder' with cancel/trap paths giving 96/97/143 receipts"
+  },
+  {
+   "id": "A decision points (91/97/98 prose)",
+   "status": "ADDRESSED",
+   "change": "91/70/95 labelled pre-spawn (no finish); 97 receipt includes readlink fd 9 result and identity certainty; 98 judged on LEFT_FINAL while LEFT_FIRST preserved"
+  }
+ ],
+ "preserved": [
+  "S4-V4-A-01 latch + control seam (lib identical modulo names)",
+  "mandatory parsed-record/nonempty-step predicates",
+  "guarded raw callers",
+  "launcher-owned lease attribution in EXIT_RECORD.lock",
+  "artifact joins/pins (runner identical modulo names/header)",
+  "uutils exit set {15,124,137,143}",
+  "survivors-before-TIMEOUT precedence",
+  "setsid ownership, quoted-heredoc JSON writers (56/56, 27/27 argv)",
+  "pipe helper bytes c261ffb4"
+ ],
+ "not_exercised_by_stage1": [
+  "SELF-HOLD (12)",
+  "standby holder loss + respawn",
+  "canonical lock",
+  "native runner steps"
+ ],
+ "remaining_blockers": [
+  "nothing executed; all closures source-level until Stage 1 runs under a separate grant",
+  "two independent exact-V6 reviews required",
+  "restoration paths absent (SLOT_REQUEST_V6.md \u00a73)",
+  "decision point: SELF-HOLD as terminal containment fallback vs parent rescope (request \u00a77.1)"
+ ],
+ "smallest_next_action": "dispatch two independent risk-scoped exact-V6 reviews against SHA256SUMS; then separate Stage 1 grant"
+}

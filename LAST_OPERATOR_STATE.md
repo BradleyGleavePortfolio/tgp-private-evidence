@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 21:53 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
+Updated: 2026-09-22 22:03 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
 
 ## Mission and authority
 
@@ -31,15 +31,17 @@ Preserved public stacks remain open and unmerged:
 
 Current independently executable slice records, writer surfaces, acceptance, recovery and non-goals: `execution/OP88_WAVE1.md`, continuing the original `execution/CONTINUATION_20260922.md` and named repair-wave scopes without reopening them. Fresh worker IDs are in synchronized `execution/DISPATCHES.md`. Prior-session IDs and grants are historical, not live in this workspace. All 64 preserved public PR grades remain in `execution/pr-grades/PUBLIC_PR_GRADES.{md,json}`; retained grades are not audit clearance.
 
-Current dispatch: three disjoint T4 repair lanes run in parallel: S2 V5.7, S4 V6, shared-launch S5 V10. All three preceding candidates now have BOTH independent reports frozen; every material finding binds without majority waiver. V10 includes both V9 reports, followed by fresh dual review. S5 R1 checker gap closed, no rerun; all later execution remains held. S6 C6 unaffected-scope review complete, launch adaptations/setup pending. S1/S2 source and S3 two-parent PREP2 source ready, not runtime-cleared. No installation/heavy/DB/product landing/release grant.
+Owner course correction22:03: EXECUTION OVER META. No new revision/audit/harness requirement unless a concrete material defect, attributable failed execution, changed exact head or true previously uncovered T4 boundary requires it. Do not rerun valid evidence or broaden closed review scope. Prefer the smallest safe next bounded proof immediately upon exact-scope closure. Priority: S2 V5.7 controls→realDB/S1TRUNCATE; S5 V10→setup/T0; S4 V6→controls/package/browser; shared launch→S6 C6. Independent ready lanes need not wait for an unrelated blocker.
+
+Current dispatch: S4 V6 and S5 V10 frozen, each under dual exact-scope review. S2 V5.7 still fixing existing material findings. S5 setup-only exclusion successor addresses the disclosed existing A04 release defect; it must not delay a genuinely independent safe V10 private proof. S5 R1 closed, no rerun. S6 C6 unaffected-scope review complete; S1/S2 source and S3 PREP2 ready, not runtime-cleared. No new runtime/install/release grant yet.
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
 | S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups frozen; no new source defect. Source-only CONTROL_REQUEST_10 prerequisites restored: s2-runner53 exact clean d5cd/treec0ab87d4 and s2-setup-prep37/37 verified, no path amendment needed. Proof packet upstream-prereqs-2 manifestc6bb412c; parent verified21:44. No install/runtime. Next: execution after S2 review/setup clearance, then dual auditors. TRUNCATE/membership dynamic proof pending; 56fb IS composed in21ea/d5cd. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Product R3 unchanged; V5.6 outer41cd5371,19/19 immutable. A9f5a7e01 + environment0a9fb84f and B54f0382a frozen, both execution HOLD. Next: sole Fable fixer V5.7 closes A01..07 plus B material watchdog/slack/proof-bound/installstamp findings, then dual exact review. Source pins restored, predecessor writable output ENV01 remains future grant prerequisite; no setup05 reuse. |
 | S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source ready, not runtime-cleared. S3 bundle940ce711/manifest8646c075 verified34/34; head/tree/23commits restored offline. PREP2 treea584a1b9 reproduced from BOTH parents; parent2 matrix86/86, no missing objects. Three recorded resolutions/six formatting-only changes attributed. Runtime/hooks/composed-lock/final reviews pending. |
-| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V5 manifest73c2dbbe12/12 immutable. A audit0adc4d6b and B manifest1bf4653c frozen, execution HOLD. Next: sole fixer V6 against A01..05 and B findings; private survivor/quarantine/holder-failure controls required before canonical first-use. B narrower closure/5-line suggestion waives nothing. No controls/native grant; source/artifact distinction unchanged. |
-| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R1 closed. V9 manifest36f04f84+closure345c1b7f immutable. A audit104a6bba/manifest56d46b9f and B manifestcceedc52 frozen; controls/setup/T0 remain HELD. Next: sole fixer V10 against both reports, then dual exact review. B confirms wait/trap/publication defects and adds group-census race; S6 adaptations paused, no runtime. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V6 frozen manifest8b04adaf7d4f0a511ee68e960d880e0ec386187335b7da9fde9c44c1c74a050b,12/12 verified. Dual A/B review active, limited to existing material closures/next-proof safety. Retained SELF-HOLD is exceptional recovery, not finite success; no blanket extra fault-coverage gate absent concrete material gap. Next: safe bounded Stage1 after dual closure, then actual package/browser prerequisites. |
+| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10 frozen manifestfdc9977191a6d311281fdbb239d6ba015f2ca3f7b1bc5024fe7b56d51a26f54a,20/20 verified. Dual A/B review active with separate primitive/private-controls/T0/setup verdicts. Known setup failed-marker→releaseunknown branch remains HOLD; sole fixer makes setup-only outer-lease successor, no V10 mutation. Next safe private proof may execute independently after dual closure. S6 adaptation follows primitive acceptance. |
 | S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 narrow B frozen5196e231: unaffected hazard/classifier/observer/binding scope has no material defect, execution still HELD on shared startup primitive/setup.19/19 original packet unchanged. C5 additive correction76f70108 confirms8policy+7historicalnoreply identities; original2398cc9d preserved, finald51 Bradley identity verified. No product/diagnostic runtime. |
 
 Four advertised bundle identities were checked against current packet heads: S2 `3b6cee48…0f75`, S4 `f8de3d63…cf97`, S5 `e42aa021…5b48`, S6 `c0ad2994…9662`. Workers must verify prerequisite, actual tree and isolated clean restoration before edits. Restoration is not a new passing test or audit.
@@ -93,16 +95,16 @@ Success requires native reconciled completion, not staging/generic reconstructio
 
 ## Next six executable slices
 
-1. S5 R1 bounded gap closed; complete V10 against both frozen V9 reports, then dual exact review before separately granted controls/setup/T0. Preserve failedV6 and valid observations, no checker rerun.
-2. S6 C6 unaffected-scope narrow review complete; after shared primitive acceptance, sole owner adapts exact C6/setup consumers, followed by applicable review and separately granted fresh setup/C-only discriminator.
-3. Complete S2 V5.7 against both frozen V5.6 reports, dual exact closure, then necessary controls before fresh setup/realproof.
-4. Complete S4 V6 repair against both frozen V5 reports, then exact dual review before private controls/native/artifact/browser proof.
+1. S2: freeze V5.7 existing material corrections, dual exact closure, immediately bounded controls then fresh setup/realDB composition. No additional process refinement.
+2. S5: finish active dual V10 reviews, execute the first safe independent bounded proof; close only concrete setup-exclusion defect before setup/T0. Preserve R1 positive and V6 fail, no rerun.
+3. S4: finish active dual V6 reviews, immediately execute safe private controls; restore only actual prerequisites for package/browser.
+4. S6: after shared primitive clearance, exact consumer adaptation/applicability, fresh setup and C6 only; no repetition of valid C5 A/B/D.
 5. Guarded unchanged-d5cd/S1 real composition/TRUNCATE discriminator after safe runner/environment; dual final evidence-bound follow-up.
 6. S3 exact two-parent PREP2 source now ready; request03/environment/hook-enabled merge, composed-lock proof and final dual reviews remain downstream of upstream readiness.
 
 ## Bradley decision required
 
-NO for current local engineering/review. Hosted-review identity/security settings and production/customer actions remain reserved. Exact next action: collect bounded S2 V5.7/S4 V6/S5 V10 candidates, dispatch exact independent reviews immediately at each freeze, then grant only validated execution serially. Do not repeat valid controls, speculate on product fixes, or run downstream integration before prerequisites.
+NO for current local engineering/review. Hosted-review identity/security settings and production/customer actions remain reserved. Exact next action: freeze/review S2 V5.7 and collect S4 V6/S5 V10 exact-scope verdicts; immediately grant the smallest safe bounded proof when ready. Further cycles need one of the owner's four concrete triggers, never generalized safety refinement.
 
 ## Evidence entry points
 
