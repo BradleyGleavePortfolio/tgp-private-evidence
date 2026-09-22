@@ -33,7 +33,7 @@ Full independently executable slice records, writer surfaces, acceptance, recove
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
-| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Frozen tree79ebf175, restored clean. Two fresh independent R4 source follow-up reviewers active; neither writes source. Historical24/24 and predecessor17/7 retained. Real TRUNCATE discriminator/composition remains pending and final dynamic attestation held. Sole schema/migration/generator ownership reserved. |
+| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Frozen tree79ebf175, clean. R4 reviewer A frozen04:41:58 accepts narrow source follow-up; quoted/pre-seed findings source-closed, effective TRUNCATE source-fixed/behavior pending. No new material source blocker within scope. B still independently reviewing. Real discriminator/composition and final dynamic attestation held; historical24/24 and predecessor17/7 remain limited message evidence. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | S2-RUNNER-53 dispatched to Fable. Execution-only child/cleanup-budget repair; product source stays frozen. Last archived named runner is v5.1; verify current packet before claiming later bytes recovered. At most 60s of bounded private-lock fake-process controls allowed; no DB/heavy grant. |
 | S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Unchanged, retained bounded R2 acceptance. Fresh Fable integration-applicability analyst compares exact5c7b/d5cd ancestry, overlap and prior proof; no duplicate R2 audit/tests or product composition authorized. S3 not yet included in S2 composition. |
 | S4 / T4 | `88287cff47240aa58b5f0fea5da08670f1e87df6` | S4-R6-REPORTING dispatched to Fable. Frozen R5 A counterexample remains material despite B not observing it. Minimal synchronous reporting-generation repair and bounded dependency-free probes allowed; no full/package/browser slot. |
@@ -48,7 +48,7 @@ Fresh workspace: 2 CPUs, about 8 GB memory; baseline clones and private archive 
 
 Source reads/edits are parallel in isolated areas. Only the brief's bounded S2 fake-process and S4 dependency-free probes have execution permission. S5/S6 require separate proposed and reviewed allocations. A free lock is not a grant; changed source/runner bytes invalidate a prior grant's attribution.
 
-Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. Two independent S1 R4 source follow-ups are active; other current-round candidate reviews await frozen builder evidence. Prior frozen reports remain original evidence and are not rewritten. All six S-lanes now have appropriately staged active work.
+Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 R4 A returned a frozen source-only acceptance with dynamic attestation pending; B remains independent and active. Other current-round candidate reviews await frozen builder evidence. All original reports remain unchanged. All six S-lanes have appropriately staged work.
 
 ## Material failed evidence and findings
 

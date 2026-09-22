@@ -6,7 +6,7 @@ Updated 2026-09-22 04:38 UTC. Current session `8fc3af28-e515-4342-8e32-b79aa3b06
 
 | Slice | Worker ID | Requested model | Sole writes | State |
 |---|---|---|---|---|
-| S1-R4-SOURCE-FOLLOWUP A / T4 | `s1_r4_independent_audit_a_muc6muvy` | Inherited parent; actual runtime identity unexposed | `execution/audits/s1-r4-current/a` only | Independent read-only R4 source follow-up on56fb/tree79eb; real discriminator/composition attestation explicitly pending. No current peer access. |
+| S1-R4-SOURCE-FOLLOWUP A / T4 | `s1_r4_independent_audit_a_muc6muvy` | Inherited parent; actual runtime identity unexposed | `execution/audits/s1-r4-current/a` only | Revision1 frozen04:41:58: narrow source follow-up accepted, quoted/pre-seed source closure; TRUNCATE behavior and dynamic composition attestation PENDING. No new material source finding; no current peer access. |
 | S1-R4-SOURCE-FOLLOWUP B / T4 | `s1_r4_independent_audit_b_muc6muwk` | Claude Fable 5; High policy, actual setting unexposed | `execution/audits/s1-r4-current/b` only | Independent read-only R4 source follow-up on same frozen56fb; no current peer access, DB or test execution. |
 | S3-R2-INTEGRATION-APPLICABILITY / T4 | `s3_r2_integration_applicability_muc6muwe` | Claude Fable 5; actual setting unexposed | isolated restored source, `execution/s3-integration-applicability` | Read-only applicability/composition preparation for retained5c7b against d5cd; not a duplicate R2 audit or new clearance. |
 | S2-RUNNER-53 / T4 | `s2_t4_runner_cleanup_muc6cvij` | Claude Fable 5; High policy, actual setting unexposed | `worktrees/s2-runner53`, `execution/s2-runner53` | Dispatched; execution-only runner repair from preserved d5cd, bounded private-lock fake controls ≤60s. No DB/heavy grant. |
