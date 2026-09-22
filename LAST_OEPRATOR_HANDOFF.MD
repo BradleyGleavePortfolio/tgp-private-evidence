@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September22,2026 1:52PM PDT / 20:52UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
+Updated September22,2026 2:01PM PDT / 21:01UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -10,11 +10,11 @@ Bradley explicitly instructed all six existing continuations in parallel IF SAFE
 
 ## Active lanes
 
-- S5 / T4: Fable selective V7 checker/T0-only driver preparation. Preserve dirty patch on143d451e, failed V6 and valid T1/T2/rawT3 evidence. Independent narrow review then separately granted execution.
-- S6 / T4: independent Fable C5 raw-evidence/causal-applicability review on unchangedd51a1910. Six behavioral passes plus hang143 are not acceptance; no speculative teardown/product fix.
+- S5 / T4: V7 frozen, manifestdd7f2eab15/15 verified, under independent narrow review; same Fable builder restores143d+patch at reservedworktrees/s5-r4 without installs. Failed V6/validT1/T2/rawT3 remain. No checker/T0 execution yet.
+- S6 / T4: independent C5 B frozen2398cc9d; five timers observed, initiating clear inferred, test-only complete-fix claim held for two predicted in-case orphans. New non-auditor Fable prepares smallest two-hook C6 discriminator, no product fix/runtime; predeclared2/0/5/divergence outcomes.
 - S2 / T4: Fable V5.6 minimal fixer against BOTH frozen55 reports, unchanged productd5cd9b8b. No control or real DB grant; dual exact-successor reviews after freeze.
 - S4 / T4: V4 A frozen HOLD both stages, six material source counterexamples, manifest63de35c3 verified; B review independently active, no A sharing. Product91990ae9 source closure remains narrow; no controls/artifact acceptance. Consolidate both frozen verdicts before one runner-only fixer.
-- S1/S3 / T4: Fable builder restores exact preserved inputs/PREP2 tree without code edits; runtime composition and integration remain dependency-gated, not independently executable now.
+- S1/S3 / T4: S1/S2 identities/23commits/blobs and PREP2 parent1 tree verified offline. Specific S3 parent bundle was absent from sparse intake, now hydrated for additive parent2 closure; not lost or reimplemented. Runtime/integration remain dependency-gated.
 
 ## Resource and evidence truth
 

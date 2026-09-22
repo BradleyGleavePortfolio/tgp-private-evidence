@@ -1,0 +1,46 @@
+--- inputs/ctl-teardown-gate.v6.sh	2026-09-22 20:50:56.154466816 +0000
++++ controls-v7-selective/ctl-t0-only.sh	2026-09-22 20:53:32.638466816 +0000
+@@ -1,4 +1,14 @@
+ #!/usr/bin/env bash
++# OP88-S5-V7 T0-ONLY driver (successor of controls-v6-gate b7207f46; NOT EXECUTED). Derived from the exact v6 bytes by
++# DELETING the T1/T2/T3 run_gate blocks (v6 L69-L81) and lowering the aggregate bound to one run; nothing else changes:
++# grant/QUARANTINE preconditions, HEAD + dirty-fingerprint + jest + strict dependency identities + harness/config hash gates
++# (rc 2 before any child), owned setsid group (90 s -> TERM -> 10 s -> KILL), .owned census, first-failure stop, EXIT-trap reap,
++# root retention, unchanged predecessor (git show 143d451e:...), fake harness 2de5fe24 and control config a6eeb1cd.
++# T1/T2 valid wave-6 observations (12 PASS, 06:06:47-52Z) are NOT repeated; T3 is closed by the separate JSON-aware read-only
++# checker (check-t3-teardown.cjs) on the preserved T3 JSONL/log; wave 6 remains FAIL and immutable. This driver runs real Jest
++# ONCE (predecessor spec, scenario refused-identity) and asserts T0.defect (FAILING predecessor behaviour) + T0.refusal_reason.
++# Budget: 1 run <= 90 s + 10 s grace; aggregate bound 120 s; recommended outer: timeout --foreground -k 20 140.
++# Original v6 header follows.
+ # S5 R4 Tier 2 control v6 (successor of controls-v5-gate 4d09589c; NOT EXECUTED). v6 closes audit B T2-1 with three
+ # named refusal-reason checks read from the Jest logs (T1/T0: identity toMatchObject received database
+ # not_the_disposable_db; T2: appliedMigrations toBe('164') Received: "165"), each also excluding 'Exceeded timeout',
+@@ -21,7 +31,7 @@
+ PIN_CONFIG=a6eeb1cd1797388a2f81e5b2980bcc9b62e25852e3cd9923aa8168d482ab5e71
+ PIN_HEAD=143d451ead6ccdbebd92ca3031ba7a89867d6cfc
+ PIN_DIRTY_FINGERPRINT=6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0   # v6 (T2-2, optional attribution gate)
+-RUN_BUDGET=90; RUN_GRACE=10; AGG_BOUND=380; T0=$(date +%s)
++RUN_BUDGET=90; RUN_GRACE=10; AGG_BOUND=120; T0=$(date +%s)
+ OWNED_PGIDS=""
+ # ---- dependency + input gates (all refusals rc 2, before any child)
+ [ "$(git -C "$W" rev-parse HEAD)" = "$PIN_HEAD" ] || { log "REFUSE: worktree HEAD != $PIN_HEAD"; exit 2; }
+@@ -66,19 +76,6 @@
+   check "$1.owned" "$( [ -z "$m" ] && [ "$how" = exited ]; echo $? )" "jest child exited within budget and its process group is empty"
+ }
+ mut() { grep -c '"mutating":true' "$1"; }
+-run_gate T1 candidate.spec.ts refused-identity; R="$OUT/gate-$CTL_TS-T1.jsonl"
+-check T1.zero_mutation "$( [ "$(mut "$R")" = 0 ] && [ "$(wc -l < "$R")" -ge 1 ]; echo $? )" "candidate refused-identity: $(mut "$R") mutating calls of $(wc -l < "$R") recorded (expected 0)"
+-check T1.skipped_marker "$( grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T1.jest.log"; echo $? )" "PG17_TEARDOWN_SKIPPED emitted by afterAll"
+-check T1.jest_failed "$( [ "$GATE_RC" != 0 ]; echo $? )" "jest exit $GATE_RC recorded (a refused setup must not look like a passing suite)"
+-check T1.refusal_reason "$( J="$OUT/gate-$CTL_TS-T1.jest.log"; grep -q 'not_the_disposable_db' "$J" && grep -q 'toMatchObject' "$J" && ! grep -q 'Exceeded timeout' "$J"; echo $? )" "beforeAll failed at the identity toMatchObject (received database not_the_disposable_db), not a hook timeout (T2-1)"
+-run_gate T2 candidate.spec.ts refused-prestate; R="$OUT/gate-$CTL_TS-T2.jsonl"
+-check T2.zero_mutation "$( [ "$(mut "$R")" = 0 ] && grep -q '_prisma_migrations' "$R"; echo $? )" "candidate refused-prestate: $(mut "$R") mutating calls (expected 0); identity gates reached"
+-check T2.skipped_marker "$( grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T2.jest.log"; echo $? )" "PG17_TEARDOWN_SKIPPED emitted"
+-check T2.refusal_reason "$( J="$OUT/gate-$CTL_TS-T2.jest.log"; grep -q 'Received: "165"' "$J" && grep -q 'Expected: "164"' "$J" && ! grep -q 'not_the_disposable_db' "$J" && ! grep -q 'Exceeded timeout' "$J"; echo $? )" "beforeAll failed at appliedMigrations toBe('164') with Received: \"165\" (identity gates passed), not a hook timeout (T2-1)"
+-run_gate T3 candidate.spec.ts authorized-partial; R="$OUT/gate-$CTL_TS-T3.jsonl"
+-check T3.setup_partial "$( grep -q '"mutating":true.*GRANT USAGE' "$R" && grep -q 'ADD CONSTRAINT g2p_target_refusal' "$R"; echo $? )" "authorized setup began (GRANT) and ALTER failed"
+-check T3.teardown_ran "$( grep -q 'DROP CONSTRAINT IF EXISTS g2p_target_refusal' "$R" && grep -q '"fn":"resetData"' "$R" && grep -q 'DELETE FROM "ScoutImport"' "$R"; echo $? )" "teardown still cleaned up after partial authorized setup"
+-check T3.no_skip "$( ! grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T3.jest.log"; echo $? )" "no TEARDOWN_SKIPPED for an authorized setup"
+ run_gate T0 predecessor.spec.ts refused-identity; R="$OUT/gate-$CTL_TS-T0.jsonl"
+ check T0.defect "$( [ "$(mut "$R")" -ge 2 ] && grep -q 'DROP CONSTRAINT IF EXISTS g2p_target_refusal' "$R" && grep -q '"fn":"resetData"' "$R"; echo $? )" "PREDECESSOR refused-identity: $(mut "$R") mutating teardown calls recorded (frozen S5-R3-A-01 under real Jest hook semantics; FAILING behaviour)"
+ check T0.refusal_reason "$( J="$OUT/gate-$CTL_TS-T0.jest.log"; grep -q 'not_the_disposable_db' "$J" && grep -q 'toMatchObject' "$J" && ! grep -q 'Exceeded timeout' "$J"; echo $? )" "PREDECESSOR beforeAll failed at the identity toMatchObject (received database not_the_disposable_db), not a hook timeout; the mutating teardown followed that refusal (T2-1)"

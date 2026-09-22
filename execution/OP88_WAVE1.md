@@ -99,3 +99,19 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Required evidence: exact restored identities, source unchanged, archived commands mapped to fresh workspace with any necessary portability delta proposed rather than silently applied.
 - Recovery: preserved input snapshots, no mutable live fixture.
 - Success does not prove: runtime composition, serving-role safety, hook-enabled integration or final audit.
+
+## S6: OP88-S6-C6-PREP (after frozen C5 independent review)
+
+- Repository / PR: mobile cumulative #289-292, no Roman edits/new product PR.
+- Base: a5933fd6de5616493de75f0db907098b149b955c; exact product head d51a191098f483cea9abec6cc7e9f3beffd18c06, tree62bf67b88e0f123f1a23ee34a1a75cb43029d9fb, unchanged.
+- Purpose: distinguish hook-boundary orphans from in-case signOut orphans before product repair.
+- Non-goals: no auth/queryClient product edits, no timer masking/unref/gcTime/forceExit, no assertion weakening, no repetition of C5 A/B/D clean controls, no native/export acceptance.
+- Dependencies: frozen `execution/op88/audits/s6-c5-b/S6_C5_REVIEW_B.md` and its exact inputs; current hazard v4 ee9b94df, adapter3796be8f, unchanged v3.1 instrument cf470101 and runner b7b328a5; preserved product bundle c0ad2994.
+- Sole writer: new canonical Fable builder in execution/op88/s6-c6-prep; restore exact product only at worktrees/s6-diagnostic (fresh, exclusively reserved) if needed. Independent auditor is not the builder.
+- Tier/rationale: T4 account-sensitive identity/cache hazard proof. T1 boundedness fails privilege/sensitive-data assurance. Canonical builder Claude Fable5; High requested policy, unexposed actual telemetry.
+- Required review: independent narrow delta/perturbation/runner applicability before any execution; two independent final product attestations remain later.
+- Acceptance: hazard v5 changes only afterEach/afterAll to await `qc.queryClient.cancelQueries()` before their existing clear; preserve mounted/in-flight signOut preconditions, MeProbe, recommit, all six assertions and overlap checks. No unmount-before-signOut. Keep original v4 and C5 evidence immutable.
+- Required evidence: exact two-hook delta, old/new hashes, frozen C-only execution request with unchanged instrument; explain necessary runner selection/hash/path adaptations as additive new wrapper, never silently alter v3.1. Predeclare outcomes: two residual removeObserver600000ms timers+hang supports hook-fix insufficiency; zero+clean exit refutes attribution; five means cancellation-order hypothesis failed; any assertion/overlap divergence stops. Identify authoritative raw child/outer/cleanup exit capture.
+- Setup: source restore may read/fetch only required public prerequisite objects and import verified bundle. No dependency installation or control/Jest/diagnostic execution granted. Read frozen setup91fe0f1b and prepare fresh exact isolated installation request separately; old1099-package record is historical.
+- Recovery: no product edits/commit, no mutation of prior fixture/source/output; retain first failure and unknown outer receipt. Any portability change must be pinned and independently reviewed.
+- Success does not prove: app harmlessness, historical C2-C4 cause, baseline/P1/native/import/release acceptance. This is a discriminator, not a product fix.
