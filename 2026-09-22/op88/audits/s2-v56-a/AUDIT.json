@@ -1,0 +1,146 @@
+{
+  "assignment": "OP88-S2-V56-A",
+  "tier": "T4",
+  "reviewer": {
+    "role": "Independent A, non-builder",
+    "requested_model": "Inherited parent identity; no named model/version supplied to this reviewer",
+    "actual_model_and_runtime_settings": "Not observable; not asserted",
+    "requested_reasoning": "High is policy, not observed runtime telemetry",
+    "current_peer_report_read": false,
+    "prior_reports_used": "Frozen s2-runner55 plan-a/revision-1 and plan-b/revision-1 only"
+  },
+  "scope": "Exact v5.5 to v5.6 runner/driver closure and requests; source, hashes and diffs only. No candidate execution, syntax check, process/lock probe, install, network, source edit, product audit, landing or publication clearance. Prior own reports remain unchanged.",
+  "verdicts": {
+    "CONTROL_REQUEST_10": "HOLD as written: deterministic k failure, unsafe/incomplete ownership and publication closure, and request/driver scope mismatch. Do not spend a grant reproducing these source counterexamples. [Driver](../../s2-v56/controls-proposed/run-controls-v56.sh#L169) [Request10](../../s2-v56/CONTROL_REQUEST_10.md#L20)",
+    "PROOF_REQUEST_11": "HOLD separately: shared runner findings remain; reviewed successful controls and fresh explicitly granted setup are absent. CLI-before-use ordering is source-corrected, not an installed dependency or real proof. [Runner](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L357) [Request11](../../s2-v56/PROOF_REQUEST_11.md#L5)",
+    "product": "No product, final dual-audit, native, hosted, landing or release conclusion."
+  },
+  "findings": [
+    {
+      "id": "S2-V56-A01",
+      "severity": "HIGH",
+      "scope": "Controls: k and nested neg/N2",
+      "title": "Unbound R55 aborts before K1 and bypasses completion cleanup",
+      "counterexample": "With the documented invocation and no inherited R55, set -u at L48, the sole root assignment R56 at L49, and expansion of $R55 at L169 cause an unbound-variable exit before enclose runs; the watchdog has already started at L157-162, and only TERM (not EXIT) has a completion trap. [Driver L48-49,L124,L157-169](../../s2-v56/controls-proposed/run-controls-v56.sh#L48)",
+      "consequence": "k cannot produce the promised six-control result; N2 can see exit 1 from nounset rather than its intended injected assertion, but its required ONE-STRIKE/1-of-6 predicates then fail. A live watchdog/sleeper can be left after the top-level k shell exits. [Driver L169,L289-293](../../s2-v56/controls-proposed/run-controls-v56.sh#L169)",
+      "smallest_correction": "Bind K1 to the frozen successor lane rather than ambient R55; preserve expected-negative discrimination and ensure abnormal driver termination enters bounded owner cleanup."
+    },
+    {
+      "id": "S2-V56-A02",
+      "severity": "HIGH",
+      "scope": "Runner and controls evidence",
+      "title": "Both inner-manifest pipelines can inventory their temporary output",
+      "counterexample": "Runner L316 and driver L102 redirect xargs output to SHA256SUMS.tmp without excluding that filename from find. In the permitted schedule where that pipeline member opens its redirection before find scans the directory, find includes ./SHA256SUMS.tmp; if hashing succeeds, mv renames it away and the final manifest names a nonexistent input, while rejection by the hash utility instead makes the intended positive publication fail. [Runner L316](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L316) [Driver L102](../../s2-v56/controls-proposed/run-controls-v56.sh#L102)",
+      "consequence": "Runner outer verification hashes the inner manifest's bytes, not its entries, so it does not catch this before an otherwise-zero exit; the driver later checks the runner inner manifest and strikes, whereas its own result manifest is never reverified before publication_status=ok. This is a source scheduling counterexample, not an observed runtime failure. [Runner L318-329](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L318) [Driver L103-106,L142](../../s2-v56/controls-proposed/run-controls-v56.sh#L103)",
+      "smallest_correction": "Exclude all publication temporaries or place them outside the inventoried tree; check the completed inner manifest before certifying immutable successful publication."
+    },
+    {
+      "id": "S2-V56-A03",
+      "severity": "HIGH",
+      "scope": "Startup/interruption closure; prior A-02",
+      "title": "Ack gating improves startup but registration failure and pending acquisition remain uncovered",
+      "counterexamples": [
+        "Driver record writes and CURRENT publication at L65/L81 are unchecked; a data-block ENOSPC can make nonempty registry writes fail while creation of the zero-length ack still succeeds. L82 then permits workload exec despite neither durable ownership record nor watchdog authority being present. [Driver L58,L65,L76-87](../../s2-v56/controls-proposed/run-controls-v56.sh#L58)",
+        "A TERM handled after runner spawn L207-208 but before STEP_PID assignment L209 reaches halt with an empty PID/group registry; the already published leader and its ack-wait sleeper are outside OWNED_PAT and can survive a claimed REAP ok/normal cleanup handoff. No workload exec is alleged here: lack of ack blocks it, but does not prove the child has been reaped. The driver similarly has no pending-enclosure adoption in on_cancel before L81 registration. [Runner L128,L150-184,L194,L207-210](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L128) [Driver L78-82,L115-124](../../s2-v56/controls-proposed/run-controls-v56.sh#L78)"
+      ],
+      "smallest_correction": "Require successful recoverable registration/current publication before ack; latch interruption through spawn/adoption and resolve the pending published child or explicitly preserve uncertainty as unsafe handoff. Extend only the affected startup seams to enclosures and cleanup clients."
+    },
+    {
+      "id": "S2-V56-A04",
+      "severity": "HIGH",
+      "scope": "Current signal authority and watchdog ownership; prior A-03/B-03",
+      "title": "Watchdog stop races sleeper replacement; historical PID imports can regain authority",
+      "counterexamples": [
+        "stop_watchdog reads wd.sleeper once before killing the watchdog. It can read the first, already-exited sleeper, then the watchdog starts/publishes its second sleeper at L159, then stop kills only the shell and the old sampled PID. The second sleeper is outside OWNED/PAT and the census still examines only the sampled PID, so census_after=[empty] can omit a live child. The same publication gap exists at initial sleeper creation. [Driver L93-98,L157-162](../../s2-v56/controls-proposed/run-controls-v56.sh#L93)",
+        "record_from_run imports every historical spawned PID from completed step logs at L69, including a K8 child already killed by the runner; if that numeric PID is reused before import/owned_cleanup, kill -0 and pruning retain the replacement and TERM/KILL target it. Dropping dead records after a later observation does not prevent this reacquisition from history; no current generation is bound. This is a specific reuse schedule, not a claim that reuse occurred. [Driver L66-75,L108-113,L250-256](../../s2-v56/controls-proposed/run-controls-v56.sh#L66)"
+      ],
+      "positive_boundary": "The previous newest-historical-pgid watchdog lookup is removed: CURRENT is now written on adoption and cleared on observed-empty retirement, and dead plain records can be pruned. These narrow changes are real but do not establish all-current ownership. [Driver L73-90,L156](../../s2-v56/controls-proposed/run-controls-v56.sh#L73)",
+      "smallest_correction": "Stop/reap all watchdog-owned children under a closed spawn/stop handoff; retire authority without reacquiring historical numeric IDs as current ownership. Add deterministic transition/cancellation and retired-identity discriminators."
+    },
+    {
+      "id": "S2-V56-A05",
+      "severity": "HIGH",
+      "scope": "Cleanup, publication and total completion; prior A-02/A-03/A-05",
+      "title": "Bounded hashing is not bounded completion; final publication still admits a zero failure",
+      "counterexamples": [
+        "After the nominal bounded TERM/KILL refusal, runner L257 still unconditionally waits for the unconfirmed cleanup child, even if it remains alive after KILL (for example blocked I/O). The deadline is not checked by that wait; CLEANUP_LEAK is set only afterwards. Driver refusal L85-87 has the same unconditional-wait tail. [Runner L250-259](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L250) [Driver L84-87](../../s2-v56/controls-proposed/run-controls-v56.sh#L84)",
+        "Only the inner hash pipeline is enclosed. Runner receipt/outer-hash/reverification/final publication at L321-328 remain outside the timeout; driver stops its watchdog at L115 before final census and publication, checks elapsed time before publication at L119, then has an unenclosed receipt/stdout tail. A blocked write/read there has no total deadline; even a delayed successful driver receipt crossing BUDGET can still return 0 because there is no post-publication elapsed check. [Runner L316-329](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L316) [Driver L99-121](../../s2-v56/controls-proposed/run-controls-v56.sh#L99)",
+        "After otherwise successful receipt/outer publication, failure writing PUBLICATION.txt (for example ENOSPC at that final write) is explicitly ignored at runner L327, leaving FINAL=0 and stdout status=ok. This is a required output of Request11 and a required successor predicate in the driver. [Runner L324-329](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L324) [Driver L140-141](../../s2-v56/controls-proposed/run-controls-v56.sh#L140) [Request11 L17](../../s2-v56/PROOF_REQUEST_11.md#L17)"
+      ],
+      "smallest_correction": "Bound/refuse unreaped-child waits and the complete cleanup/publication tail, reserve failure reporting, check the final required write, and classify the actual exit after all publication outcomes; retain first-failure and distinct cleanup registers."
+    },
+    {
+      "id": "S2-V56-A06",
+      "severity": "HIGH",
+      "scope": "neg2 control safety and claimed discrimination",
+      "title": "N4/N6 controllers lack cancellation cleanup; N5/N7 do not close all claimed seams",
+      "counterexample": "TERM to the outer driver during N4 or N6 enters finish but never reaches the normal-only DECOY/HOLDER cleanup. N4's caller-group sleep is deliberately absent from OWNED/PAT and can survive a reported empty handoff; N6's separate flock/sleep group is also unrecorded and can retain the private lock until its 40-second sleep ends. Keeping a decoy unowned by the tested cleanup must not make it unowned by its controller's cancellation path. [Driver L115-124,L325-339,L367-375](../../s2-v56/controls-proposed/run-controls-v56.sh#L115)",
+      "discrimination_limits": [
+        "N4b uses a fixed four-second timeout and checks final=143, not that TERM reached step40: an earlier interrupted step with clean cleanup can satisfy these predicates without the stated sleeping-composition scenario. [Driver L331-334](../../s2-v56/controls-proposed/run-controls-v56.sh#L331)",
+        "N5a is a useful deterministic publication-failure seam, and N5b checks the published/unadopted seam and no harness output; neither covers pre-PID assignment or failed driver registration. N5b's controller also sends TERM after its polling loop expires without requiring that the seam was actually seen. [Driver L342-362](../../s2-v56/controls-proposed/run-controls-v56.sh#L342)",
+        "N6 infers its holder's lock ownership after sleep 0.3 and treats any failed nonblocking flock as that owner, rather than a holder-ready acknowledgement. N7's ordinary sleep exits on first TERM; removing the watchdog KILL and driver-cancellation branches would leave its required TERM/current/empty-census assertions satisfiable. Thus N7 is not escalation or total-cancellation proof. [Driver L313-319,L367-382](../../s2-v56/controls-proposed/run-controls-v56.sh#L313)"
+      ],
+      "smallest_correction": "Add a separate controller-resource registry/finally path, acknowledge the intended negative-control state, refuse timed-out synchronization, and exercise the affected cancellation/escalation seam rather than infer it from a first-TERM success."
+    },
+    {
+      "id": "S2-V56-A07",
+      "severity": "MEDIUM",
+      "scope": "Control grant payload and real-proof caller",
+      "title": "Request commands mask raw status and the allowed write set disagrees with execution",
+      "counterexamples": [
+        "Every Request10 command ends with echo, so in the ordinary non-errexit caller a failed set is followed by successful echo and then the next set; the displayed STOP instruction is not implemented. Request11 has the same masking even when manifest verification fails before the runner starts. [Request10 L20-31](../../s2-v56/CONTROL_REQUEST_10.md#L20) [Request11 L12-16](../../s2-v56/PROOF_REQUEST_11.md#L12)",
+        "Request10 authorizes predecessor output writes only for new2, but new1 actually invokes K7pre and K8pre while new2 runs K10. The private lock is also opened/created under controls-proposed/stubs, outside the request's enumerated write directories. This is grant scope, not cosmetic control naming. [Request10 L25-35](../../s2-v56/CONTROL_REQUEST_10.md#L25) [Driver L227-266](../../s2-v56/controls-proposed/run-controls-v56.sh#L227) [Runner L99,L336](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L99)"
+      ],
+      "smallest_correction": "Use an explicit status-preserving, stop-on-first-nonzero caller and align set-to-workload/output/lock authorization with the actual frozen driver; keep control versus real execution grants separate."
+    }
+  ],
+  "prior_closure_ledger": [
+    {
+      "prior": "A-01 / B-01",
+      "disposition": "SOURCE-CLOSED for the reported IDDIR reset/root-path defect: initialized once, no trailing reset, guards before step/cleanup identity removal. [Runner L110-124,L204-205,L246-247](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L110)"
+    },
+    {
+      "prior": "A-02 / B-04; inherited leader/stop ownership",
+      "disposition": "PARTIAL: publication failure now prevents workload exec; registration-before-ack works in the ordinary runner branch; a known published in-flight STEP_PID is adopted on interruption; unknown cleanup/enclosure identity is no longer silently accepted. A03/A05/A06 retain the concrete remaining boundaries. [Runner L128-139,L159-165,L250-259](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L128) [Driver L80-87](../../s2-v56/controls-proposed/run-controls-v56.sh#L80)"
+    },
+    {
+      "prior": "A-03 / B-03; active/retired IDs and watchdog total bound",
+      "disposition": "PARTIAL: CURRENT-only lookup, dead-PID pruning and a driver TERM branch replace the named old mechanisms; A04-A06 prevent full ownership/total-bound closure. [Driver L73-75,L93-124,L156-162](../../s2-v56/controls-proposed/run-controls-v56.sh#L73)"
+    },
+    {
+      "prior": "A-04 / B-02",
+      "disposition": "SOURCE-CLOSED for the exact old predicate defects: K2 now matches owned groups [none]/retired; predecessor checks its actual exit-codes/inner-manifest format rather than requiring RECEIPT.txt; request verification uses the predecessor directory. Independent new A01/A02/A07 still prevent valid control execution. [Driver L139-146,L183-185](../../s2-v56/controls-proposed/run-controls-v56.sh#L139) [Predecessor L156-158](../../../../tgp-private-evidence/2026-09-22/remediation/s2-setup-prep/proposal-1/run-composition-r53-v5.3.1-when-granted.sh#L156) [Request10 L13-14](../../s2-v56/CONTROL_REQUEST_10.md#L13)"
+    },
+    {
+      "prior": "A-05 / B-05; prior post-hash mutation and deadline anchor",
+      "disposition": "PARTIAL: first-wins deadline anchor and no post-hash stamp append retained; whole inner pipeline now gets kill-after and no minimum allowance after deadline; receipt/outer statuses checked. A02/A05 retain immutable/complete-publication and total-bound blockers. [Runner L141,L307-329](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L141)"
+    },
+    {
+      "prior": "A-06; B checkpoint/client discussion and B-06 real assumptions",
+      "disposition": "SOURCE-CLOSED for installed CLI existence/hash-before-first-CLI-execution: L357-358 precede L360; CHECKPOINT_DISABLE export and both env-i carries preserved. No installed bytes, PG daemon behavior, checkpoint egress or dynamic pass inferred. The builder map attributes these prior IDs imprecisely; this ledger uses the original reports' meanings. [Runner L91,L357-364,L380-384](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L357) [Prior A](../../../../tgp-private-evidence/2026-09-22/remediation/s2-runner55/plan-a/revision-1/REPORT.md) [Prior B](../../../../tgp-private-evidence/2026-09-22/remediation/s2-runner55/plan-b/revision-1/REPORT.md)"
+    },
+    {
+      "prior": "Preserved refusal/no-destroy, first failure, documented K9 boundary",
+      "disposition": "Retained at source: 64/64 offline refusal predicates, fixture stop refused on REAP failure, distinct first/cleanup exits, no destroy invocation, and K9 explicitly remains an expected boundary counterexample rather than an ownership pass. No expansion into arbitrary setsid containment or product re-audit. [Runner L283-304,L379-385](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L283) [Driver L257-262](../../s2-v56/controls-proposed/run-controls-v56.sh#L257)"
+    }
+  ],
+  "environment_applicability": {
+    "observed_by_read_only_path_and_git_metadata_checks": {
+      "worktrees/s2-runner53": "absent",
+      "execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh": "absent",
+      "execution/s2-setup-prep/SHA256SUMS.outer": "absent",
+      "/home/user/pg17/dist/bin/postgres": "absent",
+      "worktrees/s2-runner53/node_modules/prisma/build/index.js": "absent",
+      "worktrees/op88-s2": {
+        "head": "d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c",
+        "tree": "c0ab87d4dc584b2a7ccad53db16fa551b93fe359",
+        "git_status_porcelain_untracked_all": "",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_OPTIONAL_LOCKS": "0"
+      }
+    },
+    "meaning": "The restored op88-s2 source is not the runner's pinned worktree and proves no dependency installation. Request10 needs its named read-only source/predecessor prerequisites or a separately frozen/reviewed path successor; Request11 additionally needs fresh setup and an explicit canonical-lock slot. No versions, processes, listeners, locks or clients were probed by this reviewer. [Runner L79-85](../../s2-v56/run-composition-r56-v5.6-when-granted.sh#L79) [Request10 L11-18](../../s2-v56/CONTROL_REQUEST_10.md#L11) [Request11 L5-10](../../s2-v56/PROOF_REQUEST_11.md#L5)"
+  },
+  "smallest_next_step": "Preserve this candidate and all prior reports; assign the sole builder an additive execution-layer successor limited to A01-A07, with corrected bounded request payloads and exact hashes, then narrow independent closure review before any control grant. Source restoration may proceed separately but does not unblock execution or infer an install.",
+  "evidence_state": "All findings are source counterexamples or identified control-coverage limits. No candidate was executed; all controls and real composition remain unrun by this reviewer. Hash/diff/metadata results are in INPUTS.json. The separate FREEZE.json records actual UTC sealing time."
+}

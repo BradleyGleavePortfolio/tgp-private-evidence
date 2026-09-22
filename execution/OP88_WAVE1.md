@@ -68,6 +68,12 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Recovery: all old runner packets and product remain immutable; unsafe ownership refuses/quarantines with nonzero status.
 - Success does not prove: real PG composition, hosted enforcement or release.
 
+## S2: OP88-S2-V57 bounded successor
+
+OP88-S2-V57 inherits the complete S2 T4 repository/PR/base/product-head/purpose/non-goal/acceptance/recovery record above. Canonical Fable sole writer s2_v5_6_runner_fixer_mud58q6g now owns new execution/op88/s2-v57; V5.6 manifest41cd5371 and all prior files remain immutable. Dependencies are BOTH frozen audits s2-v56-a (9f5a7e01, additiveENV0a9fb84f) and s2-v56-b (54f0382a), plus restored source packet upstream-prereqs-2.
+
+Close A01..07 and all material B findings in one cohesive bounded execution-layer delta; B's narrower runner-source conclusion or one-audit proposal waives nothing. Acceptance includes correct root variables, non-self-including verified manifests, checked adoption and pending acquisition, active-only/watchdog/controller ownership, bounded checked complete finalization, deterministic negative-control synchronization, guarded raw stop-first callers and actual write/lock/set map, consistent proof bounds and fresh installstamp. Preserve existing closed properties. Two independent exact-successor reviews precede any control grant; no install/network/probe/lock/runtime/client/DB/destroy/product edit. ENV01 additive output permissions remain parent-controlled at future grant. Any material ownership architecture expansion must return for parent ruling, not freestyle. Success proves only implemented static repair until independently reviewed and separately executed.
+
 ## S4: OP88-S4-V4-A and OP88-S4-V4-B
 
 - Repository / PR: extension cumulative #21/#23/#24/#25.
@@ -142,11 +148,11 @@ Dependencies/acceptance: verified local d5cd objects plus named s2-setup-prep/pr
 - Repository/PR/base/exact product head: unchanged extension cumulative #21/#23/#24/#25, base0111be661922234d670bbf23e23d270eec1b4a4e, head91990ae9aec72f47a67591892ac09fa1f59d2f16/tree840fb2855953d5363fbd144e11b3f81763d9cef7.
 - Runner base: frozen V5 manifest73c2dbbec0c9ae2d767adf16f19cb764f540d452f62170766be4cccc2728d753; no new product PR.
 - Purpose/non-goals: repair concrete residual execution-layer failures, not product reimplementation, generic supervisor, dependencies, runtime or revision of originals.
-- Dependencies: frozen V5 A audit0adc4d6b and exact V5 bytes. V5 B remains independent; builder may begin A corrections but must incorporate B after its freeze and before final successor freeze.
+- Dependencies: both frozen V5 A audit0adc4d6b and V5 B manifest1bf4653c plus exact V5 bytes. Both are now available to the sole fixer; B's narrower closure opinion does not waive A concrete findings.
 - Sole writer/canonical builder: Claude Fable5 s4_consolidated_v5_runner_fixer_mud5vjls, new execution/op88/s4-v6 only. Parent owns disposition; independent auditors never implement.
 - Tier/rationale: T4 trusted validation/recovery/exclusion boundary, unchanged cumulative grade.
 - Acceptance: bind cancellation to actual current run, one absolute cancellation deadline without repeated allowance, no destruction of last verified exclusion while survivors unresolved, required checked terminal success receipt, census timeout/error distinct from empty. Preserve V5 source-closed latch, required predicates, raw callers, lease attribution and artifact joins.
-- Required review/evidence: exact delta and full A/B finding map, deterministic private failure discriminators, separate bounded control/native requests, two independent exact-successor reviews before any execution. Correct actual exit legend and qualify unenforced phase-bound claims.
+- Required review/evidence: exact delta and full A/B finding map, deterministic private failure discriminators including B06 survivor/quarantine/holder creation/publication failures before canonical first-use, separate bounded control/native requests, two independent exact-successor reviews before any execution. Correct actual exit legend and qualify unenforced phase-bound claims.
 - Recovery/rollback: originals immutable; no execution now. Preserve verified exclusion or checked recovery owner on publication failure; honest unsafe-release exit is insufficient. If existing tokenized-holder contract cannot satisfy bounded attributable recovery, stop that boundary for parent rescope while independent corrections continue. No silent immortal unrecorded holder.
 - Success does not prove: executed controls, installed/native/browser artifacts, product acceptance or release. Allowed now: edits/hash/diff/syntax only, no probe/lock/network/install/runtime.
 - Recovery: refuse nonzero and preserve evidence when identity/cleanup/publication is uncertain; one owned writer and immutable V4 packets. New meaningful architecture/ownership requirements require parent rescope, not freestyling.

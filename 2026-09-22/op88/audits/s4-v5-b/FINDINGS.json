@@ -1,0 +1,77 @@
+{
+  "slice": "OP88-S4-V5-B",
+  "role": "independent non-builder auditor B (T4); reviewer runtime identity not observed and not asserted",
+  "tier": "T4",
+  "frozen_at_utc": "2026-09-22T21:50:00Z",
+  "mode": "static read/hash/diff/text-count only; no syntax check, probe, control, lock, install, network, browser, worktree or product action; sole writes execution/op88/audits/s4-v5-b",
+  "peer_output_read": false,
+  "peer_dir_observed_not_read": "execution/op88/audits/s4-v5-a",
+  "live_contract_note": "execution/OP88_WAVE1.md changed during review (sha256 8564a721... at read); only the OP88-S4-V5-PREP section was read (15 lines, section sha256 e9dcf27f..., text identical to the builder's cited copy); the newly appeared OP88-S4-V6-PREP section was deliberately NOT read",
+  "packet": {
+    "root": "execution/op88/s4-v5",
+    "manifest_sha256": "73c2dbbec0c9ae2d767adf16f19cb764f540d452f62170766be4cccc2728d753",
+    "manifest_check": "sha256sum -c 12/12 OK, non-self-including",
+    "diff_reproduced": "diff -u proposal-4 vs s4-v5 for six pairs in packet order == V4_TO_V5.diff modulo ---/+++ headers",
+    "pipe_helper": "byte-identical to V4 c261ffb4...",
+    "runner_delta": "paths/names/comments only (lines 3-9,34,40,56,60,67,96,105,237); pins, joins, latch, expect_exit unchanged",
+    "writer_arity_by_text": {"launcher_argv_vs_tuple": "47/47", "lib_fixed_argv_vs_tuple": "27/27"}
+  },
+  "closure_ledger": [
+    {"prior_id": "S4-V4-A-01", "status": "SOURCE_CLOSED_WITH_STAGE1_DISCRIMINATOR", "lines": {"lib": "107,109,111,114,116,126,127,133,134,83", "stub": "43-51", "driver": "120", "predicates": "99-131 (119,123,125,126)"}, "note": "deferral ends after primary latch; seam determinism assumes bash runs pending traps at next command boundary (stated, unobserved)"},
+    {"prior_id": "S4-V4-A-02", "status": "SUBSTANTIALLY_CLOSED_RESIDUALS_V5B-01_V5B-02", "lines": {"launcher": "68,70,74-78,95,112,116,165,168,217,227", "driver": "33,49-65,88-98,104-114,137,139,158-159"}},
+    {"prior_id": "S4-V4-A-03 / S4-V4-B-01", "status": "SOURCE_CLOSED_NOT_EXERCISED_BY_STAGE1", "lines": {"launcher": "146,206-209,220,225,229,230", "predicates": "66,73,74,77"}, "residual": "V5B-06"},
+    {"prior_id": "S4-V4-A-04 / S4-V4-B-05", "status": "SOURCE_CLOSED_NOT_EXERCISED_BY_STAGE1_DESIGN_CHOICE_V5B-08", "lines": {"launcher": "169-205 (176,178,180-185,187-189,194,196,199,200-202)", "request": "113-123"}, "residual": "V5B-06, V5B-08"},
+    {"prior_id": "S4-V4-A-05", "status": "CLOSED", "lines": {"predicates": "49-56,77,78,87,108,135,151-152,157,173,177"}},
+    {"prior_id": "S4-V4-A-06 / S4-V4-B-04", "status": "CLOSED_AT_GRANT_TEXT", "lines": {"request": "71,74-75,104", "driver": "113,142,153", "predicates": "67"}},
+    {"prior_id": "S4-V4-B-03 / S4-V4-A-N01", "status": "CLOSED", "lines": {"lib": "147,149,164", "runner": "75-77", "predicates": "160-161"}, "nit": "holder string constant; mode text forward-looking"},
+    {"prior_id": "S4-V4-B-02", "status": "CLOSED_OPTIONAL_RESIDUALS_V5B-03_V5B-04", "lines": {"driver": "34,49-65,93,62"}},
+    {"prior_id": "S4-V4-B-06", "status": "NOT_ADDRESSED_MAP_MISLABELS", "lines": {"stub": "21,56", "findings_map": "69-73", "request": "39"}, "residual": "V5B-05"}
+  ],
+  "verdicts": {
+    "lib_seam": "ACCEPTABLE — doubly gated (runner 61 refuses KIND!=VALIDATION; S4R6_SEAM env); inert in Stage 2; same certified lib bytes",
+    "precedence_124_to_5_10": "ACCEPTED — matches both V4 auditors' requested correction; cause preserved",
+    "budget_600_and_new_exits": "ARITHMETIC_VERIFIED (520+7+70=597); exits 10/91/97/98 are STOP codes, none accepted as pass; 5/10 never an expected control outcome; budget can be exceeded by ~6 s only on the V5B-03 double-fault path",
+    "u01_signal_exits": "ACCEPTED_AS_EXPECTATION_SETTING — uutils raw-15 behaviour unverified by anyone; set covers 15/143; does not admit a wrong exit class for live-step controls (orphan adds rc=96 block breaking ordering predicate); 137 inherited",
+    "stage1_private_controls": "SAFE_TO_EXECUTE_ON_EXACT_BYTES_BUT_HOLD — driver evidence-truth defects V5B-01/V5B-02 change certified bytes; correct in minimal V5.1 (driver + request + map only) then grant once; launcher/lib/stub/predicates/runner/pipe need no change",
+    "stage2_native": "NOT_GRANTABLE — prerequisites: Stage 1 pass on final bytes; both reviews; restored paths (all absent); canonical-lock grant; V5B-06 survivor/quarantine discriminator or explicit residual acceptance; unverified environment inputs (node/npm/Chrome/package-lock); downstream key rename pipe_v5_sha256",
+    "preserved_closures": "PRESERVED — initialisation order, setsid own-session spawn, quoted heredocs, expect_exit split, refusals 71/73/75, artifact joins/pins, non-job-control check, lease-before-spawn; no V3-A-01-type regression"
+  },
+  "material_findings": [
+    {
+      "id": "S4-V5-B-01",
+      "severity": "MEDIUM",
+      "material": true,
+      "applies_to": ["stage1_evidence_truth", "A-02 closure completeness"],
+      "title": "Trap-path finish scans the previous run's session (stale LAST_RUN_DIR)",
+      "locations": {"driver": ["91", "99-100", "104-114", "137"], "request": ["33"], "findings_map": ["A-02 discriminator"]},
+      "mechanism": "LAST_RUN_DIR assigned only at 137 after run_bounded returns; TERM/INT traps call finish during run_bounded; finish -> session_state \"$LAST_RUN_DIR\" targets control n-1's OWNED_SID (or nothing during control 1, LEASE_FREE=unchecked)",
+      "counterexample": "TERM the driver during control 3: launcher tears down leaving a recorded holder (5) or, if defective, a free lease with leftovers; receipt line 96 reports leftovers/holder of control 2's dir; 98 detection (94) blind; claim 'finish on EVERY exit does scan' untrue for 143/130",
+      "consequence": "misleading cancellation receipt; no ownership regression (launcher owns cleanup; driver waits for it; next run refuses 95 on held lease)",
+      "smallest_correction": "set current run dir inside run_bounded after spawn or recompute in finish when ACTIVE_PID is set (<=3 driver lines)"
+    },
+    {
+      "id": "S4-V5-B-02",
+      "severity": "MEDIUM",
+      "material": true,
+      "applies_to": ["stage1_grant_text", "receipt truth"],
+      "title": "Success path exits 0 without finish; request §4 pass criterion requires an EXIT code=0 line that no path prints",
+      "locations": {"driver": ["158-159", "96"], "request": ["94", "33"], "findings_map": ["A-02 discriminator"]},
+      "mechanism": "driver 159 `exit 0` bypasses finish(); only finish (96) prints 'EXIT code=... leftovers_initial=... private_lease_free=... quarantine_holder=...'; §4 line 94 makes that line part of Pass",
+      "consequence": "grant evaluator cannot apply the written criterion (fails a passing run or improvises); overclaim 'EXIT line on every exit path'; per-control facts do exist at 146/148 so no cleanup gap",
+      "smallest_correction": "replace 159 with `finish 0 \"all controls ok\"` (also yields final scan) or amend §4 to the per-control line-146 facts (<=2 lines)"
+    }
+  ],
+  "nonmaterial_observations": [
+    {"id": "S4-V5-B-03", "where": "driver 55-64,113,139,90", "note": "cancel_active re-entered after UNRESOLVED: second TERM to live launcher, second grace+40 wait, second receipt; contradicts §7.5 'one TERM'; last-control double fault exceeds 600 s by ~6 s + drift. Fix: `[[ -n $UNRESOLVED ]] && return 0` at 55."},
+    {"id": "S4-V5-B-04", "where": "driver 58,106,113; launcher 157", "note": "cancel wait == launcher nominal worst with 2 s slack; legitimately finishing launcher can be tagged UNRESOLVED 97 (stale identity receipt). Optional +5 s; treat empty ACTIVE_START as unresolved instead of falling to unconditional wait."},
+    {"id": "S4-V5-B-05", "where": "FINDINGS_MAP.json 69-73; request 39; stub 21,56", "note": "B-06 (control 5 non-discriminating; stub inherits fd 9) not addressed; row mislabels it as direct-refusal budget. Optional exec 9>&- before probe still open."},
+    {"id": "S4-V5-B-06", "where": "launcher 169-205,225; predicates 66,73,74,77; all controls", "note": "A-03/A-04 paths (survivors->quarantine, holder verify/record failure, exits 5/10, driver 94-on-holder, §6 recovery) unexercised by Stage 1; first execution would be on the canonical lock. Stage-2 prerequisite: control-only fault-injection control on the private lease or explicit operator acceptance."},
+    {"id": "S4-V5-B-07", "where": "launcher 116,136; session_members/signal_session; §5 command", "note": "post-writer JSON validation, mv, tee, pgrep/ps, sha256sum outside any timeout; worst_case_s is a sound estimate not externally enforced; Stage 2 has no external deadline authority by design. Optional timeout at 116; TERM-only outer timeout for Stage 2 if desired (never --kill-after)."},
+    {"id": "S4-V5-B-08", "where": "launcher 186-202", "note": "verified holder + receipt-write failure => holder killed, lease released (recorded, exit 10) though identity reaches SUPERVISOR_RECORD/console; contract-consistent; parent may prefer retention for the canonical lock when the supervisor record publishes."},
+    {"id": "S4-V5-B-09", "where": "driver 76-82 (§7.5)", "note": "driver reaps a session whose launcher exited: owned by construction (live session reserves its SID number); judged fact stays LEFT_INITIAL; residual SID-reuse class inherited. Accepted."},
+    {"id": "S4-V5-B-10", "where": "request 24,86-88; lib 164,165; caller/driver 70", "note": "cosmetic: stub +15/-6; '94 covers recorded holder' true only on normal path (cancel/trap paths give 96/143 with holder in receipt); '96 session clean' not implied; holder string constant + forward-looking mode text; code 70 collision; pipe_v4_sha256 -> pipe_v5_sha256 key rename for downstream consumers."},
+    {"id": "inherited", "where": "launcher 139; lib 104-106; INT traps; kill -0; readlink paths", "note": "unchanged V4 behaviours not re-raised: lock identity line truncation; pre-step-zone signal still runs the step (bounded by launcher); INT inert in background children; kill -0 on unreaped child; canonical-path refusals fail closed."}
+  ],
+  "not_proven": "no execution of any kind by this reviewer; no uutils/bash behaviour measured (timeout signal exit, setsid in-place exec, pending-trap timing, sleep 60 9>&-); environment versions unverified; no canonical-lock/gate/Vitest/gitleaks/package/browser/pipe observation; no artifact or native attestation; hooks 0/6 inherited; product acceptance neither widened nor withdrawn; a passing Stage 1 as packaged proves nothing about the survivor/quarantine path",
+  "smallest_next_action": "Builder V5.1: driver only (V5B-01 current run dir on trap path; V5B-02 finish 0 at success; optional V5B-03/04), request §4/§2 text, FINDINGS_MAP B-06 row; new manifest; launcher/lib/stub/predicates/runner/pipe unchanged. Dual exact-delta confirmation, then one Stage-1 grant (<=600 s, private lease, restored paths). Add or explicitly waive the private-lease survivor/quarantine discriminator (V5B-06) before any Stage-2 request."
+}

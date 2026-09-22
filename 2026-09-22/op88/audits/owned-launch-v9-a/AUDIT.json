@@ -1,0 +1,153 @@
+{
+  "audit": "OP88-OWNED-LAUNCH-V9-A",
+  "status": "FROZEN_INDEPENDENT_STATIC_EXACT_DELTA_REVIEW",
+  "tier": "T4",
+  "inputs": "INPUTS.json",
+  "packet_manifest_sha256": "36f04f84a08192f7d9e7ad4358dcb453a0243b4ee8f8ae0aab989e94f3e188c3",
+  "addendum_manifest_sha256": "345c1b7f482b78de731978638b76bbe611024c3315edbae2337372516474175d",
+  "actual_input_verification_utc": "2026-09-22T21:48:17Z",
+  "freeze_clock_observed_utc": "2026-09-22T21:48:17Z",
+  "scope": "Primitive + two S5 consumers + fake-child controls; BOTH frozen V8 reviews and S6 narrow B Part B considered; no absent S6 consumer or product clearance.",
+  "verdicts": {
+    "R6_fake_child_control_grantability": "HOLD: OWN-V9-A-01 contaminates fixture/enclosure raw exit capture, so do not spend the exact requested 15-check slot on these known-invalid status paths. [Control capture](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L30-L38) [Named status predicates](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L45-L73)",
+    "fresh_S5_setup_applicability": "HOLD: A-01, A-03, A-04 and A-05 apply; source-level primitive equality is not install authorization, and the normal npm command/pins being preserved does not close its exceptional ownership/publication paths. [Setup launch/finalization](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L126-L199)",
+    "S5_T0_applicability": "HOLD: A-01, A-02, A-03 and A-04 apply; the unchanged predecessor-selection and assertion predicates remain applicable, but no T0 execution or correct primary/cleanup receipt follows from them alone. [T0 consumer](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L137-L185)",
+    "S6_or_product_runtime_acceptance": "NONE; S6 adaptations are expressly paused and outside this review. [V9 rescope](../../OWNED_LAUNCH_SCOPE.md#L26-L32)",
+    "grants_issued": false
+  },
+  "material_findings": [
+    {
+      "id": "OWN-V9-A-01",
+      "severity": "HIGH",
+      "title": "All own_finish calls move wait out of the child-owning shell and mislabel the result as observed",
+      "lineage": ["OWN-V8-A-04", "OWN-V8-A-05", "V8B-02"],
+      "applies_to": ["R6", "primitive", "setup", "T0"],
+      "mechanism": "own_finish executes wait and prints observed <rc>, but every caller invokes it through command substitution; that subshell is not the shell that launched the child, and preserving $$ for the PPID check does not give it the parent's wait authority. [Primitive](../../s5-v9-t0/own-block-v9.sh#L21-L23) [Wait](../../s5-v9-t0/own-block-v9.sh#L52-L53) [Enclosure](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L34) [Fixture](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L40-L50) [T0](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L172) [Setup](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L184-L192)",
+      "static_counterexample": "For the ordinary natural-exit child that exits 0, FIN=$(own_finish \"$PID\") attempts wait from the command-substitution environment: the non-child wait status 127 can be printed as observed 127 rather than the child's 0; the enclosure repeats the same defect for the fixture, while C2 expressly requires observed 0 and the ordinary control cases require SUP_RC=0. [Natural-exit fixture](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L16-L16) [Capture](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L45-L51) [Enclosure and C2](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L34-L48)",
+      "consequence": "A successful npm exit can be reported as failure 127, and T0 can accept a fabricated observed status because its adoption predicate merely excludes 75/76; the advertised actual-wait prerequisite for retirement is also not satisfied by this call shape. [Setup status use](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L192-L199) [T0 acceptance](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L172-L179)",
+      "minimal_correction": "Perform the guarded wait in the original launching shell and return status through parent-shell variables or another non-subshell result channel; distinguish a wait-mechanism error from a workload's genuine exit 127.",
+      "closure_discriminator": "After correction, C2 must observe actual 0, no-ack/stale must observe actual 75, TERM must preserve actual signal status, and the enclosure must preserve each actual fixture status without weakening expectations.",
+      "runtime_observed": false
+    },
+    {
+      "id": "OWN-V9-A-02",
+      "severity": "HIGH",
+      "title": "The T0 successor deletes both cleanup and signal trap registrations",
+      "lineage": ["OWN-V8-A-01", "OWN-V8-A-03", "OWN-V8-A-06", "V8B-05"],
+      "applies_to": ["T0 direct"],
+      "mechanism": "V9 defines on_exit but deletes V8's trap on_exit EXIT and TERM/INT/HUP registration without replacement; the sourced frozen lib defines logging/check helpers but installs no compensating traps. [Exact deletion](../../s5-v9-t0/controls-v8-to-v9-t0-only.diff#L112-L124) [Unused handler](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L137-L144) [Support library](../../s5-v7/controls-v3/lib.sh#L10-L39)",
+      "static_counterexample": "Send TERM to the T0 driver after its ADOPT release has started the detached Jest child: default signal termination exits the driver, with neither on_exit nor own_reap_all invoked, leaving the already released child outside the caller's timeout group. [Release](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L161-L171) [Deleted traps](../../s5-v9-t0/controls-v8-to-v9-t0-only.diff#L116-L123)",
+      "consequence": "This is a supported ordinary cancellation regression, not a narrow scheduling/kernel-failure demand; the fixture's installed TERM trap does not prove the actual consumer, and the claimed final cleanup/publication path is unreachable on normal exit as well. [Fixture trap](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L13) [Consumer handler](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L139-L143)",
+      "minimal_correction": "Restore the intended traps before any workload can be spawned and bind consumer-level interruption/finalization evidence to those actual registrations.",
+      "closure_discriminator": "Verify the exact consumer trap wiring, then separately authorized pre-adoption and post-release cancellation must reach its owned cleanup and final primary/cleanup receipt.",
+      "runtime_observed": false
+    },
+    {
+      "id": "OWN-V9-A-03",
+      "severity": "HIGH",
+      "title": "Required identity publication is after workload release; setup's checked append failure exits without reaping",
+      "lineage": ["OWN-V8-A-01", "OWN-V8-A-03", "OWN-V8-A-05"],
+      "applies_to": ["setup direct safety", "T0 adoption/publication truth"],
+      "mechanism": "The child execs as soon as ADOPT matches, but both consumers publish required IDENTITY evidence only after own_adopt; setup then handles failure of its EXIT_RECORD identity append with bare exit 74, whose EXIT trap only counts processes and does not reap them. [Gate/release](../../s5-v9-t0/own-block-v9.sh#L14-L15) [Adoption publication](../../s5-v9-t0/own-block-v9.sh#L33-L37) [T0 ordering](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L165-L169) [Setup ordering](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L178-L185) [EXIT trap](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L126-L144)",
+      "static_counterexample": "ADOPT is successfully renamed and the gate begins npm ci; the subsequent identity append at setup line 182 fails with a storage/write error, so setup exits 74 while the install continues in its detached session with fd 9 closed; final_accounting observes rather than terminates the child, and this branch does not call quarantine. [Launch fd closure and failing branch](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L178-L185) [Accounting](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L126-L144)",
+      "consequence": "The lease can be released with active install work even though the new publication error is nonzero; if ATT/IDENTITY fails instead, the later refusal text 'npm ci never released' is also false because ADOPT was already consumable. [Refusal claim](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L180-L185)",
+      "minimal_correction": "Treat ADOPT as the release point: finish required pre-release recoverable identity publication first, and route every later fatal publication exit through owned cleanup/recovery; distinguish never-released from released-then-cancelled truthfully.",
+      "closure_discriminator": "The existing C5 only denies ADOPT.tmp creation before release; add or adapt a deterministic consumer-shaped failure after release/at identity publication and require retained ownership plus truthful released-state evidence. [Current C5 seam](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L29-L40)",
+      "runtime_observed": false
+    },
+    {
+      "id": "OWN-V9-A-04",
+      "severity": "MEDIUM",
+      "title": "Some required record failures still do not control final evidence or recovery state",
+      "lineage": ["OWN-V8-A-05"],
+      "applies_to": ["T0 evidence", "setup recovery/publication"],
+      "static_counterexamples": [
+        "T0's EXIT printf can create/truncate the file then fail partway, for example on ENOSPC; the error branch only logs, and the adoption check accepts the file's existence rather than successful complete publication, allowing the named evidence predicate to pass. [T0 write and check](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L174-L179)",
+        "On setup's explicitly supported unresolved-cleanup route, quarantine write failure merely appends QUARANTINE_WRITE_FAILED and then unconditionally appends QUARANTINE written; if the marker was not created, the later S5 precondition has no marker to refuse, while finish still exits and closes the lease. [Quarantine/finalization](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L136-L143) [Existing precondition](../../s5-v7/controls-v3/lib.sh#L33-L35)"
+      ],
+      "consequence": "The addendum's all-publication-outcomes-checked claim is not met: an error label or existing pathname is not successful evidence publication or checked recovery handoff. [Request claim](../../s5-v9-t0/V9_OWNED_LAUNCH_REQUEST.md#L12-L17)",
+      "minimal_correction": "Latch required write outcomes separately from primary exit and existence tests; never report a quarantine marker written after failure, and define a checked parent recovery disposition before releasing unresolved ownership.",
+      "closure_discriminator": "Reject a created-but-incomplete EXIT record and an absent quarantine marker after a failed write; preserve primary, cleanup and publication outcomes separately without loosening predicates.",
+      "runtime_observed": false
+    },
+    {
+      "id": "OWN-V9-A-05",
+      "severity": "MEDIUM",
+      "title": "Setup final accounting bypasses the new retired-identity and zombie-aware census",
+      "lineage": ["OWN-V8-A-02", "V8B-01", "V8B-04"],
+      "applies_to": ["setup evidence truth"],
+      "mechanism": "The new helper filters zombies and retires OWN_PIDS/OWN_PGIDS, but setup keeps the separate legacy OWNED_PGIDS string and final_accounting still runs unfiltered pgrep -g on it; own_retire never clears that string. [Helper census/retire](../../s5-v9-t0/own-block-v9.sh#L41-L57) [Legacy final census](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L131-L134) [Legacy assignment and retire call](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L186-L197)",
+      "static_counterexample": "After the install leader is gone, let its remaining group contain only a zombie descendant: the new live-session census accepts empty and retirement proceeds, but final_accounting's pgrep still returns that group member and increments CLEANUP_FAILURES; alternatively a later foreign occupant of a retired numeric group is counted as owned even though no active registry authorizes it. [Live filter](../../s5-v9-t0/own-block-v9.sh#L41-L44) [Accounting and FINAL](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L131-L139)",
+      "consequence": "The specific V8B-04 evidence-truth obligation is not closed in the consumer and can turn successful verified-live cleanup into FINAL 90; this finding is false attribution, not an allegation that this legacy accounting loop sends a signal. [Frozen B-04](../owned-launch-v8-b/REPORT.md#L78-L81) [Setup outcome](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L137-L139)",
+      "minimal_correction": "Use the current ownership registry and the same live-versus-zombie/foreign distinction for final accounting; retain historical IDs as evidence, not as current owned-process facts.",
+      "closure_discriminator": "A consumer-shaped final-accounting check must distinguish a live owned descendant, a zombie-only remainder and an already retired/foreign identity without relabeling all three as owned survivors.",
+      "runtime_observed": false
+    }
+  ],
+  "closure_ledger": [
+    {
+      "prior": "OWN-V8-A-01 / V8B-05",
+      "status": "PARTIAL: child gate and phase-bound fallback source improvements; actual T0 trap and post-release publication holes remain A-02/A-03",
+      "evidence": "Fresh attempt paths, pid+attempt ADOPT matching, phase=spawning and direct-child/not-registered/not-retired pending selection address the pre-exec/pre-register design gap; C8 fires after fork before PID registration, C9 after registration, and C10 before a new fork with stale retired $!, rather than only the old post-registration seam. [Primitive](../../s5-v9-t0/own-block-v9.sh#L14-L32) [Seams](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L21-L35) [Pre-spawn seam](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L54)"
+    },
+    {
+      "prior": "OWN-V8-A-02 / V8B-01",
+      "status": "SUBSTANTIAL SOURCE CORRECTION, NOT FULL CLOSURE",
+      "evidence": "Foreign non-direct-child pid signals are now refused, confirmed session groups are registry-gated and retirement removes primitive authority, but actual-parent wait is broken (A-01) and setup's separate historical census survives (A-05); C13 tests an old absent PID and PID 1, not replacement of a live historical identity. [Identity/signals](../../s5-v9-t0/own-block-v9.sh#L21-L50) [Retirement](../../s5-v9-t0/own-block-v9.sh#L52-L57) [C13](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L55)"
+    },
+    {
+      "prior": "OWN-V8-A-03 / V8B-03",
+      "status": "LEADERLESS SESSION ESCALATION SOURCE-CLOSED; CONSUMER RECOVERY PARTIAL",
+      "evidence": "The independent group loop now TERM/KILLs live members of the confirmed session even after leader exit and includes other process groups within that session; C11 targets the original leader-first-exit counterexample, but T0 lacks its handler and setup's publication exit can bypass cleanup. [Session reaper](../../s5-v9-t0/own-block-v9.sh#L41-L64) [C11](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L66-L67)"
+    },
+    {
+      "prior": "OWN-V8-A-04 / V8B-02",
+      "status": "OLD LIVE-CHILD UNCONDITIONAL-WAIT BRANCH REMOVED; RAW-EXIT REPLACEMENT INVALID (A-01)",
+      "evidence": "own_finish avoids wait when own_alive reports a live direct child, but the command-substitution call shape cannot establish the claimed parent wait/raw status; do not weaken C2/C3/C4/C14 to accept its mechanism error. [Guard](../../s5-v9-t0/own-block-v9.sh#L52-L54) [Control expectations](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L47-L52) [C14](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L72-L73)"
+    },
+    {
+      "prior": "OWN-V8-A-05 / V8B-04",
+      "status": "PARTIAL: checked ADOPT and primitive live-census improvements; A-03/A-04/A-05 remain",
+      "evidence": "ADOPT.tmp write/rename/readback outcomes are named, fixture cleanup rc now governs its result, and common primitive census excludes Z; consumer publication and legacy accounting do not uniformly follow those rules. [Adoption](../../s5-v9-t0/own-block-v9.sh#L33-L37) [Fixture result](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L49-L56) [Live census](../../s5-v9-t0/own-block-v9.sh#L41-L44)"
+    },
+    {
+      "prior": "OWN-V8-A-06",
+      "status": "PARTIAL: actively owned enclosure and wider cases; R6 raw-exit blocker A-01 and coverage limits remain",
+      "evidence": "The driver now registers/confirms/adopts its enclosure before waiting and has TERM/EXIT handlers with cleanup rc escalation, rather than only discovering a fixture PID after a synchronous timeout; its GRAND list is still populated after run_sup finishes, so C8/C9 prove fixture interruption, not independent cancellation of the outer driver while the fixture's separately setsid child is active. [Driver ownership/cleanup](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L19-L38) [Fixture separate session](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L21-L27)"
+    },
+    {
+      "prior": "S6 B Part B R1/R2/R3/(c)/(d)/stamp",
+      "status": "NARROW PRIMITIVE APPLICABILITY ONLY; NO S6 CLEARANCE",
+      "evidence": "The phase-bound gate/fallback and direct-child topology improve R1/R2, and both S5 consumers invoke the monitor-mode precondition; setup immediately truncates its just-written OWN_STAMP with START, so required successful-run tool/mode evidence is not preserved, and no R3 set-m case is in the fake-child driver. [S6 requirements](../s6-c6-b/S6_C6_REVIEW_B.md#L51-L57) [T0 precondition](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L126) [Setup stamp loss](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L147-L149) [Control set](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L44-L74)"
+    }
+  ],
+  "control_adequacy_and_bounds": {
+    "C0": "Arithmetic control covers the named own_budget examples, not an enforced whole-driver elapsed deadline. [C0](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L44)",
+    "C1_C2_C14": "Adoption/workload marker, natural 0 and actual TERM exit checks are meaningful intended discriminators, but A-01 makes their raw capture invalid on the frozen call paths. [Fixture](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L42-L51) [Checks](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L45-L48) [C14](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L72-L73)",
+    "C3_C4_C5": "No-ack, stale pid/token and directory write denial are genuine preconfigured negative conditions with absence-of-workload checks, not just expected log labels; C5 only covers initial ADOPT write refusal, not rename/readback, post-release identity, partial EXIT or quarantine failure. [Fixture seams](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L29-L41) [Checks](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L49-L55)",
+    "C6_C7": "Never-setsid exercises caller-group refusal with pid-only signal; delayed-setsid uses a one-second delay rather than an acknowledged hold/release, and C7 does not require its claimed intermediate decoy observation. [Spawn cases](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L23-L25) [Checks](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L56-L59)",
+    "C8_C9_C10": "The interruption seams target distinct real source boundaries and improve the former coverage, but C8 lacks an independent child PID/gone join (the trap runs before child.pid is written), and C10 checks phase/retired/no-reap text without requiring bang to equal the retired child; these are limits on what PASS would prove, not observed failures. [Spawn/registration](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L27-L33) [Checks](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L60-L65)",
+    "C11_C12": "Leaderless and TERM-ignore escalation are required and use cleanup-rc assertions, but trap-ignore readiness is not acknowledged: C11's parent may exit before its grandchild installs ignore-TERM, and C12 relies on sleep 0.5 after a marker written before trap installation; the KILL-path assertions fail closed if the precondition loses that race. [Workloads](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L17-L18) [Delay](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L45-L49) [Checks](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L66-L69)",
+    "C13": "The absent retired PID/PID-1/removed-group test is useful basic refusal coverage, not a live replacement or foreign-group-member discriminator; no PID-wrap experiment or new process-identity framework is demanded by this audit. [Fixture](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L55) [Check](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L70-L71)",
+    "driver_cancellation": "The enclosure registry and driver handlers are real improvements, but detached fixture-child cleanup still depends on the fixture's own TERM handler; current tests do not directly exercise an outer driver cancellation with that child active, and retained GRAND numeric checks use kill -0 without live/zombie distinction. [Driver](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L19-L38) [Fixture trap](../../s5-v9-t0/controls-v9-t0/sup-under-test.v9.sh#L13)",
+    "budgets": "R6 uses 170-second admission, 25-second polling and outer 200+10 nominal allowance; admission reserves 3+5 but the overrun path can spend 3+3 on leader cleanup plus 2+1 on session cleanup before final checks, so these are not a proof that all 15 checks complete inside a hard 170-second end-to-end budget. [Budget/paths](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L6-L7) [Admission and overrun](../../s5-v9-t0/controls-v9-t0/ctl-own-launch.v9.sh#L17-L38)",
+    "consumer_bounds": "T0's 120/140+20 and setup's 1200/1290+30 remain nominal allowances with loop overhead, after-checks and finalization, not observed completion; the material T0 cancellation blocker is missing traps, not a demand for absolute timing under arbitrary kernel failure. [T0 bounds](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L24-L25) [Setup allowance](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L15-L17)"
+  },
+  "preserved_applicability_and_prerequisites": [
+    "Both embedded blocks are byte-identical and all five declared diffs independently match their frozen input pairs; this establishes exact source identity, not behavioral closure. [Fingerprint/comparison ledger](INPUTS.json)",
+    "T0 retains HEAD/fingerprint/dependency/harness/config gates and the same predecessor refused-identity selection, I0 copy comparison, mutation and refusal-reason assertions; the fixture is not a substitute for its missing actual traps. [Gates](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L127-L135) [Selection/assertions](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L145-L185)",
+    "Setup retains source/lock/dirty/ancestor/fresh-install gates, taskset plus npm ci --ignore-scripts arguments, child fd9 closure, and strict after-install identities; no installation success is inferred. [Gates](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L154-L178) [After-checks](../../s5-v9-t0/controls-v9-t0/run-s5-setup-npm-ci.v9.sh#L201-L221)",
+    "After exact-successor dual closure, R6 still needs a separate grant and raw caller capture; fresh setup separately needs approved evidence paths, exact restored source/prerequisites and canonical-lock authority, and T0 needs attributable fresh setup plus byte-identical staged controls-v3 library/harness/config at its relative paths. [Final request](../../s5-v9-t0-closure-1/FINAL_CLOSURE_ADDENDUM.md#L29-L34) [T0 dependency path](../../s5-v9-t0/controls-v9-t0/ctl-t0-only.v9.sh#L52-L54) [Declared staging](../../s5-v8-t0/V8_T0_AND_SETUP_SUCCESSOR_REQUEST.md#L26)"
+  ],
+  "independence_and_truth": {
+    "non_builder": true,
+    "both_frozen_V8_reviews_read": true,
+    "current_V9_B_read": false,
+    "candidate_execution_probes_syntax": false,
+    "lock_install_network_source_edits": false,
+    "actual_runtime_model_settings": "Unexposed; not fabricated from policy labels",
+    "counterexamples": "Static source/shell-semantics reasoning only, not observed runs; no kernel-failure-immunity or generic-framework requirement",
+    "writes": "Only new audit files in execution/op88/audits/owned-launch-v9-a; preceding S4 audit left frozen"
+  },
+  "smallest_next_action": "Canonical builder prepares one additive successor correcting parent-shell wait capture, actual T0 trap wiring, release/publication cleanup, checked receipt/quarantine outcomes and setup's final current/live census; preserve V9 and this addendum, refresh exact hashes/diffs/embedded comparisons, then both independent risk-scoped reviews before R6. [Ownership/rescope](../../OWNED_LAUNCH_SCOPE.md#L26-L32)"
+}
