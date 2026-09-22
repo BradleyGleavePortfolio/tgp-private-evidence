@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 06:12 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
+Updated: 2026-09-22 20:47 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
 
 ## Mission and authority
 
@@ -12,7 +12,7 @@ Mandatory reads completed: current private state and exact companion, attached t
 
 ## Verified source and publication baseline
 
-At takeover, relevant public mains and PR heads were re-queried and unchanged. Private intake commit is `4aeacc694fb8ca8b6e0302e3c184fc57e15059f2`; current source packets were retrieved from it, not from stale context main.
+At op 88 takeover, relevant public mains and active PR heads were re-queried and unchanged. Current private intake is `ad3568a953304dcf031b6e1cd6c290061f23ac30`, reverified against remote main at 20:43 UTC. Its parent history preserves the earlier `4aeacc694fb8ca8b6e0302e3c184fc57e15059f2` intake. Current packets come from private evidence, not stale context telemetry.
 
 | Repository | Verified main |
 |---|---|
@@ -29,24 +29,26 @@ Preserved public stacks remain open and unmerged:
 
 ## Current lanes and exact state
 
-Full independently executable slice records, writer surfaces, acceptance, recovery and non-goals: `execution/CONTINUATION_20260922.md`. Fresh worker IDs are in synchronized `execution/DISPATCHES.md`. Prior-session IDs are not live workers in this workspace. Each of all64 preserved open public PRs has its own explicit consequence grade, exact head, reported base and rationale in `execution/pr-grades/PUBLIC_PR_GRADES.{md,json}`; provisional retained-work grades are not invented audit clearance.
+Current independently executable slice records, writer surfaces, acceptance, recovery and non-goals: `execution/OP88_WAVE1.md`, continuing the original `execution/CONTINUATION_20260922.md` and named repair-wave scopes without reopening them. Fresh worker IDs are in synchronized `execution/DISPATCHES.md`. Prior-session IDs and grants are historical, not live in this workspace. All 64 preserved public PR grades remain in `execution/pr-grades/PUBLIC_PR_GRADES.{md,json}`; retained grades are not audit clearance.
+
+**Current dispatch:** Bradley instructed all six continuations in parallel IF SAFE. Fresh Fable fixers are preparing S5 selective V7 and S2 V5.6; independent Fable S6 C5 result review and separate inherited/Fable S4 V4 reviews are active. A separate Fable integration builder restores S1/S3 exact inputs behind upstream gates. These are preparation/review assignments only. No runtime/install/control/DB grant, no new product fix/test result, and no product landing/release permission.
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
-| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Both R4 source follow-ups frozen: quoted/pre-seed source-closed, no source defect established. TRUNCATE behavior/membership path/discriminator unobserved. B addendum688bc92d corrects revision1:56fb IS composed in21ea/d5cd; successful final dynamic proof is not. Offline24/24 exists;17/7 mutant bytes missing. No schema change ordered. |
-| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | R3 unchanged; setup05 all0, no server. Both V5.5 reviews frozen HOLD08/09, agree IDDIR reset/K2 predicate; parent retains A's additional startup/watchdog/deadline/predecessor-receipt/publication/CLI-order residuals despite B's narrower opinion. Minimal V5.6 preparation with N4/N5/N6 discriminators assigned. Checkpoint export and original post-hash mutation narrowly source-corrected only; no controls/reinstall/DB. |
-| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Retained R2; PREP2 write6/check46 both0, stagedtreea584a1b95423f95dae8daabf673ef3776604acbb reproduced from both parents, six formatted S3 blobs/three unchanged resolutions/0 unexpected. Request03e707ec2a and additive68872675 checkpoint-disable environment frozen. No application deps/Prisma/hooks/commit; upstream B3 then composed-lock proof and six-file applicability still required. |
-| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow A/B source closure; artifact held, historical hooks0/6. V3 A concrete HOLD retained despite narrower B. V4 frozen launcher23ebfbc3/libabfdd0bd/runner86a4f6cc, manifest3c9276aa, dual exact-successor reviews assigned. Private control lease/quarantine holder and340s bound requested, not granted. No controls/native/product edit. |
-| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R4 dirty patchc36258b3/fingerprint6850b32e uncommitted. Setup74736a58 positive1117 packages/inner-FINAL-outer0, exact source/ancestor and identities preserved, no generated client/hooks. V6 real-Jest/fake-harness once06:06:47–52:12PASS/1FAIL on T3 JSON-escaping checker, outer1/no survivors; T1/T2 named refusals/zero mutation/skips positive, T0 NOTRUN. Selective read-only T3 checker plus T0-only driver preparation assigned, no repeat valid runs. All failed waves remain failed. |
-| S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 unchanged. Setup91fe0f1b positive1099packages/20 strict identities. C5b7b328a5 once: A/B/D0; C6/6/no overlap with preserved hang143 budget-TERM and nine snapshots of five600000ms refed singleton-Query GC timers. Cleanup0/five copies removed/ancestor unchanged/porcelain0; actual outer wait unobserved. B bounded result/proposal review assigned; trigger/app impact/historical extrapolation and test-only fix sufficiency not yet accepted. |
+| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups remain frozen; no new source defect. Fresh upstream builder restoring exact composition/discriminator inputs only. TRUNCATE behavior/membership path/final dynamic proof pending; 56fb IS composed in21ea/d5cd. Prior offline24/24 remains qualified. No schema change. |
+| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Product R3 unchanged. Fresh Fable fixer preparing V5.6 against BOTH frozen V5.5 HOLD reviews, including A's material ownership/deadline/receipt residuals. N4/N5/N6 controls unrun; dual exact-successor review required before execution. Historical setup05 is not an installation in this sandbox. |
+| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Retained bounded R2 acceptance; fresh integration builder restoring PREP2 treea584a1b95423f95dae8daabf673ef3776604acbb and request03/addendum inputs without new edits. Upstream B3, hook-enabled exact-tree integration, composed-lock proof and changed-six-file applicability remain pending. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow source closure retained; artifact held, historical hooks0/6. Frozen V4 launcher23ebfbc3/libabfdd0bd/runner86a4f6cc, manifest3c9276aa under fresh independent A/B review. Private controls/native execution NOT GRANTED. |
+| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R4 patchc36258b3/fingerprint6850b32e preserved uncommitted. Fresh Fable fixer preparing JSON-aware T3 log checker and T0-only driver. V6 remains12PASS/1FAIL, outer1; valid T1/T2 and raw T3 evidence retained, no replay. Historical1117-package setup not present here. |
+| S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 unchanged. Fresh independent B reviewing C5 raw evidence/proposal applicability; no product/teardown fix granted. Prior C5 A/B/D0, C6/6+hang143 and five600000ms Query timers preserved; causal trigger/app impact/history/test-only-fix sufficiency unproven. Outer wait remains unobserved. |
 
 Four advertised bundle identities were checked against current packet heads: S2 `3b6cee48…0f75`, S4 `f8de3d63…cf97`, S5 `e42aa021…5b48`, S6 `c0ad2994…9662`. Workers must verify prerequisite, actual tree and isolated clean restoration before edits. Restoration is not a new passing test or audit.
 
 ## Resource and truth boundaries
 
-Workspace2CPUs/about8GB; disk6.4GB free observed06:09. Installed /home/user/pg17/dist fixed17.6 and isolated S2/S5/S6 application dependencies are attributable; no real cluster/server created. Platform-owned /home/user/node_modules is read-only: historical209 entries, contemporaneous S5/S6 setup inventory210 entries with before/after hash3bc7f2e3 unchanged. Acceptance uses each slot's hash equality, not a permanent count. Isolated Prettier3.9.6 tooling is installed, no S3 application dependencies.
+Fresh op88 workspace: 2 CPUs/about8GB; disk9.9GB free observed20:43 before packet/baseline restoration. Prior PG17.6/tooling/application dependency installations and PIDs are not inherited. Backend/mobile/extension public baselines restored read-only; only named private packets hydrated. Platform-owned `/home/user/node_modules` remains outside worker ownership. Any installation requires separate reviewed scope, capacity check and serialized grant.
 
-Source/preparation/review lanes remain parallel and isolated. S6 diagnostic, S5 setup and S5 v6 allocations are consumed; v6 stopped on first checker failure, reporting no survivors. No new heavy allocation is granted. S5 selective preparation, S6 result review, S2 independent reviews and S4 V4 preparation are active; S2 realproof/S4native/new S6runtime remain held. A free lock is not permission.
+Source/preparation/review lanes are active in parallel and isolated. All prior execution grants are consumed/historical. No new heavy or control allocation is granted. S5/S2 fixer preparation, S6 result review, independent S4 V4 reviews and upstream restoration may proceed; S2 realproof/S4native/new S6runtime and S3 integration remain held. A free lock is not permission.
 
 Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 A/B source reviews and B factual addendum are frozen, dynamic attestation pending. S4 A source acceptance is not artifact acceptance. All original reports remain unchanged. Every S-lane has stage-correct work.
 
@@ -91,12 +93,13 @@ Success requires native reconciled completion, not staging/generic reconstructio
 
 ## Bradley decision required
 
-NO for current local engineering/review. Hosted-review identity/security settings and production/customer actions remain reserved. Next actions are the exact S5 control grant, S6 independent result review and held S2/S4 successor preparation; no speculative product edits or valid-control repetition.
+NO for current local engineering/review. Hosted-review identity/security settings and production/customer actions remain reserved. Exact next action: inspect fresh S5 V7/S2 V5.6 frozen preparations and S6/S4 independent returns; assign narrow reviews/remediation, then grant only validated bounded execution serially. Do not repeat valid controls, speculate on product fixes, or run downstream integration before prerequisites.
 
 ## Evidence entry points
 
 - Intake truth and original continuation: Git commit `4aeacc694fb8ca8b6e0302e3c184fc57e15059f2`.
 - Current slice contracts: `execution/CONTINUATION_20260922.md`.
+- op88 current bounded assignments: `execution/OP88_WAVE1.md`; current ownership: `execution/DISPATCHES.md`.
 - S1/S3 stage-correct follow-up contracts: `execution/S1_S3_CONTINUATION_BRIEF.md`.
 - S4 current review: `execution/S4_R6_REVIEW_BRIEF.md`; S2 setup preparation: `execution/S2_SETUP_PREPARATION_BRIEF.md`.
 - Current allocation/repair decisions: `execution/VALIDATION_PREPARATION_20260922.md`; exact S2 setup/independent review: `execution/S2_R53_ALLOCATION_AND_REVIEW.md`.
