@@ -1,14 +1,14 @@
 # Active TGP execution register
 
-Updated 2026-09-22 21:50 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
+Updated 2026-09-22 21:53 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
 
 User directed the existing six-slice continuation in parallel IF SAFE. Full current contracts: `execution/OP88_WAVE1.md`. All assignments T4; canonical builder Claude Fable 5. Requested High policy is not observed runtime telemetry. All prior-session worker IDs/processes/installations/grants are historical. Earlier register retained in Git at ad3568a9.
 
 | Slice | Fresh worker ID | Requested model | Sole writes | Current state |
 |---|---|---|---|---|
-| S5/S6 shared launch V10 correction | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozenV8/V9/closure; new execution/op88/s5-v10-t0 | ACTIVE exact V9 A residual repair; B required before final freeze. S6 adaptation paused, no runtime. |
+| S5/S6 shared launch V10 correction | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozenV8/V9/closure; new execution/op88/s5-v10-t0 | ACTIVE exact repair against BOTH frozen V9 reports; current-census race included. S6 adaptation paused, no runtime. |
 | Owned launch V9 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | frozen execution/op88/audits/owned-launch-v9-a | COMPLETE audit104a6bba/manifest56d46b9f, R6/setup/T0 HOLD, five material findings. No peer access/execution; idle. |
-| Owned launch V9 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | execution/op88/audits/owned-launch-v9-b | ACTIVE same exact frozen candidate independently; no current A access/execution. V8 report remains frozen. |
+| Owned launch V9 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | frozen execution/op88/audits/owned-launch-v9-b | COMPLETE manifestcceedc52, five material findings, setup/T0 not grantable, no known-invalid controls recommended. No peer access/execution; idle. |
 | Owned launch V8 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | frozen execution/op88/audits/owned-launch-v8-a | COMPLETE manifest9f54e9d7: all execution HOLD, six concrete findings. No peer access/probes; frozen report released to fixer only. |
 | Owned launch V8 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | frozen execution/op88/audits/owned-launch-v8-b | COMPLETE manifestb22a6140: five material findings; setup/T0 HOLD, narrower controls-safe opinion does not waive A. No peer access; both now released to fixer. |
 | S5 V7 narrow review A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | frozen execution/op88/audits/s5-v7-a | COMPLETE manifest157b6ab5: R1 logic closed, grant text corrections; R2 HOLD startup/caller-group/deadline+setup. Idle; S4 original remains frozen. |

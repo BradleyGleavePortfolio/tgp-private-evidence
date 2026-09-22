@@ -1,0 +1,153 @@
+{
+ "id": "OP88-OWNED-LAUNCH-V9-B",
+ "role": "independent non-builder T4 reviewer B",
+ "model_label": "canonical Claude Fable 5 reviewer label; actual setting unexposed",
+ "parent": "e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038",
+ "frozen_at": "2026-09-22T21:52:39Z",
+ "clock": "actual `date -u` at freeze",
+ "status": "FROZEN",
+ "packet_manifest_sha256": "36f04f84a08192f7d9e7ad4358dcb453a0243b4ee8f8ae0aab989e94f3e188c3",
+ "addendum_sha256": "d66b23c136aba589cd0a46d94484296e368a37db3d13fec9c62ce50b0b0d092c",
+ "peer_isolation": "owned-launch-v9-a not read; frozen V8 A/B and S6-C6-B Part B read as instructed",
+ "truth": {
+  "implemented": "18-file packet + addendum hash-bound; embedded block identical x2 and all 5 diffs reproduced by reviewer",
+  "tested": "nothing",
+  "unrun": "15 control checks; T0 v9; setup v9"
+ },
+ "findings": [
+  {
+   "id": "V9B-01",
+   "severity": "HIGH",
+   "material": true,
+   "title": "T0 driver installs no trap; on_exit is dead code (interruption closure, EXIT reap, FINAL rc 90 absent)",
+   "locations": [
+    "controls-v9-t0/ctl-t0-only.v9.sh:139-143 (defined, never installed)",
+    "controls-v8-to-v9-t0-only.diff:117 (V8 L92 trap line deleted)",
+    "s5-v7/controls-v3/lib.sh:24-31 (check relies on EXIT trap)"
+   ],
+   "counterexample": "outer timeout TERM or check exit 1 kills the driver by default action; adopted Jest session survives unowned; no FINAL 90, no cleanup_rc, no control-root decision",
+   "controls_cover": false,
+   "closure": "reinstate `trap on_exit EXIT; trap 'log SIGNAL; exit 143' TERM INT HUP` after L143"
+  },
+  {
+   "id": "V9B-02",
+   "severity": "HIGH",
+   "material": true,
+   "title": "own_finish's `wait` runs inside $(...) at every call site: subshell is not the parent (waitpid ECHILD); observed rc fabricated; child never reaped",
+   "locations": [
+    "own-block-v9.sh:53",
+    "ctl-t0-only.v9.sh:172",
+    "run-s5-setup-npm-ci.v9.sh:184,192,199",
+    "sup-under-test.v9.sh:40,48,50",
+    "ctl-own-launch.v9.sh:34"
+   ],
+   "counterexample": "setup RC never npm's status -> die npm-ci 127 (or false 0); T0 GATE_RC/raw not Jest's while .adoption/.owned PASS; controls stop deterministically at C1 (SUP_RC) or C3 (observed 75) -> 'expected pass=15' false",
+   "controls_cover": "yes (would fail at C1/C3)",
+   "closure": "return via variable OWN_FIN; call own_finish at top level at all seven sites"
+  },
+  {
+   "id": "V9B-03",
+   "severity": "MEDIUM",
+   "material": true,
+   "title": "setup OWN_STAMP appended (L148) then EXIT_RECORD truncated (L149 `>`): required stamp evidence lost",
+   "locations": [
+    "run-s5-setup-npm-ci.v9.sh:148-149"
+   ],
+   "controls_cover": false,
+   "closure": "stamp after record creation or `>>` at L149"
+  },
+  {
+   "id": "V9B-04",
+   "severity": "MEDIUM",
+   "material": true,
+   "title": "setup identity-record failure branch exits 74 after adoption was published: released npm ci abandoned, lease released, no reap/quarantine",
+   "locations": [
+    "run-s5-setup-npm-ci.v9.sh:180-182 (adopt L180, exit 74 L182)",
+    "run-s5-setup-npm-ci.v9.sh:126-135 (final_accounting census only)"
+   ],
+   "controls_cover": false,
+   "closure": "route L182 failure through reap + quarantine + finish 74 as L184-185"
+  },
+  {
+   "id": "V9B-05",
+   "severity": "LOW-MEDIUM",
+   "material": true,
+   "title": "own_group_current classifies a member gone between pgrep and ps as foreign (rc2); own_reap_all skips the group with rc 0; setup L196 CE=0 then retires",
+   "locations": [
+    "own-block-v9.sh:43,49,62",
+    "run-s5-setup-npm-ci.v9.sh:196-197"
+   ],
+   "controls_cover": false,
+   "closure": "treat empty ps output as gone; rc2 only for present member with sid != $1"
+  }
+ ],
+ "optional": [
+  {
+   "id": "O-01",
+   "note": "ps -eo pid=,sid=,stat= header parsing personality-dependent per procps docs; use separate -o"
+  },
+  {
+   "id": "O-02",
+   "note": "bounds: setup on_signal worst 46 s > 30 s kill margin; T0 EXIT reap worst 26 s (header says <=13); allowance wording correct, figures wrong"
+  },
+  {
+   "id": "O-03",
+   "note": "control finish_ctl GRAND lacks in-flight case child on mid-case cancellation"
+  },
+  {
+   "id": "O-04",
+   "note": "T0 mktemp before (missing) trap; inherited"
+  },
+  {
+   "id": "O-05",
+   "note": "empty/failed ps treated as not-child (fail-open skip under fork failure); /proc/<pid>/stat needs no fork"
+  },
+  {
+   "id": "O-06",
+   "note": "C5 `! ran` cannot fail (attempt dir a-w); assert raw=observed 75"
+  }
+ ],
+ "closure_map": {
+  "A-01": {
+   "primitive": "CLOSED",
+   "T0": "NOT CLOSED (V9B-01)",
+   "setup": "CLOSED except V9B-04"
+  },
+  "A-02/V8B-01": "CLOSED (ppid==$$, retire, retired skipped; C10/C13)",
+  "A-03/V8B-03": {
+   "primitive": "CLOSED in design, qualified by V9B-05",
+   "T0": "EXIT path void (V9B-01)",
+   "setup": "CLOSED (L195-197 quarantine)"
+  },
+  "A-04/V8B-02": "no blocking wait remains, but wait is impossible in $(...) (V9B-02): raw exit untruthful",
+  "A-05": {
+   "T0": "NOT CLOSED (FINAL 90 never emitted)",
+   "setup": "CLOSED except V9B-04"
+  },
+  "A-06": "enclosure cancellation-safe; discriminators broad; expected pass=15 false (V9B-02)",
+  "V8B-04": "CLOSED (zombies excluded; reap_rc asserted x8)",
+  "V8B-05": "CLOSED (phase-bound $!; C8)",
+  "S6-B PartB": {
+   "R3 stamp/refuse": "CLOSED in T0; setup stamp lost (V9B-03)",
+   "(c)": "CLOSED",
+   "(d)": "CLOSED via zombie exclusion"
+  },
+  "S5-V7-A-02/P88-S5-SETUP-01": "CLOSED at source in primitive",
+  "S5-V7-A-03": "bounds remain allowance (O-02)"
+ },
+ "controls_review": {
+  "cases": 15,
+  "expected_by_builder": "pass=15",
+  "reviewer_expectation": "stop at C1 (SUP_RC != 0) or C3 (observed 75) due to V9B-02",
+  "discriminator_safe": true,
+  "notes": "fake sleep children; enclosure via primitive; grandchildren never signalled by bare number; lock stat only; seams deterministic (C8 hits &->$! boundary); consumer-only defects invisible by construction"
+ },
+ "verdicts": {
+  "R6_fake_child_controls": "SAFE to run; NOT worth spending on these bytes (statically stops at C1/C3); grant only for empirical confirmation of V9B-02, else after V10",
+  "T0_applicability_38f8ec01": "NOT GRANTABLE (V9B-01, V9B-02)",
+  "fresh_setup_R2prime_da5228c2": "NOT GRANTABLE (V9B-02, V9B-03, V9B-04)",
+  "S6_consumers": "absent, not cleared",
+  "product_clearance": "none"
+ },
+ "smallest_next_action": "Builder issues V10 (block byte-identical x2): own_finish via OWN_FIN with all 7 call sites top-level (V9B-02); T0 trap line restored after L143 (V9B-01); setup stamp after record creation (V9B-03); L182 failure -> reap+quarantine+finish 74 (V9B-04); empty-ps-as-gone in own_group_current/own_group_signal (V9B-05); C5 asserts raw=observed 75; corrected bound figures. Then two exact re-reviews, then R6."
+}
