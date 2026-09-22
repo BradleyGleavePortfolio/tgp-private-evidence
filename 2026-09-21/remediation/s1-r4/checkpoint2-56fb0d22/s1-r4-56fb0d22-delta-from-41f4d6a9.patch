@@ -1,0 +1,267 @@
+From 56fb0d227558c86fe824f9fb1bc15e222411504f Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Tue, 22 Sep 2026 00:26:58 +0000
+Subject: [PATCH] test(db): S1 R4 TRUNCATE controls expect the verifier's
+ quoted-identifier diagnostic (S1-R4-A-01)
+
+verify.sql emits API-role privilege problems through format('%I: %s still holds %s'),
+so the mixed-case relation arrives double-quoted: `"MuxProcessedEvent": anon still
+holds TRUNCATE` (observed verbatim in the B1 composed verifier output). The first R4
+draft of the shared controls searched for the unquoted spelling and could never match.
+
+- s1-truncate-controls.sh: exact fixed-string needles in S1_TRUNC_MSG_* and
+  s1_trunc_msg_count (grep -F); C1/C2 additionally assert the other role is NOT named;
+  predecessor checks are labelled psql-route only (the predecessor is not run through
+  Prisma; the Prisma route is asserted for the current verifier).
+- s1-r4-truncate-discriminator.sh: precondition decision is taken BEFORE the optional
+  synthetic marker INSERT, so a failed precondition issues no INSERT/GRANT/REVOKE; the
+  message says exactly that instead of "nothing mutated".
+- new test/db/s1-r4-truncate-message-spec.sh: offline (bash+grep, no database) spec
+  that pins the needles to verify.sql's format strings and to real B1 fragments, and
+  rejects wrong role, wrong privilege, wrong class, the OK notice and the unquoted
+  spelling.
+
+verify.sql, migration.sql, down.sql, the target guard, the bootstrap and the full
+harness are byte-identical to 41f4d6a9. No database run has happened.
+---
+ test/db/_support/s1-truncate-controls.sh | 50 +++++++++++----
+ test/db/s1-r4-truncate-discriminator.sh  | 26 ++++----
+ test/db/s1-r4-truncate-message-spec.sh   | 79 ++++++++++++++++++++++++
+ 3 files changed, 131 insertions(+), 24 deletions(-)
+ create mode 100755 test/db/s1-r4-truncate-message-spec.sh
+
+diff --git a/test/db/_support/s1-truncate-controls.sh b/test/db/_support/s1-truncate-controls.sh
+index d1561a4d..a07e4f8a 100644
+--- a/test/db/_support/s1-truncate-controls.sh
++++ b/test/db/_support/s1-truncate-controls.sh
+@@ -15,18 +15,27 @@
+ # references it by FK — restored after every step; the seeded row is never lost):
+ #   C0  positive: current verifier passes on the protected state (both routes)
+ #   C1  direct `GRANT TRUNCATE ... TO anon`  -> effective CRUD f,f,f,f TRUNCATE t;
+-#       PREDECESSOR verifier exits 0 (the false green); CURRENT verifier exits
+-#       non-zero, class "1 exposure problem(s); 0 allowed-path problem(s)", message
+-#       names "MuxProcessedEvent: anon still holds TRUNCATE"; Prisma route non-zero;
++#       PREDECESSOR verifier exits 0 via psql (the false green; the predecessor is
++#       NOT run through Prisma - that route is asserted for the CURRENT verifier only);
++#       CURRENT verifier exits non-zero, class "1 exposure problem(s); 0 allowed-path
++#       problem(s)", message names '"MuxProcessedEvent": anon still holds TRUNCATE'
++#       (the relation is emitted through format('%I') and therefore DOUBLE-QUOTED
++#       because of its mixed case - exact strings below are taken from the real B1
++#       verifier output, S1-R4-A-01); Prisma route non-zero;
+ #       behavioural corroboration in a ROLLBACK-ONLY transaction: SET ROLE anon can
+ #       TRUNCATE the FORCE-RLS deny-all table (00000), in-transaction count 0, after
+ #       ROLLBACK the owner still sees the seeded row. Restore -> positive again.
+ #   C2  direct `GRANT TRUNCATE ... TO authenticated` -> current fails naming
+ #       authenticated; restore -> positive.
+ #   C3  PUBLIC-only `GRANT TRUNCATE ... TO PUBLIC` (no direct anon/authenticated ACL
+-#       entry) -> effective TRUNCATE t for both API roles; predecessor exits 0;
++#       entry) -> effective TRUNCATE t for both API roles; predecessor exits 0 (psql);
+ #       current exits non-zero with 2 exposure problems naming both roles; Prisma
+-#       route non-zero; restore -> positive (both routes).
++#       route non-zero; restore -> positive (both routes, current verifier).
++#
++# Message predicates are exact fixed strings (grep -F) kept in the S1_TRUNC_MSG_*
++# variables below so test/db/s1-r4-truncate-message-spec.sh can prove offline that
++# they accept the real diagnostic shape and reject wrong role / wrong class / missing
++# exposure, without any database.
+ #   C4  baseline: without the grant, SET ROLE anon TRUNCATE is refused 42501 (the
+ #       privilege, not RLS, is what gates the operation).
+ #
+@@ -45,6 +54,18 @@
+ #   predecessor path:   the frozen b7d7fe59 verify.sql, already extracted and sha256-pinned by the caller
+ 
+ S1_TRUNC_TABLE='"MuxProcessedEvent"'
++# Exact substrings of the verifier's RAISE EXCEPTION line. Relation names come out of
++# format('%I', t) -> double-quoted for mixed-case identifiers (observed in B1:
++# `EXPOSURE: "ClientAssetGrant": RLS not enabled; ... "MuxProcessedEvent": anon still holds TRUNCATE`).
++# The ALLOWED-PATH branch uses %s (unquoted) - a different predicate, not used here.
++S1_TRUNC_MSG_CLASS1='1 exposure problem(s); 0 allowed-path problem(s)'
++S1_TRUNC_MSG_CLASS2='2 exposure problem(s); 0 allowed-path problem(s)'
++S1_TRUNC_MSG_ANON='"MuxProcessedEvent": anon still holds TRUNCATE'
++S1_TRUNC_MSG_AUTHN='"MuxProcessedEvent": authenticated still holds TRUNCATE'
++S1_TRUNC_MSG_ONLY_ANON="EXPOSURE: $S1_TRUNC_MSG_ANON"    # sole problem => directly after the class prefix
++S1_TRUNC_MSG_ONLY_AUTHN="EXPOSURE: $S1_TRUNC_MSG_AUTHN"
++# s1_trunc_msg_count <message> <fixed-needle> -> number of lines of <message> containing <needle> (0 or 1)
++s1_trunc_msg_count() { printf '%s\n' "$1" | grep -cF -- "$2"; }
+ 
+ # effective privileges of <role> on the control table: "S,I,U,D,T" as t/f letters
+ s1_trunc_eff() { # <url> <role>
+@@ -88,7 +109,7 @@ s1_truncate_controls() {
+   check "R4 TRUNCATE C0: protected state — anon effective S,I,U,D,T all false" "f,f,f,f,f" "$(s1_trunc_eff "$OWNER" anon)"
+   check "R4 TRUNCATE C0: protected state — authenticated effective S,I,U,D,T all false" "f,f,f,f,f" "$(s1_trunc_eff "$OWNER" authenticated)"
+   check "R4 TRUNCATE C0: CURRENT verify.sql passes on the protected state (psql route)" 0 "$(verify_rc "$OWNER")"
+-  check "R4 TRUNCATE C0: PREDECESSOR (b7d7fe59) verify.sql also passes on the protected state (both agree on the positive)" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
++  check "R4 TRUNCATE C0: PREDECESSOR (b7d7fe59) verify.sql also passes on the protected state (psql route; both agree on the positive)" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
+   check "R4 TRUNCATE C4: baseline — SET ROLE anon TRUNCATE is refused 42501 without the privilege (rollback-only txn)" "SQLSTATE=42501|IN_TXN_COUNT=n/a" "$(s1_trunc_probe_rollback_only "$AUTHN")"
+   check "R4 TRUNCATE C4: seeded rows intact after the refused probe" "$seed" "$(q "$OWNER" "select count(*) from $S1_TRUNC_TABLE")"
+ 
+@@ -98,11 +119,12 @@ s1_truncate_controls() {
+   check "R4 TRUNCATE C1: authenticated unaffected by the anon grant" "f,f,f,f,f" "$(s1_trunc_eff "$OWNER" authenticated)"
+   check "R4 TRUNCATE C1: RLS invariants unchanged (enabled+forced, 3 policies) — only the privilege drifted" "t,t,3" \
+     "$(q "$OWNER" "select concat_ws(',', c.relrowsecurity, c.relforcerowsecurity, (select count(*) from pg_policy where polrelid=c.oid)) from pg_class c where c.oid='$S1_TRUNC_TABLE'::regclass")"
+-  check "R4 TRUNCATE C1 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with anon holding TRUNCATE (the S1-R3-A-01 false green)" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
++  check "R4 TRUNCATE C1 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with anon holding TRUNCATE (psql route; the S1-R3-A-01 false green)" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
+   check "R4 TRUNCATE C1 DISCRIMINATOR: CURRENT verify.sql exits NON-ZERO (psql route)" 1 "$(verify_rc "$OWNER")"
+   vm=$(verify_msg "$OWNER")
+-  check "R4 TRUNCATE C1: classified EXPOSURE — '1 exposure problem(s); 0 allowed-path problem(s)'" 1 "$(printf '%s\n' "$vm" | grep -c '1 exposure problem(s); 0 allowed-path problem(s)')"
+-  check "R4 TRUNCATE C1: message names the relation, role and privilege" 1 "$(printf '%s\n' "$vm" | grep -c 'EXPOSURE: MuxProcessedEvent: anon still holds TRUNCATE')"
++  check "R4 TRUNCATE C1: classified EXPOSURE — '$S1_TRUNC_MSG_CLASS1'" 1 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_CLASS1")"
++  check "R4 TRUNCATE C1: message is exactly the quoted relation, role and privilege — '$S1_TRUNC_MSG_ONLY_ANON'" 1 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_ONLY_ANON")"
++  check "R4 TRUNCATE C1: message does NOT name authenticated" 0 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_AUTHN")"
+   check "R4 TRUNCATE C1 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO with anon holding TRUNCATE" 1 "$(prisma_verify_rc "$OWNER")"
+   check "R4 TRUNCATE C1 behaviour (rollback-only): SET ROLE anon CAN TRUNCATE the FORCE-RLS deny-all table (00000) and the table is empty inside the txn" "SQLSTATE=00000|IN_TXN_COUNT=0" "$(s1_trunc_probe_rollback_only "$AUTHN")"
+   check "R4 TRUNCATE C1 behaviour: after ROLLBACK the owner still sees every seeded row (no destruction committed)" "$seed" "$(q "$OWNER" "select count(*) from $S1_TRUNC_TABLE")"
+@@ -115,7 +137,9 @@ s1_truncate_controls() {
+   check "R4 TRUNCATE C2: after direct grant, authenticated effective TRUNCATE=t" "f,f,f,f,t" "$(s1_trunc_eff "$OWNER" authenticated)"
+   check "R4 TRUNCATE C2: CURRENT verify.sql exits NON-ZERO" 1 "$(verify_rc "$OWNER")"
+   vm=$(verify_msg "$OWNER")
+-  check "R4 TRUNCATE C2: message names authenticated" 1 "$(printf '%s\n' "$vm" | grep -c 'EXPOSURE: MuxProcessedEvent: authenticated still holds TRUNCATE')"
++  check "R4 TRUNCATE C2: classified EXPOSURE — '$S1_TRUNC_MSG_CLASS1'" 1 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_CLASS1")"
++  check "R4 TRUNCATE C2: message is exactly the quoted relation, authenticated and TRUNCATE — '$S1_TRUNC_MSG_ONLY_AUTHN'" 1 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_ONLY_AUTHN")"
++  check "R4 TRUNCATE C2: message does NOT name anon" 0 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_ANON")"
+   q "$OWNER" "revoke truncate on table $S1_TRUNC_TABLE from authenticated" >/dev/null
+   check "R4 TRUNCATE C2 restore: CURRENT verify.sql passes again" 0 "$(verify_rc "$OWNER")"
+ 
+@@ -124,11 +148,11 @@ s1_truncate_controls() {
+   check "R4 TRUNCATE C3: PUBLIC grant leaves NO direct anon/authenticated ACL entry (effective-only case)" 0 "$(s1_trunc_direct_acl "$OWNER")"
+   check "R4 TRUNCATE C3: anon effective TRUNCATE=t via PUBLIC" "f,f,f,f,t" "$(s1_trunc_eff "$OWNER" anon)"
+   check "R4 TRUNCATE C3: authenticated effective TRUNCATE=t via PUBLIC" "f,f,f,f,t" "$(s1_trunc_eff "$OWNER" authenticated)"
+-  check "R4 TRUNCATE C3 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with PUBLIC holding TRUNCATE" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
++  check "R4 TRUNCATE C3 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with PUBLIC holding TRUNCATE (psql route)" 0 "$(s1_trunc_pred_rc "$OWNER" "$PRED")"
+   check "R4 TRUNCATE C3 DISCRIMINATOR: CURRENT verify.sql exits NON-ZERO (psql route)" 1 "$(verify_rc "$OWNER")"
+   vm=$(verify_msg "$OWNER")
+-  check "R4 TRUNCATE C3: classified EXPOSURE with one line per API role — '2 exposure problem(s); 0 allowed-path problem(s)'" 1 "$(printf '%s\n' "$vm" | grep -c '2 exposure problem(s); 0 allowed-path problem(s)')"
+-  check "R4 TRUNCATE C3: message names both anon and authenticated" "1|1" "$(printf '%s\n' "$vm" | grep -c 'MuxProcessedEvent: anon still holds TRUNCATE')|$(printf '%s\n' "$vm" | grep -c 'MuxProcessedEvent: authenticated still holds TRUNCATE')"
++  check "R4 TRUNCATE C3: classified EXPOSURE with one problem per API role — '$S1_TRUNC_MSG_CLASS2'" 1 "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_CLASS2")"
++  check "R4 TRUNCATE C3: message names both quoted-relation problems — '$S1_TRUNC_MSG_ANON' and '$S1_TRUNC_MSG_AUTHN'" "1|1" "$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_ANON")|$(s1_trunc_msg_count "$vm" "$S1_TRUNC_MSG_AUTHN")"
+   check "R4 TRUNCATE C3 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO on the PUBLIC-only grant" 1 "$(prisma_verify_rc "$OWNER")"
+   q "$OWNER" "revoke truncate on table $S1_TRUNC_TABLE from public" >/dev/null
+   check "R4 TRUNCATE C3 restore: anon and authenticated effective privileges back to all false" "f,f,f,f,f|f,f,f,f,f" "$(s1_trunc_eff "$OWNER" anon)|$(s1_trunc_eff "$OWNER" authenticated)"
+diff --git a/test/db/s1-r4-truncate-discriminator.sh b/test/db/s1-r4-truncate-discriminator.sh
+index 4bc23682..ded58605 100755
+--- a/test/db/s1-r4-truncate-discriminator.sh
++++ b/test/db/s1-r4-truncate-discriminator.sh
+@@ -110,20 +110,24 @@ git show "$S1_PRED_HEAD:$MIG_DIR/verify.sql" >"$PRED_VERIFY" 2>>"$LOG" || : >"$P
+ check "predecessor control: frozen b7d7fe59 verify.sql extracted from history matches its pinned sha256" "$S1_PRED_VERIFY_SHA256" "$(sha256sum "$PRED_VERIFY" | cut -c1-64)"
+ check "current verifier differs from the predecessor (a changed verifier is under test)" differs "$(cmp -s "$PRED_VERIFY" $MIG_DIR/verify.sql && echo same || echo differs)"
+ 
+-# ---------- 4. seed marker row only if the control table is empty (synthetic, removed at the end)
++# ---------- 4. precondition decision BEFORE any write of ours (S1-R4-A-01 low observation):
++#               if anything above failed, issue no INSERT/GRANT at all. The guard and read-only
++#               probes have already run, so this is "no write issued by this script", not "nothing
++#               happened on the connection".
++PRECOND_FAIL=$FAIL
+ SEEDED_BY_US=0
+-if [ "$(q "$PG_URL" 'select count(*) from "MuxProcessedEvent"')" = "0" ]; then
+-  q "$PG_URL" "insert into \"MuxProcessedEvent\"(mux_event_id, type) values ('s1-r4-synthetic-control','s1.r4.truncate.control')" >/dev/null
+-  SEEDED_BY_US=1
+-  echo "note: control table was empty; inserted one synthetic marker row (removed at the end)"
+-fi
+-
+-# ---------- 5. the shared controls (identical to the full harness §4b)
+-if [ $FAIL -eq 0 ]; then
++if [ "$PRECOND_FAIL" -ne 0 ]; then
++  bad "controls NOT run: $PRECOND_FAIL precondition check(s) failed above; this script issued no INSERT/GRANT/REVOKE (fail closed)"
++else
++  # ---------- 5a. seed marker row only if the control table is empty (synthetic, removed at the end)
++  if [ "$(q "$PG_URL" 'select count(*) from "MuxProcessedEvent"')" = "0" ]; then
++    q "$PG_URL" "insert into \"MuxProcessedEvent\"(mux_event_id, type) values ('s1-r4-synthetic-control','s1.r4.truncate.control')" >/dev/null
++    SEEDED_BY_US=1
++    echo "note: control table was empty; inserted one synthetic marker row (removed at the end)"
++  fi
++  # ---------- 5b. the shared controls (identical to the full harness §4b)
+   . test/db/_support/s1-truncate-controls.sh
+   s1_truncate_controls "$PG_URL" "$AUTHN_URL" "$PRED_VERIFY"
+-else
+-  bad "controls NOT run: a precondition failed above (fail closed, nothing mutated)"
+ fi
+ 
+ # ---------- 6. cleanup of our own marker row only; final positive control
+diff --git a/test/db/s1-r4-truncate-message-spec.sh b/test/db/s1-r4-truncate-message-spec.sh
+new file mode 100755
+index 00000000..9686f097
+--- /dev/null
++++ b/test/db/s1-r4-truncate-message-spec.sh
+@@ -0,0 +1,79 @@
++#!/usr/bin/env bash
++# Offline exact-string spec for the S1 R4 TRUNCATE message predicates (S1-R4-A-01).
++#
++# No database, no network, no install; bash + grep only, well under a second. Proves that
++# the fixed-string predicates in test/db/_support/s1-truncate-controls.sh (S1_TRUNC_MSG_*
++# + s1_trunc_msg_count) ACCEPT the verifier's real diagnostic shape - relation names are
++# emitted by format('%I') and are therefore double-quoted for the mixed-case
++# "MuxProcessedEvent" - and REJECT wrong role, wrong privilege, wrong class
++# (ALLOWED-PATH), the OK notice, and the unquoted spelling the R4 first draft expected.
++#
++# Fixture strings: two fragments are VERBATIM from the real B1 composed verifier output
++# (execution/s2-composition/composition/20260922T000811Z/harness/C3.release.log,
++# sha256 948249c7b4f3597ac3c225e45a7f9d6aa51b07f63f4ca4fb1bded933a10f8ca7); the single-
++# and two-problem lines are composed from the verifier's RAISE EXCEPTION format string
++# and the same %I-quoted problem text. This spec does NOT claim any database result; it
++# only pins the predicates to the diagnostic grammar the real verifier produced.
++set -u
++cd "$(dirname "$0")/../.."
++PASS=0; FAIL=0
++ok()   { PASS=$((PASS+1)); echo "PASS  $1"; }
++bad()  { FAIL=$((FAIL+1)); echo "FAIL  $1"; }
++check(){ if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (expected [$2] got [$3])"; fi; }
++VERIFY=prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
++. test/db/_support/s1-truncate-controls.sh   # definitions only; no connection is made
++
++echo "== S1 R4 TRUNCATE message spec (offline) head=$(git rev-parse --short HEAD 2>/dev/null || echo n/a)"
++echo "controls_sha256=$(sha256sum test/db/_support/s1-truncate-controls.sh | cut -c1-64)"
++echo "verify_sql_sha256=$(sha256sum $VERIFY | cut -c1-64)"
++
++# ---- 1. source coupling: the predicates must match the verifier's actual format strings
++check "verify.sql emits API-role privilege problems as format('%I: %s still holds %s') (quoted relation)" 1 \
++  "$(grep -cF "format('%I: %s still holds %s', t, api_role, priv)" $VERIFY)"
++check "verify.sql RAISE line is 'S1-DB-01 VERIFY FAILED (% exposure problem(s); % allowed-path problem(s)): %'" 1 \
++  "$(grep -cF "RAISE EXCEPTION 'S1-DB-01 VERIFY FAILED (% exposure problem(s); % allowed-path problem(s)): %'" $VERIFY)"
++check "verify.sql prefixes the exposure list with 'EXPOSURE: ' and joins problems with '; '" 1 \
++  "$(grep -cF "THEN 'EXPOSURE: ' || array_to_string(exposure, '; ')" $VERIFY)"
++check "verify.sql privilege array is SELECT,INSERT,UPDATE,DELETE,TRUNCATE" 1 \
++  "$(grep -cF "ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']" $VERIFY)"
++
++# ---- 2. fixtures
++B1_FRAG_ANON='"MuxProcessedEvent": anon still holds DELETE; "MuxProcessedEvent": anon still holds TRUNCATE; "MuxProcessedEvent": restrictive deny-all policy for authenticated missing; "MuxProcessedEvent": authenticated still holds SELECT'
++B1_FRAG_AUTHN='s INSERT; "MuxProcessedEvent": authenticated still holds UPDATE; "MuxProcessedEvent": authenticated still holds DELETE; "MuxProcessedEvent": authenticated still holds TRUNCATE; "NudgeLog": RLS not enabled; "NudgeLog": RLS not forced; "'
++PFX='S1-DB-01 VERIFY FAILED'
++M_C1="$PFX (1 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: \"MuxProcessedEvent\": anon still holds TRUNCATE"
++M_C2="$PFX (1 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: \"MuxProcessedEvent\": authenticated still holds TRUNCATE"
++M_C3="$PFX (2 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: \"MuxProcessedEvent\": anon still holds TRUNCATE; \"MuxProcessedEvent\": authenticated still holds TRUNCATE"
++M_ALLOWED="$PFX (0 exposure problem(s); 1 allowed-path problem(s)): ALLOWED-PATH: DunningAttempt: service_role lost SELECT"
++M_RLSOFF="$PFX (2 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: \"DunningAttempt\": RLS not enabled; \"DunningAttempt\": RLS not forced"
++M_DELETE="$PFX (1 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: \"MuxProcessedEvent\": anon still holds DELETE"
++M_OK='S1-DB-01 VERIFY OK: 18 relations protected (4 community_messages partitions), 5 functions pinned, service_role path intact'
++M_UNQUOTED_DRAFT="$PFX (1 exposure problem(s); 0 allowed-path problem(s)): EXPOSURE: MuxProcessedEvent: anon still holds TRUNCATE"
++OLD_NEEDLE_ANON='EXPOSURE: MuxProcessedEvent: anon still holds TRUNCATE'   # the R4 first-draft expectation
++
++# ---- 3. accept: real B1 fragments and the composed single/two-problem lines
++check "real B1 fragment contains the quoted anon TRUNCATE problem" 1 "$(s1_trunc_msg_count "$B1_FRAG_ANON" "$S1_TRUNC_MSG_ANON")"
++check "real B1 fragment contains the quoted authenticated TRUNCATE problem" 1 "$(s1_trunc_msg_count "$B1_FRAG_AUTHN" "$S1_TRUNC_MSG_AUTHN")"
++check "real B1 fragment does NOT match the first-draft unquoted needle (the S1-R4-A-01 defect, reproduced)" 0 "$(s1_trunc_msg_count "$B1_FRAG_ANON" "$OLD_NEEDLE_ANON")"
++check "C1 line: class 1/0 accepted" 1 "$(s1_trunc_msg_count "$M_C1" "$S1_TRUNC_MSG_CLASS1")"
++check "C1 line: sole-problem anon needle accepted" 1 "$(s1_trunc_msg_count "$M_C1" "$S1_TRUNC_MSG_ONLY_ANON")"
++check "C1 line: authenticated needle rejected (wrong role)" 0 "$(s1_trunc_msg_count "$M_C1" "$S1_TRUNC_MSG_AUTHN")"
++check "C2 line: sole-problem authenticated needle accepted" 1 "$(s1_trunc_msg_count "$M_C2" "$S1_TRUNC_MSG_ONLY_AUTHN")"
++check "C2 line: anon needle rejected (wrong role)" 0 "$(s1_trunc_msg_count "$M_C2" "$S1_TRUNC_MSG_ANON")"
++check "C3 line: class 2/0 accepted" 1 "$(s1_trunc_msg_count "$M_C3" "$S1_TRUNC_MSG_CLASS2")"
++check "C3 line: both role needles accepted" "1|1" "$(s1_trunc_msg_count "$M_C3" "$S1_TRUNC_MSG_ANON")|$(s1_trunc_msg_count "$M_C3" "$S1_TRUNC_MSG_AUTHN")"
++check "C3 line: class 1/0 rejected (wrong class count)" 0 "$(s1_trunc_msg_count "$M_C3" "$S1_TRUNC_MSG_CLASS1")"
++check "C3 line would FAIL C1's 'does NOT name authenticated' assertion (C1 and C3 are distinguishable)" 1 "$(s1_trunc_msg_count "$M_C3" "$S1_TRUNC_MSG_AUTHN")"
++
++# ---- 4. reject: wrong class, wrong privilege, OK notice, unquoted spelling
++check "ALLOWED-PATH line: class 1/0 rejected" 0 "$(s1_trunc_msg_count "$M_ALLOWED" "$S1_TRUNC_MSG_CLASS1")"
++check "ALLOWED-PATH line: anon/authenticated needles rejected" "0|0" "$(s1_trunc_msg_count "$M_ALLOWED" "$S1_TRUNC_MSG_ANON")|$(s1_trunc_msg_count "$M_ALLOWED" "$S1_TRUNC_MSG_AUTHN")"
++check "RLS-disabled EXPOSURE line (other relation): anon/authenticated TRUNCATE needles rejected" "0|0" "$(s1_trunc_msg_count "$M_RLSOFF" "$S1_TRUNC_MSG_ANON")|$(s1_trunc_msg_count "$M_RLSOFF" "$S1_TRUNC_MSG_AUTHN")"
++check "DELETE-only exposure: TRUNCATE needle rejected (wrong privilege)" 0 "$(s1_trunc_msg_count "$M_DELETE" "$S1_TRUNC_MSG_ANON")"
++check "OK notice: every needle rejected" "0|0|0|0" "$(s1_trunc_msg_count "$M_OK" "$S1_TRUNC_MSG_CLASS1")|$(s1_trunc_msg_count "$M_OK" "$S1_TRUNC_MSG_CLASS2")|$(s1_trunc_msg_count "$M_OK" "$S1_TRUNC_MSG_ANON")|$(s1_trunc_msg_count "$M_OK" "$S1_TRUNC_MSG_AUTHN")"
++check "empty message (verifier produced nothing): every needle rejected" "0|0" "$(s1_trunc_msg_count "" "$S1_TRUNC_MSG_CLASS1")|$(s1_trunc_msg_count "" "$S1_TRUNC_MSG_ANON")"
++check "unquoted spelling (which the real verifier never emits for this relation) is NOT accepted by the corrected needle" 0 "$(s1_trunc_msg_count "$M_UNQUOTED_DRAFT" "$S1_TRUNC_MSG_ANON")"
++check "controls no longer contain the unquoted first-draft needle" 0 "$(grep -cF 'EXPOSURE: MuxProcessedEvent:' test/db/_support/s1-truncate-controls.sh)"
++
++echo "== $PASS passed, $FAIL failed"
++[ $FAIL -eq 0 ]
+-- 
+2.53.0
+

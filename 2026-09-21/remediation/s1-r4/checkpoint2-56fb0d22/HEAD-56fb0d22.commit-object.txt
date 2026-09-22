@@ -1,0 +1,26 @@
+tree 79ebf1750ca0e49e511666bafcfaf967f0ba39cc
+parent 41f4d6a985e5037bf53831a38ed00a9a4314cf7d
+author Bradley Gleave <bradley@bradleytgpcoaching.com> 1790036818 +0000
+committer Bradley Gleave <bradley@bradleytgpcoaching.com> 1790036818 +0000
+
+test(db): S1 R4 TRUNCATE controls expect the verifier's quoted-identifier diagnostic (S1-R4-A-01)
+
+verify.sql emits API-role privilege problems through format('%I: %s still holds %s'),
+so the mixed-case relation arrives double-quoted: `"MuxProcessedEvent": anon still
+holds TRUNCATE` (observed verbatim in the B1 composed verifier output). The first R4
+draft of the shared controls searched for the unquoted spelling and could never match.
+
+- s1-truncate-controls.sh: exact fixed-string needles in S1_TRUNC_MSG_* and
+  s1_trunc_msg_count (grep -F); C1/C2 additionally assert the other role is NOT named;
+  predecessor checks are labelled psql-route only (the predecessor is not run through
+  Prisma; the Prisma route is asserted for the current verifier).
+- s1-r4-truncate-discriminator.sh: precondition decision is taken BEFORE the optional
+  synthetic marker INSERT, so a failed precondition issues no INSERT/GRANT/REVOKE; the
+  message says exactly that instead of "nothing mutated".
+- new test/db/s1-r4-truncate-message-spec.sh: offline (bash+grep, no database) spec
+  that pins the needles to verify.sql's format strings and to real B1 fragments, and
+  rejects wrong role, wrong privilege, wrong class, the OK notice and the unquoted
+  spelling.
+
+verify.sql, migration.sql, down.sql, the target guard, the bootstrap and the full
+harness are byte-identical to 41f4d6a9. No database run has happened.

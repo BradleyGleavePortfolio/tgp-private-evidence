@@ -1,0 +1,35 @@
+start_utc=2026-09-22T00:26:22Z head=41f4d6a985e5037bf53831a38ed00a9a4314cf7d tree=8ab0eb9e942686896a0039038a2d3bbbe2aa4b06 porcelain_lines=3 bash=5.3.9(1)-release grep=grep (GNU grep) 3.12
+== S1 R4 TRUNCATE message spec (offline) head=41f4d6a9
+controls_sha256=6a88a98cd199910115bdc044f6169c6175721014b62e2d2d2bbff8a5c741a65c
+verify_sql_sha256=266e62e9ed6def7491e886c1f9648ce31dd95d62931c839fb84db2b3140a9448
+PASS  verify.sql emits API-role privilege problems as format('%I: %s still holds %s') (quoted relation)
+PASS  verify.sql RAISE line is 'S1-DB-01 VERIFY FAILED (% exposure problem(s); % allowed-path problem(s)): %'
+PASS  verify.sql prefixes the exposure list with 'EXPOSURE: ' and joins problems with '; '
+PASS  verify.sql privilege array is SELECT,INSERT,UPDATE,DELETE,TRUNCATE
+PASS  real B1 fragment contains the quoted anon TRUNCATE problem
+PASS  real B1 fragment contains the quoted authenticated TRUNCATE problem
+PASS  real B1 fragment does NOT match the first-draft unquoted needle (the S1-R4-A-01 defect, reproduced)
+PASS  C1 line: class 1/0 accepted
+PASS  C1 line: sole-problem anon needle accepted
+PASS  C1 line: authenticated needle rejected (wrong role)
+PASS  C2 line: sole-problem authenticated needle accepted
+PASS  C2 line: anon needle rejected (wrong role)
+PASS  C3 line: class 2/0 accepted
+PASS  C3 line: both role needles accepted
+PASS  C3 line: class 1/0 rejected (wrong class count)
+PASS  C3 line would FAIL C1's 'does NOT name authenticated' assertion (C1 and C3 are distinguishable)
+PASS  ALLOWED-PATH line: class 1/0 rejected
+PASS  ALLOWED-PATH line: anon/authenticated needles rejected
+PASS  RLS-disabled EXPOSURE line (other relation): anon/authenticated TRUNCATE needles rejected
+PASS  DELETE-only exposure: TRUNCATE needle rejected (wrong privilege)
+PASS  OK notice: every needle rejected
+PASS  empty message (verifier produced nothing): every needle rejected
+PASS  unquoted spelling (which the real verifier never emits for this relation) is NOT accepted by the corrected needle
+PASS  controls no longer contain the unquoted first-draft needle
+== 24 passed, 0 failed
+
+real	0m0.327s
+user	0m0.051s
+sys	0m0.030s
+exit=0
+end_utc=2026-09-22T00:26:22Z

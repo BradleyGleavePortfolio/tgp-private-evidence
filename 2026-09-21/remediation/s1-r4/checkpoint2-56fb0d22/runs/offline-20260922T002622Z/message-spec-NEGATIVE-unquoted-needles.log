@@ -1,0 +1,30 @@
+NEGATIVE CONTROL: spec run against a controls copy whose needles are the UNQUOTED first-draft spelling (expected: FAILs, non-zero exit)
+== S1 R4 TRUNCATE message spec (offline) head=n/a
+controls_sha256=e60f95232fbfc94c0bbdb52a99c19bd87bc2a94d7ea902ecf4fd7ed30b7a6d95
+verify_sql_sha256=266e62e9ed6def7491e886c1f9648ce31dd95d62931c839fb84db2b3140a9448
+PASS  verify.sql emits API-role privilege problems as format('%I: %s still holds %s') (quoted relation)
+PASS  verify.sql RAISE line is 'S1-DB-01 VERIFY FAILED (% exposure problem(s); % allowed-path problem(s)): %'
+PASS  verify.sql prefixes the exposure list with 'EXPOSURE: ' and joins problems with '; '
+PASS  verify.sql privilege array is SELECT,INSERT,UPDATE,DELETE,TRUNCATE
+FAIL  real B1 fragment contains the quoted anon TRUNCATE problem (expected [1] got [0])
+FAIL  real B1 fragment contains the quoted authenticated TRUNCATE problem (expected [1] got [0])
+PASS  real B1 fragment does NOT match the first-draft unquoted needle (the S1-R4-A-01 defect, reproduced)
+PASS  C1 line: class 1/0 accepted
+FAIL  C1 line: sole-problem anon needle accepted (expected [1] got [0])
+PASS  C1 line: authenticated needle rejected (wrong role)
+FAIL  C2 line: sole-problem authenticated needle accepted (expected [1] got [0])
+PASS  C2 line: anon needle rejected (wrong role)
+PASS  C3 line: class 2/0 accepted
+FAIL  C3 line: both role needles accepted (expected [1|1] got [0|0])
+PASS  C3 line: class 1/0 rejected (wrong class count)
+FAIL  C3 line would FAIL C1's 'does NOT name authenticated' assertion (C1 and C3 are distinguishable) (expected [1] got [0])
+PASS  ALLOWED-PATH line: class 1/0 rejected
+PASS  ALLOWED-PATH line: anon/authenticated needles rejected
+PASS  RLS-disabled EXPOSURE line (other relation): anon/authenticated TRUNCATE needles rejected
+PASS  DELETE-only exposure: TRUNCATE needle rejected (wrong privilege)
+PASS  OK notice: every needle rejected
+PASS  empty message (verifier produced nothing): every needle rejected
+FAIL  unquoted spelling (which the real verifier never emits for this relation) is NOT accepted by the corrected needle (expected [0] got [1])
+PASS  controls no longer contain the unquoted first-draft needle
+== 17 passed, 7 failed
+exit=1

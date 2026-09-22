@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 00:25 UTC. Operator: GPT 6 Astra, executive orchestrator only.
+Updated: 2026-09-22 00:39 UTC. Operator: GPT 6 Astra, executive orchestrator only.
 
 ## Mission and authority
 
@@ -18,7 +18,7 @@ G01–G22 remain effective. The supplied PDF explicitly preserves Bradley's Sept
 | Mobile | `a5933fd6de5616493de75f0db907098b149b955c` |
 | Extension | `0111be661922234d670bbf23e23d270eec1b4a4e` |
 | Context | `1ebbed76188e33c970fc17c1e7b252f535d040d0` |
-| Private evidence | `6a84cf8f3df8c28a648023367129b58e1105deb7` (before this handoff publication; query GitHub for newer evidence commits) |
+| Private evidence | `f1eaf57b1f4cd8f3bfcac15418dbc4f3fbafa181` (before this handoff publication; query GitHub for newer evidence commits) |
 
 Product mains and importer-critical PR heads are unchanged; context/evidence advanced beyond the previous state's pre-refresh references. Main remains staging/generic reconstruction, not proven native reconciled completion. No real-source acceptance, zero-touch proof, five-minute native completion or pilot acceptance was established.
 
@@ -32,16 +32,16 @@ Five current source bundles were hash-checked, verified, and restored clean unde
 
 | Lane | Last preserved head | Exact next exit |
 |---|---|---|
-| S1 containment | `41f4d6a985e5037bf53831a38ed00a9a4314cf7d` | R4 verifier source fixed; isolated DB proof unrun. Combined audit found quoted-identifier assertion mismatch and pre-seed truth issue; sole S1 builder owns a narrow test-harness successor, SQL/guard unchanged. Historical89/89 and prior guard/atomicity closures remain bounded; final closure needs real discriminator and both follow-ups. |
-| S2 delivery/composition | `9742037b153221de565e651ad8ba3b721bc0fb31` | B1 guard72/72; real composition63 passed/4 failed. Genuine164-parent replay and ledger165 observed; Prisma6 pending/version/count output defects and an invalid recovery-status expectation identified. Isolated S2 successor authorized, preserving974 for both current reviewers; no S1 edits or gate weakening. Discriminator NOTRUN; no clearance. |
+| S1 containment | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Test-only quoted-diagnostic and precondition-before-seed correction frozen; SQL/guard unchanged from41f4. Offline message spec24/24, unquoted predecessor needles17/7. Those are not DB proof. S2 will compose this head; real discriminator and both independent follow-ups remain pending. |
+| S2 delivery/composition | `21ea3252de90cab66c591cf907b65a0ee7eef879` | Genuine merge of S2 repair3f49ffc8 and exact S1 successor56fb, tree5aa6630b. B1 at974 remains63/4. Final-head offline message24/24 and guard72/72 passed; fresh real composition plus discriminator granted as the sole heavy slot. No aggregate clearance or real result yet. |
 | S3 reliability | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Preserve accepted bounded R2 proof unchanged. Recheck only material integration applicability; landing still depends on S1/S2. |
-| S4 extension | `2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3` | A3 focused113/full1714/gates/package passed; browser aborted before checks, negative NOTRUN. Both R4 reviews frozen. Parent accepts A-01 late preflight ownership and A-02 replacement-token consumption as material despite B's nonmaterial interpretation of the latter. Isolated T4 R5 repair dispatched to same writer; 2bcf remains frozen. |
-| S5 provenance validation | `b94c24889c8f5bf40a2749ad57c26173ab5ad64a` | B2 atcf3e: guard27/preflight/bootstrap164 passed; live TS2304, ZERO cases, clean stop. Type-only successor compile pair exists, not live acceptance. Bootstrap silently auto-installed Prisma outside its package root; same writer fixing pinned-root generation with auto-install disabled. Parent quarantined unintended ancestor packages intact00:23:47; stopped DB retained. No retry grant. |
-| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C1 locked install then identical T1–T4 baseline controls; no product repair yet. Runner briefly held while healthy install continued, then CONT authorized after unintended ancestor packages were quarantined; behavioral tests had not started. Actual dependency resolution must be recorded. Six-file staged checkpoint preserved. |
+| S4 extension | `2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3` | A3 focused113/full1714/gates/package passed; browser aborted before checks, negative NOTRUN. Both R4 reviews frozen; A-01 late preflight ownership and A-02 replacement-token consumption are material. After freeze B acknowledged the missed preflight schedule and accepted the token-authority disposition; original report retained. Isolated R5 repair underway, no heavy/browser grant. |
+| S5 provenance validation | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | B3 genctl passed intended no-auto-install refusal and pinned resolution; resume00:29:32–00:33:40 passed guard27 and real51/51, STOP_RC0/DAEMONnone. Parent verified lock free/no survivors/no server and ancestor package roots absent. Fresh full bootstrap at143d was not rerun; generate-only+resume is the proven path. Final packet frozen, dual independent T4 audits active; no self-clearance. |
+| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C1 install passed; hazard baseline4 passed/2 failed, then hung and was terminated143. T1 reproduced anonymous-key restore; async RNTL lifecycle misuse corrupted later controls, so no whole-baseline acceptance. Test-only v3 lifecycle/throttle/cleanup correction authorized, product fix held, no retry slot yet. Original C1 and v2 preserved; local dependency resolution recorded after quarantine. |
 
 At initialization, the prior session's S4 R4 and dirty S6 R3 deltas were absent from the inspected archive; the targeted session recovery returned "Session has no entries to load." That bounded route is exhausted, not proof of global loss. Their new source checkpoints above are explicitly reimplementations and privately preserved. Both new S1 R3 reviews are preserved. Actual S1/S2 composition has now run and FAILED overall, as above. No further historical reconnaissance.
 
-Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. A1/A2 completed; A3/B1/B2 failed at their stated proof boundaries and released cleanly. C1 belongs to S6 for setup/baseline only. S2/S5 repairs remain T4; their next real proofs require explicit slot allocation, not blind retries. One moderate/heavy slot at a time; independent source reviews and bounded lightweight probes proceed in parallel. Real composition used **164 parent migrations plus candidate =165**, never ledger-only baselining.
+Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. A1/A2 completed; A3/B1/B2 and S6 C1 failed at their stated boundaries, with failures retained. S5 B3 completed successfully00:33:40 and released cleanly. S2 now owns B2-S1S2-COMPOSITION-R2 on21ea; S6 C2 baseline-only is queued for a separate grant after verified cleanup. No worker may infer a grant from a free lock. One moderate/heavy slot at a time; independent source reviews and bounded lightweight probes proceed in parallel. Real composition used **164 parent migrations plus candidate =165**, never ledger-only baselining.
 
 ## Current blockers and reserved boundaries
 
