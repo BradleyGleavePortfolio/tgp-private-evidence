@@ -1,0 +1,203 @@
+--- ../s2-v56/run-composition-r56-v5.6-when-granted.sh	2026-09-22 21:29:16.938466816 +0000
++++ run-composition-r57-v5.7-when-granted.sh	2026-09-22 21:55:02.854466816 +0000
+@@ -1,4 +1,20 @@
+ #!/usr/bin/env bash
++# S2 composition proof runner v5.7 — OP88-S2-V57. Derived (2026-09-22) from FROZEN v5.6 sha256 8980bca0936a34b25950f90bc97731d073c7d1dab95178ee80db8edb0d0e1de1
++# (execution/op88/s2-v56, immutable). Execution-only successor closing the frozen V5.6 audits A (S2-V56-A01..A07) and B (D-01..D-05, R-1..R-3, P-01..P-03)
++# where they touch this runner; no product/fixture/lockfile/stub change, no supervisor rewrite. v5.7 delta (FINDINGS_MAP_V57.md):
++#   A02  inner manifest excludes ALL publication temporaries/outputs (SHA256SUMS*, RECEIPT.txt, PUBLICATION.txt) and the COMPLETED inner manifest is
++#        re-verified (sha256sum -c) inside the same bounded pipeline before anything is certified.
++#   A03  startup latch: PENDING_IDF/STEP_LABEL are set before the leader spawn and the interrupt handler recovers the just-spawned child from `$!`;
++#        a pending published identity is awaited briefly (leader publishes within ms), adopted and group-signalled; an unpublished child gets a bounded
++#        pid-only TERM/KILL and, if it survives, is an explicit survivor (never REAP ok). Leaders carry a marker (`: s2r57-step-leader;`) that is part
++#        of the anchored owned-work scan, so an unreaped leader is visible. Same latch in owned_cleanup_cmd (cleanup clients).
++#   A05  no unconditional wait on an unreaped child (cleanup client: alive after KILL → survivor, not waited); ANOMALY loops clipped to the cleanup
++#        deadline (B R-2); the WHOLE publication tail (RECEIPT write+check, outer manifest write+verify) runs under ONE bounded `timeout -k 1`;
++#        PUBLICATION.txt is written under its own small bound and its write is CHECKED (failure → 71); the actual exit is classified after all outcomes.
++#   B R-1 interruption after ack: the registered identity is re-pointed (no duplicate registration) and the stamp says the workload MAY have started.
++#   B R-3 receipt label `deadline_exceeded` (no `after_hash` claim).   A07: stub-mode private lock lives under $R57/runtime/ (enumerated write set).
++#   Lane: execution/op88/s2-v57 (runner-selftest-r57/, composition-r57/, runtime/). Pins WT/LANE/EXPECT_* unchanged (restored per upstream-prereqs-2).
++# ---- v5.6 header retained below for provenance ----
+ # S2 composition proof runner v5.6 — OP88-S2-V56 (S2-RUNNER-V5.6-PREP). Derived (2026-09-22) from FROZEN v5.5
+ # sha256 c3a4d2a9a234dda141122a44d46a3902a8575001a26ffcadc2029080a768de49 (s2-runner55, unchanged). Minimal correction of BOTH frozen v5.5
+ # reviews (A revision-1 fb91a51d…, B revision-1 8d35b223…); no product/fixture/lockfile/stub change, no supervisor rewrite. v5.6 delta (FINDINGS_MAP_V56.md):
+@@ -78,7 +94,7 @@
+ ROOT=/home/user/workspace
+ WT=$ROOT/worktrees/s2-runner53
+ LANE=$ROOT/execution/s2-setup-prep   # setup/fixture lane (grant05 install, fixture 9fcc3696); pin unchanged — must be restored before any execution
+-R56=$ROOT/execution/op88/s2-v56       # this runner's lane (sole writer OP88-S2-V56); every identity/output path must resolve under it (F01)
++R57=$ROOT/execution/op88/s2-v57       # this runner's lane (sole writer OP88-S2-V57); every identity/output path must resolve under it (F01)
+ EXPECT_HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c   # FROZEN successor r3; no override
+ EXPECT_LOCK_SHA=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+ EXPECT_PRISMA_CLI_SHA=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0   # P1: installed prisma/build/index.js (6.19.3) recorded by grant05 setup-30; the checkpoint analysis (audits/s2-r54/a) is bound to these bytes
+@@ -96,12 +112,12 @@
+ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+ STUBS=${S2_RUNNER_STUBS-}
+ if [ -n "$STUBS" ]; then
+-  LOCK=$STUBS/test-validation.lock; OUT=$R56/runner-selftest-r56/$STAMP
++  mkdir -p "$R57/runtime"; LOCK=$R57/runtime/test-validation.lock; OUT=$R57/runner-selftest-r57/$STAMP   # A07: lane-private lock in the enumerated runtime/ write set (never $STUBS, never canonical)
+   GUARD_SPEC="bash $STUBS/guard-spec.sh"; FIXTURE="bash $STUBS/fixture.sh"; HARNESS="bash $STUBS/harness.sh"; DISC="bash $STUBS/discriminator.sh"
+   REFUSAL_HARNESS="bash $WT/test/release/s1s2-composition.sh"   # real offline refusal path is cheap and DB-free
+-  OWNED_PAT="^bash $STUBS/|^s2r53-stub-escapee|^bash $WT/test/release/s1s2-composition.sh"
++  OWNED_PAT="^bash $STUBS/|^s2r53-stub-escapee|^bash $WT/test/release/s1s2-composition.sh|^bash -c : s2r57-step-leader;"   # A03: an unreaped step/cleanup leader is visible to the scan
+ else
+-  LOCK=$ROOT/execution/test-validation.lock; OUT=$R56/composition-r56/$STAMP
++  LOCK=$ROOT/execution/test-validation.lock; OUT=$R57/composition-r57/$STAMP
+   GUARD_SPEC="bash test/db/s1-harness-guard.spec.sh"; FIXTURE="bash $LANE/infra/s2-fixture-r53.sh"
+   HARNESS="bash test/release/s1s2-composition.sh"; DISC="bash test/db/s1-r4-truncate-discriminator.sh"; REFUSAL_HARNESS=$HARNESS
+   OWNED_PAT="^bash test/db/s1-harness-guard.spec.sh|^bash test/release/s1s2-composition.sh|^bash test/db/s1-r4-truncate-discriminator.sh|^psql .*(127\.0\.0\.1:$PORT|-p $PORT)|^node .*prisma/build/index.js"
+@@ -119,13 +135,14 @@
+ STEP_LABEL=none; STEP_PID=; STEP_PGID=; OWNED_PGIDS=; RETIRED_PGIDS=; DEADLINE_EXCEEDED=no; CLEANUP_DEADLINE=; MY_PGID=$(ps -o pgid= -p $$ | tr -d ' '); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d ' ')   # F01: no IDDIR reset here
+ iddir_guard(){   # F01 (A-01/B-01): before EVERY identity remove/write — IDDIR must be exactly "$OUT/.pgid", a directory, and $OUT must lie inside this lane
+   case ${IDDIR-} in "$OUT/.pgid") ;; *) stamp "${1-}: IDDIR guard FAILED: IDDIR='${IDDIR-}' != '$OUT/.pgid' → refuse, nothing removed/written"; return 1;; esac
+-  case $OUT in "$R56"/*/*) ;; *) stamp "${1-}: IDDIR guard FAILED: OUT='$OUT' is not an invocation subdirectory of lane $R56 → refuse"; return 1;; esac
++  case $OUT in "$R57"/*/*) ;; *) stamp "${1-}: IDDIR guard FAILED: OUT='$OUT' is not an invocation subdirectory of lane $R57 → refuse"; return 1;; esac
+   [ -d "$IDDIR" ] || { stamp "${1-}: IDDIR guard FAILED: '$IDDIR' is not a directory → refuse"; return 1; }
+ }
+ # F02: shared leader text for steps and cleanup clients. After setsid: publish own pid (== session/group id) or exit 70; then WAIT for the runner's
+ # adoption ack ("<idfile>.ack") before exec — no ack within ACK_WAIT_TICKS×0.02 s → exit 70 and the workload is never started. Args: idfile ticks timeout-args…
+ ACK_WAIT_TICKS=150   # 3 s; the runner's identity poll is ≤ 2 s (40 × 0.05 s)
+-LEADER='echo $$ > "$1" || exit 70; i=0; while [ ! -e "$1.ack" ]; do i=$((i+1)); [ "$i" -gt "$2" ] && exit 70; sleep 0.02; done; shift 2; exec timeout --foreground "$@"'
++LEADER=': s2r57-step-leader; echo $$ > "$1" || exit 70; i=0; while [ ! -e "$1.ack" ]; do i=$((i+1)); [ "$i" -gt "$2" ] && exit 70; sleep 0.02; done; shift 2; exec timeout --foreground "$@"'   # A03: marker makes the leader cmdline scannable
++PENDING_IDF=   # A03 latch: set before a leader spawn, cleared once STEP_PID/adoption bookkeeping holds the child; read by halt_owned_work
+ ADOPTED=; PUBLISHED=
+ adopt_published(){   # adopt_published <idfile> <pid> <label>: poll the self-published identity, validate (== pid, never own/caller group), REGISTER, then ack.
+   local idf=$1 pid=$2 label=$3 pg= i; ADOPTED=   # returns 0 adopted (ADOPTED=pgid) | 1 not adoptable (ADOPTED empty) | 2 registered but ack failed (ADOPTED=pgid, TERM sent)
+@@ -156,14 +173,29 @@
+ halt_owned_work(){   # O1/O2: targets = every recorded group that still has members (not the leader pid); bounded, deadline-clipped; no blocking wait
+   local t0=$(now_s) left groups g
+   deadline_start halt   # P4: a reap is exceptional work; the deadline is running before the first signal
++  # A03 latch: a signal handled between the leader spawn and `STEP_PID=$!` finds STEP_PID empty but PENDING_IDF set → recover the child from `$!`
++  # (bash sets `$!` at fork time), so the just-spawned leader is never outside the halt's knowledge.
++  local lastbg=${!-}
++  if [ -z "${STEP_PID:-}" ] && [ -n "$PENDING_IDF" ] && [ -n "$lastbg" ] && kill -0 "$lastbg" 2>/dev/null; then STEP_PID=$lastbg; stamp "HALT: pending leader pid=$STEP_PID (spawned for '$STEP_LABEL', not yet booked) recovered from \$! → resolved below"; fi
+   if [ -n "${STEP_PID:-}" ] && kill -0 "$STEP_PID" 2>/dev/null && ! echo " $OWNED_PGIDS " | grep -q " ${STEP_PGID:-none} "; then
+     # F02 (A-02): resolve the CURRENT published identity first — a leader that published but was not yet adopted is adopted now and group-signalled;
+     # only a leader with no published identity gets the bounded pid-only fallback (it has not exec'd: no ack → no workload).
+-    local pub=; [ -n "${STEP_LABEL:-}" ] && [ "$STEP_LABEL" != none ] && [ -f "$IDDIR/$STEP_LABEL.pgid" ] && [ -s "$IDDIR/$STEP_LABEL.pgid" ] && pub=$(tr -dc '0-9' < "$IDDIR/$STEP_LABEL.pgid" 2>/dev/null)
++    # A03: the leader publishes within milliseconds of the spawn — wait briefly (≤ 0.5 s, deadline-clipped) for a pending publication before deciding.
++    local pub= idf="$IDDIR/$STEP_LABEL.pgid" i
++    for ((i=0;i<10;i++)); do [ -f "$idf" ] && [ -s "$idf" ] && { pub=$(tr -dc '0-9' < "$idf" 2>/dev/null); break; }; kill -0 "$STEP_PID" 2>/dev/null || break; [ "$(now_s)" -ge "$CLEANUP_DEADLINE" ] && break; sleep 0.05; done
++    [ -n "$STEP_LABEL" ] && [ "$STEP_LABEL" != none ] || pub=
+     if [ -n "$pub" ] && [ "$pub" = "$STEP_PID" ] && [ "$pub" != "$MY_PGID" ] && [ "$pub" != "$PARENT_PGID" ]; then
+-      OWNED_PGIDS="$OWNED_PGIDS $pub"; STEP_PGID=$pub; stamp "HALT: in-flight step '$STEP_LABEL' pid=$STEP_PID had a PUBLISHED but unadopted identity $pub → adopted now and signalled as a group (never acked → workload never started)"
+-    else stamp "HALT: in-flight step '$STEP_LABEL' pid=$STEP_PID has no published identity (published='${pub:-none}') → SIGTERM by pid only (never a group; unacked leader cannot have exec'd)"; kill -TERM "$STEP_PID" 2>/dev/null; fi   # P2 fallback
++      if echo " $OWNED_PGIDS " | grep -q " $pub "; then STEP_PGID=$pub; stamp "HALT: in-flight step '$STEP_LABEL' pid=$STEP_PID identity $pub already REGISTERED (ack $([ -e "$idf.ack" ] && echo written → workload MAY have started || echo not written → workload never started)) → pointer restored, signalled as a group"   # B R-1: no duplicate registration, truthful wording
++      else OWNED_PGIDS="$OWNED_PGIDS $pub"; STEP_PGID=$pub; stamp "HALT: in-flight step '$STEP_LABEL' pid=$STEP_PID had a PUBLISHED but unadopted identity $pub → adopted now and signalled as a group (never acked → workload never started)"; fi
++    else
++      # P2/A03 fallback: no published identity → bounded pid-only TERM/KILL; a child that survives is an explicit survivor (scan sees the leader marker) — never REAP ok
++      stamp "HALT: in-flight step '$STEP_LABEL' pid=$STEP_PID has no published identity (published='${pub:-none}') → SIGTERM/SIGKILL by pid only (never a group; unacked leader cannot have exec'd), bounded ≤${ANOMALY_WAIT}s"; kill -TERM "$STEP_PID" 2>/dev/null
++      local e=$(( $(now_s) + ANOMALY_WAIT )); while kill -0 "$STEP_PID" 2>/dev/null && [ "$(now_s)" -lt "$e" ] && [ "$(now_s)" -lt "$CLEANUP_DEADLINE" ]; do sleep 0.1; done
++      kill -0 "$STEP_PID" 2>/dev/null && { kill -KILL "$STEP_PID" 2>/dev/null; sleep 0.2; }
++      if kill -0 "$STEP_PID" 2>/dev/null; then stamp "HALT: unpublished child pid=$STEP_PID STILL ALIVE after KILL → not waited on; counted as survivor (unsafe handoff)"; else wait "$STEP_PID" 2>/dev/null; stamp "HALT: unpublished child pid=$STEP_PID reaped (wait status $?)"; STEP_PID=; fi
++    fi
+   fi
++  PENDING_IDF=
+   groups=$(live_groups)
+   if [ -n "$groups" ]; then
+     stamp "HALT: live owned groups [$(echo $groups)] (current step '$STEP_LABEL' pid=${STEP_PID:-none}) → SIGTERM to each group (reap wait ≤${REAP_TERM_WAIT}s, remaining ${CLEANUP_DEADLINE:+$(remaining)s}${CLEANUP_DEADLINE:-unbounded-pre-cleanup})"
+@@ -204,16 +236,17 @@
+   iddir_guard "$label" || finish 70
+   local idf="$IDDIR/$label.pgid"; rm -f "$idf" "$idf.ack"
+   if [ -n "$STUBS" ] && [ "${STUB_PUBLISH_FAIL-}" = "$label" ]; then mkdir -p "$idf"; stamp "SEAM: $label publish target made unwritable (stub seam STUB_PUBLISH_FAIL: a directory occupies the id-file path)"; fi   # N5a seam, stub mode only
++  PENDING_IDF=$idf; STEP_PID=; STEP_PGID=   # A03: latch armed BEFORE the spawn; halt_owned_work recovers the child from $! if a signal lands before the next line completes
+   if [ $inherit = 1 ]; then setsid bash -c "$LEADER" _ "$idf" "$ACK_WAIT_TICKS" "$bound" "$@" >"$log" 2>&1 &
+   else setsid bash -c "$LEADER" _ "$idf" "$ACK_WAIT_TICKS" "$bound" "$@" >"$log" 2>&1 9>&- & fi
+-  STEP_PID=$!; STEP_PGID=
++  STEP_PID=$!; STEP_PGID=; PENDING_IDF=   # child booked; the latch is disarmed (STEP_PID now carries it)
+   adopt_published "$idf" "$STEP_PID" "$label"; local ad=$?
+   if [ $ad -eq 2 ]; then STEP_PGID=$ADOPTED; halt_owned_work; STEP_PID=; STEP_PGID=; finish 70; fi   # registered group, ack failed → bounded group halt, refuse
+   if [ $ad -ne 0 ]; then
+     if kill -0 "$STEP_PID" 2>/dev/null; then
+       # identity not published by a live child → not ours to group-signal: TERM/KILL by pid only (bounded), refuse 70, record nothing as a group
+       deadline_start anomaly; stamp "$label: IDENTITY ANOMALY pid=$STEP_PID published='${PUBLISHED:-none}' (not adoptable; never acked → workload never started) → TERM by pid only (≤${ANOMALY_WAIT}s), refuse (70)"; kill -TERM "$STEP_PID" 2>/dev/null
+-      for ((i=0;i<ANOMALY_WAIT*10;i++)); do kill -0 "$STEP_PID" 2>/dev/null || break; sleep 0.1; done
++      for ((i=0;i<ANOMALY_WAIT*10;i++)); do kill -0 "$STEP_PID" 2>/dev/null || break; [ "$(now_s)" -ge "$CLEANUP_DEADLINE" ] && break; sleep 0.1; done   # B R-2: deadline-clipped
+       if kill -0 "$STEP_PID" 2>/dev/null; then kill -KILL "$STEP_PID" 2>/dev/null; for ((i=0;i<10;i++)); do kill -0 "$STEP_PID" 2>/dev/null || break; sleep 0.1; done; fi
+       if kill -0 "$STEP_PID" 2>/dev/null; then stamp "$label: anomaly pid=$STEP_PID still alive after KILL; listed as survivor, no group adopted"; else wait "$STEP_PID" 2>/dev/null; fi
+       STEP_PGID=; finish 70
+@@ -249,12 +282,13 @@
+   pid=$!; adopt_published "$idf" "$pid" "$label"; ad=$?; pg=$ADOPTED
+   if [ $ad -ne 0 ]; then
+     # F02 (A-02 / B-04): an unconfirmed cleanup client is never accepted as "empty": bounded halt (group if registered, else pid only), then cleanup failure
+-    if [ $ad -eq 2 ]; then e=$(( $(now_s) + ANOMALY_WAIT )); while pgrep -g "$pg" >/dev/null 2>&1 && [ "$(now_s)" -lt "$e" ]; do sleep 0.1; done; pgrep -g "$pg" >/dev/null 2>&1 && { kill -KILL -- "-$pg" 2>/dev/null; sleep 0.3; }
++    if [ $ad -eq 2 ]; then e=$(( $(now_s) + ANOMALY_WAIT )); while pgrep -g "$pg" >/dev/null 2>&1 && [ "$(now_s)" -lt "$e" ] && [ "$(now_s)" -lt "$CLEANUP_DEADLINE" ]; do sleep 0.1; done; pgrep -g "$pg" >/dev/null 2>&1 && { kill -KILL -- "-$pg" 2>/dev/null; sleep 0.3; }   # B R-2: deadline-clipped
+       pgrep -g "$pg" >/dev/null 2>&1 && { CLEANUP_SURVIVOR_GROUPS="${CLEANUP_SURVIVOR_GROUPS-} $pg"; stamp "$label: registered group $pg STILL has members after KILL"; }
+     elif kill -0 "$pid" 2>/dev/null; then stamp "$label: cleanup client pid=$pid alive without an adoptable identity (published='${pg:-none}') → TERM/KILL by pid only (≤${ANOMALY_WAIT}s), never a group"; kill -TERM "$pid" 2>/dev/null
+-      e=$(( $(now_s) + ANOMALY_WAIT )); while kill -0 "$pid" 2>/dev/null && [ "$(now_s)" -lt "$e" ]; do sleep 0.1; done; kill -0 "$pid" 2>/dev/null && { kill -KILL "$pid" 2>/dev/null; sleep 0.3; }
++      e=$(( $(now_s) + ANOMALY_WAIT )); while kill -0 "$pid" 2>/dev/null && [ "$(now_s)" -lt "$e" ] && [ "$(now_s)" -lt "$CLEANUP_DEADLINE" ]; do sleep 0.1; done; kill -0 "$pid" 2>/dev/null && { kill -KILL "$pid" 2>/dev/null; sleep 0.3; }   # B R-2: deadline-clipped
+     fi
+-    wait "$pid" 2>/dev/null; rc=$?
++    # A05: NO unconditional wait — a client still alive after KILL is an explicit survivor (scan sees the leader marker / group), not something to block on
++    if kill -0 "$pid" 2>/dev/null; then rc=unreaped; CLEANUP_SURVIVOR_PIDS="${CLEANUP_SURVIVOR_PIDS-} $pid"; stamp "$label: cleanup client pid=$pid STILL ALIVE after KILL → not waited on; counted as survivor"; else wait "$pid" 2>/dev/null; rc=$?; fi
+     CLEANUP_LEAK=yes; stamp "$label: cleanup client NOT accepted (leader exit rc=$rc, identity unconfirmed → workload never acked/started) → cleanup failure (never 'empty'), client rc reported as 70"
+     return 70
+   fi
+@@ -271,7 +305,7 @@
+   fi   # B-04: the former unreachable `kill -0` after `wait` branch is removed; the unconfirmed path is handled above BEFORE wait
+   return $rc
+ }
+-CLEANUP_LEAK=no; CLEANUP_SURVIVOR_GROUPS=
++CLEANUP_LEAK=no; CLEANUP_SURVIVOR_GROUPS=; CLEANUP_SURVIVOR_PIDS=   # A05: unreaped cleanup-client pids are listed as survivors, never waited on
+ 
+ cleanup(){
+   trap - EXIT; trap '' TERM INT HUP
+@@ -294,7 +328,7 @@
+     fi
+   fi
+   # process evidence: fixture postgres, any owned-work child, any $PORT listener (anchored cmdline starts; see v4.1 false-positive note)
+-  SURVIVORS=$( { local g; for g in $OWNED_PGIDS $CLEANUP_SURVIVOR_GROUPS; do [ "$g" = "$MY_PGID" ] || pgrep -g "$g" -a 2>/dev/null; done; pgrep -af "$FIXTURE_PAT|$OWNED_PAT" 2>/dev/null | grep -vE "^[0-9]+ (pgrep|grep) " | awk -v me=$$ '$1!=me'; ss -ltnH 2>/dev/null | grep -E ":${PORT}\b"; } | sort -u | sed 's/^/  survivor: /' )
++  SURVIVORS=$( { local g p; for g in $OWNED_PGIDS $CLEANUP_SURVIVOR_GROUPS; do [ "$g" = "$MY_PGID" ] || pgrep -g "$g" -a 2>/dev/null; done; for p in $CLEANUP_SURVIVOR_PIDS ${STEP_PID:-}; do kill -0 "$p" 2>/dev/null && ps -o pid=,args= -p "$p" 2>/dev/null; done; pgrep -af "$FIXTURE_PAT|$OWNED_PAT" 2>/dev/null | grep -vE "^[0-9]+ (pgrep|grep) " | awk -v me=$$ '$1!=me'; ss -ltnH 2>/dev/null | grep -E ":${PORT}\b"; } | sort -u | sed 's/^/  survivor: /' )
+   [ "$CLEANUP_LEAK" = yes ] && { SURVIVORS="$SURVIVORS
+   survivor: (cleanup client leaked members; halted — see 50/51 lines)"; }
+   if [ -n "$SURVIVORS" ]; then stamp "CLEANUP: surviving processes/listeners after cleanup:"; echo "$SURVIVORS" | tee -a "$S"; SURVIVORS=present; else SURVIVORS=none; stamp "CLEANUP: no surviving fixture/owned-work processes, nothing listening on $PORT"; fi
+@@ -313,19 +347,33 @@
+   # SHA256SUMS (inner) ← RECEIPT.txt ← SHA256SUMS.outer; PUBLICATION.txt is written last and hashed by nothing (records publication status + actual exit).
+   local hrc=0 hb pub=ok; hb=$(remaining)
+   if [ "$hb" -le 0 ]; then hrc=deadline; DEADLINE_EXCEEDED=yes; stamp_stdout "HASH SKIPPED: cleanup deadline exhausted before the inner manifest (no minimum allowance)"
+-  else timeout -k 1 "$hb" bash -c 'cd "$1" && find . -type f ! -name SHA256SUMS ! -name RECEIPT.txt ! -name SHA256SUMS.outer ! -name PUBLICATION.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.tmp && mv -f SHA256SUMS.tmp SHA256SUMS' _ "$OUT" 9>&- || hrc=$?; rm -f "$OUT/SHA256SUMS.tmp"; fi
++  else   # A02: exclude EVERY publication temporary/output (SHA256SUMS*, RECEIPT.txt, PUBLICATION.txt) and re-verify the COMPLETED inner manifest inside the same bound
++    timeout -k 1 "$hb" bash -c 'cd "$1" && find . -type f ! -name "SHA256SUMS*" ! -name RECEIPT.txt ! -name PUBLICATION.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.tmp && mv -f SHA256SUMS.tmp SHA256SUMS && sha256sum -c --quiet SHA256SUMS' _ "$OUT" 9>&- || hrc=$?; rm -f "$OUT/SHA256SUMS.tmp"; fi
+   deadline_check; dur=$(awk -v a="$CLEANUP_T0" -v b="$(date +%s.%N)" 'BEGIN{printf "%.2f", b-a}')
+-  local receipt=ok; [ "$hrc" = 0 ] && [ -s "$OUT/SHA256SUMS" ] || receipt="FAILED(hash_rc=$hrc)"; [ "$DEADLINE_EXCEEDED" = yes ] && receipt="${receipt};deadline_exceeded_after_hash"
++  local receipt=ok; [ "$hrc" = 0 ] && [ -s "$OUT/SHA256SUMS" ] || receipt="FAILED(hash_rc=$hrc)"; [ "$DEADLINE_EXCEEDED" = yes ] && receipt="${receipt};deadline_exceeded"   # B R-3: no 'after_hash' claim
+   if [ "$receipt" != ok ] && [ "$CLEANUP_EXIT" = 0 ]; then CLEANUP_EXIT=71; fi     # a missing/failed/over-deadline receipt is never cleanup_exit=0
+   if [ "$FIRST_EXIT" != 0 ]; then FINAL=$FIRST_EXIT; else FINAL=$CLEANUP_EXIT; fi
+-  { echo "receipt_status=$receipt"; echo "final_exit=$FINAL first_exit=$FIRST_EXIT cleanup_exit=$CLEANUP_EXIT"; echo "cleanup_seconds_total=$dur deadline_exceeded=$DEADLINE_EXCEEDED hash_rc=$hrc inner_manifest_sha256=$(sha256sum "$OUT/SHA256SUMS" 2>/dev/null | cut -c1-64)"; echo "utc=$(date -u +%FT%TZ)"; } > "$OUT/RECEIPT.txt" 2>/dev/null || pub=receipt_write_failed
+-  [ "$pub" = ok ] && grep -q "^final_exit=$FINAL first_exit=" "$OUT/RECEIPT.txt" 2>/dev/null || pub=receipt_write_failed   # F05: the receipt write status is checked, not assumed
+-  if [ "$pub" = ok ]; then ( cd "$OUT" && sha256sum SHA256SUMS RECEIPT.txt > SHA256SUMS.outer.tmp && mv -f SHA256SUMS.outer.tmp SHA256SUMS.outer && sha256sum -c --quiet SHA256SUMS.outer ) 9>&- 2>/dev/null || pub=outer_manifest_failed; rm -f "$OUT/SHA256SUMS.outer.tmp"; fi   # F05: written AND re-verified
++  # A05: the WHOLE publication tail (RECEIPT write + content check, outer manifest write + verification) is ONE bounded operation; a deadline already
++  # exhausted here still gets a 2 s failure-reporting reserve so the failure itself is written. Distinct rcs name the failed stage.
++  local pb tail_rc=0; pb=$(remaining); [ "$pb" -gt 10 ] && pb=10; [ "$pb" -lt 2 ] && { pb=2; [ "$(now_s)" -ge "${CLEANUP_DEADLINE:-0}" ] && DEADLINE_EXCEEDED=yes; }
++  timeout -k 1 "$pb" bash -c '
++    cd "$1" || exit 10
++    { echo "receipt_status=$2"; echo "final_exit=$3 first_exit=$4 cleanup_exit=$5"; echo "cleanup_seconds_total=$6 deadline_exceeded=$7 hash_rc=$8 inner_manifest_sha256=$(sha256sum SHA256SUMS 2>/dev/null | cut -c1-64)"; echo "utc=$(date -u +%FT%TZ)"; } > RECEIPT.txt || exit 11
++    grep -q "^final_exit=$3 first_exit=$4 cleanup_exit=$5\$" RECEIPT.txt || exit 12
++    [ -s SHA256SUMS ] || exit 13
++    sha256sum SHA256SUMS RECEIPT.txt > SHA256SUMS.outer.tmp && mv -f SHA256SUMS.outer.tmp SHA256SUMS.outer || exit 14
++    sha256sum -c --quiet SHA256SUMS.outer || exit 15
++    exit 0' _ "$OUT" "$receipt" "$FINAL" "$FIRST_EXIT" "$CLEANUP_EXIT" "$dur" "$DEADLINE_EXCEEDED" "$hrc" 9>&- 2>/dev/null || tail_rc=$?
++  rm -f "$OUT/SHA256SUMS.outer.tmp"
++  case $tail_rc in 0) pub=ok;; 10) pub=outdir_unreachable;; 11) pub=receipt_write_failed;; 12) pub=receipt_content_mismatch;; 13) pub=inner_manifest_missing;; 14) pub=outer_manifest_write_failed;; 15) pub=outer_manifest_verify_failed;; 124|137) pub="publication_timeout(rc=$tail_rc)";; *) pub="publication_failed(rc=$tail_rc)";; esac
+   local dl_pub=no; [ -n "$CLEANUP_DEADLINE" ] && [ "$(now_s)" -ge "$CLEANUP_DEADLINE" ] && dl_pub=yes
+   local receipt_final=$FINAL
+   if [ "$FINAL" = 0 ] && { [ "$pub" != ok ] || [ "$dl_pub" = yes ]; }; then FINAL=71; fi   # F05: the ACTUAL exit is classified after publication/deadline outcomes; a failed publication is never accepted 0
+-  { echo "publication_status=$pub deadline_exceeded_at_publication=$dl_pub"; echo "process_exit=$FINAL receipt_final_exit=$receipt_final"; echo "rule: process exit == RECEIPT.txt final_exit unless publication_status!=ok or deadline_exceeded_at_publication=yes, in which case a 0 becomes 71"; echo "utc=$(date -u +%FT%TZ)"; } > "$OUT/PUBLICATION.txt" 2>/dev/null || true
+-  echo "RECEIPT: $(head -2 "$OUT/RECEIPT.txt" 2>/dev/null | tr '\n' ' ') PUBLICATION: status=$pub deadline_at_publication=$dl_pub process_exit=$FINAL"
++  # A05: the final required write is CHECKED under its own small bound; PUBLICATION.txt is hashed by nothing. Its failure is a publication failure (0 → 71).
++  local prc=0
++  timeout -k 1 2 bash -c '{ echo "publication_status=$2 deadline_exceeded_at_publication=$3"; echo "process_exit=$4 receipt_final_exit=$5"; echo "rule: process exit == RECEIPT.txt final_exit unless publication_status!=ok or deadline_exceeded_at_publication=yes or this file could not be written, in which case a 0 becomes 71"; echo "utc=$(date -u +%FT%TZ)"; } > "$1/PUBLICATION.txt" && grep -q "^process_exit=$4 receipt_final_exit=$5\$" "$1/PUBLICATION.txt"' _ "$OUT" "$pub" "$dl_pub" "$FINAL" "$receipt_final" 9>&- 2>/dev/null || prc=$?
++  local pubfile=ok; [ "$prc" = 0 ] || { pubfile="FAILED(rc=$prc)"; [ "$FINAL" = 0 ] && FINAL=71; }
++  echo "RECEIPT: $(head -2 "$OUT/RECEIPT.txt" 2>/dev/null | tr '\n' ' ') PUBLICATION: status=$pub publication_file=$pubfile deadline_at_publication=$dl_pub process_exit=$FINAL"
+   exit "$FINAL"
+ }
+ stamp_stdout(){ echo "$*"; }   # F05: post-freeze notes go to stdout (launcher log) only — stamp.txt is hashed and must never be appended after the freeze
+@@ -413,7 +461,7 @@
+ 
+ # ---- 5) S1 R4 discriminator (S1-owned, frozen) on the PROTECTED database the harness leaves behind, under the same hold.
+ mkdir -p "$OUT/s1-r4"
+-export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-r56-v5.6 pid=$$ fd9=$LOCK"
++export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-r57-v5.7 pid=$$ fd9=$LOCK"
+ run_step 45-s1-r4-discriminator 300 "$OUT/s1-r4/s1-r4-discriminator.log" -- $DISC "$DB"; RC_DISC=$?
+ stamp "45 s1-r4-discriminator exit=$RC_DISC $(grep -E 'passed|FAIL' "$OUT/s1-r4/s1-r4-discriminator.log" | tail -1)"
+ stamp "lock still held by runner after discriminator: $(lock_probe)"

@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September22,2026 3:03PM PDT / 22:03UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
+Updated September22,2026 3:10PM PDT / 22:10UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -12,9 +12,9 @@ Owner correction22:03: EXECUTION OVER META. New cycles only for concrete materia
 
 ## Active lanes
 
-- S5 / T4: R1 CLOSED, no rerun. V10 frozenfdc99771,20/20 verified, dual exact reviews active. Separate safe private-control verdict from known setup-marker failure/release defect; setup-only outer-lease successor is being built, V10 immutable. Execute independent safe proof on closure rather than wait for unrelated setup work.
+- S5 / T4: R1 CLOSED, no rerun. V10 frozenfdc99771,20/20, dual review active. Setup-only outer-lease successor frozen0a690111,9/9, has its own dual review; shared primitive unchanged. Execute independent safe V10 proof on closure without waiting for unrelated setup scope.
 - S6 / T4: C6 independent narrow B frozen5196e231, unaffected hazard/classifier/observer/binding has no material defect; startup/setup remain HELD. Original19/19 packet fixed. C5 correction76f70108 preserves original while correcting8policy/7historicalnoreply identity count; finald51 Bradley. No diagnostic/runtime/product fix.
-- S2 / T4: V5.6 frozen41cd5371; both reviews frozen A9f5a7e01(+ENV0a9fb84f)/B54f0382a, execution HOLD. Next agent: sole Fable fixer V5.7 covering all material findings without majority waiver, then dual exact review. Productd5cd unchanged; restored source is not install/runtime clearance, predecessor additive-output permission still pending.
+- S2 / T4: V5.7 frozen72b9cfb5,15/15, dedicated A/B exact review active. Productd5cd unchanged; next bounded controls, then existing fresh setup/realDB proof. Expected standalone wdcancel3 belongs in corrected parent grant, no code revision for caller-only text. ENV01 output permission still pending.
 - S4 / T4: V6 frozen8b04adaf,12/12 verified, dual exact reviews active. Next safe private controls, then real package/browser prerequisites; no blanket additional fault-coverage requirement without a concrete material gap. Product91990 unchanged, artifact proof pending.
 - S1/S3 / T4: S1/S2 identities/blobs verified; S3 bundle restored offline, PREP2 reproduced exactly from BOTH parents, matrix86/86. Source-only S2 prerequisites complete: clean d5cd at s2-runner53 plus predecessor37/37 at s2-setup-prep, parent verified21:44, manifestc6bb412c. No path amendment/install/runtime; integration remains dependency-gated.
 
@@ -26,7 +26,7 @@ All prior failures, audit reports, source bundles and missing-evidence qualifica
 
 ## Immediate next steps
 
-1. S2 V5.7 freeze→dual-clear→bounded controls→fresh realDB composition. No speculative extra cycle.
+1. S2 V5.7 dual-clear→bounded controls→existing fresh setup→realDB composition. No speculative extra cycle.
 2. S5 V10 dual-clear→safe private proof→concrete setup-boundary closure→setup/T0. Never repeat R1.
 3. S4 V6 dual-clear→controls→actual package/browser evidence.
 4. Shared primitive clearance→S6 exact adaptation/applicability→fresh setup→C6 only.

@@ -1,0 +1,26 @@
+--- inputs/run-s5-setup-npm-ci.v10.sh	2026-09-22 22:04:16.514466816 +0000
++++ run-s5-setup-npm-ci.v10x.sh	2026-09-22 22:04:16.522466816 +0000
+@@ -1,4 +1,9 @@
+ #!/usr/bin/env bash
++# OP88-S5-SETUP-EXCLUSION runner variant v10x of frozen V10 setup 8fa80828 (V10 immutable; NOT LAUNCHED). ONLY delta: the canonical lease may be
++# INHERITED from the explicitly owned outer launcher (launch-s5-setup-exclusion.v1.sh) instead of acquired here. When S5_LEASE_INHERITED=<token>
++# is set the runner verifies that fd 9 is already open on $LOCK (readlink /proc/$$/fd/9), that $EX/LEASE_HOLDER names the same token and a live
++# holder, and does NOT call flock (the outer open-file-description keeps the lease after this runner exits; the child still gets 9>&-).
++# Without S5_LEASE_INHERITED the V10 behaviour (own flock) is unchanged. Everything else is the V10 bytes. V10 header follows.
+ # OP88-S5-V10 ADDITIVE SETUP SUCCESSOR of V9 da5228c2 (v1 74736a58, V8, V9 preserved; NOT LAUNCHED). Corrects owned-launch-v9-a A-01/A-03/A-04/A-05
+ # and owned-launch-v9-b V9B-02/03/04/05 in this consumer: in-shell `wait` via own_finish variables (never $(...)); OWN_STAMP written AFTER the START
+ # record creation (no truncation); required IDENTITY published (own_record, checked) BEFORE ADOPT release — failure => never released; every
+@@ -180,7 +185,12 @@
+ mkdir -p "$LOGS/npm-logs"
+ echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"
+ echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"
+-exec 9>"$LOCK"; flock -n 9 || die lock-busy 75; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"
++if [ -n "${S5_LEASE_INHERITED:-}" ]; then   # v10x: lease owned by the outer launcher; verify, never re-acquire, never release here
++  [ "$(readlink /proc/$$/fd/9 2>/dev/null)" = "$LOCK" ] || die lease-fd-not-inherited 75 "S5_LEASE_INHERITED set but fd 9 is not open on $LOCK"
++  grep -q "^token=$S5_LEASE_INHERITED " "$EX/LEASE_HOLDER" 2>/dev/null || die lease-holder-record-mismatch 75 "$EX/LEASE_HOLDER does not name token=$S5_LEASE_INHERITED"
++  HP=$(sed -n "s/^token=[^ ]* holder_pid=\([0-9]*\) .*/\1/p" "$EX/LEASE_HOLDER" 2>/dev/null); [ -n "$HP" ] && [ -d "/proc/$HP" ] || die lease-holder-gone 75 "holder pid=[$HP] not present"
++  echo "$(ts) lease INHERITED fd=9 path=$LOCK token=$S5_LEASE_INHERITED holder_pid=$HP (outer launcher retains exclusion after this runner exits)" >> "$EXIT_RECORD"
++else exec 9>"$LOCK"; flock -n 9 || die lock-busy 75; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"; fi
+ cd "$WT" || die cd 1
+ [ "$PWD" = "$WT" ] || die cwd 1
+ 

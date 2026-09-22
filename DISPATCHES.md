@@ -1,12 +1,14 @@
 # Active TGP execution register
 
-Updated 2026-09-22 22:03 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
+Updated 2026-09-22 22:10 UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. This file is authoritative; root DISPATCHES.md is an identical compatibility mirror.
 
 User directed the existing six-slice continuation in parallel IF SAFE. Full current contracts: `execution/OP88_WAVE1.md`. All assignments T4; canonical builder Claude Fable 5. Requested High policy is not observed runtime telemetry. All prior-session worker IDs/processes/installations/grants are historical. Earlier register retained in Git at ad3568a9.
 
 | Slice | Fresh worker ID | Requested model | Sole writes | Current state |
 |---|---|---|---|---|
-| S5 setup-only exclusion successor | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozen s5-v10-t0; new execution/op88/s5-setup-exclusion | V10 COMPLETEfdc99771,20/20. ACTIVE only concrete A04 outer-lease correction; no generic refinement or V10 mutation. |
+| S5 setup-only exclusion successor | s5_selective_v7_fixer_mud58q6n | Claude Fable 5 | frozen s5-v10-t0 and execution/op88/s5-setup-exclusion | COMPLETE0a6901119/9, unchanged primitive. Idle for concrete findings or exact execution grant. |
+| S5 setup-exclusion independent A | s5_setup_exclusion_independent_audit_a_mud8a27y | Inherited parent | execution/op88/audits/s5-setup-exclusion-a | ACTIVE new outerlease/setupdelta/controlscope only; no duplicate primitive audit or current B access. |
+| S5 setup-exclusion independent B | s5_setup_exclusion_independent_audit_b_mud8a28j | Claude Fable 5 | execution/op88/audits/s5-setup-exclusion-b | ACTIVE independently on same frozen9files; no current A access. |
 | S5 V10 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | execution/op88/audits/owned-launch-v10-a | ACTIVE exact-scope next-proof review; separate private controls/T0/setup verdicts, no current B access. |
 | S5 V10 independent B | s4_v4_independent_audit_b_mud58q6s | Claude Fable 5 | execution/op88/audits/owned-launch-v10-b | ACTIVE independently on same frozen bytes; no current A access. |
 | Owned launch V9 independent A | s4_v5_independent_audit_a_mud6seld | Inherited parent | frozen execution/op88/audits/owned-launch-v9-a | COMPLETE audit104a6bba/manifest56d46b9f, R6/setup/T0 HOLD, five material findings. No peer access/execution; idle. |
@@ -17,7 +19,9 @@ User directed the existing six-slice continuation in parallel IF SAFE. Full curr
 | S6 C5 result review B | s6_independent_c5_review_mud58q6k | Claude Fable 5 | frozen execution/op88/audits/s6-c5-b | Complete2398cc9d: actual five timers confirmed; hook-only complete-fix claim held. Smallest C6 discriminator recommended; no product acceptance. |
 | S6 C6 discriminator preparation | s6_bounded_c6_discriminator_preparation_mud5qzvh | Claude Fable 5 | frozen execution/op88/s6-c6-prep | COMPLETE19/19: hazardv5a91bb732/C-only746e244d, unchangedinstrument. Idle; transferred launch correction to S5 owner, no competing edits. |
 | S6 C6 narrow review B | s6_independent_c5_review_mud58q6k | Claude Fable 5 | frozen execution/op88/audits/s6-c6-b; additive C5 identity correction | COMPLETE5196e231: unaffected PartA no material defect; PartB startup HELD, no execution grant. Additive76f70108 corrects15commit identity overclaim; original preserved. |
-| S2 V5.7 runner fixer | s2_v5_6_runner_fixer_mud58q6g | Claude Fable 5 | frozen s2-v56; new execution/op88/s2-v57 | ACTIVE bounded consolidation of both frozen V5.6 reports; all A material findings bind, no majority waiver. Static only; controls/realproof unrun. |
+| S2 V5.7 builder / fresh setup readiness | s2_v5_6_runner_fixer_mud58q6g | Claude Fable 5 | frozen s2-v57; execution/op88/s2-fresh-setup-readiness | COMPLETE72b9cfb515/15. Read-only existing freshsetup invocation preparation active, no codechange/install/runtime. |
+| S2 V5.7 independent A | s2_v5_7_independent_audit_a_mud87yti | Inherited parent | execution/op88/audits/s2-v57-a | ACTIVE dedicated exact-scope review; S4A routing corrected before this dispatch, no competing writes authorized. |
+| S2 V5.7 independent B | s6_independent_c5_review_mud58q6k | Claude Fable 5 | execution/op88/audits/s2-v57-b | ACTIVE exact next-control readiness independently; no current A access. |
 | S2 V5.6 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent | frozen execution/op88/audits/s2-v56-a | COMPLETE original9f5a7e01/addendum0a9fb84f, both requests HOLD, seven material findings plus ENV01. No peer access/execution; idle. |
 | S2 V5.6 independent B | s6_independent_c5_review_mud58q6k | Claude Fable 5 | frozen execution/op88/audits/s2-v56-b | COMPLETE54f0382a: controls/proof not grantable, narrower runner-source view retained without waiving A. No peer access/execution; idle. |
 | S4 V4 independent A | s4_v4_independent_audit_a_mud58q62 | Inherited parent; actual runtime identity unexposed | frozen execution/op88/audits/s4-v4-a | COMPLETE/FROZEN: Stage1/Stage2 HOLD; six material source counterexamples, manifest63de35c3 verified. No peer access or probes. V5 consolidated successor now independently under review. |
