@@ -1,0 +1,200 @@
+{
+  "audit": "OP88-S4-V5-A",
+  "status": "FROZEN_INDEPENDENT_STATIC_DELTA_REVIEW",
+  "tier": "T4",
+  "input_fingerprints": "INPUTS.json",
+  "packet_manifest_sha256": "73c2dbbec0c9ae2d767adf16f19cb764f540d452f62170766be4cccc2728d753",
+  "citation_convention": "Relative links resolve from execution/op88/audits/s4-v5-a; line anchors refer to the frozen files whose SHA-256 values are in INPUTS.json.",
+  "verdicts": {
+    "stage1_private_control_grantability": {
+      "status": "HOLD_ON_EXACT_V5_REQUEST",
+      "recommend_grant": false,
+      "direct_blockers": ["S4-V5-A-01", "S4-V5-A-02", "S4-V5-A-04", "S4-V5-A-05"],
+      "shared_exceptional_path_blocker": "S4-V5-A-03",
+      "reason": "The corrected latch and mandatory record predicates are suitable source-level improvements, but the requested Stage 1 still has incomplete current-run cancellation accounting, a repeated cancellation allowance, an impossible specified success receipt, and a fail-open bounded scan; private scope does not waive the contract's ownership requirement. [S4 acceptance](../../../OP88_WAVE1.md#L128-L134) [Driver](../../s4-v5/controls/run-controls-v5.sh#L48-L159)",
+      "boundary": "The intended launcher controls select the private lease and the direct real-runner control refuses before native activity; this review does not claim that Stage 1 opens the canonical lock. [Launcher](../../s4-v5/launcher/s4-r6-launch-v5.sh#L42-L47) [Runner refusal](../../s4-v5/runner/s4-r6-validate-v5.sh#L58-L67)"
+    },
+    "stage2_native_prerequisites_and_applicability": {
+      "status": "HOLD_NOT_EXECUTABLE",
+      "recommend_grant": false,
+      "direct_material_blocker": "S4-V5-A-03",
+      "dependency_blockers": ["Corrected Stage 1 must pass under a separate grant", "Both independent exact-successor reviews required"],
+      "additional_prerequisites": [
+        "Restore and externally verify the exact successor packet manifest at the requested execution path; this review is not restoration.",
+        "Restore the exact clean product head/tree, predecessor export, pinned probes and tooling paths; meet the runner's source/toolchain/freshness checks.",
+        "Obtain a separate canonical-lock execution grant and use a non-job-control caller preserving the raw launcher exit.",
+        "Resolve the native total-bound qualification and correct the request's exit-code legend before using it for dispatch/recovery."
+      ],
+      "basis": "Native prerequisites remain explicit and unfulfilled by a source review, while the source-level artifact joins survive the V4-to-V5 naming delta. [Stage 2 request](../../s4-v5/SLOT_REQUEST_V5.md#L97-L111) [Runner prerequisites](../../s4-v5/runner/s4-r6-validate-v5.sh#L81-L109) [Artifact joins](../../s4-v5/runner/s4-r6-validate-v5.sh#L164-L215)",
+      "product_runtime_artifact_acceptance": "NONE; no gates, native tests, package, browser, revocation or release acceptance is granted. [Scope limit](../../../OP88_WAVE1.md#L134)"
+    },
+    "execution_truth": "All behavioral conclusions below are static counterexamples or source applicability judgments, not observed control failures or passes; no candidate, syntax check or probe was executed.",
+    "independence": "Non-builder A; BOTH frozen V4 reviews read; current s4-v5-b not read; actual model/version/settings not exposed."
+  },
+  "closure_ledger_against_both_v4_reviews": [
+    {
+      "prior_ids": ["S4-V4-A-01"],
+      "status": "SOURCE_CLOSED_UNRUN",
+      "assessment": "STEP_ACTIVE now remains set through head-state collection, metadata and the required-step primary block, and late deferred signals are appended only afterward; the prior second-TERM-before-latch counterexample no longer wins FIRST_FAIL for the required failing live step. [Library](../../s4-v5/runner/s4-r6-lib-v5.sh#L107-L135)",
+      "discriminator": "The CONTROL-only self-TERM seam fires after the pending snapshot but before primary latching, and the new predicate requires the step first, all later blocks SIGNAL_TERM, at least two such signals and a while-latching block; this tests the actual shared library rather than replacing its implementation. [Seam](../../s4-v5/runner/s4-r6-lib-v5.sh#L114-L116) [Predicates](../../s4-v5/controls/control-predicates-v5.py#L99-L131)",
+      "limits": "The seam is inert for VALIDATION, where the runner requires KIND=VALIDATION; accepting it does not establish a runtime pass or require moving it out of the only code location that can exercise this interval. [Runner kind gate](../../s4-v5/runner/s4-r6-validate-v5.sh#L59-L61)"
+    },
+    {
+      "prior_ids": ["S4-V4-A-02", "S4-V4-B-02"],
+      "status": "PARTIAL_SOURCE_CLOSURE_MATERIAL_RESIDUALS",
+      "assessment": "Wall-clock launcher polling and bounded EXIT_RECORD readers replace the specific iteration/read gaps, and the driver no longer KILLs its live launcher, but current-run cancellation accounting and total cancellation budgeting remain open as A-01/A-02/A-05 below. [Launcher waits/readers](../../s4-v5/launcher/s4-r6-launch-v5.sh#L66-L78) [Driver](../../s4-v5/controls/run-controls-v5.sh#L48-L114)",
+      "publication_qualification": "The supervisor writer has a timeout, but the subsequent JSON reparse, rename and final log remain outside it; 3385 seconds is the sum of declared phase allowances, not a newly demonstrated end-to-end enforced publication deadline. [Publication](../../s4-v5/launcher/s4-r6-launch-v5.sh#L88-L120) [Native bound](../../s4-v5/SLOT_REQUEST_V5.md#L107-L111)",
+      "proportionality": "No standalone requirement for absolute real-time completion under arbitrary kernel/filesystem failure is introduced; the material driver timing counterexample is the visible duplicate cancellation path, not speculation that every ordinary shell operation can hang."
+    },
+    {
+      "prior_ids": ["S4-V4-A-03", "S4-V4-B-01"],
+      "status": "PRECEDENCE_SOURCE_CLOSED_CONTAINMENT_DEPENDS_ON_A03",
+      "assessment": "SURVIVORS now enters quarantine before TIMEOUT/INTERRUPTED classification, preserving timed_out/interrupt cause fields; the prior branch-order bypass is closed, but the new quarantine-failure branch still deliberately releases unresolved-survivor exclusion. [Launcher](../../s4-v5/launcher/s4-r6-launch-v5.sh#L204-L230) [Lease semantics](../../s4-v5/launcher/s4-r6-launch-v5.sh#L112-L113)"
+    },
+    {
+      "prior_ids": ["S4-V4-A-04", "S4-V4-B-05"],
+      "status": "PARTIAL_SOURCE_CLOSURE_MATERIAL_A03",
+      "assessment": "Successful transfer now verifies a live tokenized holder with fd 9, captures starttime, checks receipt creation/rename/nonempty state and provides identity-checked recovery; these close the prior unverified-success and bare-PID instructions, but verified-holder receipt failure kills that holder before unresolved work is verified gone. [Handoff](../../s4-v5/launcher/s4-r6-launch-v5.sh#L169-L205) [Recovery](../../s4-v5/SLOT_REQUEST_V5.md#L113-L123)",
+      "qualification": "The unique run token is meaningful current-process evidence; this review does not demand immunity to arbitrary PID reuse or an immortal holder, and does not claim the checked handoff has run."
+    },
+    {
+      "prior_ids": ["S4-V4-A-05"],
+      "status": "SOURCE_CLOSED_FOR_PRIOR_COUNTEREXAMPLES_UNRUN",
+      "assessment": "Missing/unparseable records and empty required step lists now add failing checks rather than skip assertions; nested-orphan, both live-step, predicate-rc0, record-without-sentinel and lease scenarios use mandatory parsed/step evidence, and refuse requires no runner record. [Helpers](../../s4-v5/controls/control-predicates-v5.py#L49-L56) [Scenario checks](../../s4-v5/controls/control-predicates-v5.py#L82-L173)",
+      "limits": "Other malformed nested data can still raise a Python exception rather than print every MISS, but the driver captures the predicate process's nonzero status; this is fail-closed and is not a new blocker for the specific vacuous-PASS defects. [Predicate invocation](../../s4-v5/controls/run-controls-v5.sh#L141-L148)"
+    },
+    {
+      "prior_ids": ["S4-V4-A-06", "S4-V4-B-04"],
+      "status": "GUARDED_RAW_CALLERS_SOURCE_CLOSED_UNRUN",
+      "assessment": "Both requested callers guard cd, capture driver/launcher status in if/else, print it and explicitly exit with the captured status, eliminating the trailing-echo success mask; the dangerous kill-after outer wrapper is removed. [Stage 1 caller](../../s4-v5/SLOT_REQUEST_V5.md#L68-L75) [Stage 2 caller](../../s4-v5/SLOT_REQUEST_V5.md#L103-L105)",
+      "limits": "The corrected raw status does not create the missing terminal Stage 1 success receipt, repair internal cancellation budgeting or make every publication succeed. [Driver terminal path](../../s4-v5/controls/run-controls-v5.sh#L150-L159)"
+    },
+    {
+      "prior_ids": ["S4-V4-B-03", "S4-V4-A-N01"],
+      "status": "SOURCE_CLOSED_UNRUN",
+      "assessment": "EXIT_RECORD.lock now consumes launcher-provided path/kind/pid, names the launcher as holder, and retains runner_sid separately; the private lease control checks the record/supervisor pid and path join. [Record writer](../../s4-v5/runner/s4-r6-lib-v5.sh#L146-L165) [Join predicate](../../s4-v5/controls/control-predicates-v5.py#L153-L165)"
+    },
+    {
+      "prior_ids": ["S4-V4-B-06"],
+      "status": "NONBLOCKING_LIMIT_REMAINS_NOT_CLOSED_BY_BUDGET_CHANGE",
+      "assessment": "The B-06 finding was that the outside flock probe cannot distinguish the launcher's hold from the stub's inherited fd 9; the stub still retains that descriptor, so the new truthful metadata join does not add that behavioral discrimination. [Frozen B-06](../s4-v4-b/REPORT.md#L42) [Stub verification/probe](../../s4-v5/controls/s4-r6-control-stub-v5.sh#L19-L21) [Probe](../../s4-v5/controls/s4-r6-control-stub-v5.sh#L52-L57)",
+      "disposition": "Keep this as the prior nonblocking applicability limit, not an invented new product or architecture requirement; FINDINGS_MAP's B-02/B-06 budget/receipt grouping does not actually close B-06. [Mapping](../../s4-v5/FINDINGS_MAP.json#L69-L73)"
+    }
+  ],
+  "material_findings": [
+    {
+      "id": "S4-V5-A-01",
+      "prior_lineage": ["S4-V4-A-02", "S4-V4-B-02"],
+      "severity": "HIGH",
+      "title": "Signal cancellation scans an empty or previous run identity, not the active control",
+      "applies_to": ["Stage1 direct", "Stage2 Stage1 dependency"],
+      "owner": "Canonical S4 execution-layer builder",
+      "locations": ["controls/run-controls-v5.sh:48,61-62,88-100,104-113,134-139"],
+      "mechanism": "LAST_RUN_DIR is initialized empty and is assigned only after run_bounded returns, whereas TERM/INT calls finish from inside that active interval; finish scans only LAST_RUN_DIR and never resolves the active launcher's current run. [State and recovery](../../s4-v5/controls/run-controls-v5.sh#L48-L64) [Finish/traps](../../s4-v5/controls/run-controls-v5.sh#L88-L100) [Late assignment](../../s4-v5/controls/run-controls-v5.sh#L134-L139)",
+      "concrete_static_counterexample": "Deliver driver TERM during the first control after its launcher has created OWNED_SID but before run_bounded returns: finish cancels the launcher, then skips session_state entirely because LAST_RUN_DIR is still empty, and exits with private_lease_free=unchecked and no current-session census; during control two the same path instead scans control one's directory. [Launcher OWNED_SID](../../s4-v5/launcher/s4-r6-launch-v5.sh#L149-L153) [Driver](../../s4-v5/controls/run-controls-v5.sh#L88-L113) [Assignment](../../s4-v5/controls/run-controls-v5.sh#L134-L139)",
+      "consequence": "The promised verification before every cancellation exit is absent on an ordinary supported TERM path; if cancellation produces a current quarantine holder or failed handoff, the terminal driver receipt cannot account for it, and the unresolved receipt initially records an empty/stale dir. [Driver receipt paths](../../s4-v5/controls/run-controls-v5.sh#L60-L96) [Request claim](../../s4-v5/SLOT_REQUEST_V5.md#L33)",
+      "smallest_correction": "Associate the current launcher's run token/directory/SID with ACTIVE_PID before cancellable supervision, or resolve and validate that association inside finish before inspecting or signalling any session; distinguish no-spawn/unknown from verified empty.",
+      "future_closure_discriminator_not_executed": "Cancel once during first-control execution and once during the next control; require the receipt to name the actual active run and independently account for its current session, lease and any holder, never a preceding run.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V5-A-02",
+      "prior_lineage": ["S4-V4-A-02"],
+      "severity": "MEDIUM",
+      "title": "Unresolved cancellation is repeated, invalidating the advertised cleanup reserve",
+      "applies_to": ["Stage1 direct", "Stage2 Stage1 dependency"],
+      "owner": "Canonical S4 execution-layer builder",
+      "locations": ["controls/run-controls-v5.sh:29-35,49-64,88-90,104-113,139", "SLOT_REQUEST_V5.md:77-90,133-134"],
+      "mechanism": "run_bounded invokes cancel_active at a deadline and preserves ACTIVE_PID when UNRESOLVED is set, then the caller invokes finish 96, whose unconditional cancel_active sends another TERM and starts a fresh grace+40-second wait; no already-cancelled or already-unresolved guard prevents that second allowance. [Cancellation](../../s4-v5/controls/run-controls-v5.sh#L49-L64) [Finish](../../s4-v5/controls/run-controls-v5.sh#L88-L90) [Deadline and caller](../../s4-v5/controls/run-controls-v5.sh#L104-L139)",
+      "concrete_static_counterexample": "Take the explicit exit-97 state the new code is designed to handle: the same launcher remains alive after the first wait; with live-step grace 6, the route waits 46 seconds, records UNRESOLVED, returns, then waits another 46 seconds in finish before scanning/probing, already exceeding the entire 70-second cleanup reserve. [Reserve](../../s4-v5/controls/run-controls-v5.sh#L29-L35) [Two invocations](../../s4-v5/controls/run-controls-v5.sh#L88-L113) [Live-step settings and finish](../../s4-v5/controls/run-controls-v5.sh#L117-L139)",
+      "consequence": "The stated one-TERM policy and 66-second cancellation calculation do not describe this reachable source path; 600 seconds is not established as the requested aggregate bound merely by summing 597, although this does not predict that the ordinary fast controls will exceed 600 seconds. [Request](../../s4-v5/SLOT_REQUEST_V5.md#L77-L79) [One-TERM claim](../../s4-v5/SLOT_REQUEST_V5.md#L133-L134)",
+      "smallest_correction": "Make cancellation idempotent with one recorded absolute cancellation deadline, do not restart the allowance in finish, and reconcile elapsed startup/finalization costs with the admission calculation.",
+      "future_closure_discriminator_not_executed": "A bounded private cancellation discriminator must exercise the unresolved return-to-finish path, count one TERM request, retain exclusion/identity, and show no second full grace allowance; do not KILL the lease holder to force a timing pass.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V5-A-03",
+      "prior_lineage": ["S4-V4-A-04", "S4-V4-A-03", "S4-V4-B-05", "S4-V4-B-01"],
+      "severity": "HIGH",
+      "title": "Holder-receipt failure intentionally destroys exclusion while survivors remain unverified",
+      "applies_to": ["Stage2 direct canonical containment", "Stage1 shared exceptional private-lease containment"],
+      "owner": "Canonical S4 execution-layer builder; parent for any required ownership rescope",
+      "locations": ["launcher/s4-r6-launch-v5.sh:185-205,220-230", "SLOT_REQUEST_V5.md:34-35,107-110"],
+      "mechanism": "On verified-holder receipt write/rename failure, the code kills the token-matching holder, marks LEASE_RELEASED_AT_EXIT=true and exits through QUARANTINE_HOLDER_FAILED 10, without verifying survivors gone or transferring exclusion to another checked owner. [Failure branch](../../s4-v5/launcher/s4-r6-launch-v5.sh#L185-L205)",
+      "concrete_static_counterexample": "Start at the specifically supported quarantine state SURVIVORS nonempty, with the runner already exited and the new holder alive with the inherited lease; let QUARANTINE_LEASE_HOLDER.tmp creation fail with ENOSPC, or its rename fail with a normal filesystem error: lines 194-205 deliberately kill that working holder and close the launcher's own fd on exit while the prior step descendants have fd 9 closed. [Handoff failure](../../s4-v5/launcher/s4-r6-launch-v5.sh#L186-L205) [Survivor entry](../../s4-v5/launcher/s4-r6-launch-v5.sh#L220-L225) [Step fd closure](../../s4-v5/runner/s4-r6-lib-v5.sh#L107-L108)",
+      "consequence": "Exit 10 is more honest than a false retained-lease claim, but an UNSAFE RELEASE label is not the mandated unresolved-survivor exclusion; the same storage failure can also prevent the promised supervisor receipt, so reporting is not a substitute for containment. [Publication](../../s4-v5/launcher/s4-r6-launch-v5.sh#L99-L120) [Contract](../../../OP88_WAVE1.md#L130-L133)",
+      "scope_qualification": "No normal Stage 1 scenario intentionally exercises this failure and all common predicates require no quarantine; this is the existing shared exceptional-path obligation, not a claim that a current private control has produced survivors or a demand for safety under arbitrary kernel failure. [Common predicates](../../s4-v5/controls/control-predicates-v5.py#L62-L78)",
+      "smallest_correction": "Do not destroy the last verified exclusion holder before survivors are verified gone or a checked recovery owner has accepted them; if bounded caller completion and durable recovery on receipt failure need a different ownership contract, request parent rescope rather than declaring intentional release closed.",
+      "future_closure_discriminator_not_executed": "Under a separately authorized private-only fixture, discriminate holder-creation and receipt-publication failure with a known unresolved session; require containment plus attributable recovery or an explicit approved narrower boundary, not only nonzero status.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V5-A-04",
+      "prior_lineage": ["S4-V4-A-02", "V5 new Stage1 acceptance contract"],
+      "severity": "MEDIUM",
+      "title": "An otherwise perfect Stage 1 cannot emit its mandatory success receipt",
+      "applies_to": ["Stage1 exact request", "Stage2 Stage1 dependency"],
+      "owner": "Canonical S4 driver/request author",
+      "locations": ["controls/run-controls-v5.sh:87-100,150-159", "SLOT_REQUEST_V5.md:94-95"],
+      "mechanism": "The request requires driver 0, passing predicates and an EXIT code=0 terminal line, but only finish emits EXIT code=; the successful path prints ALL 8 CONTROLS OK and executes bare exit 0 with no EXIT trap or finish call. [Pass definition](../../s4-v5/SLOT_REQUEST_V5.md#L94-L95) [Only EXIT logger](../../s4-v5/controls/run-controls-v5.sh#L87-L100) [Success path](../../s4-v5/controls/run-controls-v5.sh#L150-L159)",
+      "concrete_static_counterexample": "Let every predicate pass, all sessions be empty, the private lease be free and the direct refusal be exactly 71: line 159 exits zero without the required EXIT code=0 receipt, so the packet's own anything-else STOP rule still rejects the run. [Terminal path](../../s4-v5/controls/run-controls-v5.sh#L150-L159) [Request](../../s4-v5/SLOT_REQUEST_V5.md#L94-L95)",
+      "smallest_correction": "Route success through the intended checked finalization/receipt path, preserving the successful code only when its final facts are confirmed, and reconcile the acceptance text with actual emitted evidence.",
+      "future_closure_discriminator_not_executed": "A successful exact control run must produce one terminal success receipt with current final lease/session facts and the raw outer exit 0.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V5-A-05",
+      "prior_lineage": ["S4-V4-A-02"],
+      "severity": "MEDIUM",
+      "title": "The new bounded session scan converts timeout/error into verified-empty evidence",
+      "applies_to": ["Stage1 direct", "Stage2 Stage1 dependency"],
+      "owner": "Canonical S4 execution-layer builder",
+      "locations": ["controls/run-controls-v5.sh:69-85,91-96,141-148"],
+      "mechanism": "session_state assigns the stdout of timeout pgrep piped to tr but never saves the timeout/pgrep status; without pipefail, an empty scan timeout or pgrep error leaves LEFT_INITIAL/LEFT_FINAL empty just like no matches, then a successful lease probe permits the normal success branch. [Scan](../../s4-v5/controls/run-controls-v5.sh#L69-L85) [Decision](../../s4-v5/controls/run-controls-v5.sh#L141-L148)",
+      "concrete_static_counterexample": "For otherwise expected receipts, let the explicitly bounded pgrep phase expire before printing a PID: tr produces empty output, session_state returns 0, LEFT_INITIAL is empty, and LEASE_FREE=true causes line 148 not to stop; the source therefore accepts an uncompleted independent census, without needing a claim that a real survivor was observed. [Timeout pipeline](../../s4-v5/controls/run-controls-v5.sh#L75-L85) [Acceptance](../../s4-v5/controls/run-controls-v5.sh#L143-L148)",
+      "consequence": "The control cannot establish its asserted independent empty-session fact when that very bounded phase times out or errors, and the same suppression can hide the observation needed to select unsafe-release exit 98. [Finish classification](../../s4-v5/controls/run-controls-v5.sh#L91-L96)",
+      "smallest_correction": "Capture census stdout and raw status separately; accept only the defined successful/no-match outcomes, and preserve timed-out/error/unknown as a stopping, nonempty-or-unknown ownership state rather than empty.",
+      "future_closure_discriminator_not_executed": "A data/adapter-level private negative control should make the scan return no output with a timeout/error status and require a non-success unknown-census receipt, distinct from an actual successful no-match scan.",
+      "runtime_observed": false
+    }
+  ],
+  "explicit_decision_points": {
+    "new_holder_failure_10": "Not accepted as containment closure: truthful non-success is useful, but release with unresolved work is the A-03 residual, not permission for another holder. [Launcher](../../s4-v5/launcher/s4-r6-launch-v5.sh#L198-L205)",
+    "control_only_seam": "Acceptable bounded source-level discriminator; hard-gated on KIND=CONTROL plus the exact seam selector, and the Stage 1 driver enables it only for live-step-double-term. [Library](../../s4-v5/runner/s4-r6-lib-v5.sh#L114-L116) [Driver controls](../../s4-v5/controls/run-controls-v5.sh#L117-L135)",
+    "600_second_budget": "The listed seven control allowances sum to 520, and 520+7+70=597 is arithmetically correct, but the duplicate cancellation path exceeds the reserve; the separate 20-second manifest and 5-second initial lease probe are also omitted from that sum, though dynamic admission can stop rather than guarantee completing all eight. [Budget and startup](../../s4-v5/controls/run-controls-v5.sh#L29-L46) [Initial lease/admission](../../s4-v5/controls/run-controls-v5.sh#L126-L135)",
+    "native_3385_seconds": "3300+45+10+8+5+10+5+2=3385 matches the declared formula; bounded readers and wall-clock wait loops are real improvements, but the post-writer parse/rename/log are not enclosed in that writer timeout, so this review does not certify an end-to-end hard publication deadline. [Constants](../../s4-v5/launcher/s4-r6-launch-v5.sh#L48-L55) [Publication](../../s4-v5/launcher/s4-r6-launch-v5.sh#L100-L120)",
+    "new_driver_91": "Useful pre-control manifest refusal; it performs hash checks before launching controls, but its early exit does not run finish, so the every-exit receipt prose overclaims this pre-spawn case without creating an owned workload hazard. [Manifest](../../s4-v5/controls/run-controls-v5.sh#L45-L48)",
+    "new_driver_97": "Leaving a still-live launcher rather than KILLing its lease is the right direction, but A-01/A-02 prevent treating this receipt as a current-run, once-budgeted recovery proof; the receipt write itself is also unchecked and the prose asserts lease retention from liveness rather than recording a verified fd check. [Unresolved branch](../../s4-v5/controls/run-controls-v5.sh#L55-L64)",
+    "new_driver_98": "It denotes observed final leftovers plus a free private lease, not every unsafe release; A-05 means a timed-out census can suppress the observation, and finalization may also overwrite the earlier LEFT_INITIAL snapshot while retaining the earlier failure log. [Session state](../../s4-v5/controls/run-controls-v5.sh#L69-L96) [Earlier decision/log](../../s4-v5/controls/run-controls-v5.sh#L143-L148)",
+    "survivors_first_5_or_10": "Moving survivor handling before 124/143 is accepted as the source ordering correction; outcome 5 has checked handoff evidence, whereas 10 expressly does not preserve the same exclusion guarantee. [Ordering](../../s4-v5/launcher/s4-r6-launch-v5.sh#L204-L230)",
+    "uutils_15_and_signal_counts": "Adding raw exit 15 is acceptable as an explicitly unmeasured uutils portability assumption, not runtime proof; the actual observed integers must be retained, and the mandatory step-first ordering remains while counts are lower bounds to allow the launcher's repeated group/PID TERM route. [Builder assumption](../../s4-v5/FINDINGS_MAP.json#L76-L80) [Predicate set/order](../../s4-v5/controls/control-predicates-v5.py#L58-L60) [Live predicates](../../s4-v5/controls/control-predicates-v5.py#L99-L131) [Signal route](../../s4-v5/launcher/s4-r6-launch-v5.sh#L79-L84)",
+    "exit_legend_correction": "The Stage 2 request mislabels inherited exits: actual lease busy is 75, topology refusal is 73, 6 is FAILED_RUNNER_LEFT_ORPHANS, 7 is publication failure and 9 is ownership handshake failure, not a runner-hash mismatch; correct the legend without pretending the launcher compares a pinned runner hash. [Incorrect legend](../../s4-v5/SLOT_REQUEST_V5.md#L107-L111) [Actual refusal branches](../../s4-v5/launcher/s4-r6-launch-v5.sh#L123-L140) [Actual classification](../../s4-v5/launcher/s4-r6-launch-v5.sh#L229-L237)"
+  },
+  "preserved_positive_applicability": [
+    {
+      "property": "Initialization, isolated session, launch handshake, private/native separation",
+      "assessment": "The split dependent local initialization, setsid runner construction, pre-spawn launcher-held fd and runner handshake/refusal structure remain present; no product re-audit is implied. [Library](../../s4-v5/runner/s4-r6-lib-v5.sh#L62-L65) [Launcher](../../s4-v5/launcher/s4-r6-launch-v5.sh#L123-L153) [Runner](../../s4-v5/runner/s4-r6-validate-v5.sh#L58-L79)"
+    },
+    {
+      "property": "Observed-exit versus validation-exit distinction and first-failure dependent NOTRUN",
+      "assessment": "The predicate-rc0 path still preserves observed 0 while blocking with validation 89, and dependent steps retain NOTRUN after the latch; S45 still uses expect_exit rather than inventing a nonzero observed command exit. [Library](../../s4-v5/runner/s4-r6-lib-v5.sh#L23-L43) [NOTRUN](../../s4-v5/runner/s4-r6-lib-v5.sh#L97-L103) [S45](../../s4-v5/runner/s4-r6-validate-v5.sh#L160-L162)"
+    },
+    {
+      "property": "Quoted argv-based JSON writers",
+      "assessment": "The supervisor and runner record writers remain quoted-heredoc Python with argv-supplied values, and the lease attribution delta correctly adjusts the runner record argument split from 24 to 27. [Supervisor](../../s4-v5/launcher/s4-r6-launch-v5.sh#L100-L115) [Runner record](../../s4-v5/runner/s4-r6-lib-v5.sh#L147-L167)"
+    },
+    {
+      "property": "Exact product identity and package/browser artifact joins",
+      "assessment": "The native source still pins head/tree/toolchain/probes, checks the sole ZIP/inventory pair against actual hash/size and HEAD blobs, joins the positive browser receipt, and requires the syntax-specific negative control against the same original ZIP; the independently reproduced runner diff contains only header/path/name changes, so these source checks retain applicability but have not produced artifacts in this review. [Pins](../../s4-v5/runner/s4-r6-validate-v5.sh#L42-L56) [Preconditions](../../s4-v5/runner/s4-r6-validate-v5.sh#L81-L109) [Joins](../../s4-v5/runner/s4-r6-validate-v5.sh#L164-L215) [Exact runner diff](../../s4-v5/V4_TO_V5.diff#L285-L366)"
+    }
+  ],
+  "review_limits": [
+    "No broad product re-audit, no product changes and no native/runtime/artifact/release acceptance.",
+    "No candidate execution, syntax check, probe, lock acquisition, process signalling, install, database or browser action.",
+    "The only remote read was GitHub AGENT_RULES retrieval for the expressly requested live policy check; actual tool versions and process behavior were not measured.",
+    "No current B directory read; both PRIOR frozen V4 reviews are the comparison baseline.",
+    "No demand for a generic supervisor, immortal process, arbitrary-kernel-failure guarantee or cosmetic-only audit loop.",
+    "All counterexamples are static; proposed discriminators require their own authorization and were not run."
+  ],
+  "smallest_next_action": "Return these concrete residuals to the sole canonical builder for an additive execution-only successor: bind current cancellation identity, make cancellation once-budgeted, fail closed on census errors, emit the declared terminal receipt and preserve exclusion on failed quarantine publication or seek parent rescope; freeze new bytes and obtain both independent risk-scoped reviews before a separate Stage 1 grant. [Ownership and acceptance](../../../OP88_WAVE1.md#L123-L134)"
+}

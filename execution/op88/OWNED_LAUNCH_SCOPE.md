@@ -22,3 +22,11 @@ Operator: op 88 / v12vantage88. Parent architecture/ownership decision, not an i
 ## Parallel work
 
 S6 independent hazard/classifier/observer review can proceed on its frozen packet with the known launch primitive explicitly held. S2 V5.6 and S4 V5 own different runner compositions and continue independently; do not transplant unpublished code or share mutable helpers with them. S1/S3 source is ready and runtime remains upstream-gated.
+
+## V9 bounded rescope ruling
+
+V8 remains frozen and unexecuted. Builder's checkpoint-2 acknowledged that next-command registration is not atomic, workload executes before adoption, and retired numeric identities are not safe signal authority. Parent authorizes a bounded child-side verified-adoption gate as the smallest existing technique, not a general framework or product scope expansion.
+
+Prepare additive V9 primitive/two S5 consumers/controls only. A fresh private attempt identity/path and checked publication are required before workload release. Failed, expired or interrupted adoption cannot run the workload. A trap's `$!` is not universally authentic: use phase-bound current identity and direct-child evidence, retire authority separately from retained historical evidence, and preserve ownership of descendants after leader exit. Every branch must avoid unconfirmed waits/unowned signals and propagate cleanup/publication failures honestly.
+
+Independent V8 A and B are frozen under audits/owned-launch-v8-a (manifest9f54e9d7) and owned-launch-v8-b (manifestb22a6140), respectively; sole fixer may now read both. A's concrete control findings retain the HOLD despite B's narrower controls-safe opinion. Incorporate both reports before final V9 review. Preserve V9 milestone36f04f84 unchanged; use an additive final closure mapping if no code changes are needed, otherwise a new successor revision. S6 adaptations stay paused until primitive acceptance; completed narrow hazard/classifier/observer review does not grant runtime.

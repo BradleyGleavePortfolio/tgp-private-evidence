@@ -1,0 +1,810 @@
+--- proposal-4/launcher/s4-r6-launch-v4.sh
++++ v5/launcher/s4-r6-launch-v5.sh
+@@ -1,8 +1,18 @@
+ #!/usr/bin/env bash
+-# S4 R6 validation V4 — exact bounded detached launcher / supervisor / canonical lease holder.
++# S4 R6 validation V5 — exact bounded detached launcher / supervisor / lease holder.
+ #
+-#   bash execution/s4-r6-validation/v4/launcher/s4-r6-launch-v4.sh              (kind=VALIDATION)
+-#   S4R6_CONTROL=1 S4R6_SCENARIO=<name> bash .../s4-r6-launch-v4.sh              (kind=CONTROL, stub runner)
++#   bash execution/s4-r6-validation/v5/launcher/s4-r6-launch-v5.sh              (kind=VALIDATION)
++#   S4R6_CONTROL=1 S4R6_SCENARIO=<name> bash .../s4-r6-launch-v5.sh              (kind=CONTROL, stub runner)
++#
++# V5 changes versus V4 (frozen reviews S4-V4-A-02/03/04, S4-V4-B-01/05):
++#  * Cleanup state before outcome precedence (A-03/B-01): SURVIVORS is resolved FIRST on every post-exit
++#    path; TIMEOUT/INTERRUPTED never bypass lease retention. The cause stays in bounds.timed_out/interrupt.
++#  * Checked quarantine handoff (A-04/B-05): the holder is verified alive with fd 9 -> lease path and a
++#    token in its cmdline, identified by pid+starttime+token, and durably recorded BEFORE this process exits.
++#    Verification or record failure => QUARANTINE_HOLDER_FAILED (10), the just-spawned holder is terminated
++#    (identity-checked), and the unsafe release is recorded. No unrecorded infinite holder, no bare-PID recovery.
++#  * Enforced elapsed phases (A-02): grace/confirm/post-exit waits are wall-clock deadlines, both record
++#    readers run under `timeout --foreground READ_S`, and bounds.worst_case_s/formula include every phase.
+ #
+ # V4 changes versus V3 (frozen reviews S4-V3-A-01..04):
+ #  * Lease outside the killable workload (A-04): the launcher takes `flock -n` on the lease file
+@@ -31,15 +41,18 @@
+ set -u
+ ROOT=/home/user/workspace
+ VAL=$ROOT/execution/s4-r6-validation
+-V4=$VAL/v4
+-KIND=VALIDATION; RUNNER=$V4/runner/s4-r6-validate-v4.sh; RUNS=$VAL/runs
++V5=$VAL/v5
++KIND=VALIDATION; RUNNER=$V5/runner/s4-r6-validate-v5.sh; RUNS=$VAL/runs
+ LEASE_PATH=$ROOT/execution/test-validation.lock; LEASE_KIND=canonical-held-by-launcher
+-if [[ ${S4R6_CONTROL:-0} == 1 ]]; then KIND=CONTROL; RUNNER=$V4/controls/s4-r6-control-stub-v4.sh; RUNS=$V4/control-runs; : "${S4R6_SCENARIO:?control scenario required}"; LEASE_PATH=$V4/control-runs/.private-control-lease.lock; LEASE_KIND=private-held-by-launcher; fi
++if [[ ${S4R6_CONTROL:-0} == 1 ]]; then KIND=CONTROL; RUNNER=$V5/controls/s4-r6-control-stub-v5.sh; RUNS=$V5/control-runs; : "${S4R6_SCENARIO:?control scenario required}"; LEASE_PATH=$V5/control-runs/.private-control-lease.lock; LEASE_KIND=private-held-by-launcher; fi
+ OUTER_S=${S4R6_OUTER_S:-3300}   # mandatory total bound for the runner (validation default 55 min)
+ GRACE_S=${S4R6_GRACE_S:-45}     # TERM→KILL grace for the owned session
+ CONFIRM_S=10                    # bounded wait for runner exit after KILL before QUARANTINED
+ POST_S=8                        # post-exit orphan reap loops (5 s TERM + 3 s KILL)
+ PUBLISH_S=5                     # record writer bound (timeout --foreground)
++READ_S=5                        # each EXIT_RECORD reader bound (timeout --foreground); two readers per run
++QH_VERIFY_S=5                   # quarantine holder verification bound
++WORST_EXTRA_S=$((READ_S*2+QH_VERIFY_S+2))   # readers + holder verification + slack; formula below
+ now() { date -u +%FT%TZ; }
+ sha() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+ T0=$(date +%s); LAUNCH_START=$(now)
+@@ -48,9 +61,21 @@
+ RUN_ID=""; OUT=""; CONSOLE=/dev/null; SUP=""; RPID=""; SID=""; RUNNER_SHA=""; RUNNER_PID_FILE=""
+ RUNNER_RC=""; RUNNER_EXIT_CONFIRMED=false; TIMED_OUT=false; INTERRUPT=""; SIGNALLED=none
+ MEMBERS_AT_DEADLINE=""; ORPHANS=""; REAPED_HERE=""; SURVIVORS=""; REFUSAL=""
+-LEASE_HELD=false; LEASE_RELEASED_AT_EXIT=true; QUARANTINE_HOLDER=""
++LEASE_HELD=false; LEASE_RELEASED_AT_EXIT=true; QUARANTINE_HOLDER=""; QUARANTINE_HOLDER_START=""; QUARANTINE_TOKEN=""; QUARANTINE_OK=""; QUARANTINE_FAILURE=""
+ 
+ session_members() { [[ -n $SID ]] && pgrep -s "$SID" 2>/dev/null | tr '\n' ' '; }
++# wait_session_empty <seconds>: wall-clock bounded (A-02), returns 0 as soon as the owned session is empty.
++wait_session_empty() { local until=$(( $(date +%s) + $1 )); while (( $(date +%s) < until )); do [[ -z $(session_members) ]] && return 0; sleep 1; done; [[ -z $(session_members) ]]; }
++# wait_pid_gone <pid> <seconds>: wall-clock bounded, returns 0 once the pid is gone.
++wait_pid_gone() { local until=$(( $(date +%s) + $2 )); while (( $(date +%s) < until )); do kill -0 "$1" 2>/dev/null || return 0; sleep 1; done; ! kill -0 "$1" 2>/dev/null; }
++# proc_start <pid>: kernel start time (clock ticks) from /proc/<pid>/stat, comm-safe; identity for holder recovery.
++proc_start() { sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'; }
++# read_record_result <file>: bounded reader (A-02); prints result or MISSING_OR_UNPARSEABLE.
++read_record_result() {
++  local r; r=$(timeout --foreground "$READ_S" python3 -c 'import json,sys
++try: print(json.load(open(sys.argv[1])).get("result","UNPARSEABLE"))
++except Exception: print("MISSING_OR_UNPARSEABLE")' "$1" 2>/dev/null); [[ -n $r ]] && echo "$r" || echo MISSING_OR_UNPARSEABLE
++}
+ # signal_session <SIG>: every foreign process group in the owned session (-pgid), then every pid.
+ signal_session() {
+   local sig=$1 p g
+@@ -67,17 +92,15 @@
+   if [[ -n $OUT ]]; then
+     [[ -f $OUT/RUN_COMPLETE.sentinel ]] && sentinel=yes
+     [[ -f $OUT/EXIT_RECORD.json ]] && record_present=true
+-    runner_result=$(python3 -c 'import json,sys
+-try: print(json.load(open(sys.argv[1])).get("result","UNPARSEABLE"))
+-except Exception: print("MISSING_OR_UNPARSEABLE")' "$OUT/EXIT_RECORD.json" 2>/dev/null)
++    runner_result=$(read_record_result "$OUT/EXIT_RECORD.json")
+     [[ -f $RUNNER_PID_FILE ]] && runner_pid_seen=$(tr -d ' \n' < "$RUNNER_PID_FILE")
+   fi
+   local publication_ok=false
+   if [[ -n $SUP ]]; then
+-    timeout --foreground "$PUBLISH_S" python3 - "$SUP.tmp" "$KIND" "${S4R6_SCENARIO:-}" "$RUN_ID" "$overall" "$code" "$RUNNER" "$RUNNER_SHA" "$RPID" "$RUNNER_RC" "$RUNNER_EXIT_CONFIRMED" "$runner_result" "$sentinel" "$record_present" "$SID" "$runner_pid_seen" "$SIGNALLED" "$MEMBERS_AT_DEADLINE" "$ORPHANS" "$REAPED_HERE" "$SURVIVORS" "$OUTER_S" "$GRACE_S" "$CONFIRM_S" "$TIMED_OUT" "$INTERRUPT" "$REFUSAL" "$LAUNCH_START" "$end" "$OUT" "$CONSOLE" "$POST_S" "$PUBLISH_S" "$LEASE_PATH" "$LEASE_KIND" "$LEASE_HELD" "$LEASE_RELEASED_AT_EXIT" "$QUARANTINE_HOLDER" "$$" <<'PY'
++    timeout --foreground "$PUBLISH_S" python3 - "$SUP.tmp" "$KIND" "${S4R6_SCENARIO:-}" "$RUN_ID" "$overall" "$code" "$RUNNER" "$RUNNER_SHA" "$RPID" "$RUNNER_RC" "$RUNNER_EXIT_CONFIRMED" "$runner_result" "$sentinel" "$record_present" "$SID" "$runner_pid_seen" "$SIGNALLED" "$MEMBERS_AT_DEADLINE" "$ORPHANS" "$REAPED_HERE" "$SURVIVORS" "$OUTER_S" "$GRACE_S" "$CONFIRM_S" "$TIMED_OUT" "$INTERRUPT" "$REFUSAL" "$LAUNCH_START" "$end" "$OUT" "$CONSOLE" "$POST_S" "$PUBLISH_S" "$LEASE_PATH" "$LEASE_KIND" "$LEASE_HELD" "$LEASE_RELEASED_AT_EXIT" "$QUARANTINE_HOLDER" "$$" "$READ_S" "$QH_VERIFY_S" "$WORST_EXTRA_S" "$QUARANTINE_HOLDER_START" "$QUARANTINE_TOKEN" "$QUARANTINE_OK" "$QUARANTINE_FAILURE" "$(proc_start $$)" <<'PY'
+ import json,sys
+ a=sys.argv[1:]
+-(out,kind,scenario,run_id,overall,code,runner,runner_sha,rpid,runner_rc,exit_confirmed,runner_result,sentinel,record_present,sid,runner_pid_seen,signalled,members_at_deadline,orphans,reaped_here,survivors,outer_s,grace_s,confirm_s,timed_out,interrupt,refusal,start,end,outdir,console,post_s,publish_s,lease_path,lease_kind,lease_held,lease_released,quarantine_holder,launcher_pid)=a
++(out,kind,scenario,run_id,overall,code,runner,runner_sha,rpid,runner_rc,exit_confirmed,runner_result,sentinel,record_present,sid,runner_pid_seen,signalled,members_at_deadline,orphans,reaped_here,survivors,outer_s,grace_s,confirm_s,timed_out,interrupt,refusal,start,end,outdir,console,post_s,publish_s,lease_path,lease_kind,lease_held,lease_released,quarantine_holder,launcher_pid,read_s,qh_verify_s,worst_extra_s,qh_start,qh_token,qh_ok,qh_failure,launcher_start)=a
+ def num(x):
+     try: return int(x)
+     except Exception: return None
+@@ -86,8 +109,8 @@
+  "overall_semantics":"SUCCESS only if runner exit 0 confirmed, runner EXIT_RECORD.result==SUCCESS, sentinel present, RUNNER_PID handshake matches, owned session empty without supervisor reaping; everything else is non-success. publication_ok is recorded separately by the caller after this file is parsed.",
+  "runner":{"path":runner,"sha256":runner_sha or None,"spawned_pid":num(rpid),"exit":num(runner_rc),"exit_confirmed":b(exit_confirmed),"exit_record_result":runner_result,"exit_record_present":b(record_present),"sentinel":sentinel=="yes","runner_pid_handshake":num(runner_pid_seen),"handshake_ok":(num(runner_pid_seen)==num(rpid)) if runner_pid_seen else None},
+  "owned_session":{"sid":num(sid),"signal_route":"kill -SIG -- -pgid for every foreign pgid in session, then kill -SIG pid for every member; never outside the session","signalled":signalled,"members_at_deadline":members_at_deadline.split(),"orphans_after_runner_exit":orphans.split(),"reaped_by_supervisor":reaped_here.split(),"survivors_after_kill":survivors.split()},
+- "bounds":{"outer_s":num(outer_s),"grace_s":num(grace_s),"confirm_s":num(confirm_s),"post_exit_reap_s":num(post_s),"publish_s":num(publish_s),"timed_out":b(timed_out),"interrupt":interrupt or None,"worst_case_s":num(outer_s)+num(grace_s)+num(confirm_s)+num(post_s)+num(publish_s)+2,"worst_case_formula":"outer+grace+confirm+post_exit_reap+publish+2"},
+- "lease":{"path":lease_path,"kind":lease_kind,"holder_pid":num(launcher_pid),"held_by_launcher":b(lease_held),"released_at_launcher_exit":b(lease_released),"quarantine_holder_pid":num(quarantine_holder),"semantics":"held from before spawn until verified cleanup; on unverified survivors NOT released — quarantine holder keeps it (unsafe handoff, never permission for another lane)"},
++ "bounds":{"outer_s":num(outer_s),"grace_s":num(grace_s),"confirm_s":num(confirm_s),"post_exit_reap_s":num(post_s),"publish_s":num(publish_s),"read_s":num(read_s),"quarantine_verify_s":num(qh_verify_s),"timed_out":b(timed_out),"interrupt":interrupt or None,"worst_case_s":num(outer_s)+num(grace_s)+num(confirm_s)+num(post_s)+num(publish_s)+num(worst_extra_s),"worst_case_formula":"outer+grace+confirm+post_exit_reap+publish+2*read+quarantine_verify+2","phases_are_wall_clock":True},
++ "lease":{"path":lease_path,"kind":lease_kind,"holder_pid":num(launcher_pid),"holder_starttime":num(launcher_start),"held_by_launcher":b(lease_held),"released_at_launcher_exit":b(lease_released),"quarantine_holder_pid":num(quarantine_holder),"quarantine_holder_starttime":num(qh_start),"quarantine_holder_token":qh_token or None,"quarantine_ok":(qh_ok=="true") if qh_ok else None,"quarantine_failure":qh_failure or None,"semantics":"held from before spawn until verified cleanup; unverified survivors on ANY path => checked quarantine holder keeps it (QUARANTINED_SURVIVORS 5, unsafe handoff, never permission for another lane); if the holder cannot be verified/recorded => QUARANTINE_HOLDER_FAILED 10 and released_at_launcher_exit=true is an UNSAFE RELEASE, recorded, never SUCCESS. Recovery must verify pid+starttime+token+fd9 before any kill."},
+  "refusal":refusal or None,"start_utc":start,"end_utc":end,"out_dir":outdir or None,"console":console},open(out,"w"),indent=2)
+ PY
+     if [[ $? == 0 ]] && python3 -c 'import json,sys;json.load(open(sys.argv[1]))' "$SUP.tmp" 2>/dev/null && mv "$SUP.tmp" "$SUP"; then publication_ok=true; fi
+@@ -104,7 +127,7 @@
+ 
+ # ---- 1. fresh exclusive run directory + safe id ------------------------------------------------------
+ mkdir -p "$RUNS" || exit 70
+-RUN_ID="${KIND}-V4-$(date -u +%Y%m%dT%H%M%SZ)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
++RUN_ID="${KIND}-V5-$(date -u +%Y%m%dT%H%M%SZ)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+ OUT=$RUNS/$RUN_ID
+ if ! mkdir "$OUT" 2>/dev/null; then echo "REFUSE: run directory exists: $OUT" >&2; exit 71; fi
+ CONSOLE=$OUT/console.log; : > "$CONSOLE" || exit 70
+@@ -117,7 +140,7 @@
+ if ! flock -n 9; then REFUSAL="lease busy: $LEASE_PATH (a free lease is not permission; nothing spawned)"; log "REFUSE: $REFUSAL"; publish_and_exit LEASE_BUSY 75; fi
+ LEASE_HELD=true; echo "$$ launcher $RUN_ID $(now)" >&9
+ log "lease held kind=$LEASE_KIND path=$LEASE_PATH holder=$$ (fd 9; inherited by runner for verification only; step children close it)"
+-log "launch kind=$KIND scenario=${S4R6_SCENARIO:-} run=$RUN_ID runner=$RUNNER sha256=$RUNNER_SHA outer=${OUTER_S}s grace=${GRACE_S}s confirm=${CONFIRM_S}s post=${POST_S}s publish=${PUBLISH_S}s worst=$((OUTER_S+GRACE_S+CONFIRM_S+POST_S+PUBLISH_S+2))s"
++log "launch kind=$KIND scenario=${S4R6_SCENARIO:-} run=$RUN_ID runner=$RUNNER sha256=$RUNNER_SHA outer=${OUTER_S}s grace=${GRACE_S}s confirm=${CONFIRM_S}s post=${POST_S}s publish=${PUBLISH_S}s read=${READ_S}s qverify=${QH_VERIFY_S}s worst=$((OUTER_S+GRACE_S+CONFIRM_S+POST_S+PUBLISH_S+WORST_EXTRA_S))s launcher_start=$(proc_start $$)"
+ 
+ # ---- 2. detached session; ownership by construction ----------------------------------------------------
+ INTERRUPT=""; trap 'INTERRUPT=TERM' TERM; trap 'INTERRUPT=INT' INT
+@@ -139,23 +162,50 @@
+   MEMBERS_AT_DEADLINE=$(session_members)
+   log "TERM owned session $SID members: $MEMBERS_AT_DEADLINE"
+   signal_session TERM; SIGNALLED=TERM
+-  for ((i=0;i<GRACE_S;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done
+-  if [[ -n $(session_members) ]]; then log "KILL owned session survivors: $(session_members)"; signal_session KILL; SIGNALLED=TERM+KILL; fi
++  wait_session_empty "$GRACE_S" || { log "KILL owned session survivors: $(session_members)"; signal_session KILL; SIGNALLED=TERM+KILL; }
+ fi
+-# bounded confirmation of the runner's exit (never an unconditional wait)
+-for ((i=0;i<CONFIRM_S;i++)); do kill -0 "$RPID" 2>/dev/null || break; sleep 1; done
++# bounded confirmation of the runner's exit (never an unconditional wait); wall-clock (A-02)
++wait_pid_gone "$RPID" "$CONFIRM_S" || :
+ hold_quarantine_lease() {
+-  # Unverified survivors: keep the lease beyond our own exit. The holder inherits fd 9 (same open
+-  # file description ⇒ the flock persists while it lives). Parent must resolve survivors, then kill
+-  # this pid explicitly. Never SUCCESS, never permission for another lane.
+-  setsid sleep infinity < /dev/null > /dev/null 2>&1 &
+-  QUARANTINE_HOLDER=$!; LEASE_RELEASED_AT_EXIT=false
+-  echo "$QUARANTINE_HOLDER" > "$OUT/QUARANTINE_LEASE_HOLDER"
+-  log "UNSAFE HANDOFF: survivors '$SURVIVORS' — lease $LEASE_PATH retained by quarantine holder pid $QUARANTINE_HOLDER"
++  # Unverified survivors: keep the lease beyond our own exit as a CHECKED owned-resource handoff (S4-V4-A-04).
++  # The holder inherits fd 9 (same open file description => the flock persists while it lives). It is
++  # verified alive with fd 9 -> lease path and our token in its cmdline, identified by pid+starttime+token
++  # and recorded durably BEFORE we exit. Returns 0 only on verified+recorded handoff; otherwise the holder
++  # we spawned is terminated (identity-checked) and the caller publishes QUARANTINE_HOLDER_FAILED.
++  # Parent recovery: verify pid+starttime+token+fd9 against QUARANTINE_LEASE_HOLDER, then kill. Never a bare pid.
++  QUARANTINE_TOKEN="s4r6-quarantine-holder-$RUN_ID"
++  # holder = one bash keeping fd 9; its sleep children close fd 9 (9>&-) so ONLY the recorded pid holds the lease
++  setsid bash -c 'while :; do sleep 60 9>&-; done' "$QUARANTINE_TOKEN" < /dev/null > /dev/null 2>&1 &
++  QUARANTINE_HOLDER=$!
++  local until=$(( $(date +%s) + QH_VERIFY_S )) verified=false
++  while (( $(date +%s) < until )); do
++    if kill -0 "$QUARANTINE_HOLDER" 2>/dev/null && [[ $(readlink "/proc/$QUARANTINE_HOLDER/fd/9" 2>/dev/null) == "$LEASE_PATH" ]] && tr '\0' ' ' < "/proc/$QUARANTINE_HOLDER/cmdline" 2>/dev/null | grep -q -- "$QUARANTINE_TOKEN"; then verified=true; break; fi
++    sleep 1
++  done
++  QUARANTINE_HOLDER_START=$(proc_start "$QUARANTINE_HOLDER")
++  if [[ $verified == true && -n $QUARANTINE_HOLDER_START ]]; then
++    if printf 'pid=%s starttime=%s token=%s lease=%s lease_kind=%s run=%s owned_sid=%s survivors=%s launcher_pid=%s recorded=%s\nRECOVERY: kill ONLY if /proc/<pid>/stat starttime == %s AND /proc/<pid>/cmdline contains %s AND readlink /proc/<pid>/fd/9 == %s, after the listed survivors are verified gone. Never signal a bare pid.\n' \
++         "$QUARANTINE_HOLDER" "$QUARANTINE_HOLDER_START" "$QUARANTINE_TOKEN" "$LEASE_PATH" "$LEASE_KIND" "$RUN_ID" "$SID" "$SURVIVORS" "$$" "$(now)" "$QUARANTINE_HOLDER_START" "$QUARANTINE_TOKEN" "$LEASE_PATH" > "$OUT/QUARANTINE_LEASE_HOLDER.tmp" \
++       && mv "$OUT/QUARANTINE_LEASE_HOLDER.tmp" "$OUT/QUARANTINE_LEASE_HOLDER" && [[ -s $OUT/QUARANTINE_LEASE_HOLDER ]]; then
++      QUARANTINE_OK=true; LEASE_RELEASED_AT_EXIT=false
++      log "UNSAFE HANDOFF: survivors '$SURVIVORS' — lease $LEASE_PATH retained by VERIFIED quarantine holder pid=$QUARANTINE_HOLDER starttime=$QUARANTINE_HOLDER_START token=$QUARANTINE_TOKEN (recorded in QUARANTINE_LEASE_HOLDER)"
++      return 0
++    fi
++    QUARANTINE_FAILURE="holder verified but QUARANTINE_LEASE_HOLDER record could not be written"
++  else
++    QUARANTINE_FAILURE="holder pid $QUARANTINE_HOLDER not verified alive with fd 9 -> $LEASE_PATH and token within ${QH_VERIFY_S}s"
++  fi
++  # failure: never leave an unrecorded infinite holder — terminate what we just spawned, identity-checked by token
++  if kill -0 "$QUARANTINE_HOLDER" 2>/dev/null && tr '\0' ' ' < "/proc/$QUARANTINE_HOLDER/cmdline" 2>/dev/null | grep -q -- "$QUARANTINE_TOKEN"; then kill -KILL "$QUARANTINE_HOLDER" 2>/dev/null; fi
++  QUARANTINE_OK=false; LEASE_RELEASED_AT_EXIT=true
++  log "QUARANTINE HOLDER FAILED: $QUARANTINE_FAILURE — lease $LEASE_PATH WILL be released at exit while survivors '$SURVIVORS' are unverified (UNSAFE RELEASE, recorded; never SUCCESS)"
++  return 1
+ }
++# quarantine_exit: cleanup/lease state is secured BEFORE any outcome precedence (S4-V4-A-03 / B-01)
++quarantine_exit() { if hold_quarantine_lease; then publish_and_exit QUARANTINED_SURVIVORS 5; else publish_and_exit QUARANTINE_HOLDER_FAILED 10; fi; }
+ if kill -0 "$RPID" 2>/dev/null; then
+   RUNNER_EXIT_CONFIRMED=false; SURVIVORS=$(session_members)
+-  hold_quarantine_lease; publish_and_exit QUARANTINED_SURVIVORS 5
++  quarantine_exit
+ fi
+ wait "$RPID" 2>/dev/null; RUNNER_RC=$?; RUNNER_EXIT_CONFIRMED=true
+ 
+@@ -164,21 +214,20 @@
+ if [[ -n $ORPHANS ]]; then
+   log "owned orphans after runner exit: $ORPHANS — TERM/KILL"
+   for p in $ORPHANS; do printf '%s :: ' "$p"; tr '\0' ' ' < /proc/$p/cmdline 2>/dev/null | cut -c1-160; echo; done >> "$OUT/orphans.log"
+-  signal_session TERM; for ((i=0;i<5;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done
+-  if [[ -n $(session_members) ]]; then signal_session KILL; for ((i=0;i<3;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done; fi
++  signal_session TERM; wait_session_empty 5 || { signal_session KILL; wait_session_empty 3 || :; }   # POST_S = 5 + 3, wall-clock
+   REAPED_HERE=$ORPHANS
+ fi
+ SURVIVORS=$(session_members)
+ 
+-# ---- 5. classification ---------------------------------------------------------------------------------------------
++# ---- 5. cleanup/lease state FIRST, then classification (S4-V4-A-03 / B-01) ------------------------------------
++# Unverified survivors take precedence over TIMEOUT/INTERRUPTED: the lease is never released with owned work
++# unaccounted for. The cause remains recorded (bounds.timed_out, bounds.interrupt, owned_session.signalled).
++if [[ -n $SURVIVORS ]]; then quarantine_exit; fi
+ HANDSHAKE=""; [[ -f $RUNNER_PID_FILE ]] && HANDSHAKE=$(tr -d ' \n' < "$RUNNER_PID_FILE")
+-RES=$(python3 -c 'import json,sys
+-try: print(json.load(open(sys.argv[1])).get("result","UNPARSEABLE"))
+-except Exception: print("MISSING_OR_UNPARSEABLE")' "$OUT/EXIT_RECORD.json" 2>/dev/null)
++RES=$(read_record_result "$OUT/EXIT_RECORD.json")
+ SENT=no; [[ -f $OUT/RUN_COMPLETE.sentinel ]] && SENT=yes
+ if   [[ $TIMED_OUT == true ]]; then publish_and_exit TIMEOUT 124
+ elif [[ -n $INTERRUPT ]]; then publish_and_exit INTERRUPTED 143
+-elif [[ -n $SURVIVORS ]]; then hold_quarantine_lease; publish_and_exit QUARANTINED_SURVIVORS 5
+ elif [[ -n $REAPED_HERE ]]; then publish_and_exit FAILED_RUNNER_LEFT_ORPHANS 6
+ elif [[ $RUNNER_RC == 71 || $RUNNER_RC == 73 || $RUNNER_RC == 75 ]]; then REFUSAL="runner refused with exit $RUNNER_RC (see console.log)"; publish_and_exit RUNNER_REFUSED "$RUNNER_RC"
+ elif [[ $RUNNER_RC != 0 ]]; then publish_and_exit RUNNER_NONZERO "$RUNNER_RC"
+--- proposal-4/runner/s4-r6-lib-v4.sh
++++ v5/runner/s4-r6-lib-v5.sh
+@@ -1,5 +1,13 @@
+-# S4 R6 validation V4 — shared step wrapper / ownership / publication library.
+-# Sourced by runner/s4-r6-validate-v4.sh (kind=VALIDATION) AND by controls/s4-r6-control-stub-v4.sh
++# S4 R6 validation V5 — shared step wrapper / ownership / publication library.
++# V5 changes versus V4 (frozen reviews S4-V4-A-01, S4-V4-B-03 / S4-V4-A-N01):
++#  * A-01: STEP_ACTIVE stays set through head-state collection, metadata writes AND the primary
++#    latch; pending signals are folded in only after the step's own exit is latched. A signal that
++#    arrives after deferral ends is handled by the no-active-step path (after the primary), never before.
++#  * B-03/N01: EXIT_RECORD.lock names the actual holder (launcher pid from S4R6_LEASE_PID, lease path
++#    and kind from the launch environment); the runner only verified inherited fd 9.
++#  * Control-only synchronisation seam (S4R6_SEAM=step-after-reap, KIND=CONTROL only): a self-TERM
++#    inside the metadata zone gives the A-01 discriminator a deterministic second signal.
++# Sourced by runner/s4-r6-validate-v5.sh (kind=VALIDATION) AND by controls/s4-r6-control-stub-v5.sh
+ # (kind=CONTROL) so the safety controls exercise the ACTUAL nested step wrapper, census, reap,
+ # latch and record writer — not a re-implementation. No product code, no lock handling here.
+ #
+@@ -101,8 +109,11 @@
+   local rc=$?
+   local end; end=$(now); local dur=$(( $(date +%s) - s0 ))
+   local reap_ok=true; reap_owned "$id" || reap_ok=false     # still "active": a signal here is recorded, not re-entered
+-  STEP_ACTIVE=""
++  # S4-V4-A-01: deferral is NOT ended here. STEP_ACTIVE stays set through head-state, metadata and the
++  # primary latch below; a signal in that zone is recorded into PENDING_SIGNAL and folded in as SECONDARY.
+   local pending=$PENDING_SIGNAL; PENDING_SIGNAL=""
++  # control-only deterministic seam (A-01 discriminator): second TERM to ourselves inside the metadata zone
++  if [[ ${KIND:-} == CONTROL && ${S4R6_SEAM:-} == step-after-reap ]]; then echo "SEAM step-after-reap: kill -TERM $$ (metadata zone, before primary latch)" | tee -a "$log"; kill -TERM "$$"; fi
+   local found=$REAP_FOUND
+   read -r h1 t1 d1 < <(head_state | tr '\n' ' ')
+   local timed_out=false; [[ $rc == 124 || $rc == 137 ]] && timed_out=true
+@@ -112,10 +123,15 @@
+     "$id" "$required" "$status" "$rc" "$timed_out" "$pending" "$tmo" "$start" "$end" "$dur" "$h0" "$d0" "$h1" "$t1" "$d1" "$found" "$reap_ok" "$cwd" "$cmdjson" "$log" > "$meta"
+   STEPS_JSON+=("$(cat "$meta")")
+   echo "[$end] $id exit=$rc (${dur}s) orphans_found=$found reaped_verified=$reap_ok" | tee -a "$log"
+-  [[ $rc == 0 || $required == 0 ]] || block "$id" "$rc" "required step failed${pending:+ (outer $pending received during step)}" "$rc"
++  [[ $rc == 0 || $required == 0 ]] || block "$id" "$rc" "required step failed${pending:+ (outer $pending received during step)}" "$rc"   # PRIMARY latch
+   [[ -z $pending ]] || block "SIGNAL_$pending" 143 "outer interruption received during step $id (secondary; primary is the step's own exit)" 143
+   [[ $reap_ok == true ]] || block "$id" 96 "owned orphan(s) survived TERM/KILL — cleanup unverified" "$rc"
+   if [[ ${SOURCE_CHECK:-0} == 1 ]]; then [[ $h1 == "$EXPECT_HEAD" && $d1 == 0 ]] || block "$id" 98 "worktree not at exact clean head afterwards (head=$h1 dirty=$d1)" "$rc"; fi
++  # S4-V4-A-01: end deferral only now. A signal recorded during the metadata/latch zone is blocked here as
++  # a further SECONDARY block; a signal arriving after this line takes the no-active-step path (also after
++  # the primary). Nothing is dropped and nothing precedes the step's own latched exit.
++  STEP_ACTIVE=""
++  if [[ -n $PENDING_SIGNAL ]]; then local late=$PENDING_SIGNAL; PENDING_SIGNAL=""; block "SIGNAL_$late" 143 "outer interruption received while latching step $id (secondary; primary already latched)" 143; fi
+   return $rc
+ }
+ 
+@@ -127,10 +143,11 @@
+ publish_exit_record() {
+   local result=$1 clean_rc=$2 source_ok=$3 fh=$4 ft=$5 fd=$6 start=$7 end=$8 blocked=$9 head=${10} tree=${11} runner=${12} pipe=${13} chrome=${14} zipp=${15} zsha=${16} write_sentinel=${17}
+   local summary=$OUT/EXIT_RECORD.json
+-  python3 - "$summary.tmp" "$RUN_ID" "$KIND" "$result" "$FIRST_FAIL" "${FIRST_FAIL_RC:-}" "$FIRST_FAIL_REASON" "${FIRST_FAIL_OBSERVED:-}" "$clean_rc" "$source_ok" "$fh" "$ft" "$fd" "$start" "$end" "$SID" "$blocked" "$head" "$tree" "$runner" "$pipe" "$chrome" "$zipp" "$zsha" "${BLOCKS[@]}" --WARN-- "${WARNINGS[@]}" --STEPS-- "${STEPS_JSON[@]}" <<'PY'
++  # S4-V4-B-03 / A-N01: the lease holder is the LAUNCHER (S4R6_LEASE_PID); path/kind come from the launch environment.
++  python3 - "$summary.tmp" "$RUN_ID" "$KIND" "$result" "$FIRST_FAIL" "${FIRST_FAIL_RC:-}" "$FIRST_FAIL_REASON" "${FIRST_FAIL_OBSERVED:-}" "$clean_rc" "$source_ok" "$fh" "$ft" "$fd" "$start" "$end" "$SID" "$blocked" "$head" "$tree" "$runner" "$pipe" "$chrome" "$zipp" "$zsha" "${S4R6_LEASE_PATH:-}" "${S4R6_LEASE:-}" "${S4R6_LEASE_PID:-}" "${BLOCKS[@]}" --WARN-- "${WARNINGS[@]}" --STEPS-- "${STEPS_JSON[@]}" <<'PY'
+ import json,sys,hashlib
+-a=sys.argv[1:]; (out,run_id,kind,result,ff,ffrc,ffreason,ffobs,clean_rc,source_ok,fh,ft,fd,start,end,sid,blocked,head,tree,runner,pipe,chrome,zipp,zsha)=a[:24]
+-rest=a[24:]; w=rest.index("--WARN--"); s=rest.index("--STEPS--"); blocks=rest[:w]; warns=rest[w+1:s]; steps=[json.loads(x) for x in rest[s+1:]]
++a=sys.argv[1:]; (out,run_id,kind,result,ff,ffrc,ffreason,ffobs,clean_rc,source_ok,fh,ft,fd,start,end,sid,blocked,head,tree,runner,pipe,chrome,zipp,zsha,lease_path,lease_kind,lease_pid)=a[:27]
++rest=a[27:]; w=rest.index("--WARN--"); s=rest.index("--STEPS--"); blocks=rest[:w]; warns=rest[w+1:s]; steps=[json.loads(x) for x in rest[s+1:]]
+ def h(p):
+     try: return hashlib.sha256(open(p,'rb').read()).hexdigest()
+     except Exception as e: return f"missing:{e}"
+@@ -144,8 +161,8 @@
+  "first_failure":{"step":ff or None,"validation_exit":num(ffrc),"observed_exit":num(ffobs),"reason":ffreason or None},"blocks":blocks,"warnings":warns,
+  "cleanup":{"exit":num(clean_rc),"owned_sid":num(sid),"final_source":{"head":fh,"tree":ft,"dirty":num(fd),"clean_at_exact_head":source_ok=="true"}},
+  "harness_blocked":blocked or None,"expected_head":head or None,"expected_tree":tree or None,
+- "lock":{"path":"/home/user/workspace/execution/test-validation.lock","holder_pid":num(sid),"mode":"flock -n held by runner for whole run; step children 9>&-"} if kind=="VALIDATION" else {"path":None,"mode":"controls never open the canonical lock"},
+- "runner_sha256":h(runner) if runner else None,"pipe_v4_sha256":h(pipe) if pipe else None,"chrome":{"path":chrome or None,"sha256":h(chrome) if chrome else None},"zip":{"path":zipp or None,"actual_sha256":zsha or None},
++ "lock":{"path":lease_path or None,"kind":lease_kind or None,"holder":"launcher","holder_pid":num(lease_pid),"runner_sid":num(sid),"mode":("canonical lock: flock -n held by launcher pid %s from before spawn through verified supervisor cleanup; runner verified inherited fd 9 only; step children 9>&-" % lease_pid) if kind=="VALIDATION" else ("private control lease held by launcher pid %s; runner verified inherited fd 9 only; controls never open the canonical lock" % lease_pid)},
++ "runner_sha256":h(runner) if runner else None,"pipe_v5_sha256":h(pipe) if pipe else None,"chrome":{"path":chrome or None,"sha256":h(chrome) if chrome else None},"zip":{"path":zipp or None,"actual_sha256":zsha or None},
+  "start_utc":start,"end_utc":end,"steps":steps},open(out,"w"),indent=2)
+ PY
+   local pub_rc=$?
+--- proposal-4/runner/s4-r6-validate-v4.sh
++++ v5/runner/s4-r6-validate-v5.sh
+@@ -1,9 +1,12 @@
+ #!/usr/bin/env bash
+-# S4 R6 — native validation runner V4 for exact head 91990ae9 (execution-only successor of V3).
+-# Launch ONLY through v4/launcher/s4-r6-launch-v4.sh (fresh exclusive run dir, launch
++# S4 R6 — native validation runner V5 for exact head 91990ae9 (execution-only successor of V4).
++# V5 versus V4: paths/names only (v4 -> v5, lib/pipe file names, PIN_PIPE_V5 same bytes c261ffb4…). The
++# truthful lock attribution (S4-V4-B-03) lives in the shared library's record writer; steps, pins,
++# criteria, joins and the latch are unchanged from V4.
++# Launch ONLY through v5/launcher/s4-r6-launch-v5.sh (fresh exclusive run dir, launch
+ # token, own session, mandatory outer deadline, canonical lease held by the launcher).
+ # Direct invocation refuses. Step wrapper / census / reap / latch / signals / record writer live
+-# in runner/s4-r6-lib-v4.sh so the safety controls exercise the identical code.
++# in runner/s4-r6-lib-v5.sh so the safety controls exercise the identical code.
+ # V4 (S4-V3-A-04): the runner no longer takes the canonical lock itself. The launcher (outside the
+ # killable workload) holds it from before spawn until verified supervisor cleanup; the runner only
+ # VERIFIES the inherited lease (fd 9 → lock path, holder pid == parent, lease flag) and refuses otherwise.
+@@ -28,13 +31,13 @@
+ ROOT=/home/user/workspace
+ WT=$ROOT/worktrees/s4-r6
+ VAL=$ROOT/execution/s4-r6-validation
+-V4=$VAL/v4
++V5=$VAL/v5
+ PRED=$ROOT/execution/s4-r6/predecessor-88287cff
+ PROBES=$ROOT/execution/s4-r6/probes
+ TOOLING=$VAL/tooling/gitleaks
+ LOCK=$ROOT/execution/test-validation.lock
+ CHROME=${TGP_CHROME:-/home/user/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome}
+-PIPE=$V4/runner/chrome-pipe-discriminator-v4.mjs
++PIPE=$V5/runner/chrome-pipe-discriminator-v5.mjs
+ 
+ EXPECT_HEAD=91990ae9aec72f47a67591892ac09fa1f59d2f16
+ EXPECT_TREE=840fb2855953d5363fbd144e11b3f81763d9cef7
+@@ -50,18 +53,18 @@
+ PIN_R5_A01=d1e1d428c257115e0e3aaeaecd25e9a85705c28114d0af8c5ad154c246d5d342
+ PIN_R5_A02=934658813355cb8e6b4a23bc18f21cddc3ae546b2fdfc338213f9f4738045d16
+ PIN_R5_B=ae6d3e124a5fb8416d057d3aea9de18da0a1f9b056cb1afd7910ecd5262e3cef
+-PIN_PIPE_V4=c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b
++PIN_PIPE_V5=c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b
+ 
+ # ---- launch contract ------------------------------------------------------------
+ RUN_ID=${S4R6_RUN_ID:-}; OUT=${S4R6_OUT:-}; TOKEN=${S4R6_LAUNCH_TOKEN:-}; KIND=${S4R6_KIND:-}
+-[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V4 launcher (token/out mismatch)" >&2; exit 71; }
++[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V5 launcher (token/out mismatch)" >&2; exit 71; }
+ [[ $KIND == VALIDATION ]] || { echo "REFUSE: real runner only runs as kind=VALIDATION (got '$KIND'); control runs use the control stub" >&2; exit 71; }
+ [[ $(ps -o sid= -p $$ | tr -d ' ') == "$$" && $(ps -o pgid= -p $$ | tr -d ' ') == "$$" ]] || { echo "REFUSE: runner is not its own session/group leader" >&2; exit 73; }
+ echo "$$" > "$OUT/RUNNER_PID"   # ownership handshake: launcher requires this to equal the pid it spawned (setsid exec-in-place)
+ [[ ! -e $OUT/RUN_COMPLETE.sentinel && ! -e $OUT/EXIT_RECORD.json && ! -e $OUT/steps && ! -e $OUT/dist ]] || { echo "REFUSE: run directory is not fresh" >&2; exit 71; }
+ SID=$$; SOURCE_CHECK=1
+ mkdir "$OUT/steps" "$OUT/dist" || exit 70
+-. "$V4/runner/s4-r6-lib-v4.sh"
++. "$V5/runner/s4-r6-lib-v5.sh"
+ RUN_START=$(now)
+ 
+ # ---- canonical lease: VERIFIED, not taken (S4-V3-A-04) -----------------------------------------
+@@ -90,7 +93,7 @@
+   chk "$(sha "$PROBES/reused/a01-preflight-barrier-discriminator.mjs")" "$PIN_R5_A01" pin_r5_a01
+   chk "$(sha "$PROBES/reused/a02-queued-refresh-discriminator.mjs")" "$PIN_R5_A02" pin_r5_a02
+   chk "$(sha "$PROBES/reused/bound-admission-probe.mjs")" "$PIN_R5_B" pin_r5_b
+-  chk "$(sha "$PIPE")" "$PIN_PIPE_V4" pin_pipe_v4
++  chk "$(sha "$PIPE")" "$PIN_PIPE_V5" pin_pipe_v5
+   # Predecessor export must equal the 88287cff tree file-for-file (the one added
+   # spec copy is excluded); compared by git blob id, not by advertised prose.
+   pred_mism=$(cd "$PRED" && find . -type f ! -name 'R6-CANDIDATE-COPY.*' | sed 's|^\./||' | sort | while read -r f; do
+@@ -99,7 +102,7 @@
+   chk "$pred_mism" 0 predecessor_blob_mismatches; chk "$pred_count" "$tree_count" predecessor_file_count
+   [[ -x $CHROME ]] || echo "NOTE: Chrome missing at $CHROME — S60 will fail as runtime-unavailable (not product failure)"
+   if pgrep -f "tgp-browser-proof-|tgp-pipe-discriminator-" >/dev/null; then echo "PRECONDITION leftover proof-Chrome processes (UNOWNED, not signalled; refuse)"; ok=0; fi
+-  echo "runner_sha256=$(sha "$V4/runner/s4-r6-validate-v4.sh") lib_sha256=$(sha "$V4/runner/s4-r6-lib-v4.sh") pipe_v4_sha256=$(sha "$PIPE") chrome=$CHROME chrome_sha256=$( [[ -x $CHROME ]] && sha "$CHROME" || echo missing ) sid=$SID lease_holder=$LEASE_PID run=$RUN_ID kind=$KIND"
++  echo "runner_sha256=$(sha "$V5/runner/s4-r6-validate-v5.sh") lib_sha256=$(sha "$V5/runner/s4-r6-lib-v5.sh") pipe_v5_sha256=$(sha "$PIPE") chrome=$CHROME chrome_sha256=$( [[ -x $CHROME ]] && sha "$CHROME" || echo missing ) sid=$SID lease_holder=$LEASE_PID run=$RUN_ID kind=$KIND"
+   [[ $ok == 1 ]]
+ } > "$OUT/steps/S00-preconditions.log" 2>&1
+ S00=$?; cat "$OUT/steps/S00-preconditions.log"
+@@ -231,6 +234,6 @@
+ elif [[ $CLEAN_RC != 0 ]]; then RESULT=FAILED_CLEANUP
+ elif [[ $SOURCE_OK != true ]]; then RESULT=FAILED_SOURCE_STATE
+ elif [[ ${#WARNINGS[@]} -gt 0 ]]; then RESULT=WARNINGS; fi
+-RESULT=$(publish_exit_record "$RESULT" "$CLEAN_RC" "$SOURCE_OK" "$FH" "$FT" "$FD" "$RUN_START" "$RUN_END" "$HARNESS_BLOCKED" "$EXPECT_HEAD" "$EXPECT_TREE" "$V4/runner/s4-r6-validate-v4.sh" "$PIPE" "$CHROME" "${ZIP:-}" "${ZIP_SHA:-}" 1)
++RESULT=$(publish_exit_record "$RESULT" "$CLEAN_RC" "$SOURCE_OK" "$FH" "$FT" "$FD" "$RUN_START" "$RUN_END" "$HARNESS_BLOCKED" "$EXPECT_HEAD" "$EXPECT_TREE" "$V5/runner/s4-r6-validate-v5.sh" "$PIPE" "$CHROME" "${ZIP:-}" "${ZIP_SHA:-}" 1)
+ echo "RESULT=$RESULT first_fail=${FIRST_FAIL:-none}(validation_exit=${FIRST_FAIL_RC:-} observed=${FIRST_FAIL_OBSERVED:-}) blocks=${#BLOCKS[@]} warnings=${#WARNINGS[@]} cleanup_exit=$CLEAN_RC source_ok=$SOURCE_OK record=$OUT/EXIT_RECORD.json"
+ exit "$(result_exit "$RESULT")"
+--- proposal-4/controls/s4-r6-control-stub-v4.sh
++++ v5/controls/s4-r6-control-stub-v5.sh
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S4 R6 V4 — control stub runner (kind=CONTROL only). Launched by the V4 launcher exactly like
++# S4 R6 V5 — control stub runner (kind=CONTROL only). Launched by the V5 launcher exactly like
+ # the real runner, sources the SAME library (actual `step` wrapper with nested `timeout`, session
+ # census/reap, latch, signals, expect_exit, publish_exit_record) and verifies the inherited lease
+ # exactly as the real runner does — against the PRIVATE control lease, never the canonical lock.
+@@ -7,9 +7,9 @@
+ # the owned session.
+ set -u
+ ROOT=/home/user/workspace
+-V4=$ROOT/execution/s4-r6-validation/v4
++V5=$ROOT/execution/s4-r6-validation/v5
+ RUN_ID=${S4R6_RUN_ID:-}; OUT=${S4R6_OUT:-}; TOKEN=${S4R6_LAUNCH_TOKEN:-}; KIND=${S4R6_KIND:-}; SCENARIO=${S4R6_SCENARIO:-}
+-[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V4 launcher" >&2; exit 71; }
++[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V5 launcher" >&2; exit 71; }
+ [[ $KIND == CONTROL ]] || { echo "REFUSE: control stub only runs as kind=CONTROL" >&2; exit 71; }
+ # scenario 'refuse' models a fast leader refusal (e.g. lock busy) BEFORE any handshake/output.
+ [[ $SCENARIO == refuse ]] && { echo "CONTROL refuse: exiting 71 immediately"; exit 71; }
+@@ -17,11 +17,11 @@
+ echo "$$" > "$OUT/RUNNER_PID"
+ # private lease verification — same predicate shape as the real runner (S4-V3-A-04)
+ LEASE_PATH=${S4R6_LEASE_PATH:-}; LEASE_PID=${S4R6_LEASE_PID:-}
+-[[ ${S4R6_LEASE:-} == private-held-by-launcher && -n $LEASE_PID && $LEASE_PID == "$PPID" && $LEASE_PATH == "$V4/control-runs/.private-control-lease.lock" ]] || { echo "REFUSE: private lease not held by launching parent" >&2; exit 75; }
++[[ ${S4R6_LEASE:-} == private-held-by-launcher && -n $LEASE_PID && $LEASE_PID == "$PPID" && $LEASE_PATH == "$V5/control-runs/.private-control-lease.lock" ]] || { echo "REFUSE: private lease not held by launching parent" >&2; exit 75; }
+ [[ $(readlink /proc/$$/fd/9 2>/dev/null) == "$LEASE_PATH" ]] || { echo "REFUSE: fd 9 is not the private lease" >&2; exit 75; }
+ SID=$$; SOURCE_CHECK=0
+ mkdir "$OUT/steps" || exit 70
+-. "$V4/runner/s4-r6-lib-v4.sh"
++. "$V5/runner/s4-r6-lib-v5.sh"
+ RUN_START=$(now)
+ install_signal_traps
+ echo "CONTROL scenario=$SCENARIO sid=$SID run=$RUN_ID"
+@@ -40,6 +40,15 @@
+     # signal as SECONDARY (S4-V3-A-02), and the record is still written.
+     step C-live-step 1 60 /tmp sleep 300
+     ;;
++  live-step-double-term)
++    # S4-V4-A-01 discriminator. Same live step and launcher deadline as above, plus the control-only lib
++    # seam (S4R6_SEAM=step-after-reap, passed by the driver): after the step's reap and BEFORE its primary
++    # latch the stub sends itself a second TERM inside the metadata zone. V5 must still latch the step's
++    # own exit as PRIMARY (blocks[0]=C-live-step) and record BOTH signals as secondary SIGNAL_TERM blocks
++    # (>= 2, all after the primary; one of them 'while latching'). Under the V4 ordering the second TERM
++    # would have become blocks[0] and stolen the first-failure latch.
++    step C-live-step 1 60 /tmp sleep 300
++    ;;
+   lease-held-by-supervisor)
+     # While the workload runs, an OUTSIDE `flock -n` on the private lease must fail (exit 3 here):
+     # the launcher, not the workload, holds exclusion. The step child runs with 9>&- so it cannot
+@@ -66,6 +75,6 @@
+ RUN_END=$(now)
+ RESULT=SUCCESS
+ if [[ -n $FIRST_FAIL ]]; then RESULT=FAILED; elif [[ $CLEAN_RC != 0 ]]; then RESULT=FAILED_CLEANUP; fi
+-RESULT=$(publish_exit_record "$RESULT" "$CLEAN_RC" true n/a n/a 0 "$RUN_START" "$RUN_END" "" "" "" "$V4/controls/s4-r6-control-stub-v4.sh" "" "" "" "" "$WRITE_SENTINEL")
++RESULT=$(publish_exit_record "$RESULT" "$CLEAN_RC" true n/a n/a 0 "$RUN_START" "$RUN_END" "" "" "" "$V5/controls/s4-r6-control-stub-v5.sh" "" "" "" "" "$WRITE_SENTINEL")
+ echo "CONTROL RESULT=$RESULT first_fail=${FIRST_FAIL:-none}(validation_exit=${FIRST_FAIL_RC:-} observed=${FIRST_FAIL_OBSERVED:-}) cleanup_exit=$CLEAN_RC"
+ exit "$(result_exit "$RESULT")"
+--- proposal-4/controls/control-predicates-v4.py
++++ v5/controls/control-predicates-v5.py
+@@ -1,11 +1,22 @@
+ #!/usr/bin/env python3
+-"""S4 R6 V4 — field-level acceptance predicates for the safety controls.
++"""S4 R6 V5 — field-level acceptance predicates for the safety controls.
+ 
+-usage: control-predicates-v4.py <scenario> <run_dir> <launcher_exit>
++usage: control-predicates-v5.py <scenario> <run_dir> <launcher_exit>
+ Reads SUPERVISOR_RECORD.json and (when present) EXIT_RECORD.json and prints every checked field.
+ Exit 0 only if ALL predicates for the scenario hold; exit 1 otherwise (first control mismatch stops
+ the driver). Exit codes alone are never sufficient: each control names the record facts that
+ distinguish the intended behaviour from an unrelated failure with the same exit.
++
++V5 changes versus V4 (frozen review S4-V4-A-05; uutils note):
++ * Fail-closed mandatory evidence: wherever a scenario asserts EXIT_RECORD/step facts, the record must be
++   locally PARSED and `steps` must be a nonempty list of objects — recorded as MISS otherwise, never skipped.
++ * Signal-terminated step exits accept the INSTALLED implementation: rust-coreutils 0.8.0 `timeout` returns
++   the raw child signal number (15 for TERM) when its child dies of a signal, GNU would return 143; the
++   launcher's own deadline gives 124; KILL 137. Set = {15, 124, 137, 143}. The actual value is printed and
++   stamped by the run (expectation-setting, not GNU inference).
++ * New scenario live-step-double-term (S4-V4-A-01 discriminator): >= 2 SIGNAL_TERM blocks, all after the
++   step's own primary block, one recorded 'while latching' (the deferred zone).
++ * bounds.worst_case_formula updated to the V5 launcher formula (readers + quarantine verification included).
+ """
+ import json, os, sys
+ 
+@@ -35,6 +46,19 @@
+     checks.append((name, actual, f"one of {allowed}", ok))
+     return ok
+ 
++def parsed(d):
++    return isinstance(d, dict) and "_unparseable" not in d
++
++def steps_ok(rec, n=1):
++    """S4-V4-A-05: mandatory, typed, nonempty step evidence — a MISS, never a skipped branch."""
++    ok = parsed(rec) and isinstance(rec.get("steps"), list) and len(rec["steps"]) >= n and all(isinstance(x, dict) for x in rec["steps"][:n])
++    want(f"record.steps is a parsed list of >= {n} step object(s) (mandatory)", ok, True)
++    return ok
++
++# signal-terminated step exits under the INSTALLED tooling (rust-coreutils 0.8.0 timeout: raw signal 15 for a
++# TERM-killed child; GNU-style 143 if timeout itself is TERM-killed; 124 own deadline; 137 KILL)
++SIGNAL_EXITS = [15, 124, 137, 143]
++
+ # common: the supervisor record must exist and be parsed on EVERY path (A-02/F-02)
+ want("supervisor_record_parsed", isinstance(sup, dict) and "_unparseable" not in sup, True)
+ if isinstance(sup, dict) and "_unparseable" not in sup:
+@@ -44,11 +68,14 @@
+     want("supervisor.survivors_after_kill_empty", sup.get("owned_session", {}).get("survivors_after_kill"), [])
+     L = sup.get("lease", {})
+     want("lease.kind is the PRIVATE control lease", L.get("kind"), "private-held-by-launcher")
+-    want("lease.path is under v4/control-runs (never canonical)", str(L.get("path", "")).endswith("/v4/control-runs/.private-control-lease.lock"), True)
++    want("lease.path is under v5/control-runs (never canonical)", str(L.get("path", "")).endswith("/v5/control-runs/.private-control-lease.lock"), True)
+     want("lease.held_by_launcher", L.get("held_by_launcher"), True)
+     want("lease.released_at_launcher_exit (no quarantine)", L.get("released_at_launcher_exit"), True)
+     want("lease.quarantine_holder_pid absent", L.get("quarantine_holder_pid"), None)
+-    want("bounds.worst_case_formula recorded", sup.get("bounds", {}).get("worst_case_formula"), "outer+grace+confirm+post_exit_reap+publish+2")
++    want("bounds.worst_case_formula recorded", sup.get("bounds", {}).get("worst_case_formula"), "outer+grace+confirm+post_exit_reap+publish+2*read+quarantine_verify+2")
++    want("bounds.phases_are_wall_clock", sup.get("bounds", {}).get("phases_are_wall_clock"), True)
++    want("lease.quarantine_ok absent (no handoff attempted)", L.get("quarantine_ok"), None)
++    want("lease.holder_pid is the launcher (int)", isinstance(L.get("holder_pid"), int), True)
+     r = sup.get("runner", {})
+     s = sup.get("owned_session", {})
+     b = sup.get("bounds", {})
+@@ -58,8 +85,8 @@
+         want("runner.handshake_ok", r.get("handshake_ok"), True)
+         want("runner.sentinel", r.get("sentinel"), True)
+         want("supervisor.reaped_by_supervisor_empty (runner reaped its own step orphan)", s.get("reaped_by_supervisor"), [])
+-        want("exit_record_parsed", isinstance(rec, dict) and "_unparseable" not in rec, True)
+-        if isinstance(rec, dict) and rec.get("steps"):
++        want("exit_record_parsed", parsed(rec), True)
++        if steps_ok(rec):
+             st = rec["steps"][0]
+             want("step.id", st.get("step"), "C-nested-orphan")
+             want("step.exit", st.get("exit"), 0)
+@@ -69,33 +96,51 @@
+             want("record.cleanup.exit", rec.get("cleanup", {}).get("exit"), 0)
+         reaps = open(os.path.join(run_dir, "reaps.log")).read() if os.path.exists(os.path.join(run_dir, "reaps.log")) else ""
+         want("reaps.log shows TERM-immune orphan needed KILL path (found=1 then verified)", ("found=1" in reaps) and ("session verified empty" in reaps), True)
+-    elif scenario == "live-step-interrupt":
++    elif scenario in ("live-step-interrupt", "live-step-double-term"):
+         want("overall", sup.get("overall"), "TIMEOUT"); want("launcher_exit", launcher_exit, 124)
+         want("bounds.timed_out", b.get("timed_out"), True)
+         want_in("owned_session.signalled", s.get("signalled"), ["TERM", "TERM+KILL"])
+         want("members_at_deadline_nonempty (live step group was in the session)", len(s.get("members_at_deadline", [])) >= 2, True)
+         want("runner.exit_confirmed", r.get("exit_confirmed"), True)
+-        want_in("runner.exit (signal-terminated primary or latched exit)", r.get("exit"), [124, 137, 143])
++        want_in("runner.exit (signal-terminated primary or latched exit; installed uutils => 15 expected)", r.get("exit"), SIGNAL_EXITS)
+         want("runner.exit_record_present (record still written after interruption)", r.get("exit_record_present"), True)
+-        if isinstance(rec, dict) and "_unparseable" not in rec:
++        want("exit_record_parsed (mandatory, S4-V4-A-05)", parsed(rec), True)
++        if steps_ok(rec):
+             want("record.result", rec.get("result"), "FAILED")
+             want("record.first_failure.step is the live step (primary), not the SIGNAL block", rec.get("first_failure", {}).get("step"), "C-live-step")
+-            want_in("record.first_failure.observed_exit", rec.get("first_failure", {}).get("observed_exit"), [124, 137, 143])
++            want_in("record.first_failure.observed_exit", rec.get("first_failure", {}).get("observed_exit"), SIGNAL_EXITS)
+             blocks = rec.get("blocks", [])
++            want("record.blocks is a nonempty list", isinstance(blocks, list) and len(blocks) >= 2, True)
+             want("record.blocks[0] is the step's own failure", blocks[0].startswith("C-live-step") if blocks else None, True)
+             want("record.blocks[1] is the secondary SIGNAL_TERM block", blocks[1].startswith("SIGNAL_TERM") if len(blocks) > 1 else None, True)
+-            want("steps[0].signal_during_step recorded", rec["steps"][0].get("signal_during_step") if rec.get("steps") else None, "TERM")
++            n_sig = sum(1 for x in blocks if isinstance(x, str) and x.startswith("SIGNAL_TERM"))
++            # The launcher's route delivers TERM twice (group pass, then per-pid pass). Bash normally coalesces
++            # both into one trap run; if the step dies between the passes the second TERM lands in the metadata
++            # zone and V5 truthfully records a further secondary block. Counts are therefore lower bounds; the
++            # discriminating facts are blocks[0] (step) and that no SIGNAL block precedes it.
++            want("record.blocks: no SIGNAL_ block precedes the step's own block", blocks[0].startswith("C-live-step") and all(x.startswith("SIGNAL_TERM") for x in blocks[1:]) if blocks else None, True)
++            if scenario == "live-step-double-term":
++                want("record.blocks: >= 2 SIGNAL_TERM blocks (launcher TERM + seam TERM), all after the primary (S4-V4-A-01)", n_sig >= 2, True)
++                slog = open(os.path.join(run_dir, "steps", "C-live-step.log")).read() if os.path.exists(os.path.join(run_dir, "steps", "C-live-step.log")) else ""
++                want("step log shows the seam fired (SEAM step-after-reap)", "SEAM step-after-reap" in slog, True)
++                want("a 'while latching' secondary block exists (signal recorded in the deferred zone)", any("while latching step C-live-step" in x for x in blocks), True)
++            else:
++                want("record.blocks: >= 1 SIGNAL_TERM block after the primary", n_sig >= 1, True)
++            want("steps[0].step is C-live-step", rec["steps"][0].get("step"), "C-live-step")
++            want("steps[0].signal_during_step recorded", rec["steps"][0].get("signal_during_step"), "TERM")
++            want_in("steps[0].exit is a signal termination", rec["steps"][0].get("exit"), SIGNAL_EXITS)
+     elif scenario == "predicate-rc0":
+         want("overall", sup.get("overall"), "RUNNER_NONZERO"); want("launcher_exit", launcher_exit, 89)
+         want("runner.exit", r.get("exit"), 89)
+-        want("exit_record_parsed", isinstance(rec, dict) and "_unparseable" not in rec, True)
+-        if isinstance(rec, dict) and "_unparseable" not in rec:
++        want("exit_record_parsed", parsed(rec), True)
++        if steps_ok(rec):
+             ff = rec.get("first_failure", {})
+             want("record.result", rec.get("result"), "FAILED")
+             want("record.first_failure.step", ff.get("step"), "C-expected-negative")
+             want("record.first_failure.validation_exit", ff.get("validation_exit"), 89)
+             want("record.first_failure.observed_exit retained as 0", ff.get("observed_exit"), 0)
+-            want("step.status", rec["steps"][0].get("status") if rec.get("steps") else None, "EXIT_0")
++            want("step.id", rec["steps"][0].get("step"), "C-expected-negative")
++            want("step.status", rec["steps"][0].get("status"), "EXIT_0")
+     elif scenario == "record-without-sentinel":
+         want("overall", sup.get("overall"), "FAILED_PUBLICATION"); want("launcher_exit", launcher_exit, 7)
+         want("runner.exit", r.get("exit"), 0)
+@@ -103,13 +148,17 @@
+         want("runner.sentinel absent", r.get("sentinel"), False)
+         want("sentinel file absent", sentinel, False)
+         want("runner.handshake_ok", r.get("handshake_ok"), True)
++        want("exit_record_parsed (SUCCESS record exists locally)", parsed(rec) and rec.get("result") == "SUCCESS", True)
++        steps_ok(rec)
+     elif scenario == "lease-held-by-supervisor":
+         want("overall", sup.get("overall"), "SUCCESS"); want("launcher_exit", launcher_exit, 0)
+         want("runner.exit", r.get("exit"), 0); want("runner.handshake_ok", r.get("handshake_ok"), True)
+-        want("exit_record_parsed", isinstance(rec, dict) and "_unparseable" not in rec, True)
+-        if isinstance(rec, dict) and "_unparseable" not in rec and rec.get("steps"):
++        want("exit_record_parsed", parsed(rec), True)
++        if steps_ok(rec):
+             st = rec["steps"][0]
+             want("step.id", st.get("step"), "C-lease-outside-probe")
++            want("record.lock.holder is the launcher with holder_pid == supervisor lease.holder_pid (S4-V4-B-03)", (rec.get("lock", {}).get("holder"), rec.get("lock", {}).get("holder_pid")), ("launcher", L.get("holder_pid")))
++            want("record.lock.path is the private lease", rec.get("lock", {}).get("path"), L.get("path"))
+             want("step.status (outside flock -n refused ⇒ probe exit 3)", st.get("status"), "EXIT_3")
+             want("record.result", rec.get("result"), "SUCCESS")
+             want("record.first_failure.step (none: predicate satisfied)", rec.get("first_failure", {}).get("step"), None)
+@@ -121,6 +170,7 @@
+         want("runner.handshake absent (refused before handshake)", r.get("runner_pid_handshake"), None)
+         want("refusal recorded", bool(sup.get("refusal")), True)
+         want("orphans_after_runner_exit_empty", s.get("orphans_after_runner_exit"), [])
++        want("no EXIT_RECORD written by a refused stub", rec, None)
+     else:
+         checks.append(("known_scenario", scenario, "known", False))
+ 
+--- proposal-4/controls/run-controls-v4.sh
++++ v5/controls/run-controls-v5.sh
+@@ -1,100 +1,159 @@
+ #!/usr/bin/env bash
+-# S4 R6 V4 — bounded sequential safety-control driver (S4-V3-A-03). NOT a validation run.
++# S4 R6 V5 — bounded sequential safety-control driver (S4-V3-A-03, S4-V4-A-02/A-06). NOT a validation run.
+ #
+-#   bash execution/s4-r6-validation/v4/controls/run-controls-v4.sh      (only after an explicit parent grant)
++#   bash execution/s4-r6-validation/v5/controls/run-controls-v5.sh      (only after an explicit parent grant)
+ #
+-# Runs the controls in order through the ACTUAL V4 launcher/stub/library with a HARD aggregate deadline:
+-# every phase (launcher, predicates, lease/leftover scan) runs under an explicit bound derived from the
+-# remaining budget; when a bound expires the driver CANCELS the active launcher by TERM (its INTERRUPT
+-# route tears down the owned session, reaps and publishes), waits a bounded grace, KILLs if needed, and
+-# stops. A cleanup reserve is kept at the end. Stops at the first unexpected result (no retry).
+-# No network, no install, no canonical lock (the controls use the PRIVATE lease v4/control-runs/
+-# .private-control-lease.lock), no worktree, no browser.
++# V5 changes versus V4 (frozen reviews S4-V4-A-02, A-05 companion, B-02/B-04):
++#  * One enforceable ELAPSED deadline: run_bounded polls wall-clock, an aggregate guard cancels when the
++#    remaining budget reaches the cleanup reserve, and every driver phase (predicates, session scan, lease
++#    check, direct refusal) runs under an explicit `timeout --foreground`.
++#  * Cancellation never KILLs the lease holder: TERM the active launcher, wait its own worst-case teardown
++#    (grace + LAUNCHER_POST_S); if it is still alive it is recorded with pid+starttime as an UNRESOLVED
++#    holder (exit 97) — the private lease stays with it. No unconditional wait after an unconfirmed KILL.
++#  * Every exit path (stop, cancel, TERM/INT) runs the owned-session scan and private-lease check first;
++#    survivors of a launcher that already exited are TERM/KILL-reaped (they are the session this driver
++#    caused to exist) and any lease-free-with-survivors state is exit 98 (UNSAFE RELEASE observed).
++#  * Packet pinned before execution: sha256sum -c of the V5 manifest from the packet root (exit 91 on mismatch).
++#  * New control `live-step-double-term` (S4-V4-A-01 discriminator via the control-only lib seam).
++#
++# Runs the controls in order through the ACTUAL V5 launcher/stub/library. Stops at the first unexpected
++# result (no retry). No network, no install, no canonical lock (the controls use the PRIVATE lease
++# v5/control-runs/.private-control-lease.lock), no worktree, no browser.
+ set -u
+ ROOT=/home/user/workspace
+-V4=$ROOT/execution/s4-r6-validation/v4
+-LAUNCHER=$V4/launcher/s4-r6-launch-v4.sh
+-PRED=$V4/controls/control-predicates-v4.py
+-RECEIPTS=$V4/control-runs
++V5=$ROOT/execution/s4-r6-validation/v5
++LAUNCHER=$V5/launcher/s4-r6-launch-v5.sh
++PRED=$V5/controls/control-predicates-v5.py
++RECEIPTS=$V5/control-runs
+ PRIVATE_LEASE=$RECEIPTS/.private-control-lease.lock
+-# Budget arithmetic (A-03): per-control worst = outer + grace + launcher post-deadline constants
+-# (confirm 10 + post-exit reap 8 + publish 5 + 2) + driver phases (predicates 10 + scan 2) = outer+grace+37.
+-LAUNCHER_POST_S=25; PRED_S=10; SCAN_S=2
+-CLEANUP_RESERVE_S=15         # reserved for cancellation grace/KILL + final log, never used for admission
+-TOTAL_BUDGET_S=340           # hard aggregate: 65+47+50+50+50+50 (six launcher controls) + 5 (direct refusal) + 15 reserve = 332 ≤ 340; admission checks worst+reserve against remaining before every control
++# Budget arithmetic (A-03/A-02, wall-clock): launcher post-deadline constants = confirm 10 + post-exit reap 8 +
++# publish 5 + 2*read 5 + quarantine-verify 5 + 2 = 40 (LAUNCHER_POST_S, equals the launcher's own formula minus
++# outer+grace). Driver phases per control: predicates 10 + session scan 5 + lease check 5 = 20.
++# per-control worst = outer + grace + LAUNCHER_POST_S + PRED_S + SCAN_S + LEASE_S = outer + grace + 60.
++LAUNCHER_POST_S=40; PRED_S=10; SCAN_S=5; LEASE_S=5
++CLEANUP_RESERVE_S=70         # cancellation worst: TERM + wait (grace<=6 + LAUNCHER_POST_S 40) + post scan/reap (5+3+5) + lease 5 + log 2 <= 66; never used for admission
++TOTAL_BUDGET_S=600           # hard aggregate: 88+70+70+73+73+73+73 (seven launcher controls, see CONTROLS) = 520, + 7 direct refusal, + 70 reserve = 597 <= 600; admission checks worst+reserve against remaining before every control
+ mkdir -p "$RECEIPTS" || exit 70
+ now() { date -u +%FT%TZ; }
+ T0=$(date +%s)
+ elapsed() { echo $(( $(date +%s) - T0 )); }
+ remaining() { echo $(( TOTAL_BUDGET_S - $(elapsed) )); }
++proc_start() { sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'; }
+ DRIVER_LOG=$RECEIPTS/DRIVER-$(date -u +%Y%m%dT%H%M%SZ)-$$.log
+ log() { echo "[$(now)] $*" | tee -a "$DRIVER_LOG"; }
+ 
+-ACTIVE_PID=""; CANCELLED=""
++# ---- pin the packet before anything executes (from the packet root; manifest is non-self-including) ----
++if ! ( cd "$V5" && timeout --foreground 20 sha256sum -c --quiet SHA256SUMS ) >> "$DRIVER_LOG" 2>&1; then log "STOP: V5 manifest verification failed at $V5 (nothing executed)"; exit 91; fi
++
++ACTIVE_PID=""; ACTIVE_START=""; ACTIVE_GRACE=0; CANCELLED=""; UNRESOLVED=""; LAST_RUN_DIR=""
+ cancel_active() {
+-  # aggregate cancellation route: TERM the launcher (→ INTERRUPT teardown of its owned session), bounded grace, KILL
++  # aggregate cancellation route (A-02): TERM the launcher (-> its INTERRUPT teardown: owned session TERM/KILL,
++  # survivors->quarantine, publish). Wait its OWN worst-case teardown, wall-clock. NEVER KILL the lease holder:
++  # an unconfirmed KILL would release the private lease with an unrecorded session. If it is still alive after
++  # its worst case it is recorded as UNRESOLVED (identity: pid + starttime) and left holding the lease.
+   local why=$1
+   [[ -n $ACTIVE_PID ]] && kill -0 "$ACTIVE_PID" 2>/dev/null || return 0
+-  log "CANCEL active launcher pid=$ACTIVE_PID reason=$why"
++  log "CANCEL active launcher pid=$ACTIVE_PID starttime=$ACTIVE_START reason=$why"
+   kill -TERM "$ACTIVE_PID" 2>/dev/null; CANCELLED=$why
+-  for ((i=0;i<CLEANUP_RESERVE_S-5;i++)); do kill -0 "$ACTIVE_PID" 2>/dev/null || return 0; sleep 1; done
+-  kill -KILL "$ACTIVE_PID" 2>/dev/null; sleep 1
+-  log "launcher pid=$ACTIVE_PID did not exit within grace after TERM — KILLed; its owned session is reported by the leftover scan"
++  local until=$(( $(date +%s) + ACTIVE_GRACE + LAUNCHER_POST_S ))
++  while (( $(date +%s) < until )); do kill -0 "$ACTIVE_PID" 2>/dev/null || return 0; sleep 1; done
++  if kill -0 "$ACTIVE_PID" 2>/dev/null && [[ $(proc_start "$ACTIVE_PID") == "$ACTIVE_START" ]]; then
++    UNRESOLVED="launcher pid=$ACTIVE_PID starttime=$ACTIVE_START still alive $((ACTIVE_GRACE+LAUNCHER_POST_S))s after TERM; NOT killed; it still holds the private lease; dir=$LAST_RUN_DIR"
++    printf '%s\n%s\nRECOVERY: inspect its console.log/SUPERVISOR_RECORD; verify pid+starttime before any signal; never a bare pid.\n' "$(now)" "$UNRESOLVED" > "$RECEIPTS/DRIVER-UNRESOLVED-$(date -u +%Y%m%dT%H%M%SZ)-$ACTIVE_PID.txt"
++    log "UNRESOLVED: $UNRESOLVED"
++  fi
++}
++# session_state <run_dir>: bounded owned-session scan. Sets LEFT_INITIAL (what the launcher left behind — the
++# fact the controls judge), LEFT_FINAL (after this driver's bounded TERM/KILL reap of a session whose launcher has
++# already exited; that session exists only because this driver started it) and LEASE_FREE (private lease probe).
++LEFT_INITIAL=""; LEFT_FINAL=""; LEASE_FREE=unchecked
++session_state() {
++  local d=$1 sid="" p until
++  LEFT_INITIAL=""; LEFT_FINAL=""
++  sid=$(cat "$d/OWNED_SID" 2>/dev/null)
++  if [[ -n $sid ]]; then
++    LEFT_INITIAL=$(timeout --foreground "$SCAN_S" pgrep -s "$sid" 2>/dev/null | tr '\n' ' '); LEFT_FINAL=$LEFT_INITIAL
++    if [[ -n $LEFT_INITIAL && -z $UNRESOLVED ]] && ! { [[ -n $ACTIVE_PID ]] && kill -0 "$ACTIVE_PID" 2>/dev/null; }; then
++      log "owned session $sid leftovers after launcher exit: $LEFT_INITIAL — bounded TERM/KILL by the driver (recorded; still a control failure)"
++      for p in $LEFT_INITIAL; do kill -TERM "$p" 2>/dev/null; done; until=$(( $(date +%s) + 5 ))
++      while (( $(date +%s) < until )); do [[ -z $(pgrep -s "$sid" 2>/dev/null) ]] && break; sleep 1; done
++      if [[ -n $(pgrep -s "$sid" 2>/dev/null) ]]; then for p in $(pgrep -s "$sid"); do kill -KILL "$p" 2>/dev/null; done; until=$(( $(date +%s) + 3 )); while (( $(date +%s) < until )); do [[ -z $(pgrep -s "$sid" 2>/dev/null) ]] && break; sleep 1; done; fi
++      LEFT_FINAL=$(timeout --foreground "$SCAN_S" pgrep -s "$sid" 2>/dev/null | tr '\n' ' ')
++    fi
++  fi
++  LEASE_FREE=false; timeout --foreground "$LEASE_S" flock -n "$PRIVATE_LEASE" true && LEASE_FREE=true
++  return 0
++}
++# finish <code> <why>: every exit path — cancel active launcher (bounded, no KILL), scan/reap owned session, check lease, exit.
++finish() {
++  local code=$1 why=$2
++  cancel_active "$why"
++  [[ -n $LAST_RUN_DIR ]] && session_state "$LAST_RUN_DIR"
++  local qh=""; [[ -n $LAST_RUN_DIR && -f $LAST_RUN_DIR/QUARANTINE_LEASE_HOLDER ]] && qh=$(head -1 "$LAST_RUN_DIR/QUARANTINE_LEASE_HOLDER")
++  if [[ -n $UNRESOLVED ]]; then code=97
++  elif [[ -n $LEFT_FINAL && $LEASE_FREE == true ]]; then code=98; log "UNSAFE RELEASE OBSERVED: unreaped leftovers '$LEFT_FINAL' in owned session while the private lease is free"
++  elif [[ -n $LEFT_INITIAL && $LEASE_FREE == true && -z $qh ]]; then log "launcher released the lease leaving '$LEFT_INITIAL' (reaped by driver: final='$LEFT_FINAL') — launcher cleanup defect, not permission"; fi
++  log "EXIT code=$code why=$why leftovers_initial='${LEFT_INITIAL}' leftovers_final='${LEFT_FINAL}' private_lease_free=$LEASE_FREE quarantine_holder='${qh}' elapsed=$(elapsed)s budget=${TOTAL_BUDGET_S}s"
++  exit "$code"
+ }
+-trap 'cancel_active driver-TERM; log "driver interrupted"; exit 143' TERM
+-trap 'cancel_active driver-INT; log "driver interrupted"; exit 130' INT
++trap 'finish 143 driver-TERM' TERM
++trap 'finish 130 driver-INT' INT
+ 
+-# run_bounded <deadline_s> <logfile> <cmd...>: background + poll; on deadline → cancel_active. Sets RB_RC.
++# run_bounded <deadline_s> <grace_s> <logfile> <cmd...>: background + wall-clock poll; on phase deadline or when the
++# aggregate budget reaches the cleanup reserve -> cancel_active (never KILL). Sets RB_RC ("" if unresolved).
+ run_bounded() {
+-  local deadline=$1 logf=$2; shift 2
+-  "$@" >> "$logf" 2>&1 & ACTIVE_PID=$!
+-  local t=0
++  local deadline=$1 grace=$2 logf=$3; shift 3
++  "$@" >> "$logf" 2>&1 & ACTIVE_PID=$!; ACTIVE_START=$(proc_start "$ACTIVE_PID"); ACTIVE_GRACE=$grace
++  local start; start=$(date +%s)
+   while kill -0 "$ACTIVE_PID" 2>/dev/null; do
+-    if (( t >= deadline )); then cancel_active "phase deadline ${deadline}s"; break; fi
+-    sleep 1; t=$((t+1))
++    if (( $(date +%s) - start >= deadline )); then cancel_active "phase deadline ${deadline}s"; break; fi
++    if (( $(remaining) <= CLEANUP_RESERVE_S )); then cancel_active "aggregate budget ${TOTAL_BUDGET_S}s reached cleanup reserve"; break; fi
++    sleep 1
+   done
+-  wait "$ACTIVE_PID" 2>/dev/null; RB_RC=$?; ACTIVE_PID=""
++  if [[ -n $UNRESOLVED ]]; then RB_RC=""; else wait "$ACTIVE_PID" 2>/dev/null; RB_RC=$?; ACTIVE_PID=""; fi
+ }
+ 
+-# name | outer_s | grace_s | worst_case_s (= outer + grace + 37)
++# name | outer_s | grace_s | worst_case_s (= outer + grace + 60) | seam (control-only lib synchronisation, empty = none)
+ CONTROLS=(
+-  "nested-orphan-after-exit|25|3|65"
+-  "live-step-interrupt|4|6|47"
+-  "predicate-rc0|10|3|50"
+-  "record-without-sentinel|10|3|50"
+-  "lease-held-by-supervisor|10|3|50"
+-  "refuse|10|3|50"
++  "nested-orphan-after-exit|25|3|88|"
++  "live-step-interrupt|4|6|70|"
++  "live-step-double-term|4|6|70|step-after-reap"
++  "predicate-rc0|10|3|73|"
++  "record-without-sentinel|10|3|73|"
++  "lease-held-by-supervisor|10|3|73|"
++  "refuse|10|3|73|"
+ )
+-log "V4 controls start total_budget=${TOTAL_BUDGET_S}s reserve=${CLEANUP_RESERVE_S}s launcher=$(sha256sum "$LAUNCHER" | cut -c1-16) lib=$(sha256sum "$V4/runner/s4-r6-lib-v4.sh" | cut -c1-16) stub=$(sha256sum "$V4/controls/s4-r6-control-stub-v4.sh" | cut -c1-16) private_lease=$PRIVATE_LEASE"
+-if ! flock -n "$PRIVATE_LEASE" true; then log "STOP: private control lease already held before start (stale holder?)"; exit 95; fi
++log "V5 controls start total_budget=${TOTAL_BUDGET_S}s reserve=${CLEANUP_RESERVE_S}s launcher=$(sha256sum "$LAUNCHER" | cut -c1-16) lib=$(sha256sum "$V5/runner/s4-r6-lib-v5.sh" | cut -c1-16) stub=$(sha256sum "$V5/controls/s4-r6-control-stub-v5.sh" | cut -c1-16) predicates=$(sha256sum "$PRED" | cut -c1-16) private_lease=$PRIVATE_LEASE driver_pid=$$ driver_start=$(proc_start $$) timeout=$(readlink -f "$(command -v timeout)") sleep=$(readlink -f "$(command -v sleep)")"
++if ! timeout --foreground "$LEASE_S" flock -n "$PRIVATE_LEASE" true; then log "STOP: private control lease already held before start (stale holder? inspect $RECEIPTS/*/QUARANTINE_LEASE_HOLDER and DRIVER-UNRESOLVED-*)"; exit 95; fi
+ n=0
+ for spec in "${CONTROLS[@]}"; do
+-  IFS='|' read -r name outer grace worst <<< "$spec"; n=$((n+1))
+-  if (( worst + CLEANUP_RESERVE_S > $(remaining) )); then log "STOP: control $n ($name) worst ${worst}s + reserve exceeds remaining $(remaining)s"; exit 92; fi
+-  before=$(ls -1 "$RECEIPTS" | grep -c '^CONTROL-V4-' || :)
+-  log "control $n/$((${#CONTROLS[@]}+1)) $name outer=${outer}s grace=${grace}s launcher_bound=$((outer+grace+LAUNCHER_POST_S))s elapsed=$(elapsed)s remaining=$(remaining)s"
+-  S4R6_CONTROL=1 S4R6_SCENARIO=$name S4R6_OUTER_S=$outer S4R6_GRACE_S=$grace \
+-    run_bounded $((outer+grace+LAUNCHER_POST_S)) "$DRIVER_LOG" bash "$LAUNCHER"
++  IFS='|' read -r name outer grace worst seam <<< "$spec"; n=$((n+1))
++  if (( worst + CLEANUP_RESERVE_S > $(remaining) )); then finish 92 "control $n ($name) worst ${worst}s + reserve exceeds remaining $(remaining)s"; fi
++  before=$(ls -1 "$RECEIPTS" | grep -c '^CONTROL-V5-' || :)
++  log "control $n/$((${#CONTROLS[@]}+1)) $name outer=${outer}s grace=${grace}s seam='${seam}' launcher_bound=$((outer+grace+LAUNCHER_POST_S))s elapsed=$(elapsed)s remaining=$(remaining)s"
++  S4R6_CONTROL=1 S4R6_SCENARIO=$name S4R6_OUTER_S=$outer S4R6_GRACE_S=$grace S4R6_SEAM=$seam \
++    run_bounded $((outer+grace+LAUNCHER_POST_S)) "$grace" "$DRIVER_LOG" bash "$LAUNCHER"
+   lrc=$RB_RC
+-  run_dir=$(ls -1dt "$RECEIPTS"/CONTROL-V4-* 2>/dev/null | head -1)
+-  after=$(ls -1 "$RECEIPTS" | grep -c '^CONTROL-V4-' || :)
+-  [[ -z $CANCELLED ]] || { log "STOP: control $name was cancelled by the driver ($CANCELLED); launcher_exit=$lrc dir=$run_dir"; exit 96; }
+-  [[ $after == $((before+1)) && -n $run_dir ]] || { log "STOP: expected exactly one new run directory (before=$before after=$after)"; exit 93; }
++  run_dir=$(ls -1dt "$RECEIPTS"/CONTROL-V5-* 2>/dev/null | head -1); LAST_RUN_DIR=$run_dir
++  after=$(ls -1 "$RECEIPTS" | grep -c '^CONTROL-V5-' || :)
++  [[ -z $CANCELLED ]] || finish 96 "control $name was cancelled by the driver ($CANCELLED); launcher_exit=${lrc:-unresolved} dir=$run_dir"
++  [[ $after == $((before+1)) && -n $run_dir ]] || finish 93 "expected exactly one new run directory (before=$before after=$after)"
+   timeout --foreground "$PRED_S" python3 "$PRED" "$name" "$run_dir" "$lrc" | tee "$run_dir/PREDICATES.txt" | tee -a "$DRIVER_LOG"
+   prc=${PIPESTATUS[0]}
+-  # independent facts (never signalled here): owned session empty; private lease released by the launcher
+-  sid=$(cat "$run_dir/OWNED_SID" 2>/dev/null); leftovers=""; [[ -n $sid ]] && leftovers=$(pgrep -s "$sid" | tr '\n' ' ')
+-  lease_free=false; flock -n "$PRIVATE_LEASE" true && lease_free=true
+-  log "control $name launcher_exit=$lrc predicates_rc=$prc leftovers_in_session='${leftovers}' private_lease_free=$lease_free dir=$run_dir elapsed=$(elapsed)s"
+-  if [[ $prc != 0 || -n $leftovers || $lease_free != true ]]; then log "STOP at first unexpected result: $name"; exit 94; fi
++  # independent facts: owned session empty as the launcher LEFT it (LEFT_INITIAL, bounded scan); private lease released by the launcher
++  session_state "$run_dir"
++  qh=""; [[ -f $run_dir/QUARANTINE_LEASE_HOLDER ]] && qh=$(head -1 "$run_dir/QUARANTINE_LEASE_HOLDER")
++  log "control $name launcher_exit=$lrc predicates_rc=$prc leftovers_in_session='${LEFT_INITIAL}' (after driver reap: '${LEFT_FINAL}') private_lease_free=$LEASE_FREE quarantine_holder='${qh}' dir=$run_dir elapsed=$(elapsed)s"
++  if [[ -n $qh ]]; then finish 94 "control $name left a RECORDED quarantine holder ($qh) — lease intentionally retained; do not kill without identity check"; fi
++  if [[ $prc != 0 || -n $LEFT_INITIAL || $LEASE_FREE != true ]]; then finish 94 "first unexpected result: $name"; fi
+ done
+ # last control: direct invocation of the REAL runner without the launcher must refuse (71) and create nothing
+-if (( 5 + CLEANUP_RESERVE_S > $(remaining) )); then log "STOP: no budget for direct-refusal control"; exit 92; fi
++if (( 7 + CLEANUP_RESERVE_S > $(remaining) )); then finish 92 "no budget for direct-refusal control"; fi
+ runs_before=$(ls -1 "$ROOT/execution/s4-r6-validation/runs" 2>/dev/null | wc -l)
+-out=$(timeout --foreground 5 bash "$V4/runner/s4-r6-validate-v4.sh" 2>&1); drc=$?
++out=$(timeout --foreground 5 bash "$V5/runner/s4-r6-validate-v5.sh" 2>&1); drc=$?
+ runs_after=$(ls -1 "$ROOT/execution/s4-r6-validation/runs" 2>/dev/null | wc -l)
+ printf '%s\nexit=%s runs_before=%s runs_after=%s\n' "$out" "$drc" "$runs_before" "$runs_after" > "$RECEIPTS/DIRECT-REFUSAL-$(date -u +%Y%m%dT%H%M%SZ).txt"
+ log "control $((${#CONTROLS[@]}+1))/$((${#CONTROLS[@]}+1)) direct-runner-refusal exit=$drc (expect 71) message='$out' runs_dir_unchanged=$([[ $runs_before == "$runs_after" ]] && echo true || echo false)"
+-if [[ $drc != 71 || $runs_before != "$runs_after" || $out != *"REFUSE: not launched through the V4 launcher"* ]]; then log "STOP: direct refusal predicate failed"; exit 94; fi
++if [[ $drc != 71 || $runs_before != "$runs_after" || $out != *"REFUSE: not launched through the V5 launcher"* ]]; then finish 94 "direct refusal predicate failed"; fi
+ log "ALL $((${#CONTROLS[@]}+1)) CONTROLS OK elapsed=$(elapsed)s (hard budget ${TOTAL_BUDGET_S}s). Controls prove wrapper/ownership/lease/publication behaviour on the PRIVATE lease only — not the canonical lock's occupancy, not gates, Vitest, package, browser or acceptance."
+ exit 0

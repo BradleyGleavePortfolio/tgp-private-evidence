@@ -1,0 +1,154 @@
+{
+ "id": "OP88-OWNED-LAUNCH-V8-B",
+ "role": "independent non-builder T4 reviewer B",
+ "model_label": "Claude Fable 5 (policy label; actual setting unexposed)",
+ "parent": "e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038",
+ "frozen_at": "2026-09-22T21:32:34Z",
+ "clock": "actual `date -u` at freeze",
+ "packet_manifest_sha256": "ed03323afc1b6a779961a214a87b2b97b363ebe09fe8a20fbeab392d802ed6f5",
+ "status": "FROZEN",
+ "peer_isolation": "owned-launch-v8-a and s4-v4-a not read",
+ "truth": {
+  "implemented": "all packet files hash-bound; embedded block cmp-identical x2 (independently reproduced); both diffs reproduced from bases",
+  "tested": "nothing (no control or consumer executed by builder or reviewer)",
+  "unrun": "8 control cases/16 checks; T0 driver; setup v8"
+ },
+ "prior_findings": {
+  "S5-V7-A-02": {
+   "status": "SUBSTANTIALLY_SOURCE_CLOSED",
+   "residuals": [
+    "V8B-05",
+    "V8B-01"
+   ],
+   "evidence": "own-block L6,L9-17; T0 L112-115,L122; setup L130-133"
+  },
+  "S5-V7-A-03": {
+   "status": "PARTIALLY_CLOSED",
+   "open": [
+    "V8B-02"
+   ],
+   "evidence": "own-block L27-28; T0 L107-108,L117-118; setup L137-139"
+  },
+  "P88-S5-SETUP-01": {
+   "status": "SUBSTANTIALLY_SOURCE_CLOSED",
+   "residuals": [
+    "V8B-05",
+    "V8B-01"
+   ],
+   "evidence": "setup L129-133,L96"
+  }
+ },
+ "findings": [
+  {
+   "id": "V8B-01",
+   "severity": "HIGH",
+   "material": true,
+   "title": "Retired registered pids remain signal targets; identity re-confirmation is a shape test (pgid==sid==pid != self) not an ownership test (no PPID==$$ / start-time binding); no retire after wait",
+   "locations": [
+    "own-block-v8.sh:5-6,8,9-17,20-26",
+    "ctl-t0-only.v8.sh:91,112,118",
+    "run-s5-setup-npm-ci.v8.sh:90,96,130,139,141"
+   ],
+   "host_fact": "pid_max=32768 (read from /proc)",
+   "consequence": "pid reuse by any same-user own-session leader (other lanes' setsid runners) -> setup false CLEANUP_FAILURE/FINAL 90 (L90) and wrong-target group TERM+KILL from on_exit/on_signal; violates scope rule against retired numeric IDs as signal authority",
+   "controls_cover": false,
+   "closure": "own_retire after each successful wait; add ppid==$$ to own_identity/own_confirm/own_signal; optionally bind /proc/<pid>/stat starttime at confirm and require at signal"
+  },
+  {
+   "id": "V8B-02",
+   "severity": "MEDIUM",
+   "material": true,
+   "title": "Unconditional wait retained on identity-refused KILL-survivor path",
+   "locations": [
+    "ctl-t0-only.v8.sh:115,118",
+    "run-s5-setup-npm-ci.v8.sh:132",
+    "sup-under-test.sh:37 (fixture, bounded, non-material)"
+   ],
+   "consequence": "header claims 'no unconditional wait' (T0 L11-13, block L20) false on this path; outer timeout KILL would skip on_exit record",
+   "controls_cover": false,
+   "closure": "skip wait when m non-empty (T0, synthetic 137) / when CLEANUP_FAILURES branch taken (setup)"
+  },
+  {
+   "id": "V8B-03",
+   "severity": "MEDIUM",
+   "material": true,
+   "title": "Leaderless confirmed-group survivors censused but never signalled (regression in reach vs V7 L93/reap_owned and setup on_signal reap_group)",
+   "locations": [
+    "own-block-v8.sh:16,25",
+    "ctl-t0-only.v8.sh:119,91",
+    "run-s5-setup-npm-ci.v8.sh:96 (normal path L141 reap_group still signals)",
+    "controls-v7-to-v8-t0-only.diff:67,93"
+   ],
+   "consequence": "owned descendants left running after leader exit; fail-closed record only",
+   "controls_cover": false,
+   "closure": "in own_reap_all group loop: verify members' sid==pg then TERM->bounded->KILL->bounded; add leaderless-group control case"
+  },
+  {
+   "id": "V8B-04",
+   "severity": "MEDIUM",
+   "material": true,
+   "title": "Group census counts caller's own unreaped zombies as GROUP_SURVIVORS (pgrep default matches all run states; no own_alive filter)",
+   "locations": [
+    "own-block-v8.sh:25",
+    "run-s5-setup-npm-ci.v8.sh:87",
+    "ctl-t0-only.v8.sh:91-92 (trap path before wait)",
+    "run-s5-setup-npm-ci.v8.sh:96",
+    "sup-under-test.sh:38-39"
+   ],
+   "dependency": "procps 4.0.4 pgrep run-state default (man page unavailable on host); deterministically checkable by asserting reap_rc=0 in C2v8/C3v8/C4v8",
+   "consequence": "false survivor / CLEANUP_FAILURES / root retention on signal paths; violates truthful cleanup exits; current controls pass silently",
+   "controls_cover": false,
+   "closure": "filter census through own_alive or reap dead pids before census; add reap_rc=0 assertion"
+  },
+  {
+   "id": "V8B-05",
+   "severity": "LOW",
+   "material": true,
+   "title": "One command-boundary interruption window between `&` and own_register",
+   "locations": [
+    "ctl-t0-only.v8.sh:111-112",
+    "run-s5-setup-npm-ci.v8.sh:129-130",
+    "sup-under-test.sh:33-34 (C1v8 fires after registration)"
+   ],
+   "consequence": "TERM trap runs with child unregistered; own_reap_all misses it",
+   "controls_cover": false,
+   "closure": "iterate $OWN_PIDS ${!:-} in own_reap_all"
+  }
+ ],
+ "optional": [
+  {
+   "id": "O-01",
+   "note": "T0 mktemp L90 before TERM trap L92 (inherited)"
+  },
+  {
+   "id": "O-02",
+   "note": "no publication-failure control (scope requirement; milestone discloses)"
+  },
+  {
+   "id": "O-03",
+   "note": "controls exercise primitive via fixture only; consumer lines T0 L110-123 / setup L129-141 uncontrolled"
+  },
+  {
+   "id": "O-04",
+   "note": "T0 worst-case ~112-127 s + gate overhead vs 140 s outer: thin margin, correctly labelled allowance not attestation"
+  }
+ ],
+ "controls_review": {
+  "files": [
+   "ctl-own-startup.sh b34db0d8",
+   "sup-under-test.sh 9dc308ab"
+  ],
+  "expected_checks": 16,
+  "cases": 8,
+  "discriminator_safe": true,
+  "notes": "grant gate L10; pins L11-14; lock stat only L31; fake sleep children; per-case timeout -k 3 15; pid-only fixture cleanup; predecessor fixture never fires group signal; does not discriminate V8B-01/02/03/05, passes V8B-04 silently"
+ },
+ "verdicts": {
+  "R4_controls_slot": "GRANTABLE on exact bytes as evidence for A-02 decoy/post-registration interruption closure; not a T0/R2' clearance; recommend adding reap_rc=0 assertion and leaderless-group case",
+  "R2_prime_setup_install_bca83158": "NOT GRANTABLE on V8 bytes (V8B-01 most exposed: ~20 min run, pid_max 32768; V8B-02; V8B-05)",
+  "T0_applicability_c226266e": "NOT GRANTABLE on V8 bytes (V8B-01..05); A-02 substantially closed, A-03 partially",
+  "S6_consumers": "absent, not cleared",
+  "product_clearance": "none claimed"
+ },
+ "smallest_next_action": "Builder freezes own-block v9 (byte-identical in both consumers) with ppid==$$ + own_retire (V8B-01), conditional wait (V8B-02), own-session group signal + own_alive-filtered census (V8B-03/04), ${!:-} in own_reap_all (V8B-05), plus reap_rc=0 assertion and a leaderless-group control; parent may grant the V8 R4 control run now as safe evidence only."
+}

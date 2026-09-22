@@ -1,0 +1,117 @@
+{
+  "audit": "OP88-OWNED-LAUNCH-V8-A",
+  "status": "FROZEN_INDEPENDENT_SOURCE_REVIEW",
+  "tier": "T4",
+  "manifest_sha256": "ed03323afc1b6a779961a214a87b2b97b363ebe09fe8a20fbeab392d802ed6f5",
+  "verdicts": {
+    "R4_synthetic_controls": "HOLD",
+    "S5_setup_install": "HOLD",
+    "S5_T0": "HOLD",
+    "S6_consumers": "EXCLUDED / NOT REVIEWED / NO INFERRED CLEARANCE",
+    "source_contract": "PARTIAL CORRECTION; acceptance not met",
+    "runtime_or_product_clearance": "NONE",
+    "grant_issued": false
+  },
+  "contract_basis": "Review applies the promised recoverable adoption-before-work, pending-interruption closure, current-only signal authority, truthful publication/cleanup exits, and bounded recovery contract, not merely equality of the embedded helper copies. [Owned-launch scope, lines 15-19](../../OWNED_LAUNCH_SCOPE.md#L15-L19)",
+  "positive_source_delta": [
+    "The shared primitive is embedded identically in both S5 consumers, and the declared consumer diffs match the actual frozen predecessor-to-successor hunks. [Exact input/comparison ledger](INPUTS.json)",
+    "own_confirm rejects the sampled caller group and requires pid==pgid==sid before adding a group; moving registration before the old sleep closes the specific post-registration/pre-confirmation case exercised by C1v8, but not all startup interruption windows. [Primitive, lines 5-14](../../s5-v8-t0/own-block-v8.sh#L5-L14) [Fixture, lines 32-35](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L32-L35)",
+    "The ordinary confirmed budget-KILL path now avoids wait when termination remains unconfirmed, and T0 admission subtracts grace/reserve; the refusal path still violates that guarantee as A-04. [T0, lines 107-118](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L107-L118) [Setup, lines 137-139](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L137-L139)",
+    "T0 retains its exact-head/dirty-fingerprint/dependency/harness/config gates, predecessor-only selector, mutation predicate and named identity-refusal predicate; setup retains its source gates, ignore-scripts install command, workload fd9 closure, source/ancestor accounting and dependency checks. [T0, lines 80-88 and 125-128](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L80-L88) [Setup, lines 103-165](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L120-L165)"
+  ],
+  "findings": [
+    {
+      "id": "OWN-V8-A-01",
+      "severity": "HIGH",
+      "title": "Immediate registration is not atomic adoption; workload executes before recoverable authorization",
+      "applies_to": ["primitive", "controls", "S5_setup", "S5_T0"],
+      "locations": ["own-block-v8.sh:5-6", "controls-v8-t0/ctl-t0-only.v8.sh:91-92,110-115", "controls-v8-t0/run-s5-setup-npm-ci.v8.sh:95-98,129-134", "controls-v8-t0/sup-under-test.sh:32-35"],
+      "counterexample": "After the background child is launched but before own_register runs, a pending TERM can invoke the exiting trap with OWN_PIDS still empty; this remains possible between the separate pid=$! and own_register commands even though the old sleep was removed. [T0, lines 91-92 and 110-113](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L110-L113) [Setup, lines 95-98 and 129-131](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L129-L131)",
+      "workload_admission": "Both consumers exec the real Jest/npm command directly in the spawned child before parent confirmation or recoverable identity publication; there is no child-side release gate, and a failed confirmation only attempts to stop work that may already have run. [T0, lines 110-115](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L110-L115) [Setup, lines 129-134](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L129-L134)",
+      "consequence": "An interrupt can still leave an unregistered detached workload, and install mutation/network activity is not conditioned on safe recoverable adoption as required by the contract. [Scope, line 16](../../OWNED_LAUNCH_SCOPE.md#L16) [Setup, lines 129-132](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L129-L132)",
+      "minimal_closure": "Preserve pending interruptions throughout launch/adoption, make the child recoverably identifiable before workload release, and gate workload execution on successful verified adoption/publication; no increased sleep can establish this.",
+      "coverage_gap": "C1v8 sends its deterministic TERM only after registration and child.pid publication, so passing it would not discriminate the remaining pre-registration gap. [Fixture, lines 33-34](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L33-L34)",
+      "observed_runtime_failure": false
+    },
+    {
+      "id": "OWN-V8-A-02",
+      "severity": "HIGH",
+      "title": "Topology rechecking does not distinguish current ownership from reused numeric identities",
+      "applies_to": ["primitive", "controls", "S5_setup", "S5_T0"],
+      "locations": ["own-block-v8.sh:5-17,20-25", "controls-v8-t0/ctl-own-startup.sh:16,19,26,39,48", "controls-v8-t0/run-s5-setup-npm-ci.v8.sh:74-80,133,139-141"],
+      "counterexample": "A registered child exits and is reaped, its PID is reused by an unrelated process, and later own_reap_all calls own_signal on the retained number: a nonleader replacement receives pid-only TERM, while an unrelated session-leader replacement satisfying pid==pgid==sid receives group TERM. [Primitive, lines 5-17 and 20-25](../../s5-v8-t0/own-block-v8.sh#L5-L25)",
+      "consumer_bypasses": "The controls retain every numeric fixture PID until final cleanup, and setup's retained reap_group authorizes TERM/KILL by membership in the historical OWNED_PGIDS string rather than the new helper's current identity test. [Controls, lines 16-26 and 39-48](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L16-L48) [Setup, lines 74-80 and 141](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L74-L80)",
+      "consequence": "Caller-group exclusion alone does not satisfy no-unowned-signals: a different process can be signalled after PID/group-number reuse, including by the synthetic control cleanup itself. [Scope, line 16](../../OWNED_LAUNCH_SCOPE.md#L16) [Primitive, lines 15-17](../../s5-v8-t0/own-block-v8.sh#L15-L17)",
+      "minimal_closure": "Bind active ownership to a recoverable process identity beyond bare PID/topology, retire signal authority after confirmed absence, and apply the same current-identity guard to every consumer and control cleanup route; mismatched identity must refuse rather than fall back to signalling a replacement PID.",
+      "observed_runtime_failure": false
+    },
+    {
+      "id": "OWN-V8-A-03",
+      "severity": "HIGH",
+      "title": "Leader exit disables descendant cleanup, and setup can release the lease with survivors",
+      "applies_to": ["primitive", "controls", "S5_setup_signal_path", "S5_T0"],
+      "locations": ["own-block-v8.sh:15-25", "controls-v8-t0/ctl-t0-only.v8.sh:91,118-122", "controls-v8-t0/run-s5-setup-npm-ci.v8.sh:82-98,129", "controls-v8-t0/sup-under-test.sh:38-39"],
+      "counterexample": "A confirmed leader exits on TERM while its same-group grandchild ignores TERM: own_wait_gone sees the leader gone, skips KILL escalation, and the final group census only prints GROUP_SURVIVORS without terminating the remaining owned child. [Primitive, lines 20-25](../../s5-v8-t0/own-block-v8.sh#L20-L25)",
+      "after_leader_exit": "For a leader already reaped, own_signal returns gone without signalling the still-populated group, so T0's post-exit calls to own_signal cannot perform the cleanup they replaced; its EXIT reaper likewise skips the dead leader and only reports the group. [Primitive, lines 15-25](../../s5-v8-t0/own-block-v8.sh#L15-L25) [T0, lines 91 and 118-122](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L118-L122)",
+      "setup_consequence": "On setup interruption, own_reap_all replaces the previous group reap, then finish 143 exits even if final accounting finds descendants; because the install child closed fd9, this can release the canonical lease while owned install work remains, with no checked recovery holder or quarantine transition. [Setup, lines 87-98 and 129](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L87-L98)",
+      "minimal_closure": "Retain safe descendant/group authority independently of leader liveness, escalate according to the whole owned boundary, and verify it empty before handoff; if termination cannot be verified, retain explicit exclusion/recovery ownership rather than merely log survivors and exit.",
+      "observed_runtime_failure": false
+    },
+    {
+      "id": "OWN-V8-A-04",
+      "severity": "HIGH",
+      "title": "Identity-refusal paths still perform unconditional waits after unconfirmed termination",
+      "applies_to": ["controls", "S5_setup", "S5_T0"],
+      "locations": ["controls-v8-t0/ctl-t0-only.v8.sh:115-118", "controls-v8-t0/run-s5-setup-npm-ci.v8.sh:132", "controls-v8-t0/sup-under-test.sh:37-39"],
+      "counterexample": "If own_confirm fails and the child is still alive after TERM/KILL and the bounded polls, T0 sets m=pid:<pid> but keeps how=identity-refused, so line 118 takes wait; setup explicitly waits after incrementing CLEANUP_FAILURES for the same failed termination, and the fixture does likewise. [T0, lines 115-118](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L115-L118) [Setup, line 132](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L132) [Fixture, line 37](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L37)",
+      "consequence": "The exact exceptional path that should return an identity refusal can exceed the advertised cleanup allowance indefinitely, and killing the outer wrapper does not establish that its detached workload is gone. [Scope, line 16](../../OWNED_LAUNCH_SCOPE.md#L16) [Request, lines 25-29](../../s5-v8-t0/V8_T0_AND_SETUP_SUCCESSOR_REQUEST.md#L25-L29)",
+      "minimal_closure": "Apply the same confirmed-termination prerequisite to wait on every branch, including identity refusal and fixture cleanup; report raw observed exit separately from an unobserved/synthetic validation outcome, then perform bounded fail-closed recovery.",
+      "deadline_qualification": "The new admission arithmetic and nominal outer allowances are useful accounting, not a verified end-to-end deadline: polling counts exclude ps/pipeline time and consumer evidence/after-check operations remain outside an internal total watchdog; A-04 is the concrete blocking path, not a demand for a real-time guarantee under arbitrary kernel failure. [Primitive, lines 10-19 and 27-28](../../s5-v8-t0/own-block-v8.sh#L10-L28) [Setup, lines 145-165](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L145-L165)",
+      "observed_runtime_failure": false
+    },
+    {
+      "id": "OWN-V8-A-05",
+      "severity": "MEDIUM",
+      "title": "Publication and cleanup return values do not govern the reported final outcome",
+      "applies_to": ["controls", "S5_setup", "S5_T0_evidence"],
+      "locations": ["controls-v8-t0/run-s5-setup-npm-ci.v8.sh:70,92-94,102,131,134,164-165", "controls-v8-t0/ctl-t0-only.v8.sh:91", "controls-v8-t0/sup-under-test.sh:32-39", "controls-v8-t0/ctl-own-startup.sh:19-20,59-62"],
+      "publication_counterexample": "If setup's identity or final receipt write fails, no write-status gate prevents the install from continuing or finish 0 from exiting 0 after the failed FINAL append; the code therefore permits an accepted process exit without the promised durable evidence. [Setup, lines 92-94,129-134 and 164-165](../../s5-v8-t0/controls-v8-t0/run-s5-setup-npm-ci.v8.sh#L92-L94)",
+      "cleanup_truth_counterexample": "The control fixture captures own_reap_all's nonzero cleanup status but unconditionally exits 0 at 39; C3/C4 accept rc0 and REAPED/leader facts without requiring reap_rc=0 or rejecting GROUP_SURVIVORS, so a reported descendant-cleanup failure can coexist with a passing case. [Fixture, lines 38-39](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L38-L39) [Controls, lines 59-62](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L59-L62)",
+      "T0_qualification": "T0's EXIT handler parses survivor text but does not propagate the reaper's return code or explicitly replace a successful primary status when final cleanup fails; the corrected contract must make primary, cleanup and publication outcomes separate rather than relying on a successful final log command. [T0, line 91](../../s5-v8-t0/controls-v8-t0/ctl-t0-only.v8.sh#L91)",
+      "minimal_closure": "Gate workload release and final success on checked identity/evidence publication, preserve raw primary status separately, and make any failed cleanup/publication a nonzero validation result; add a named publication-failure discriminator.",
+      "observed_runtime_failure": false
+    },
+    {
+      "id": "OWN-V8-A-06",
+      "severity": "HIGH",
+      "title": "The proposed control driver is not cancellation-safe and its scenarios omit required contract discriminators",
+      "applies_to": ["R4_controls_grantability"],
+      "locations": ["controls-v8-t0/ctl-own-startup.sh:16-29,34-62", "controls-v8-t0/sup-under-test.sh:15-18,32-39", "OWNED_LAUNCH_SCOPE.md:16-17"],
+      "driver_counterexample": "If the outer caller interrupts ctl-own-startup while run_sup is waiting, the current child's identity has not joined FIXTURE_PIDS because that happens only after the synchronous timeout returns; the driver has only an EXIT trap, and no active-supervisor cancellation/adoption route, so its cleanup cannot account for that newly detached child. [Controls, lines 16-26](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L16-L26)",
+      "cleanup_counterexample": "cleanup_fixtures sends signals to retained bare PIDs and never verifies post-KILL absence or turns cleanup failure into a failing exit, so its own final SUMMARY can be emitted without proving fixture quiescence. [Controls, lines 19-20](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L19-L20)",
+      "discriminator_gaps": [
+        "C1v8 does not target pre-registration interruption, while no case injects failed identity/receipt publication or a reused identity; these are specifically required boundaries rather than optional coverage expansion. [Scope, lines 16-17](../../OWNED_LAUNCH_SCOPE.md#L16-L17) [Fixture, lines 33-35](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L33-L35) [Control cases, lines 34-62](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L34-L62)",
+        "C2 delayed adoption relies on sleep 1 versus predecessor sleep 0.2 rather than an acknowledged hold/release seam; C3 can confirm the session before its child installs trap-ignore-TERM, so the supposedly deterministic KILL-path control can race its own setup. [Fixture, lines 16-18,25,35-38](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L14-L38)",
+        "C4 spawns a 20-second sleeper and forcibly reaps it; it is not the required naturally exiting workload/adoption-retirement case, and no control covers a leader that exits before its descendant. [Fixture, lines 15 and 35-39](../../s5-v8-t0/controls-v8-t0/sup-under-test.sh#L35-L39) [Controls, lines 60-62](../../s5-v8-t0/controls-v8-t0/ctl-own-startup.sh#L60-L62)"
+      ],
+      "minimal_closure": "Own the active control enclosure and recoverable child identity before waiting, handle cancellation through verified bounded cleanup, retire resolved identities, and exercise acknowledged pre/post-adoption seams, publication failure, reuse refusal, natural exit, leader-first exit and timeout without weakening named expectations.",
+      "observed_runtime_failure": false
+    }
+  ],
+  "stage_disposition": {
+    "controls": "Do not grant this frozen control driver merely to discover the identified static gaps; A-01/A-02/A-03/A-04/A-05 govern what it proves and A-06 also governs safety of running it.",
+    "install": "Do not grant setup until both exact reviews close the owned-launch contract, discriminating controls pass under a separate grant, fresh source/dependency prerequisites and raw caller/receipt handling are explicit; no existing install is inferred.",
+    "T0": "The workload-selection/assertion delta remains applicable, but execution waits on the same primitive/consumer closure plus attributable fresh setup.",
+    "T0_layout_dependency": "The twelve-file packet does not include the relative controls-v3 dependency; the request explicitly requires staging byte-identical V7 library/harness/config copies before T0, which is a declared staging prerequisite rather than a new code defect. [Request, line 26](../../s5-v8-t0/V8_T0_AND_SETUP_SUCCESSOR_REQUEST.md#L26)",
+    "S6": "The S6 C6 and setup adaptations are outside this supplied packet; neither inherited primitive equality nor these S5 reads establishes their applicability. [Scope, lines 9-17 and 24](../../OWNED_LAUNCH_SCOPE.md#L9-L24)"
+  },
+  "smallest_next_action": "Return this exact contract gap map to the sole canonical builder for one additive owned-launch successor and discriminating control update, preserving frozen V8; if recoverable pre-exec adoption/current ownership needs broader architecture than the allowed tiny helper, freeze and request the precise parent rescope before expanding.",
+  "truth": {
+    "implemented": "Frozen V8 bytes inspected, not modified",
+    "verified": "Hashes, embedding equality, predecessor equality and diff hunks only",
+    "tested": "Nothing; no candidate scripts, syntax tools, probes or controls executed",
+    "peer_independence": "Current B output not accessed",
+    "only_new_writes": "execution/op88/audits/owned-launch-v8-a",
+    "claims_excluded": "No install, product, database, S6, native/browser or release acceptance"
+  }
+}

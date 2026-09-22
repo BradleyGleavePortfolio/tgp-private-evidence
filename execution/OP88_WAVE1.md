@@ -100,6 +100,12 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Recovery: preserved input snapshots, no mutable live fixture.
 - Success does not prove: runtime composition, serving-role safety, hook-enabled integration or final audit.
 
+## S1/S2: OP88-S1S2-STATIC-PREREQS
+
+OP88-S1S2-STATIC-PREREQS is T4 source-only preparation under the S1/S3 contract above, same backend PR/base/d5cd/S1 heads and canonical Fable builder s1_s3_gated_integration_preparation_mud58q6v. Purpose: restore the exact source prerequisites of frozen S2 V5.6 CONTROL_REQUEST_10 while reviews run. Sole new writes: execution/op88/upstream-prereqs-2 and, only if absent, worktrees/s2-runner53 and execution/s2-setup-prep. No overwrite or moving candidate edits.
+
+Dependencies/acceptance: verified local d5cd objects plus named s2-setup-prep/proposal-1 predecessor packet; offline GIT_NO_LAZY_FETCH=1 restoration, clean exact d5cd/tree,37-file predecessor manifest verified from its own directory. No new dependency installation, hooks, version/client execution, network, processes, DB, canonical lock or commit. Freeze actual identities/owned-write ledger and concrete missing prerequisites. Independent S2 reviews and later separate execution grants remain required. Recovery: preserve all originals, stop on existing target/missing concrete input, no broad search or invented bytes. Success proves source restoration only, not setup/runtime/composition/release.
+
 ## S6: OP88-S6-C6-PREP (after frozen C5 independent review)
 
 - Repository / PR: mobile cumulative #289-292, no Roman edits/new product PR.
@@ -130,6 +136,19 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Acceptance: keep active-step deferral through primary latch; effective elapsed cancellation through cleanup/publication without abandoning owned detached work; secure unresolved-survivor exclusion before TIMEOUT/INTERRUPTED precedence; checked identity-safe recoverable quarantine handoff with checked creation/publication failure; fail-closed mandatory parsed-record/nonempty-step predicates; guarded caller raw exits and truthful launcher-owned lease records. Preserve existing initialization/session/JSON/exit-split/prerequisite/artifact-join closures.
 - Required evidence: exact minimal diff, hashes, A01-A06/B03 mapping with concrete discriminators, separate Stage1 private and Stage2 requests and realistic total bounds/ownership. No claim that tiny windows or private-only names waive ownership; no infinite unrecorded holder or bare-PID recovery. Use actual uutils0.8.0 assumptions. Propose needed fresh path mapping explicitly.
 - Evidence allowed now: source reasoning, manual edits, hashes/diffs/syntax only. No controls/probes/lock acquisition/install/network/DB/browser.
+
+## S4: OP88-S4-V6-PREP (V5 residual repair)
+
+- Repository/PR/base/exact product head: unchanged extension cumulative #21/#23/#24/#25, base0111be661922234d670bbf23e23d270eec1b4a4e, head91990ae9aec72f47a67591892ac09fa1f59d2f16/tree840fb2855953d5363fbd144e11b3f81763d9cef7.
+- Runner base: frozen V5 manifest73c2dbbec0c9ae2d767adf16f19cb764f540d452f62170766be4cccc2728d753; no new product PR.
+- Purpose/non-goals: repair concrete residual execution-layer failures, not product reimplementation, generic supervisor, dependencies, runtime or revision of originals.
+- Dependencies: frozen V5 A audit0adc4d6b and exact V5 bytes. V5 B remains independent; builder may begin A corrections but must incorporate B after its freeze and before final successor freeze.
+- Sole writer/canonical builder: Claude Fable5 s4_consolidated_v5_runner_fixer_mud5vjls, new execution/op88/s4-v6 only. Parent owns disposition; independent auditors never implement.
+- Tier/rationale: T4 trusted validation/recovery/exclusion boundary, unchanged cumulative grade.
+- Acceptance: bind cancellation to actual current run, one absolute cancellation deadline without repeated allowance, no destruction of last verified exclusion while survivors unresolved, required checked terminal success receipt, census timeout/error distinct from empty. Preserve V5 source-closed latch, required predicates, raw callers, lease attribution and artifact joins.
+- Required review/evidence: exact delta and full A/B finding map, deterministic private failure discriminators, separate bounded control/native requests, two independent exact-successor reviews before any execution. Correct actual exit legend and qualify unenforced phase-bound claims.
+- Recovery/rollback: originals immutable; no execution now. Preserve verified exclusion or checked recovery owner on publication failure; honest unsafe-release exit is insufficient. If existing tokenized-holder contract cannot satisfy bounded attributable recovery, stop that boundary for parent rescope while independent corrections continue. No silent immortal unrecorded holder.
+- Success does not prove: executed controls, installed/native/browser artifacts, product acceptance or release. Allowed now: edits/hash/diff/syntax only, no probe/lock/network/install/runtime.
 - Recovery: refuse nonzero and preserve evidence when identity/cleanup/publication is uncertain; one owned writer and immutable V4 packets. New meaningful architecture/ownership requirements require parent rescope, not freestyling.
 - Success does not prove: runtime control pass, native gates, artifact/browser correctness, remote revocation, native completion or release.
 

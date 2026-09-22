@@ -1,0 +1,101 @@
+{
+ "packet": "execution/op88/s4-v5 (V5)",
+ "basis": "proposal-4 manifest 3c9276aa + audits s4-v4-a (AUDIT.json 76003cc7) and s4-v4-b (REPORT.md d3c8beb9)",
+ "truth": {
+  "implemented": true,
+  "syntax_checked": true,
+  "hashed": true,
+  "diffed": true,
+  "tested": false,
+  "executed": false
+ },
+ "closures": [
+  {
+   "id": "S4-V4-A-01",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "runner/s4-r6-lib-v5.sh",
+   "change": "STEP_ACTIVE kept set through head-state, metadata and primary latch; pending read before metadata; late PENDING_SIGNAL blocked as secondary 'while latching'; control-only seam S4R6_SEAM=step-after-reap",
+   "discriminator": "control live-step-double-term: blocks[0] startswith C-live-step; all later blocks SIGNAL_TERM; >=2 SIGNAL_TERM; one 'while latching'; step log contains 'SEAM step-after-reap'"
+  },
+  {
+   "id": "S4-V4-A-02",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": [
+    "launcher/s4-r6-launch-v5.sh",
+    "controls/run-controls-v5.sh"
+   ],
+   "change": "wall-clock wait_session_empty/wait_pid_gone; readers under timeout --foreground READ_S=5; bounds.read_s/quarantine_verify_s/phases_are_wall_clock; formula outer+grace+confirm+post_exit_reap+publish+2*read+quarantine_verify+2; driver run_bounded wall-clock, finish() on every exit (cancel->scan/reap->lease->code)",
+   "discriminator": "predicate bounds.phases_are_wall_clock==true and V5 formula string; driver EXIT line on every exit path"
+  },
+  {
+   "id": "S4-V4-A-03 / S4-V4-B-01",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "launcher/s4-r6-launch-v5.sh",
+   "change": "SURVIVORS resolved and quarantine_exit invoked BEFORE TIMEOUT/INTERRUPTED classification (also on INTERRUPT trap path)",
+   "discriminator": "TIMEOUT with survivors exits 5 or 10, never 124; lease.released_at_launcher_exit=false with recorded holder"
+  },
+  {
+   "id": "S4-V4-A-04 / S4-V4-B-05",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "launcher/s4-r6-launch-v5.sh",
+   "change": "hold_quarantine_lease: tokenised setsid bash holder (sleep children close fd 9), verified alive+fd9->lease+token within QH_VERIFY_S=5, QUARANTINE_LEASE_HOLDER written tmp+mv with pid/starttime/token/recovery rule BEFORE exit; failure => identity-checked KILL of own holder, QUARANTINE_HOLDER_FAILED 10, lease.quarantine_ok=false, quarantine_failure recorded, release labelled UNSAFE",
+   "discriminator": "record lease.quarantine_holder_starttime/_token/quarantine_ok; holder file has starttime= and token=; driver STOP 94 on recorded holder, never kills it"
+  },
+  {
+   "id": "S4-V4-A-05",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "controls/control-predicates-v5.py",
+   "change": "parsed()+steps_ok() mandatory (MISS not skip) for nested-orphan-after-exit, live-step-*, predicate-rc0, lease-held-by-supervisor; record-without-sentinel requires parsed SUCCESS record + steps; refuse requires no record; common lease.quarantine_ok None, holder_pid int",
+   "discriminator": "unparseable/empty-steps record prints MISS 'record.steps is a parsed list of >= 1 step object(s) (mandatory)' and rc 1"
+  },
+  {
+   "id": "S4-V4-A-06 / S4-V4-B-04",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": [
+    "SLOT_REQUEST_V5.md",
+    "controls/run-controls-v5.sh"
+   ],
+   "change": "guarded caller (if driver; then rc=0; else rc=$?; fi; printf; exit $rc); no --kill-after; TOTAL_BUDGET_S=600 itemised worst 597; manifest pin exit 91",
+   "discriminator": "caller prints driver exit=<n>; driver logs itemised budget and EXIT code="
+  },
+  {
+   "id": "S4-V4-B-03 / S4-V4-A-N01",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "runner/s4-r6-lib-v5.sh",
+   "change": "publish_exit_record argv 24->27 (S4R6_LEASE_PATH, S4R6_LEASE, S4R6_LEASE_PID); EXIT_RECORD.lock = {path, kind, holder:'launcher', holder_pid:<launcher pid>, runner_sid, mode}",
+   "discriminator": "predicate lease-held-by-supervisor: record.lock.holder=='launcher' and holder_pid == SUPERVISOR_RECORD.lease.holder_pid; lock.path == lease.path"
+  },
+  {
+   "id": "S4-V4-B-02 / S4-V4-B-06",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "controls/run-controls-v5.sh",
+   "change": "CLEANUP_RESERVE_S=70 itemised; cancel never KILLs the lease-holding launcher; UNRESOLVED exit 97 with pid+starttime receipt DRIVER-UNRESOLVED-*.txt; unsafe release observed exit 98; direct-refusal 7 s",
+   "discriminator": "driver receipts/log"
+  },
+  {
+   "id": "V5-U01 (builder)",
+   "status": "IMPLEMENTED_UNTESTED",
+   "file": "controls/control-predicates-v5.py",
+   "change": "SIGNAL_EXITS=[15,124,137,143] for runner.exit / first_failure.observed_exit / steps[0].exit (rust-coreutils 0.8.0 timeout returns raw child signal 15)",
+   "discriminator": "predicate line prints observed value; EXIT_RECORD.steps[0].exit stamps it. Assumption, not measured here."
+  }
+ ],
+ "preserved": [
+  "V2/V3/V4 initialisation order",
+  "own-session spawn via setsid",
+  "JSON only via quoted heredocs (0 unquoted)",
+  "expect_exit validation/observed split",
+  "prerequisite refusals 71/73/75/6/7/9",
+  "runner steps/pins/criteria/joins (names/paths mapped only)",
+  "non-job-control parent check",
+  "lease held by launcher before spawn",
+  "chrome-pipe-discriminator bytes c261ffb4"
+ ],
+ "remaining_blockers": [
+  "nothing executed: all closures are source-level until Stage 1 runs under a separate grant",
+  "two independent exact-V5 reviews required first",
+  "restoration paths absent (see SLOT_REQUEST_V5.md \u00a73)",
+  "reviewer decision points \u00a77 (lib seam, 124->5 precedence, budget 600, new codes 10/91/97/98, lower-bound signal counts, driver post-exit reap)"
+ ],
+ "smallest_next_action": "dispatch two independent risk-scoped exact-V5 reviews against SHA256SUMS; then separate Stage 1 grant"
+}
