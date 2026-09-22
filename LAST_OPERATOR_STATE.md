@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 21:01 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
+Updated: 2026-09-22 21:07 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
 
 ## Mission and authority
 
@@ -31,15 +31,15 @@ Preserved public stacks remain open and unmerged:
 
 Current independently executable slice records, writer surfaces, acceptance, recovery and non-goals: `execution/OP88_WAVE1.md`, continuing the original `execution/CONTINUATION_20260922.md` and named repair-wave scopes without reopening them. Fresh worker IDs are in synchronized `execution/DISPATCHES.md`. Prior-session IDs and grants are historical, not live in this workspace. All 64 preserved public PR grades remain in `execution/pr-grades/PUBLIC_PR_GRADES.{md,json}`; retained grades are not audit clearance.
 
-**Current dispatch:** Bradley instructed all six continuations in parallel IF SAFE. S5 V7 is frozen under independent narrow review, its builder restoring exact source separately; S2 V5.6 fixer remains active. S6 C5 review is frozen and a different Fable builder prepares its justified C6 discriminator, not a product fix. S4 A frozen HOLD/B review active. Upstream builder verified exact S1/S2 and PREP2 inputs; the specifically missing S3 parent bundle has been hydrated for additive closure. No runtime/install/control/DB grant, no new product validation pass or landing/release permission.
+**Current dispatch:** Bradley instructed all six continuations in parallel IF SAFE. S5 V7 narrow review frozen: checker logic source-closed; corrected parent R1 read-only checker grant issued, T0/setup held for startup/deadline correction. S2 V5.6 fixer active. S6 C5 review frozen and different Fable builder prepares C6 discriminator, not product fix. Both S4 V4 reviews frozen, parent HOLD both stages, new Fable V5 fixer assigned. S1/S2 identities and PREP2 tree verified; S3 restored and PREP2 reproduced from both parents. No installation/heavy/DB grant or product landing/release permission.
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
 | S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups remain frozen; no new source defect. Fresh upstream builder restoring exact composition/discriminator inputs only. TRUNCATE behavior/membership path/final dynamic proof pending; 56fb IS composed in21ea/d5cd. Prior offline24/24 remains qualified. No schema change. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Product R3 unchanged. Fresh Fable fixer preparing V5.6 against BOTH frozen V5.5 HOLD reviews, including A's material ownership/deadline/receipt residuals. N4/N5/N6 controls unrun; dual exact-successor review required before execution. Historical setup05 is not an installation in this sandbox. |
-| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Fresh upstream prep frozen: S1/S2 bundle/23 commits/blobs verified offline, PREP2 treea584a1b95423f95dae8daabf673ef3776604acbb reproduced exactly from parent1. Specific missing S3 parent bundle now hydrated; additive parent2 verification active. Upstream realproof, hooks, composed-lock and changed-six-file applicability remain pending. |
-| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow source closure retained; artifact held, historical hooks0/6. V4 A frozen HOLD both stages with six material source counterexamples; manifest63de35c3 verified, no probes run. Independent B still active and has not received A. No controls/native grant; one additive runner repair follows both frozen reports. |
-| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V7 frozen manifestdd7f2eab (15/15 parent-verified), JSON-aware checker + T0-only driver; syntax only, no execution. Independent narrow A review active. Same builder now restores143d+patchc36258b3 at reserved worktrees/s5-r4; no install. V6 remains12PASS/1FAIL, outer1, valid T1/T2/rawT3 preserved. |
+| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source ready, not runtime-cleared. S3 bundle940ce711/manifest8646c075 verified34/34; head/tree/23commits restored offline. PREP2 treea584a1b9 reproduced from BOTH parents; parent2 matrix86/86, no missing objects. Three recorded resolutions/six formatting-only changes attributed. Runtime/hooks/composed-lock/final reviews pending. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Both V4 A/B frozen independently. A HOLD both stages; B narrower Stage1 opinion does not waive six A counterexamples. B01/03/04 also retained. Parent HOLD both stages; new non-auditor Fable preparing minimal V5 including truthful lease attribution. No controls/native grant; source closure/artifact hold unchanged. |
+| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V7 manifestdd7f2eab verified15/15. Independent A manifest157b6ab5: checker source-closed; R1 granted once with corrected caller/budget, results pending. T0 remains held for startup/caller-group/deadline correction; V8 preparation assigned. Exact143d+patch restored; core.abbrev8 locally authorized to reproduce original6850b32e fingerprint. No install. V6 stays failed;12PASS includes I0/partialT3, not12T1/T2-only. |
 | S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Independent C5 B frozen2398cc9d; raw receipt24/24 verified, five timer ownership observed but initiating clear attribution inferred. Hook-only fix predicted insufficient for two in-case signOut orphans. Parent accepts smallest C6 discriminator preparation by new non-auditor builder, no product edit/runtime. Outer wait/app impact/history remain unproven. |
 
 Four advertised bundle identities were checked against current packet heads: S2 `3b6cee48…0f75`, S4 `f8de3d63…cf97`, S5 `e42aa021…5b48`, S6 `c0ad2994…9662`. Workers must verify prerequisite, actual tree and isolated clean restoration before edits. Restoration is not a new passing test or audit.
@@ -48,7 +48,7 @@ Four advertised bundle identities were checked against current packet heads: S2 
 
 Fresh op88 workspace: 2 CPUs/about8GB; disk9.9GB free observed20:43 before packet/baseline restoration. Prior PG17.6/tooling/application dependency installations and PIDs are not inherited. Backend/mobile/extension public baselines restored read-only; only named private packets hydrated. Platform-owned `/home/user/node_modules` remains outside worker ownership. Any installation requires separate reviewed scope, capacity check and serialized grant.
 
-Source/preparation/review lanes are active in parallel and isolated. All prior execution grants are consumed/historical. No new heavy or control allocation is granted. S5/S2 fixer preparation, S6 result review, independent S4 V4 reviews and upstream restoration may proceed; S2 realproof/S4native/new S6runtime and S3 integration remain held. A free lock is not permission.
+Source/preparation/review lanes remain parallel and isolated. All prior grants are historical. Only fresh R1 read-only node checker is granted by `execution/op88/S5_R1_GRANT.md`: once, exact frozen inputs,140s initial timeout+10s kill grace+15s receipt allowance, no lock/install/Jest/DB. No heavy allocation. S2realproof/S4native/S6runtime/S5T0 and S3integration remain held. A free lock is not permission.
 
 Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 A/B source reviews and B factual addendum are frozen, dynamic attestation pending. S4 A source acceptance is not artifact acceptance. All original reports remain unchanged. Every S-lane has stage-correct work.
 
@@ -56,6 +56,7 @@ Current truth: preserved and partially implemented/tested candidates, not overal
 
 - op88 S4 V4 A: six material source findings S4-V4-A-01..06 (signal latch gap, incomplete cancellation/deadline ownership, timeout-survivor quarantine bypass, unchecked quarantine-holder handoff, skipped mandatory checker predicates, masked caller exits). Both stages HOLD. Initialization defect source-closed; artifact joins and other positive properties retained. These are static counterexamples, not new executed failures. Original report frozen under `2026-09-22/op88/audits/s4-v4-a`; B independence retained.
 - op88 S6-C5-B-01 blocks treating the hook-only proposal as a complete fix: cancellation in hooks cannot reach already-orphaned Queries from in-case signOut. Next C6 discriminator preserves six hazards and varies only cancellation-before-clear in afterEach/afterAll. Predeclared2/0/5-timer outcomes distinguish hypotheses; no runtime result yet. S6-C5-B-02 preserves unverified app harmlessness/historical extrapolation; minor timeline correction is additive, not rewritten evidence.
+- op88 S5-V7-A01/A03 R1 caller/budget conditions corrected in parent grant without changing checker/fixtures. A02 material T0 startup gap: interruption before PGID registration can abandon child or adopt caller group; A03 excludes cleanup grace from stated bound. V8 held preparation only. Parent P88-S5-SETUP-01 identifies same startup pattern in frozen setup74736a58; setup held, Fable scoped to confirm/correct minimally, no automatic transfer of old source-grantable opinion. S6 setup applicability flagged to its builder.
 
 - S1 effective TRUNCATE gap prompted41f4/56fb; final discriminator remains unrun.21ea explicitly merged56fb into3f49 and d5cd descends from it. B revision1's contrary source-composition claim is superseded only by additive correction, not rewritten history. Membership path, MAINTAIN coverage, PG15 and hosted serving-role boundaries remain unproven.
 - S2 B1 exact9742037b: 63 pass/4 fail, real release telemetry defects. B2 exact21ea3252: 66 pass/2 fail in C0 historical-export fixture; d5cd corrects that harness path only. Discriminator NOTRUN. Actual B2 runner14ca1e85 differed from grant7642c3c4; actual bytes, reconstructed predecessor and chronology retained without rewriting authorization. Stale self-hash in `SHA256SUMS.b2-frozen` remains qualified by separate outer manifest.
@@ -87,12 +88,12 @@ Success requires native reconciled completion, not staging/generic reconstructio
 
 ## Next six executable slices
 
-1. S5 selective read-only T3 predicate closure and T0-only driver, independent narrow review, then separately granted execution. Preserve positive T1/T2 and original failed wave; later generation/hook/commit remains separate.
-2. S6 bounded independent C5 result/applicability review, then smallest justified discriminator or repair proposal preserving hazard assertions.
-3. Collect S2 v5.6 minimal successor against both frozen55 reviews, then independent closure and necessary discriminators before controls/realproof.
-4. S4 V4 independent exact closure and separately granted bounded controls, then native gates/framework/package/browser evidence.
-5. Guarded final S1/S2 unchanged-d5cd real composition and S1 TRUNCATE discriminator, then dual exact-successor follow-up.
-6. S3 request03 plus checkpoint-disable addendum awaits readiness/upstream proof; hook-enabled exact-tree merge, changed-lock release re-observation and dual exact-head reviews remain downstream.
+1. Collect once-only S5 R1 checker evidence; prepare V8 T0/setup ownership correction, independent narrow closure, then separately granted setup/T0. Preserve failedV6 and valid observations.
+2. Collect S6 two-hook C6 discriminator and setup applicability proposal; independent narrow review before any fresh install/runtime.
+3. Collect S2 V5.6 against both55 reports; dual independent closure and necessary controls before realproof.
+4. Collect S4 V5 against both frozenV4 reports; dual exact-delta closure, private controls, then separately granted native/artifact/browser proof.
+5. Guarded unchanged-d5cd/S1 real composition/TRUNCATE discriminator after safe runner/environment; dual final evidence-bound follow-up.
+6. S3 exact two-parent PREP2 source now ready; request03/environment/hook-enabled merge, composed-lock proof and final dual reviews remain downstream of upstream readiness.
 
 ## Bradley decision required
 

@@ -1,0 +1,81 @@
+{
+  "slice": "OP88-S4-V4-B",
+  "role": "independent auditor B (Fable, explicitly requested; actual runtime setting unexposed, not observed)",
+  "tier": "T4",
+  "frozen_at_utc": "2026-09-22T21:05:00Z",
+  "mode": "static read/hash/diff only; no syntax check, probe, control, lock, install, network, browser, worktree action",
+  "peer_output_read": false,
+  "peer_dir_observed_not_read": "execution/op88/audits/s4-v4-a",
+  "prior_frozen_reports_read": [
+    "2026-09-22/remediation/s4-r6-validation/plan-v3-a/REPORT.md sha256 34255ca9a8ab659654a15adf78c931ab71bff66f62fa13379e9873e4fb3fb881",
+    "2026-09-22/remediation/s4-r6-validation/plan-v3-a/VERDICT.json sha256 13ec27be980a99a44947fea733fac02898d83a59b58fe2889543b0b37b52912f",
+    "2026-09-22/remediation/s4-r6-validation/plan-v3-b/REPORT.md sha256 96dbb7c9356094e69552b07e9368a113e5588ecb9072153bbd52909a5a77b7e7",
+    "2026-09-22/remediation/s4-r6-validation/plan-v3-b/FINDINGS.json sha256 af3fdbcc796ecae48ca65b1752fe0ccdac0e25bc2aedd83481b5a40c8a9522c3"
+  ],
+  "product": {"head": "91990ae9aec72f47a67591892ac09fa1f59d2f16", "tree": "840fb2855953d5363fbd144e11b3f81763d9cef7", "reaudited": false, "hooks": "0/6 unchanged", "present_in_local_baseline": false},
+  "packet_verification": {
+    "manifest": "proposal-4/SHA256SUMS 3c9276aac0105f601c0e89e9d0fbb480cc0673cd75500d9bf6251e88c39e2eaa, sha256sum -c 9/9 OK, non-self-including",
+    "diff_reproduced": "diff -u proposal-3 vs proposal-4 for six changed files equals V3_TO_V4.diff modulo header timestamps plus one trailing annotation line in the packet copy",
+    "pipe_helper": "byte-identical V3/V4 (cmp), c261ffb4…",
+    "runner_delta_confined_to": "header/paths, PIN_PIPE_V4 rename, lease-verification block (71-75), install_signal_traps (76); S00 pins, S50b/S62b/S63b joins, latch unchanged"
+  },
+  "verdicts": {
+    "A01_unset_local": {"status": "CLOSED", "lines": {"lib": "55-56"}},
+    "A02_primary_exit_ordering": {"status": "CLOSED_AT_SOURCE_PREDICATES_CONSISTENT", "lines": {"lib": "73-77,99-105,111-116,164", "stub": "26,41", "launcher": "55-60,141,160,179", "predicates": "73-87"}, "note": "accepted exit set {124,137,143} tolerant of uutils/GNU timeout; no GNU-specific assumption load-bearing"},
+    "A03_total_bound": {"status": "SUBSTANTIALLY_CLOSED", "lines": {"driver": "22-24,34-57,71-73,83,92-94"}, "arithmetic": "65+47+50+50+50+50=312; +5 direct; +15 reserve = 332 <= 340; cancellation <= 11 s inside reserve", "residual": "V4B-02 (nonmaterial)"},
+    "A04_lease_outside_workload": {"status": "PARTIALLY_CLOSED_MATERIAL_COUNTEREXAMPLE", "lines": {"launcher": "116-118,147-158,171,179-181", "runner": "71-75", "stub": "19-21"}, "residual": "V4B-01"},
+    "positive_closures_preserved": {"status": "PRESERVED", "evidence": "session census/signalling lib 43-51; argv-only writers lib 127-159, launcher 63-98; SID=RPID by construction launcher 101-103,126-128; handshake runner 60/stub 17; observed-vs-validation split lib 27-35; VPA-04/05 unchanged per diff"},
+    "stage1_control_grant_private_lease": "SAFE_TO_EXECUTE_ON_EXACT_BYTES; NOT_RECOMMENDED_TO_SPEND — launcher (V4B-01) and lib (V4B-03) need <=10-line corrections that change certified bytes; caller command must be corrected first (V4B-04). No canonical lock/network/worktree/install path in any control path; all seven predicate sets consistent with traced mechanism; no V3B-01-type inversion found.",
+    "stage2_native_applicability": "NOT_GRANTABLE_ON_V4_BYTES — V4B-01, V4B-03; prerequisites: corrected Stage 1 passed once; worktrees/s4-r6, execution/s4-r6/{predecessor-88287cff,probes}, execution/s4-r6-validation/v4 restored to hardcoded paths with manifest re-verification (all absent here); non-job-control caller with guarded raw exit; no --kill-after wrapper around the lease holder",
+    "bound_340s": "HOLDS_BY_CONSTRUCTION (see A03)",
+    "bound_3370s": "SOUND_ESTIMATE_NOT_EXTERNALLY_ENFORCED — 3300 wall-clock (launcher 135) + 45 + 10 + 8 + 5 + 2; iteration-count loops add seconds of overhead; per-step timeouts sum 3450 > 3300 so slow runs can be truthfully TIMEOUT"
+  },
+  "material_findings": [
+    {
+      "id": "S4-V4-B-01",
+      "severity": "HIGH (Stage 2) / not exercised by Stage 1",
+      "title": "TIMEOUT/INTERRUPTED classified before survivors check; lease released with unverified survivors",
+      "locations": {"launcher": ["171", "179", "180", "181", "156-158", "147-155"], "request": ["35"], "predicates": ["44"]},
+      "mechanism": "SURVIVORS computed at 171 after post-exit TERM/KILL loops; 179 (TIMED_OUT) and 180 (INTERRUPT) publish_and_exit before 181 (SURVIVORS -> hold_quarantine_lease). Launcher exit closes fd 9 -> canonical (VALIDATION) or private (CONTROL) lease free while owned survivors remain. Quarantine reached only if runner itself still alive (156-158) or on non-timeout/non-interrupt path (181).",
+      "consequence": "A-04 requirement (unverified survivor must prevent slot handoff) violated on the two paths where survivors are most likely; request 35 'either path' claim untrue; record itself remains truthful",
+      "blocks": ["Stage 2 grant on V4 bytes"],
+      "minimal_closure": "check [[ -n $SURVIVORS ]] && hold_quarantine_lease before line 179 (keep TIMEOUT/INTERRUPTED label or exit 5); reword request 35; launcher byte change -> V5 + manifest"
+    },
+    {
+      "id": "S4-V4-B-03",
+      "severity": "MEDIUM (Stage 2 evidence truth)",
+      "title": "EXIT_RECORD lock section still attributes canonical lock to the runner",
+      "locations": {"lib": ["147"], "runner": ["67-75"], "diff": ["context line unchanged"]},
+      "mechanism": "kind==VALIDATION writes holder_pid=num(sid) and mode 'flock -n held by runner for whole run'; in V4 the launcher (S4R6_LEASE_PID) holds it and the runner only verifies fd 9",
+      "consequence": "durable runner record consumed by final attestations misidentifies lock holder/mode",
+      "blocks": ["Stage 2 attestation truth on V4 bytes"],
+      "minimal_closure": "pass lease holder pid/kind to publish_exit_record (or read S4R6_LEASE_PID) and state launcher-held/runner-verified; lib byte change -> V5"
+    },
+    {
+      "id": "S4-V4-B-04",
+      "severity": "MATERIAL for grant text (contract-named item)",
+      "title": "Caller commands report echo's status, not the driver/launcher raw exit; wrappers ineffective or hazardous",
+      "locations": {"request": ["53", "56", "80", "84"]},
+      "mechanism": "bash -c 'cd X && bash Y; echo \"exit=$?\"' exits 0 always; failed cd is printed as the driver/launcher exit. timeout --foreground --kill-after N bash -c '...' with trailing echo forks the child, so TERM ends only the outer shell; if effective, --kill-after would KILL the lease holder (contradicts A-04)",
+      "blocks": ["any Stage 1/2 grant text as written"],
+      "minimal_closure": "bash -c 'cd /path || exit 70; bash controls/run-controls-v4.sh; rc=$?; echo \"driver exit=$rc\"; exit \"$rc\"' (same shape for launcher); drop wrappers or use timeout --foreground N bash launcher.sh directly without --kill-after; grant-text change, no script change"
+    }
+  ],
+  "nonmaterial_observations": [
+    {"id": "S4-V4-B-02", "where": "driver 34-43, 81, 86-89", "note": "cancel_active KILLs the launcher after 10 s though its INTERRUPT teardown can take ~30 s; on CANCELLED the driver exits 96 before the leftover scan/lease check, so log line 42 is untrue; KILLed launcher releases the private lease with unrecorded session. Only trips after the launcher exceeds its own worst case; private lease only. Optional: scan before exit 96; grace >= launcher post-deadline constant."},
+    {"id": "S4-V4-B-05", "where": "launcher 147-155", "note": "quarantine holder pid recorded without kill -0 / readlink /proc/pid/fd/9 verification; uutils sleep expected to accept 'infinity' but not verified in-packet; no identity (start time/cmdline) recorded for the later explicit kill. Optional hardening."},
+    {"id": "S4-V4-B-06", "where": "stub 21,47; request 91-93", "note": "control 5 outside flock -n conflicts whether launcher or stub holds the shared open-file description (stub inherits fd 9); does not discriminate the holder. Optional: exec 9>&- in the stub before the probe step. Source reading independently establishes the launcher hold."},
+    {"id": "N-a", "where": "launcher 116,118", "note": "exec 9> truncates the lock file before flock -n; on LEASE_BUSY the current holder's identity line is erased. Workspace-wide convention; identity line not durable evidence; inherited."},
+    {"id": "N-b", "where": "launcher 123; lib 77; driver 50; launcher 126", "note": "INT traps inert in background children of non-interactive bash (SIGINT ignored on entry). Only TERM used; no effect."},
+    {"id": "N-c", "where": "lib 75; stub 64; runner 218", "note": "signal with no active step during final reap re-enters reap_owned and clobbers REAP_FOUND; cosmetic."},
+    {"id": "N-d", "where": "runner 74; stub 21", "note": "readlink canonical path vs literal path; symlinked workspace would refuse 75 (fail-closed)."},
+    {"id": "N-e", "where": "request 26", "note": "changed-line counts 33/48/110 vs my 34/49/112; cosmetic."},
+    {"id": "N-f", "where": "all scripts", "note": "hardcoded /home/user/workspace/execution/s4-r6-validation/{v4,runs}, worktrees/s4-r6, execution/s4-r6/*, execution/test-validation.lock absent in this workspace; restoration + sha256sum -c 9/9 at those paths is a grant precondition. Stage 1 outputs land inside the frozen packet dir (N-4 accepted)."},
+    {"id": "N-g", "where": "runner 109-213; launcher 38", "note": "per-step timeouts sum 3450 s > OUTER_S 3300 s; a legitimately slow run is truthfully classified TIMEOUT; expectation-setting only."},
+    {"id": "N-h", "where": "environment by filesystem listing", "note": "/usr/bin/sleep and /usr/bin/timeout -> ../lib/cargo/bin/coreutils/* (uutils); /usr/bin/flock and /usr/bin/setsid util-linux binaries; /usr/bin/pgrep procps. No version execution performed."},
+    {"id": "N-i", "where": "V3-B N-2/N-3/N-5/N-6", "note": "remain as recorded; request 38-40 accepts them."}
+  ],
+  "not_proven": "no execution of any kind; no gates/Vitest/gitleaks/package/browser/pipe/canonical-lock observations; no artifact/release/native attestation; narrow product source acceptance neither widened nor withdrawn; two independent final evidence attestations still required after any real run",
+  "next_action": "Builder V5: launcher survivors->quarantine before TIMEOUT/INTERRUPTED (179-181) + request 35; lib 147 truthful lease holder; request caller commands 53/80 guarded raw exit, wrappers 56/84 dropped or corrected; optional V4B-02/05/06. New manifest; stub/predicates/pipe may carry unchanged. Dual exact-delta confirmation, then one Stage 1 grant on V5 (<=340 s, private lease, restored paths); Stage 2 only after passing corrected Stage 1 and separate grant.",
+  "disclosure": "one read-only git cat-file -t 91990ae9 against source/extension triggered a failed promisor fetch attempt (remote 'not our ref'); no mutation; not repeated"
+}

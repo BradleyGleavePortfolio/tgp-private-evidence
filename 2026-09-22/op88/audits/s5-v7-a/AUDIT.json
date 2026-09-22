@@ -1,0 +1,113 @@
+{
+  "audit": "OP88-S5-V7-NARROW-REVIEW-A",
+  "tier": "T4",
+  "status": "FROZEN",
+  "input_manifest_sha256": "dd7f2eabccf875520301880fc064c7c7bc1e8f2956070e2a8e7490d943719eab",
+  "verdicts": {
+    "R1_checker_logic_fixtures_and_raw_binding": "SOURCE_CLOSED / EXPECTED_TO_DISCRIMINATE; not executed",
+    "R1_exact_requested_slot": "HOLD_AS_WRITTEN: caller-exit and budget statements need correction (A-01/A-03); no checker/fixture rewrite justified",
+    "R1_independence_from_R2": "R1 requires neither restored source nor application dependencies; it can be separately granted after the caller/envelope correction",
+    "R2_selector_delta": "APPLICABLE deletion-plus-bound change; T1/T2/T3 are not rerun",
+    "R2_execution": "HOLD: inherited startup-ownership hole A-02, caller/envelope corrections A-01/A-03, and fresh setup prerequisites",
+    "product_or_real_DB_clearance": false,
+    "grant_issued": false,
+    "runtime_tests_in_this_review": "NONE"
+  },
+  "positive_closure": [
+    {
+      "id": "S5-TIER2-GATE-V6-01",
+      "status": "SOURCE_CLOSED",
+      "basis": "The checker parses JSON and compares the decoded DELETE statement, requires each teardown operation independently, and checks absence of the skipped marker; the preserved T3 input contains GRANT at 11, failed ADD at 13, then DROP/resetData/DELETE at 14/15/16. [Checker, lines 53-88](../../s5-v7/controls-v7-selective/check-t3-teardown.cjs#L53-L88) [Preserved T3 JSONL, lines 11-16](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/gate-20260922T060647Z-T3.jsonl#L11-L16)"
+    },
+    {
+      "id": "R1-BINDING",
+      "status": "PRESERVED_AND_HASH_BOUND",
+      "basis": "Before checker calls, the wrapper pins both original raw files, the checker and all four fixtures, while each checker summary records the hashes of the bytes it actually read; the additional log marker checks are not a substitute for this hash binding. [Wrapper, lines 20-37](../../s5-v7/controls-v7-selective/run-t3-checker.sh#L20-L37) [Checker, lines 42-51 and 95](../../s5-v7/controls-v7-selective/check-t3-teardown.cjs#L42-L51)",
+      "additional_predicates": "The separately named teardown ordering and log-bound predicates are acceptable for these exact archived inputs: ordering 13<14<15<16 is present and the real log ends with the requested Test Suites and candidate-spec summary. [T3 JSONL, lines 13-16](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/gate-20260922T060647Z-T3.jsonl#L13-L16) [T3 log, lines 854-858](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/gate-20260922T060647Z-T3.jest.log#L854-L858)"
+    },
+    {
+      "id": "R1-NEGATIVES",
+      "status": "STATICALLY_DISCRIMINATING",
+      "basis": "N1/N2/N3 remove exactly the required DROP/resetData/DELETE records, N4 appends one skip marker, and the wrapper requires exit 1 plus each named failure rather than accepting any nonzero exit. [Derivation, lines 13-19](../../s5-v7/counterexamples/derive-counterexamples.sh#L13-L19) [Wrapper, lines 46-60](../../s5-v7/controls-v7-selective/run-t3-checker.sh#L46-L60)",
+      "expected_not_observed": "P0: six checker predicates PASS and rc0; N1/N2/N3: rc1 with the corresponding teardown_ran component MISSING; N4: rc1 with no_skip occurrences=1; wrapper pass=11/fail=0",
+      "limitation": "N1-N3 also fail the additional ordering check as intended; the wrapper nevertheless demands the original teardown_ran component, so ordering failure alone cannot satisfy a negative. [Checker, lines 72-80](../../s5-v7/controls-v7-selective/check-t3-teardown.cjs#L72-L80) [Wrapper, lines 57-59](../../s5-v7/controls-v7-selective/run-t3-checker.sh#L57-L59)"
+    },
+    {
+      "id": "R2-SELECTION",
+      "status": "NARROW_DELTA_APPLICABLE",
+      "basis": "The exact delta is ten header-comment lines, AGG_BOUND 380 to 120 and removal of the T1/T2/T3 invocation/check blocks; retained T0 still uses the HEAD predecessor spec and the same fake harness/config, input identities, first-failure handling, mutating-teardown predicate and named identity-refusal predicate. [V6-to-T0 diff](../../s5-v7/controls-v6-to-v7-t0-only.diff) [T0 driver, lines 27-82](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L27-L82)",
+      "qualification": "Unchanged run_gate bytes establish derivation, not a waiver of the concrete inherited interruption defect A-02."
+    },
+    {
+      "id": "PRESERVED-V6",
+      "status": "REUSE_VALID_OBSERVATIONS_WITHOUT_RELABELING_WAVE",
+      "basis": "The historical log retains T1/T2 named refusal, zero-mutation and owned-group passes, T3 owned/setup_partial passes, then the original teardown_ran failure and stop; its 12 PASS total includes I0 and partial T3, not 12 T1/T2-only passes. [Historical control log, lines 8-29](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/control-20260922T060647Z.log#L8-L29)",
+      "disposition": "Preserve those observations and the failed wave unchanged; selective new evidence may close the checker and T0 gaps but must never be presented as an executed green V6 wave. [V6 first-failure report, lines 5-19](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/WAVE6_FIRST_FAILURE.md#L5-L19)"
+    }
+  ],
+  "material_findings": [
+    {
+      "id": "S5-V7-A-01",
+      "severity": "MEDIUM",
+      "applies_to": ["R1_caller", "R2_caller"],
+      "title": "Printed execution commands still hide the actual outer exit",
+      "locations": ["V7_SELECTIVE_PREP_REQUEST.md:77-78"],
+      "counterexample": "If the wrapper returns 1, or timeout returns nonzero, the requested command runs a successful trailing echo and the enclosing shell returns 0 despite printing outer_exit=1 (or the timeout code). [Request, lines 77-78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L77-L78)",
+      "consequence": "The external invocation status can falsely appear successful, contradicting the request's own raw-capture qualification. [Request, lines 77-78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L77-L78)",
+      "minimal_correction": "In the parent grant, guard cd and capture the timeout command in if/else immediately, record the saved status, then exit with that same status; do not use the trailing echo as the observable command result.",
+      "nonexecuted_R1_caller_shape": "bash -c 'cd /home/user/workspace/execution/op88/s5-v7 || exit 70; if S5_CTL_GRANT=granted-by-parent timeout --foreground -k 10 140 bash controls-v7-selective/run-t3-checker.sh; then rc=0; else rc=$?; fi; printf \"outer_exit=%s\\n\" \"$rc\"; exit \"$rc\"'",
+      "qualification": "Illustrative raw-status correction only, not an execution grant or a solution to A-03.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S5-V7-A-02",
+      "severity": "HIGH",
+      "applies_to": ["R2"],
+      "title": "Inherited run_gate registers ownership only after its interruptible startup sleep",
+      "locations": ["controls-v7-selective/ctl-t0-only.sh:35,47-49,67-74"],
+      "counterexample": "Deliver TERM to the driver after the setsid child is spawned at 67-68 but while the parent is in sleep 0.2 at 69: its trap exits 143 before OWNED_PGIDS is populated, and EXIT cleanup iterates an empty list while the detached Jest child can continue. [T0 driver, lines 35,47-49 and 67-74](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L47-L74)",
+      "related_identity_counterexample": "If the spawned child has not yet performed setsid when ps runs, the sampled pgid can still be the caller group; that value is added without checking pgid==spawned_pid or excluding the caller group and later authorizes negative-group TERM/KILL. [T0 driver, lines 67-74](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L67-L74)",
+      "consequence": "The eventual T0 slot does not reliably provide the promised owned cleanup on interruption and can adopt an unowned caller group as signal authority; this is inherited from V6, not introduced by deleting T1/T2/T3. [T0 driver, lines 47-49 and 69-76](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L47-L76) [Exact selector diff](../../s5-v7/controls-v6-to-v7-t0-only.diff)",
+      "minimal_correction": "Before granting R2 execution, freeze a bounded startup-publication/adoption correction: register the spawned child immediately, resolve interruption safely through verified session/group identity, never authorize caller-group signals, and retain truthful nonzero recovery on uncertainty.",
+      "requested_future_discriminator": "Deterministic interruption between spawn and identity registration, plus delayed session creation with a caller-group decoy; prove no unowned signal and no unaccounted owned child.",
+      "scope_limit": "No new product/spec/harness changes or broad supervisor rewrite requested; source restoration can proceed independently.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S5-V7-A-03",
+      "severity": "MEDIUM",
+      "applies_to": ["R1_budget_request", "R2_budget_and_cleanup"],
+      "title": "120-second internal and 140-second outer completion claims omit explicit kill/cleanup grace",
+      "locations": ["controls-v7-selective/run-t3-checker.sh:16,40-44,62-63", "controls-v7-selective/ctl-t0-only.sh:34,47-49,64-76", "V7_SELECTIVE_PREP_REQUEST.md:55,60,77-78"],
+      "R1_counterexample": "With six aggregate seconds remaining, invoke permits a six-second timeout plus its explicit five-second kill-after interval, so that call can already run to elapsed 125 rather than 120 before wrapper logging; the outer requested 140-second timeout also has a ten-second kill-after interval. [Checker wrapper, lines 40-44](../../s5-v7/controls-v7-selective/run-t3-checker.sh#L40-L44) [Request, line 77](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L77)",
+      "R2_counterexample": "With six seconds remaining, run_gate can spend those six polling seconds and then ten more in TERM grace, followed by wait, group cleanup and EXIT cleanup; none is checked against AGG_BOUND, and the requested outer wrapper allows twenty seconds beyond its 140-second initial timeout. [T0 driver, lines 47-49 and 64-76](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L64-L76) [Request, line 78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L78)",
+      "consequence": "The requested <=140-second slot and internal 120-second aggregate completion are not the actual enforced end-to-end bounds; for R2, unconditional wait after KILL and A-02 mean an outer wrapper alone is not proof of detached-child cleanup. [T0 driver, lines 69-76](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L69-L76) [Request, lines 77-78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L77-L78)",
+      "minimal_correction": "Before R1, correct the grant's budget terminology and reserve explicit kill/output/cleanup time, with raw timeout status and no success claim on expiry; checker and fixtures need no logic change for this correction. Before R2, include cancellation/confirmed-owned-cleanup in the successor's actual deadline and request, with no unconditional wait after unconfirmed termination.",
+      "qualification": "140+10=150 for R1 and 140+20=160 for R2 are nominal outer timeout-plus-kill allowances, not attestations of whole descendant-tree completion; no current uutils/GNU exit-code equivalence is asserted.",
+      "runtime_observed": false
+    }
+  ],
+  "R2_prerequisites_not_certified_here": {
+    "source": "Fresh restoration must match HEAD 143d451ead6ccdbebd92ca3031ba7a89867d6cfc, committed tree d0e122d35022377196908b7d132fc34c1af2fc6b and dirty fingerprint 6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0 at the exact worktrees/s5-r4 path used by the frozen library. [T0 driver, lines 29-38](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L29-L38) [Library, line 17](../../s5-v7/controls-v3/lib.sh#L17) [Request, line 78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L78)",
+    "setup": "Require separately authorized fresh setup 74736a58 and attributable FINAL/raw outer status, strict inside-worktree identities, unchanged fingerprint/ancestor inventory, absent hooks/generated client and verified cleanup; historical installed packages do not establish current prerequisites. [Setup request, lines 7-13](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/tier2-preparation-1/TIER2_SETUP_REQUEST_V1.md#L7-L13)",
+    "authority": "Restoration, any necessary fetch, dependency installation and eventual T0 execution remain separately granted stages, not permissions issued by this review. [V7 request, lines 71-78](../../s5-v7/V7_SELECTIVE_PREP_REQUEST.md#L71-L78)",
+    "current_presence": "Not inspected; neither worktree nor installed application dependencies are inferred present or absent now",
+    "review_scope": "Setup request/gates reviewed only for dependency applicability; no full setup-runner or product re-audit"
+  },
+  "nonblocking_notes": [
+    "The phase field is not used to infer teardown: all preserved records say setup, and the checker instead requires decoded operation identity and observed order, which is appropriate for this exact evidence. [T3 JSONL](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/gate-20260922T060647Z-T3.jsonl) [Checker, lines 66-80](../../s5-v7/controls-v7-selective/check-t3-teardown.cjs#L66-L80)",
+    "The wrapper's final negative record_parse check is informational, but each exact hash-pinned deletion fixture remains well-shaped and the wrapper demands the specific teardown/skip failure, so no additional blocker is established for this finite fixture set. [Wrapper, lines 25-35 and 57-61](../../s5-v7/controls-v7-selective/run-t3-checker.sh#L57-L61)",
+    "Correct the shorthand that labels the entire 12-PASS historical total as T1/T2 evidence; the underlying log correctly attributes I0 and T3 passes and remains authoritative. [Driver header, line 7](../../s5-v7/controls-v7-selective/ctl-t0-only.sh#L7) [Historical control log, lines 8-27](../../../../tgp-private-evidence/2026-09-22/remediation/s5-r4/wave-6-gate-failed/control-results/wave6-gate/control-20260922T060647Z.log#L8-L27)"
+  ],
+  "smallest_next_action": "Parent corrects the R1 raw-status/budget grant contract and may then grant only the unchanged read-only checker packet; keep R2 execution held for its narrow owned-startup/deadline correction and separately verified fresh setup, while source restoration proceeds independently.",
+  "truth_and_independence": {
+    "candidate_or_checker_executed": false,
+    "syntax_or_probe_executed": false,
+    "candidate_code_or_packet_modified": false,
+    "current_peer_reports_read": false,
+    "S4_report_modified": false,
+    "frozen_prior_V6_B_addendum_read": true,
+    "all_counterexamples": "Static reasoning; not executed findings",
+    "final_product_dual_audits": "Remain downstream and unfulfilled by this review"
+  }
+}

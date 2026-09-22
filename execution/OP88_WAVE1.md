@@ -115,3 +115,20 @@ Every result must include exact inputs/hashes, implemented versus tested versus 
 - Setup: source restore may read/fetch only required public prerequisite objects and import verified bundle. No dependency installation or control/Jest/diagnostic execution granted. Read frozen setup91fe0f1b and prepare fresh exact isolated installation request separately; old1099-package record is historical.
 - Recovery: no product edits/commit, no mutation of prior fixture/source/output; retain first failure and unknown outer receipt. Any portability change must be pinned and independently reviewed.
 - Success does not prove: app harmlessness, historical C2-C4 cause, baseline/P1/native/import/release acceptance. This is a discriminator, not a product fix.
+
+## S4: OP88-S4-V5-PREP (both independent V4 reports frozen)
+
+- Repository / PR/base/head: extension #21/#23/#24/#25 cumulative, public0111be661922234d670bbf23e23d270eec1b4a4e, unchanged product91990ae9aec72f47a67591892ac09fa1f59d2f16/tree840fb2855953d5363fbd144e11b3f81763d9cef7.
+- Runner base: frozen V4 manifest3c9276aa, launcher23ebfbc3/libabfdd0bd/runner86a4f6cc.
+- Purpose: one minimal additive V5 execution-layer successor closing concrete material V4 counterexamples; not product reimplementation.
+- Non-goals: no product source, new dependencies, generic supervision framework, setup/control/native/browser execution, hook bypass, revision of originals or weakening predicates.
+- Dependencies: BOTH frozen `execution/op88/audits/s4-v4-{a,b}` reports; current proposal-4 bytes and prior closures. Both are now readable by builder.
+- Sole writer/canonical builder: new Claude Fable5 non-auditor, execution/op88/s4-v5. All originals and archived product immutable.
+- Tier: T4 trusted auth/release evidence and cleanup/recovery ownership; no downgrade for runner-only work.
+- Parent disposition: both stages HOLD. B's narrower Stage1 opinion and optional labels do not waive A's concrete A01-A06 counterexamples under G11. B03 lock-holder truth must be corrected in the same owned change. Do not spend V4 controls.
+- Required review: two independent risk-scoped exact-V5 reviews before separately granted private controls; artifact final attestations remain later.
+- Acceptance: keep active-step deferral through primary latch; effective elapsed cancellation through cleanup/publication without abandoning owned detached work; secure unresolved-survivor exclusion before TIMEOUT/INTERRUPTED precedence; checked identity-safe recoverable quarantine handoff with checked creation/publication failure; fail-closed mandatory parsed-record/nonempty-step predicates; guarded caller raw exits and truthful launcher-owned lease records. Preserve existing initialization/session/JSON/exit-split/prerequisite/artifact-join closures.
+- Required evidence: exact minimal diff, hashes, A01-A06/B03 mapping with concrete discriminators, separate Stage1 private and Stage2 requests and realistic total bounds/ownership. No claim that tiny windows or private-only names waive ownership; no infinite unrecorded holder or bare-PID recovery. Use actual uutils0.8.0 assumptions. Propose needed fresh path mapping explicitly.
+- Evidence allowed now: source reasoning, manual edits, hashes/diffs/syntax only. No controls/probes/lock acquisition/install/network/DB/browser.
+- Recovery: refuse nonzero and preserve evidence when identity/cleanup/publication is uncertain; one owned writer and immutable V4 packets. New meaningful architecture/ownership requirements require parent rescope, not freestyling.
+- Success does not prove: runtime control pass, native gates, artifact/browser correctness, remote revocation, native completion or release.
