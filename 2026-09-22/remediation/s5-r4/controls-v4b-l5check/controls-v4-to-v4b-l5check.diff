@@ -1,0 +1,11 @@
+--- controls-v4-l5check/l5-check.sh	2026-09-22 05:28:24.589839075 +0000
++++ controls-v4b-l5check/l5-check.sh	2026-09-22 05:33:19.937839075 +0000
+@@ -9,7 +9,7 @@
+ # Usage: l5-check.sh <run-log>   exit 0 = property holds, 1 = violated (reasons printed), 2 = usage.
+ set -u
+ f="${1:-}"; [ -f "$f" ] || { echo "usage: $0 <run-resume log>"; exit 2; }
+-fail=0; say() { echo "$1 $2"; [ "$1" = FAIL ] && fail=1; }
++fail=0; say() { echo "$1 $2"; if [ "$1" = FAIL ]; then fail=1; fi; return 0; }  # v4b: always return 0 so &&/|| chains never misfire
+ ref_line=$(grep -nE 'session\(s\) attached .* mutating stage resume refuses' "$f" | cut -d: -f1)
+ [ "$(printf '%s\n' "$ref_line" | grep -c .)" = 1 ] && say PASS "P1 refusal line present once (line $ref_line)" || say FAIL "P1 refusal line count=$(printf '%s\n' "$ref_line" | grep -c .)"
+ grep -qE '^CMD .*generate-only' "$f" && say FAIL "P2 generate-only CMD present" || say PASS "P2a no generate-only CMD"

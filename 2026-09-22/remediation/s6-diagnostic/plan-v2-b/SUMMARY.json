@@ -1,0 +1,39 @@
+{
+  "slice": "S6-V2-ALLOCATION-REVIEW-B",
+  "reviewer": "B (s4_r6_independent_audit_b_muc70jfl)",
+  "requested_identity": "Claude Fable 5",
+  "observable_identity": "API-hosted AI subagent; model/version/settings not exposed",
+  "source_head": "d51a191098f483cea9abec6cc7e9f3beffd18c06",
+  "source_porcelain_lines": 0,
+  "executed": false,
+  "peer_conclusions_read": false,
+  "reviewed": {
+    "v2_manifest": "MANIFEST.v2.sha256 11/11 OK",
+    "setup_runner": "6fa695109dfbb2bf6a7e5b7a72eb326a14e2656dd2597f6fa6ef2d2a78c83324",
+    "diagnostic_runner": "a38994e4645509223411a613af807ba1a6d52da040fa22eca3cc5e0b075e2120",
+    "instrument_v2": "ee00ef3f03c9be35a00b6e44e4f01e0c36b50457af17b57636333c1fe13cfa71",
+    "selftest": "425ddec601bd5c1d53fa23833ad433afafec648c827ef2ed15659871c8276a28",
+    "instrument_v3": "cf4701010365cb87326c17c901c4f6c941b84ea5d3dceb3f4c5e38c21e51c1d0",
+    "v3_manifest": "MANIFEST.v3.sha256 2/2 OK",
+    "selftest_v2_receipt": "rc=3 problems=4 liveRefed=0 (all control resources diverted to diagOwn)",
+    "selftest_v3_receipt": "rc=0 problems=0 liveRefed=3 hops=11 beforeExit exit0; RECEIPT.sha256 5/5 OK"
+  },
+  "disposition": {
+    "instrument_v2": "NOT_FIT",
+    "instrument_v3": "B-01_CLOSED_SOURCE_AND_RECEIPT; fitness under Jest unobserved",
+    "diagnostic_runner_a38994e4": "SUPERVISION_OK; NOT_EXECUTABLE_TO_COMPLETION (binds V2 instrument; B-02 module-paths deterministic fail)",
+    "setup_runner_6fa69510": "EXECUTABLE_BOUNDED_GRANTABLE (after S2 releases lock; disclosures B-04/B-05)",
+    "runtime_grant_recommendation": "NO for a38994e4; V3 runner revision required (re-point to v3/diag + MANIFEST.v3, remove @babel/preset-env from strict list, cleanup copied specs)"
+  },
+  "findings": [
+    {"id": "B-01", "class": "material", "status": "closed_by_v3", "what": "diag regex /s6diag\\./ swallowed selftest and __tests__/s6diag spec frames -> control resources hidden in diagOwn"},
+    {"id": "B-02", "class": "material", "status": "open", "what": "runner strict-resolution list requires @babel/preset-env; absent from package-lock.json and from /home/user/node_modules/@babel -> die module-paths rc 5 after successful setup"},
+    {"id": "B-03", "class": "nonmaterial", "status": "open", "what": "runner leaves 5 untracked spec copies in $WT/src/services/__tests__"},
+    {"id": "B-04", "class": "disclosure", "status": "open", "what": "lock fd 9 inherited by owned children; survivor would hold canonical lock (fail-closed)"},
+    {"id": "B-05", "class": "disclosure", "status": "open", "what": "npm ci runs dependency lifecycle scripts; writes $HOME/.npm; network inherent"},
+    {"id": "B-06", "class": "limitation", "status": "open", "what": "expected C rc=143 budget-TERM may be rc=137 budget-KILL if another SIGTERM listener remains; first_exit still truthful"},
+    {"id": "B-07", "class": "nonmaterial", "status": "open", "what": "chain label 'untracked/evicted' for root trigger asyncId 1; should read 'root'"}
+  ],
+  "supervision_semantics_ok": ["flock -n held on fd 9 through traps", "setsid owned PGIDs recorded; reap refuses unowned", "zombie-aware alive()", "first_exit separate from cleanup_exit", "per-step budget+grace; inner BUDGET 360 < external 420+30", "STOP_FIRST_FAILURE no retries", "CLI setupFilesAfterEnv override preserves the config's single jest.setup.js", "taskset -c 0,1 valid (nproc 2); npm 10.8.2 supports --logs-dir"],
+  "does_not_prove": ["Jest causal result", "product or harness ownership", "clean baseline", "P1 closure", "release readiness"]
+}

@@ -1,0 +1,100 @@
+{
+  "frozen_at": "2026-09-22T05:23:06.870836+00:00",
+  "slice": "S4-V2-INDEPENDENT-PLAN-A",
+  "tier": "T4",
+  "exact_pins": {
+    "launcher": "13fed63063ec5511c50255263e69b410df35fad625e48efb0613355ab2d53c8f",
+    "runner": "fa5dbaef8834a5766536e63c1f8772eaa3eb0e6f7173cdbbba14b99bcf09b2ff",
+    "pipe": "c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b"
+  },
+  "allocation_verdict": "HOLD_V2_INCLUDING_CONTROLS_AS_SPECIFIED",
+  "product_source_verdict": "UNCHANGED_PRIOR_NARROW_ACCEPTANCE",
+  "product_head": "91990ae9aec72f47a67591892ac09fa1f59d2f16",
+  "product_tree": "840fb2855953d5363fbd144e11b3f81763d9cef7",
+  "findings": [
+    {
+      "id": "S4-V2-A-01",
+      "severity": "high",
+      "material": true,
+      "locations": [
+        "runner/s4-r6-validate-v2.sh:56,83,114,117,273-277",
+        "launcher/s4-r6-launch-v2.sh:81-104"
+      ],
+      "title": "Nested timeout creates an owned step process group omitted by runner-PG-only supervision",
+      "evidence": "Runner calls nonforeground timeout; static actual uutils binary contains default setpgid(0,0); census and signals select runner group only",
+      "counterexample": "Command exits leaving a child in timeout PGID T; runner-PG census R reports empty. On outer KILL of R, T can continue while lock FD closes.",
+      "minimal_closure": "Align launch and verified ownership boundary or track all owned step groups; hold lock through actual cleanup; add control through real nested wrapper."
+    },
+    {
+      "id": "S4-V2-A-02",
+      "severity": "high",
+      "material": true,
+      "locations": [
+        "launcher/s4-r6-launch-v2.sh:75,120-132"
+      ],
+      "title": "Shell true/false substitution causes undefined Python names during supervisor JSON publication",
+      "evidence": "Unquoted heredoc embeds timed_out:$TIMED_OUT into Python dictionary; true/false are undefined; json.dump never reached",
+      "counterexample": "Normal false or timeout true both cause NameError; validator then sets FAILED_PUBLICATION/exit7, no intended receipt",
+      "minimal_closure": "Pass Boolean through quoted/data-safe interface; retain causal timeout/interruption and publication errors independently."
+    },
+    {
+      "id": "S4-V2-A-03",
+      "severity": "high",
+      "material": true,
+      "locations": [
+        "launcher/s4-r6-launch-v2.sh:58-71,92",
+        "controls/C2-runner-leaves-orphan-stub.sh:7-9",
+        "controls/C3-publication-failure-stub.sh:5-6"
+      ],
+      "title": "Delayed post-launch PID lookup loses fast exits and an unconditional wait can defeat supervision",
+      "evidence": "Sleep0.2 precedes ps/pgrep identity lookup; missing group exits73 before supervisor record; wait RPID precedes final survivor classification with no deadline",
+      "counterexample": "C2/C3 finish before ps; C2 orphan is reparented and cannot be found via pgrep-P old PID",
+      "minimal_closure": "Ownership handshake before workload exit/orphaning; retained identity; bounded termination confirmation and supervisor record on refusal/survivors."
+    },
+    {
+      "id": "S4-V2-A-04",
+      "severity": "medium",
+      "material": true,
+      "locations": [
+        "runner/s4-r6-validate-v2.sh:127-129,213-214,300,321"
+      ],
+      "title": "Primary failure attribution can be replaced by cleanup; failed expected-negative sign can exit0",
+      "evidence": "block cleanup/source precedes block command rc; wrong S45 rc0 becomes FIRST_FAIL_RC0 and FAILED case exits0",
+      "counterexample": "Command exit1 plus cleanup failure records96 as first failure; S45 unexpected0 latchesFAILED but runner exits0",
+      "minimal_closure": "Preserve command outcome before cleanup; retain raw0 observation but choose nonzero validation-failure exit; keep cleanup separate."
+    },
+    {
+      "id": "S4-V2-A-05",
+      "severity": "medium",
+      "material": true,
+      "locations": [
+        "SLOT_REQUEST_V2.md:requested-control-table",
+        "launcher/s4-r6-launch-v2.sh:35-36,78-101"
+      ],
+      "title": "Control defaults exceed aggregate60-second mandate on unexpected hang",
+      "evidence": "C2/C3 outer30 plus default grace45 is75 before extra reaping/publication; no aggregate supervisor",
+      "counterexample": "One unexpectedly hung C2 consumes more than whole allowed control bundle",
+      "minimal_closure": "Explicit bounded control/grace values and aggregate sequential bound including failure cleanup; first unexpected result stops."
+    }
+  ],
+  "prior_closure_matrix": {
+    "S4-R6-VPA-01": "OPEN_NESTED_TIMEOUT_BOUNDARY",
+    "S4-R6-VPA-02": "PARTIAL_NEW_PUBLICATION_AND_EXIT_ATTRIBUTION_DEFECTS",
+    "S4-R6-VPA-03": "PARTIAL_STARTUP_WAIT_CONTROL_BOUNDS_OPEN",
+    "S4-R6-VPA-04": "NARROW_SOURCE_CLOSED_REAL_ARTIFACT_PROOF_PENDING",
+    "S4-R6-VPA-05": "NARROW_SOURCE_CLOSED_EXIT_ATTRIBUTION_SEPARATELY_OPEN"
+  },
+  "control_dispositions": {
+    "C1": "Same-group control bypasses real step(); publication defect prevents intended TIMEOUT receipt",
+    "C2": "Fast-exit ownership race can miss orphan and refuse73 before record",
+    "C3": "Fast-exit race; exit7 can arise for wrong cause from undefined Python Boolean, so inspect exact facts not exit alone",
+    "C4": "Token check statically refuses71 when launch env absent; control wrapper reports success by exiting0"
+  },
+  "runtime_claims": "NONE; all counterexamples are static code/control-flow analysis, not observed process leaks or executions",
+  "artifact_attestation": "WITHHELD",
+  "test_acceptance": "WITHHELD",
+  "release_attestation": "WITHHELD",
+  "historical_hooks": "0/6 unchanged",
+  "next_action": "Minimal separately versioned frozen successor; fresh independent applicability review before any control/native allocation",
+  "current_V2_peer_conclusions_accessed": false
+}

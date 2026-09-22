@@ -1,0 +1,10 @@
+# Self-check receipt — V1 instrument, executed exactly once (granted), FAILED at instrument load
+
+- Command: `timeout -k 5 15 node diag/s6diag.selftest.js` (cwd `/home/user/workspace/execution/s6-diagnostic`; env `S6DIAG_LOG=logs/selftest/selftest.inventory.jsonl S6DIAG_STEP=selftest`); no lock, no node_modules, no product code, no network.
+- Start 2026-09-22T04:56:35.373Z, end 04:56:35.479Z (~0.1 s). rc=1 (Node uncaught exception; timeout not reached).
+- Error: `ReferenceError: init is not defined at AsyncHook.init (diag/s6diag.main.js:117:34)` — raised on the first hook init, which was Node's own `Signal` handle created by `process.once('SIGTERM')` inside `install()` (main.js:159), i.e. before any inventory work.
+- Inventory log: 1 line, `{"ev":"exit","code":1,"beforeExitSeen":false,"uptimeMs":1}`; no snapshot.
+- Cleanup: process exited by itself; `ps` afterwards showed only platform daemon processes (pids 296/336, unrelated). Nothing to reap. Files: `selftest.out`, `selftest.inventory.jsonl`, hashes in `RECEIPT.sha256`.
+- Root cause (source-only): V1 `s6diag.main.js` used object-method shorthand `init(...) {}` in `createHook({...})` and then called `captureStack(init)`; the shorthand does not create a lexical binding named `init`. This is a defect in my instrument (T4 root causal bug), not evidence about Jest or the product. It would have made every Jest step (A–C) fail identically at globalSetup.
+- Classification: FIRST UNEXPLAINED FAILURE → stopped; no retry performed. V1 bytes (`diag/`, `run-c5-resource-inventory.sh`, `MANIFEST.sha256`) left unchanged.
+- Fix prepared, not executed: `v2/diag/s6diag.main.js` names the hook `init: function initHook(...)` and calls `captureStack(initHook)`; additionally reports the instrument's own resources under `diagOwn` instead of counting them. `v2/diag/s6diag.selftest.js` takes two snapshots so a re-arming chain is shown by a fresh asyncId (the V1 "destroyed predecessor in chain" criterion assumed a PROMISE→Timeout trigger link that `await` continuations do not guarantee).

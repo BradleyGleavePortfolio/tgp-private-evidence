@@ -1,0 +1,115 @@
+{
+  "slice": "S4-V2-INDEPENDENT-PLAN B",
+  "tier": "T4",
+  "frozen_at_utc": "2026-09-22T05:26:00Z",
+  "verdict": "HOLD_V2_ALLOCATION",
+  "verdict_detail": "Block both the four fake-control grant and the validation slot on the frozen V2 packet; V3 with minimal closures required. Product 91990ae9 unchanged and not re-audited; historical hooks remain 0/6.",
+  "scope": {
+    "reviewed_only": "execution/s4-r6-validation/v2 (frozen packet)",
+    "product_head": "91990ae9aec72f47a67591892ac09fa1f59d2f16",
+    "product_tree": "840fb2855953d5363fbd144e11b3f81763d9cef7",
+    "packet_hash_check": "sha256sum -c v2/SHA256SUMS: 8/8 OK; manifest non-self-including",
+    "input_sha256": {
+      "execution/s4-r6-validation/v2/SLOT_REQUEST_V2.md": "080842efe2e3c546346f75037d64e1b2ac5161fc0da04f1e9e44fea96552951a",
+      "execution/s4-r6-validation/v2/SHA256SUMS": "28eccf521870e9a9e839e5b036f9aa884e46a4c922b06ff334693c8fc6b50f01",
+      "execution/s4-r6-validation/v2/launcher/s4-r6-launch-v2.sh": "13fed63063ec5511c50255263e69b410df35fad625e48efb0613355ab2d53c8f",
+      "execution/s4-r6-validation/v2/runner/s4-r6-validate-v2.sh": "fa5dbaef8834a5766536e63c1f8772eaa3eb0e6f7173cdbbba14b99bcf09b2ff",
+      "execution/s4-r6-validation/v2/runner/chrome-pipe-discriminator-v2.mjs": "c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b",
+      "execution/s4-r6-validation/v2/controls/C1-timeout-orphan-stub.sh": "092f7b49232704e09e0f9aaa46df61061957be36b59f65d8d041530f3c338539",
+      "execution/s4-r6-validation/v2/controls/C2-runner-leaves-orphan-stub.sh": "a05d19e18d5df8229d1fa9fc57d74dbdab487fc38bbc0255b22d83cba99e2f42",
+      "execution/s4-r6-validation/v2/controls/C3-publication-failure-stub.sh": "4b5f3351ff357aa83a9b71a7ee1e15c2323f3b9ee0206145b354a7420af94193",
+      "execution/s4-r6-validation/v2/controls/C4-direct-runner-refusal.sh": "11701fcf702861227abc2920a1341ce58161d4bbc7932c605159274929543c0e"
+    },
+    "native_consumers_read_narrowly": [
+      "worktrees/s4-r6/scripts/package-extension.mjs (lines 70-100)",
+      "worktrees/s4-r6/scripts/browser-load-proof.mjs (lines 311-331, 636-690, 700-745)",
+      "worktrees/s4-r6/scripts/install-gitleaks.sh (lines 1-25)",
+      "worktrees/s4-r6/scripts/secrets-scan.sh (lines 13-34)",
+      "worktrees/s4-r6/package.json (scripts, devDependencies), .gitignore, lefthook.yml, .git directory type"
+    ],
+    "environment_facts_static": {
+      "timeout_provider": "coreutils-from-uutils 0.8.0 at /usr/bin/timeout (dpkg -S; help text includes --foreground 'children of COMMAND will not be timed out'); GNU and uutils both setpgid(0,0) unless --foreground",
+      "pgrep_provider": "procps 4.0.4 (supports -g pgroup and -s session)",
+      "setsid_provider": "util-linux 2.41.3",
+      "bash": "5.3.9",
+      "worktree_git": ".git is a directory (standalone clone); node_modules/ and dist/ gitignored",
+      "directories": {"execution/s4-r6-validation/runs": false, "execution/s4-r6-validation/tooling": false, "worktrees/s4-r6/node_modules": false, "execution/test-validation.lock": "exists, 0 bytes"}
+    },
+    "prior_reports_read": ["execution/audits/s4-r6-validation/a/REPORT.md (completed V1 plan A, permitted)"],
+    "current_peer_conclusions_read": false,
+    "peer_dir_observed_not_read": "execution/audits/s4-r6-validation/v2/a (exists; contents not opened)"
+  },
+  "material_findings": [
+    {
+      "id": "S4-R6-VPB-F01",
+      "title": "timeout puts every step in a separate process group; PGID census/reap/signal boundary never sees step children",
+      "reopens": ["VPA-01", "VPA-03"],
+      "locations": {
+        "runner": ["114", "83", "86-96", "117-118", "127", "273-274", "65-67"],
+        "launcher": ["81", "84-89", "96-104", "115-116", "123", "125"],
+        "request": ["26", "28", "48"],
+        "native": ["browser-load-proof.mjs:673"]
+      },
+      "false_success_path": true,
+      "consequence": "Post-step and final census always empty -> SUCCESS possible with leaked owned non-Chrome processes; deadline TERM/KILL reaches only the runner bash; step children survive up to tmo+30s (S31: 930s) after launcher reports survivors_after_kill=''; lock released while children still run; worst-case bound understated by ~930s.",
+      "minimal_closure": "Census by session (pgrep -s $$ in runner; pgrep -s $SID in launcher); signal each listed PID or each distinct PGID within the session in the existing TERM->wait->KILL->verify loops; add one bounded control with a timeout-wrapped TERM-immune sleep stub."
+    },
+    {
+      "id": "S4-R6-VPB-F02",
+      "title": "Supervisor record unwritable: shell true/false interpolated as Python names",
+      "reopens": ["VPA-02", "VPA-03"],
+      "locations": {"launcher": ["126", "120-128", "129-132", "75", "78"], "request": ["28", "45-47"]},
+      "false_success_path": false,
+      "consequence": "NameError before open(); SUPERVISOR_RECORD.json never created; line 130 forces OVERALL=FAILED_PUBLICATION; exit 7 on every path (SUCCESS, TIMEOUT, 5, 6 unattainable). Fail-closed but classification and control expectations (C1 exit 124, C2 exit 6) unattainable; C3 vacuous.",
+      "minimal_closure": "Pass values via argv and coerce in Python (as runner 289-291 does) or emit True/False; control acceptance must read SUPERVISOR_RECORD.json fields, not exit code alone."
+    },
+    {
+      "id": "S4-R6-VPB-F03",
+      "title": "Controls not executable as specified and unable to observe F-01",
+      "reopens": ["VPA-01", "VPA-03"],
+      "locations": {"launcher": ["62-71"], "controls": ["C2:6-9", "C3:5-6", "C1:9-11"], "request": ["60-65"]},
+      "false_success_path": false,
+      "consequence": "C2/C3 exit within ms; RPID already reaped before the fixed 0.2s sleep -> ps/pgrep empty -> refusal exit 73 instead of 6/7, and the refusal path performs no census so C2's nohup sleep is leaked 300s. No control wraps a child in timeout as step does, so none exercises the real topology. C3's expected exit 7 coincides with F-02's universal outcome. C4 is sound (runner 52-53 precede lock 65 and mkdir 57).",
+      "minimal_closure": "Derive PGID=RPID by construction (non-leader child + setsid exec), keep runner self-assert (54) as verification; run census/reap on every launcher exit path including refusals; add timeout-wrapped stub; specify field-level acceptance per control. Aggregate budget stays <= 60s."
+    }
+  ],
+  "nonmaterial_observations": [
+    {"id": "N-01", "where": "runner 134-159; request 28", "note": "S00 block is not a bounded step; claim 'every pre/post command bounded' overstated."},
+    {"id": "N-02", "where": "launcher 43-71", "note": "Refusal exits 70-73 write no SUPERVISOR_RECORD.json and lose the runner exit code."},
+    {"id": "N-03", "where": "launcher 51-52", "note": "Runner hash recorded, not pinned to fa5dbaef in VALIDATION mode."},
+    {"id": "N-04", "where": "runner 118", "note": "owned_orphans_after counts post-reap survivors, not orphans found."},
+    {"id": "N-05", "where": "runner 109,214,259", "note": "rc 99 doubles as NOTRUN sentinel for required=0 steps; no current collision with probe/harness exits 0/1/2."},
+    {"id": "N-06", "where": "runner (whole)", "note": "No runner-side deadline; if launcher dies, bound is sum of step budgets (~1h + kill-afters)."},
+    {"id": "N-07", "where": "runner 156,275", "note": "pgrep -f pattern may match unrelated command lines containing the string; fail-closed."}
+  ],
+  "checked_not_assumed": [
+    "setsid topology: launcher 58 non-leader child -> setsid exec in place; runner 54 self-assert refuses otherwise",
+    "lock fd 9 closed for step children (runner 114)",
+    "atomic fresh run dir (launcher 43-47); runner freshness refusal (55,57)",
+    "exit truth order runner 284-288; record tmp->parse->mv->sentinel 308-312; launcher AND-condition 113-119 correct once F-02 fixed",
+    "latch semantics runner 71-74, 107-110, 129; expected-negative S45/S63 213-214, 257-269",
+    "S50b/S62b/S63b field names match package-extension.mjs 70-92 and browser-load-proof.mjs 639-668, 700-745",
+    "secrets-scan.sh pr/history and install-gitleaks.sh <absdir> conventions match; .git/hooks path valid for directory clone; node_modules and dist gitignored",
+    "pipe helper v2 exit-confirmed cleanup and exit 3 CLEANUP_UNVERIFIED (107-135, 141-148, 166-168)",
+    "C4 refuses before lock/worktree/tools (runner 52-53 < 57 < 65)"
+  ],
+  "what_success_would_not_prove": [
+    "real gates/Vitest/gitleaks/package/browser/pipe results",
+    "artifact/release or native import attestation",
+    "widening of the earlier narrow source acceptance",
+    "historical hooks remain 0/6"
+  ],
+  "identity": {
+    "role": "S4-V2-INDEPENDENT-PLAN-B, independent non-author T4 reviewer",
+    "requested_model": "Claude Fable5 (brief: 'B fresh Claude Fable5 worker'; register DISPATCHES.md line 22 'Pending fresh worker assignment')",
+    "actual_runtime_model_version_setting": "unexposed / not attested",
+    "candidate_author": false,
+    "builder_contact": false,
+    "current_peer_conclusions_read": false
+  },
+  "execution": {
+    "runner": false, "controls": false, "probe": false, "syntax_check": false, "test": false, "install": false,
+    "browser": false, "network": false, "database": false, "source_edit": false, "packet_edit": false,
+    "actions": "Read-only file inspection, sha256 verification, dpkg/strings package metadata read; wrote only execution/audits/s4-r6-validation/v2/b"
+  }
+}

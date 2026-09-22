@@ -1,0 +1,45 @@
+{
+  "revision": 1,
+  "new_findings": [
+    {
+      "id": "S2-R53-A-01",
+      "title": "step completion discards descendant ownership before quiescence",
+      "status": "OPEN_SOURCE_FINDING_NOT_EXECUTED",
+      "severity": "high",
+      "blocks": "06b",
+      "details_markdown": "step completion discards descendant ownership before quiescence\n\n**High; blocks06b.** `run_step` waits only for its `setsid timeout --foreground` leader, then clears `STEP_PID/STEP_PGID` at125 without checking remaining group members; subsequent cleanup can see only a new/current group and its command-name allowlist. ([Runner L75\u201398,112\u2013126,134\u2013147](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh))\n\n**Counterexample schedule:** an inner deadline or early leader exit leaves a same-group child whose command does not match `OWNED_PAT`; after125 the group is forgotten, so cleanup can announce `reap=ok`, stop the fixture and release the lock while that child survives, or a successful step can advance to the next stage first. ([Runner L60,117\u2013126,135\u2013158](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh))\n\nThis is relevant to the actual consumer, not just an arbitrary executable: release\u2019s ledger query is a DB-using `node -e` process, whereas the real-mode Node scan requires `prisma/build/index.js`; real release also introduces nested `timeout --foreground` commands. ([Release L325\u2013338](../../../../../worktrees/s2-runner53/scripts/release.sh), [composition L99\u2013105](../../../../../worktrees/s2-runner53/test/release/s1s2-composition.sh), [runner L60](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh))\n\nK3 exercises a signal **while** the leader/group is still recorded; K4 gives its escaped child the specially recognized `s2r53-stub-escapee` name, so neither covers forgotten same-group children or unrecognized escaped descendants. ([Stub and driver](../../../../s2-setup-prep/controls-proposed/stubs/harness.sh), [K3/K4 observations](../../../../s2-runner53/controls/20260922T043943Z/CONTROLS_RESULT.txt))\n\n**Smallest closure:** retain each owned step\u2019s group/descendant identity through a bounded post-wait quiescence check on every exit; forbid next stage and fixture stop unless it is empty, otherwise quarantine. Do not solve ownership by widening global process-name kills. Add authorized no-DB controls for leader-exits-first, inner-timeout and an unnamed descendant/escape; no product/S1 edit is needed.\n"
+    },
+    {
+      "id": "S2-R53-A-02",
+      "title": "\u201c48-second worst case\u201d is arithmetic, not an enforced cleanup deadline",
+      "status": "OPEN_SOURCE_FINDING_NOT_EXECUTED",
+      "severity": "medium",
+      "blocks": "06b",
+      "details_markdown": "\u201c48-second worst case\u201d is arithmetic, not an enforced cleanup deadline\n\n**Medium, material; blocks06b\u2019s stated60-second grace claim.** `halt_owned_work` performs unconditional `wait \"$STEP_PID\"` after its polling loops, and the isolation-anomaly branch waits after TERM with no bound; either can block before the failure/quarantine record is reached. ([Runner L81\u201398,119\u2013121](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh))\n\nThe10/5-second \u201cwaits\u201d count iterations including unbounded scan work, and `SCAN_HASH_ALLOW=3` does not enforce a deadline around final scans/hashing; `cleanup_seconds` is even stamped before the manifest hash operation. ([Runner L47\u201348,87\u201393,146\u2013157](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh))\n\n**Counterexample:** if a killed child remains unreaped/blocked, line93 waits beyond the polling allowance instead of reaching `REAP=FAILED`; the outer foreground timeout can kill the runner at its grace limit without finishing quarantine/descendant handling. This is a source possibility, not an observed kernel/process failure in this review. ([Runner L46\u201348,93\u201397](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh), [06b launch](../../../../s2-setup-prep/SLOT_REQUEST_06_CONTROLS_AND_PROOF.md))\n\n**Smallest closure:** use one elapsed-time cleanup deadline, bound anomalous isolation and reap completion, never wait indefinitely before publishing quarantine, and budget final evidence work honestly. Add the currently missing hanging-stop/slow-reap control under a separately sufficient allowance; retain separate primary and cleanup exits. No demand for a new supervision framework.\n"
+    },
+    {
+      "id": "S2-R53-A-03",
+      "title": "the proposed control driver kills pre-existing pattern matches on refusal",
+      "status": "OPEN_SOURCE_FINDING_NOT_EXECUTED",
+      "severity": "high",
+      "blocks": "06a-runner-controls",
+      "details_markdown": "the proposed control driver kills pre-existing pattern matches on refusal\n\n**High; blocks06a runner controls.** Driver25 detects pre-existing matches and calls `finish`; `finish`22 always calls `owned_cleanup`, which rescans global names and sends TERM/KILL at14\u201317\u2014thus the \u201cABORT: pre-existing pattern matches\u201d path kills processes the current invocation did not create. ([Driver L14\u201325](../../../../s2-setup-prep/controls-proposed/run-runner-controls-v531.sh))\n\n**Concrete counterexample:** a pre-existing process with argv0 `s2r53-stub-escapee` is detected before K1; it is then selected by `owned_cleanup` and signalled, despite the preflight refusal and no current child launch. The logged empty pre-snapshot in historical v5.3 does not exercise this path. ([Driver L14\u201325](../../../../s2-setup-prep/controls-proposed/run-runner-controls-v531.sh), [historical pre-snapshot](../../../../s2-runner53/controls/20260922T043943Z/CONTROLS_RESULT.txt))\n\n**Smallest closure:** refusal before ownership acquisition must exit nonzero without cleanup signals; cleanup must use recorded children/identities belonging to this invocation, not merely a reused name. Add a harmless pre-existing decoy control proving it survives refusal.\n"
+    },
+    {
+      "id": "S2-R53-A-04",
+      "title": "proposed runner-control driver can report success on failure/incomplete work and exceed06a",
+      "status": "OPEN_SOURCE_FINDING_NOT_EXECUTED",
+      "severity": "medium",
+      "blocks": "06a-runner-controls",
+      "details_markdown": "proposed runner-control driver can report success on failure/incomplete work and exceed06a\n\n**Medium, material; blocks06a as specified.** `finish`22 exits0 after strikes, precondition ABORT and the soft-budget stop; K2/K5/K6 execute the runner without an outer control deadline, and the60-second allocation is only checked between controls at a45-second soft threshold. ([Driver L11,19\u201325,42,85,93,98](../../../../s2-setup-prep/controls-proposed/run-runner-controls-v531.sh))\n\n**Counterexamples:** a K2 expectation miss calls `gate`\u2192`finish` and exits0 with later controls unrun; a hung K2 guard stub can consume the runner\u2019s120-second step bound before the next45-second check, exceeding the entire60-second06a allowance. ([Driver L21\u201322,42\u201353](../../../../s2-setup-prep/controls-proposed/run-runner-controls-v531.sh), [runner L199](../../../../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh), [06a contract](../../../../s2-setup-prep/SLOT_REQUEST_06_CONTROLS_AND_PROOF.md))\n\n**Smallest closure:** derive aggregate exit from failed/skipped/incomplete/cleanup status, preserve actual exits, and enforce an outer allocation deadline with reserved owned-cleanup grace. A bounded negative that fails an assertion and one that exhausts the budget must both exit nonzero without starting subsequent controls.\n"
+    },
+    {
+      "id": "S2-R53-A-05",
+      "title": "fixture destroy treats unknown status as stopped",
+      "status": "OPEN_SOURCE_FINDING_NOT_EXECUTED",
+      "severity": "medium",
+      "blocks": "future-destroy-only-not-06b",
+      "details_markdown": "fixture destroy treats unknown status as stopped\n\n**Medium, material before any destroy authorization; not independently a06b blocker because06b never calls destroy.** Fixture82 interprets every nonzero `pg_ctl status` as \u201cnot running,\u201d while its process scan hides errors with `|| true`; with an unavailable/failing status tool and no matching scan output, supplying the literal confirmation reaches `rm -rf`. ([Fixture L20,40\u201341,79\u201385](../../../../s2-setup-prep/infra/s2-fixture-r53.sh))\n\n**Smallest closure:** distinguish a recognized stopped result from tool/status/inspection failure and refuse deletion on unknown; retain the explicit path confirmation. Add missing-tool/unexpected-status controls before exposing destroy; keeping destroy explicitly excluded is sufficient for the current no-destroy proof scope.\n"
+    }
+  ]
+}

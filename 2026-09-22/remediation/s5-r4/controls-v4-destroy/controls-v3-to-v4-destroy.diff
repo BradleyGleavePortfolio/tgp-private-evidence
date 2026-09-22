@@ -1,0 +1,29 @@
+--- controls-v3/ctl-destroy.sh	2026-09-22 05:07:18.621839075 +0000
++++ controls-v4-destroy/ctl-destroy.sh	2026-09-22 05:20:37.813839075 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S5 R4 control: fail-closed destroy (A-03). NOT EXECUTED by the builder. Requires
++# S5 R4 control v4 (destroy driver successor): fail-closed destroy (A-03). NOT EXECUTED by the builder. Requires
+ # S5_CTL_GRANT=granted-by-parent. Budget: <= 30 s wall. Everything is a fake cluster directory under the
+ # control root; the real /home/user/pg17 is never referenced (and does not exist in this sandbox).
+ #   D0  PREDECESSOR (frozen checkpoint-5 s5-fixture.sh, one-line PG17_HOME derivation): destroy with a
+@@ -9,11 +9,18 @@
+ #   D2  candidate: already stopped, removal fails (read-only parent) -> DESTROY_FAILED rc 5, no OK line.
+ #   D3  candidate: no confirmation variable -> runner refuses rc 2 before any child runs.
+ #   D4  candidate: already stopped, marker present, confirmed -> DESTROY_OK rc 0, directory absent.
+-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
++# v4 (distinct successor of controls-v3/ctl-destroy.sh; shares the UNCHANGED v3 lib): parent preparation
++# finding — D0 writes $LOGS/D0-predecessor-destroy.out before any derived runner stage has created
++# $CR/X/s5-r4/logs. Added: private output-directory precondition (create + writability check) before D0;
++# refuses (rc 2) if the directory cannot be created inside the control root. No other change.
++source "$(dirname "${BASH_SOURCE[0]}")/../controls-v3/lib.sh"
+ control_preconditions
+ make_control_root
+ trap 'control_cleanup' EXIT
+ S="$CR/X/s5-r4"; LOGS="$S/logs"; DATA="$CR/pg17/clusters/s5"
++case "$LOGS" in "$CR"/*) ;; *) log "REFUSE: private LOGS $LOGS is not inside the control root $CR"; exit 2;; esac
++mkdir -p "$LOGS" && [ -w "$LOGS" ] && : > "$LOGS/.ctl-destroy-v4-writable" || { log "REFUSE: cannot create/write private output dir $LOGS"; exit 2; }
++log "PRIVATE_LOGS_READY $LOGS"
+ 
+ fake_marked_cluster() { mkdir -p "$DATA"; echo 17 > "$DATA/PG_VERSION"; printf "# fake\ncluster_name = 's5-disposable-pg17'\n" > "$DATA/postgresql.conf"; }
+ fake_live_postmaster() { setsid sleep 3600 </dev/null >/dev/null 2>&1 & echo "$!" > "$DATA/postmaster.pid"; echo "$!" >> "$CR/scenario/fake-postmasters"; }

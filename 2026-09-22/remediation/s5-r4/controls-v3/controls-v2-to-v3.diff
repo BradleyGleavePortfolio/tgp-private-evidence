@@ -1,0 +1,82 @@
+diff -ru controls-v2/ctl-lifecycle.sh controls-v3/ctl-lifecycle.sh
+--- controls-v2/ctl-lifecycle.sh	2026-09-22 04:56:26.489839075 +0000
++++ controls-v3/ctl-lifecycle.sh	2026-09-22 05:07:19.637839075 +0000
+@@ -1,7 +1,9 @@
+ #!/usr/bin/env bash
+ # S5 R4 control: supervisor lifecycle (A-02) and pre-live busy-session refusal (A-04) on the DERIVED
+ # candidate runner with fake pg_ctl/psql/jest. NOT EXECUTED by the builder. Requires
+-# S5_CTL_GRANT=granted-by-parent. Budget: <= 75 s wall (L2 ~10 s, L3 ~12 s, L4 ~5 s, others ~3 s each);
++# S5_CTL_GRANT=granted-by-parent. v3 budget: <= 100 s wall. Wave-1 measured pre-live overhead of the derived
++# resume stage (guard-unit + old-root + start + preflight + generate-only) = ~4 s; L1 ~7 s, L2 ~10 s (wait <= 20 s
++# + reap + stop), L3 ~20 s (WORK_BUDGET 12 s + reap <= 5 s + stop), L4 3 stages ~10 s, L5 ~5 s, 1.1 s spacing;
+ # sequential; one fake postmaster at a time; owned pids recorded and cleaned by control_cleanup.
+ # Positive criteria per scenario are asserted below; a nonzero runner exit is EXPECTED in L2-L5 and is
+ # never turned into a pass by itself — the exit RECORD fields are what is checked.
+@@ -29,10 +31,18 @@
+ # ---- L2: outer TERM while live runs (fake jest sleeps 300 s with a grandchild). Supervisor must
+ # reap the owned group, THEN stop the fixture under the still-held lock, and record first_rc=143.
+ echo "300 0" > "$CR/scenario/jest"; : > "$CR/scenario/stop-observations"; : > "$CR/scenario/jest.grandchildren"
+-sleep 1.1; prev_runs=$(ls "$LOGS"/run-resume-* 2>/dev/null | wc -l)
++sleep 1.1; prev_runs=$(ls "$LOGS"/run-resume-* 2>/dev/null | wc -l); prev_live=$(ls "$LOGS"/live-etq0-* 2>/dev/null | wc -l)
+ run_derived_bg resume
+-for i in $(seq 1 60); do [ "$(ls "$LOGS"/run-resume-* 2>/dev/null | wc -l)" -gt "$prev_runs" ] && grep -q 'CMD.*jest' "$(latest run-resume-)" 2>/dev/null && grep -q FAKE_JEST_GRANDCHILD "$(latest live-etq0-)" 2>/dev/null && break; sleep 0.25; done
+-sleep 0.5; kill -TERM "$RUNNER_PID"; t0=$(date +%s); wait "$RUNNER_PID"; rc=$?; t1=$(date +%s)
++# v3 precondition (wave-1 CONTROL-TARGETING failure): signal only once THIS run has (a) a NEW live-etq0 log that
++# already carries the fake jest grandchild marker and (b) the fake postmaster pid file present. <= 20 s wait.
++live_ready=1
++for i in $(seq 1 80); do
++  if [ "$(ls "$LOGS"/run-resume-* 2>/dev/null | wc -l)" -gt "$prev_runs" ] && [ "$(ls "$LOGS"/live-etq0-* 2>/dev/null | wc -l)" -gt "$prev_live" ] \
++     && grep -q FAKE_JEST_GRANDCHILD "$(latest live-etq0-)" 2>/dev/null && [ -f "$DATA/postmaster.pid" ] && kill -0 "$RUNNER_PID" 2>/dev/null; then live_ready=0; break; fi
++  sleep 0.25
++done
++check L2.pre "$live_ready" "live phase reached in THIS run (new live log with grandchild marker, postmaster.pid present, runner alive) before TERM; waited $((i / 4)) s"
++kill -TERM "$RUNNER_PID"; t0=$(date +%s); wait "$RUNNER_PID"; rc=$?; t1=$(date +%s)
+ E="$(latest exit-resume-)"
+ check L2.rc "$( [ "$rc" = 143 ]; echo $? )" "runner exited $rc after TERM (expected 143 = first rc preserved; cleanup succeeded so not upgraded)"
+ check L2.exit "$( [ "$(exit_field "$E" FIRST_RC)" = 143 ] && [ "$(exit_field "$E" SIGNALLED)" = TERM ] && [ "$(exit_field "$E" STOP_RC)" = 0 ] && [ "$(exit_field "$E" DAEMON)" = none ] && [ "$(exit_field "$E" SURVIVORS)" = none ]; echo $? )" "exit record FIRST_RC=143 SIGNALLED=TERM STOP_RC=0 DAEMON=none SURVIVORS=none ($E)"
+@@ -42,15 +52,19 @@
+ check L2.budget "$( [ $((t1 - t0)) -le 30 ]; echo $? )" "signal-to-exit took $((t1 - t0)) s (budget: reap 20 + stop <= 30)"
+ check L2.release_after_stop "$( r=$(grep -n 'RELEASE=s5-r4 stage=resume first_rc=143' "$LOCKLOG" | tail -1 | cut -d: -f1); [ -n "$r" ]; echo $? )" "RELEASE record written with first_rc=143 (after stop; lock release = process exit)"
+ 
+-# ---- L3: inner deadline. Re-derive with WORK_BUDGET=6 s; fake jest sleeps 300 s.
+-derive_runner "$CANDIDATE_RUNNER" "$S/run-proof.sh" 6 5 45
++# ---- L3: inner deadline. v3: WORK_BUDGET=12 s so the deadline expires INSIDE the live phase (pre-live overhead
++# measured ~4 s in wave 1; guard-unit fake jest now exits in 0.2 s); fake live jest sleeps 300 s. Causality is
++# asserted (L3.pre): the live CMD line must precede OWNED_WORK_DEADLINE in the same run log.
++derive_runner "$CANDIDATE_RUNNER" "$S/run-proof.sh" 12 5 45
+ : > "$CR/scenario/stop-observations"; : > "$CR/scenario/jest.grandchildren"
+ sleep 1.1; t0=$(date +%s); run_derived resume; rc=$?; t1=$(date +%s)
+ E="$(latest exit-resume-)"
++R3="$(latest run-resume-)"
++check L3.pre "$( a=$(grep -n 'CMD.*rls-g2-pg17-etq0.spec.ts' "$R3" | head -1 | cut -d: -f1); b=$(grep -n 'OWNED_WORK_DEADLINE' "$R3" | head -1 | cut -d: -f1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]; echo $? )" "deadline expired inside the live phase (live CMD line precedes OWNED_WORK_DEADLINE in $R3)"
+ check L3.rc "$( [ "$rc" = 124 ]; echo $? )" "runner rc=$rc on inner deadline (expected 124)"
+ check L3.exit "$( [ "$(exit_field "$E" FIRST_RC)" = 124 ] && [ "$(exit_field "$E" STOP_RC)" = 0 ] && [ "$(exit_field "$E" DAEMON)" = none ] && [ "$(exit_field "$E" SURVIVORS)" = none ]; echo $? )" "exit record FIRST_RC=124 STOP_RC=0 DAEMON=none SURVIVORS=none"
+ check L3.deadline_line "$( grep -q 'OWNED_WORK_DEADLINE' "$(latest run-resume-)" && grep -q 'OWNED_GROUP_REAPED' "$(latest run-resume-)"; echo $? )" "deadline recorded and owned group reaped"
+-check L3.wall "$( [ $((t1 - t0)) -le 25 ]; echo $? )" "wall $((t1 - t0)) s (budget 6 + reap <= 5 + stop + records <= 25)"
++check L3.wall "$( [ $((t1 - t0)) -le 30 ]; echo $? )" "wall $((t1 - t0)) s (budget 12 + reap <= 5 + stop + records <= 30)"
+ check L3.lock_at_stop "$( grep -q 'lock_at_stop=HELD' "$CR/scenario/stop-observations"; echo $? )" "lock HELD during deadline cleanup stop"
+ derive_runner "$CANDIDATE_RUNNER" "$S/run-proof.sh" 1560 20 45
+ 
+diff -ru controls-v2/lib.sh controls-v3/lib.sh
+--- controls-v2/lib.sh	2026-09-22 04:56:26.505839075 +0000
++++ controls-v3/lib.sh	2026-09-22 05:07:19.133839075 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S5 R4 frozen control library v2 (NOT EXECUTED by the builder; prepared for parent inspection and a
++# S5 R4 frozen control library v3 (NOT EXECUTED by the builder; prepared for parent inspection and a
+ # separately granted narrow no-DB slot). Everything here is synthetic: a private control root under
+ # /tmp, a lane-private lock file, fake pg_ctl/initdb/postgres/psql/jest/prisma binaries, and a
+ # DERIVED copy of the candidate runner + fixture in which ONLY the "lane constants" block is rewritten
+@@ -72,8 +72,10 @@
+   # group termination (not just child termination) is what the control observes.
+   cat > "$CR/W/node_modules/.bin/jest" <<'SH'
+ #!/usr/bin/env bash
+-# FAKE jest (owned work). scenario/jest: "<sleep_seconds> <exit_code>"; default "1 0".
+-read -r secs code < "$CR/scenario/jest" 2>/dev/null || { secs=1; code=0; }
++# FAKE jest (owned work). v3: scenario/jest "<sleep_seconds> <exit_code>" applies ONLY to the live spec
++# (argv contains rls-g2-pg17-etq0.spec.ts); every other jest invocation (guard-unit) exits 0 after 0.2 s,
++# so a signal/deadline scenario targets the live phase (after fixture start), not the guard phase.
++case " $* " in *rls-g2-pg17-etq0.spec.ts*) read -r secs code < "$CR/scenario/jest" 2>/dev/null || { secs=1; code=0; };; *) echo "FAKE_JEST_GUARD_UNIT pid=$$ (not the live spec; exit 0)"; sleep 0.2; exit 0;; esac
+ st="$(cat /proc/$$/stat)"; st="${st##*) }"; set -- $st; echo "FAKE_JEST pid=$$ pgid=${3:-?} sleeping=$secs exit=$code"
+ sleep "$secs" & echo "FAKE_JEST_GRANDCHILD pid=$!" ; echo "$!" >> "$CR/scenario/jest.grandchildren"
+ wait; echo "FAKE_JEST_DONE"; exit "$code"

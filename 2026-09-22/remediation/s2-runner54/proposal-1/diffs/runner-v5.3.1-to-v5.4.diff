@@ -1,0 +1,205 @@
+--- ../s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh	2026-09-22 04:52:36.425839075 +0000
++++ run-composition-r54-v5.4-when-granted.sh	2026-09-22 05:23:04.125839075 +0000
+@@ -1,4 +1,16 @@
+ #!/usr/bin/env bash
++# S2 composition proof runner v5.4 — S2-R54-EXECUTION-SAFETY. Derived (2026-09-22) from FROZEN v5.3.1
++# sha256 fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 (execution/s2-setup-prep, unchanged). v5.4 delta (FINDINGS_MAP.md):
++#   O1 (A01/B01) every step group id is RETAINED in OWNED_PGIDS for the whole run; owned_scan covers all recorded groups (live members) plus the
++#      unchanged anchored patterns (NOT widened); after each step's leader exits, a bounded post-exit quiescence check (QUIESCE_WAIT) must find
++#      the group empty, otherwise the group is halted (TERM/KILL, bounded), the stage is refused (first_exit = step rc if nonzero else 70) and
++#      the run ends via cleanup; halt targets are live groups, gated on group membership, never on the leader pid alone (inner 124 path).
++#   O2 (A02) one elapsed cleanup deadline (CLEANUP_BUDGET s from cleanup/signal start): every reap poll, the fixture stop/status bounds and the
++#      isolation-anomaly branch are clipped to the remaining time; no unconditional `wait` on a still-alive pid; deadline exhaustion is recorded
++#      (deadline_exceeded=yes → cleanup class 71 at least); cleanup_seconds is measured before AND after the final evidence hashing.
++#   O3 stub-mode-only: STUB_STEP40_BOUND may shorten step 40's bound so an inner-timeout counterexample fits a bounded control; ignored in real mode.
++#   Unchanged: lock/fd-9 handling, target pins (head/lock/closure/fixture/NS/DB/PORT), steps 10–45 and the 164+1 harness, first-vs-cleanup exit
++#   registers, refusal codes, quarantine posture (failed reap → fixture stop REFUSED, nothing erased), no destroy. v5.3.1 header follows.
+ # S2 composition proof runner v5.3.1 — S2-RUNNER-53 LANE. Derived (S2-SETUP-FIXTURE-PREP, 2026-09-22) from FROZEN v5.3
+ # sha256 fbc8b9af592b370429a66bf164d3c5ac0f0b1bac0f57474c50ac293ebebd1bfc (execution/s2-runner53, unchanged). v5.3.1 delta (see REPORT.md):
+ #   L1 lane paths: LANE=execution/s2-setup-prep, fixture infra/s2-fixture-r53.sh (REIMPLEMENTED fixture, sha pinned below; not 6062f4ce);
+@@ -34,7 +46,8 @@
+ set -u
+ ROOT=/home/user/workspace
+ WT=$ROOT/worktrees/s2-runner53
+-LANE=$ROOT/execution/s2-setup-prep
++LANE=$ROOT/execution/s2-setup-prep   # setup/fixture lane (grant05 install, fixture 9fcc3696); this runner lives in execution/s2-runner54
++R54=$ROOT/execution/s2-runner54
+ EXPECT_HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c   # FROZEN successor r3; no override
+ EXPECT_LOCK_SHA=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+ EXPECT_FIXTURE_SHA=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881   # infra/s2-fixture-r53.sh (REIMPLEMENTATION from 08987e4c; request-03's 6062f4ce is unpreserved); refuse if absent/different
+@@ -45,16 +58,17 @@
+ unset S2_KEEP_FIXTURE
+ # ---- cleanup budget (seconds). Outer launch is `timeout --foreground -k 60 2100`: TERM at 2100 s, KILL 60 s later.
+ OUTER_GRACE=60; REAP_TERM_WAIT=10; REAP_KILL_WAIT=5; STOP_BUDGET=20; STOP_KILL=3; STATUS_BUDGET=5; STATUS_KILL=2; SCAN_HASH_ALLOW=3
++CLEANUP_BUDGET=50; QUIESCE_WAIT=2; ANOMALY_WAIT=3   # O2: single elapsed deadline for the whole cleanup (< OUTER_GRACE); O1: post-exit group quiescence; isolation-anomaly bound
+ WORST=$((REAP_TERM_WAIT+REAP_KILL_WAIT+STOP_BUDGET+STOP_KILL+STATUS_BUDGET+STATUS_KILL+SCAN_HASH_ALLOW)); MARGIN=$((OUTER_GRACE-WORST))
+ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+ STUBS=${S2_RUNNER_STUBS-}
+ if [ -n "$STUBS" ]; then
+-  LOCK=$STUBS/test-validation.lock; OUT=$LANE/runner-selftest-r531/$STAMP
++  LOCK=$STUBS/test-validation.lock; OUT=$R54/runner-selftest-r54/$STAMP
+   GUARD_SPEC="bash $STUBS/guard-spec.sh"; FIXTURE="bash $STUBS/fixture.sh"; HARNESS="bash $STUBS/harness.sh"; DISC="bash $STUBS/discriminator.sh"
+   REFUSAL_HARNESS="bash $WT/test/release/s1s2-composition.sh"   # real offline refusal path is cheap and DB-free
+   OWNED_PAT="^bash $STUBS/|^s2r53-stub-escapee|^bash $WT/test/release/s1s2-composition.sh"
+ else
+-  LOCK=$ROOT/execution/test-validation.lock; OUT=$LANE/composition-r53/$STAMP
++  LOCK=$ROOT/execution/test-validation.lock; OUT=$R54/composition-r54/$STAMP
+   GUARD_SPEC="bash test/db/s1-harness-guard.spec.sh"; FIXTURE="bash $LANE/infra/s2-fixture-r53.sh"
+   HARNESS="bash test/release/s1s2-composition.sh"; DISC="bash test/db/s1-r4-truncate-discriminator.sh"; REFUSAL_HARNESS=$HARNESS
+   OWNED_PAT="^bash test/db/s1-harness-guard.spec.sh|^bash test/release/s1s2-composition.sh|^bash test/db/s1-r4-truncate-discriminator.sh|^psql .*(127\.0\.0\.1:$PORT|-p $PORT)|^node .*prisma/build/index.js"
+@@ -69,38 +83,45 @@
+ # ---- result registers. FIRST_EXIT = first failing step / signal; CLEANUP_EXIT = cleanup class; FINAL derived in cleanup, never an unconditional 0.
+ FIRST_EXIT=unset; CLEANUP_EXIT=unset; FINAL=1; SIGNAL=none; REAP=unchecked; RC_STOP=notrun; SURVIVORS=unchecked; FIXTURE_STARTED=0; CLEANUP_T0=
+ RC_GUARD=notrun; RC_R20=notrun; RC_R21=notrun; RC_FIXTURE=notrun; RC_COMP=notrun; RC_DISC=notrun
+-STEP_LABEL=none; STEP_PID=; STEP_PGID=
++STEP_LABEL=none; STEP_PID=; STEP_PGID=; OWNED_PGIDS=; DEADLINE_EXCEEDED=no; CLEANUP_DEADLINE=
++now_s(){ date +%s; }
++remaining(){ local r; [ -n "$CLEANUP_DEADLINE" ] || { echo 999; return; }; r=$((CLEANUP_DEADLINE-$(now_s))); [ $r -gt 0 ] && echo $r || echo 0; }   # pure (safe in subshells)
++deadline_check(){ [ -n "$CLEANUP_DEADLINE" ] && [ "$(now_s)" -ge "$CLEANUP_DEADLINE" ] && DEADLINE_EXCEEDED=yes; :; }   # sets the flag in the main shell
++live_groups(){ local g; for g in $OWNED_PGIDS; do pgrep -g "$g" >/dev/null 2>&1 && echo "$g"; done; }
+ finish(){ FIRST_EXIT=$1; exit; }   # EXIT trap → cleanup decides the process exit
+ 
+ # ---- owned-work scan: processes of the live step's group plus anchored owned-work cmdlines (never the fixture server; never platform/unowned processes)
+-owned_scan(){
+-  { [ -n "${STEP_PGID:-}" ] && pgrep -g "$STEP_PGID" -a 2>/dev/null; pgrep -af "$OWNED_PAT" 2>/dev/null; } | grep -vE "^[0-9]+ (pgrep|grep) " | awk -v me=$$ '$1!=me' | sort -u
++owned_scan(){   # O1: every recorded step group (live members) + anchored owned-work cmdlines; patterns deliberately NOT widened
++  { local g; for g in $OWNED_PGIDS; do pgrep -g "$g" -a 2>/dev/null; done; pgrep -af "$OWNED_PAT" 2>/dev/null; } | grep -vE "^[0-9]+ (pgrep|grep) " | awk -v me=$$ '$1!=me' | sort -u
+ }
++# poll_until_quiet <max_s>: returns 0 when owned_scan is empty; bounded by max_s AND by the cleanup deadline (O2)
++poll_until_quiet(){ local end=$(( $(now_s) + $1 )) lim; while :; do [ -z "$(owned_scan)" ] && return 0; lim=$end; [ -n "$CLEANUP_DEADLINE" ] && [ "$CLEANUP_DEADLINE" -lt "$lim" ] && lim=$CLEANUP_DEADLINE; [ "$(now_s)" -ge "$lim" ] && { deadline_check; return 1; }; sleep 0.1; done; }
+ # halt_owned_work: TERM the live step's group, bounded reap; then KILL, bounded reap. Sets REAP=ok|FAILED. Signals ONLY the recorded group.
+-halt_owned_work(){
+-  local t0=$(date +%s) left
+-  if [ -n "${STEP_PID:-}" ] && kill -0 "$STEP_PID" 2>/dev/null; then
+-    [ -n "${STEP_PGID:-}" ] || STEP_PGID=$(ps -o pgid= -p "$STEP_PID" 2>/dev/null | tr -d ' ')
+-    if [ "$STEP_PGID" = "$STEP_PID" ]; then TARGET="-$STEP_PGID"; else TARGET=$STEP_PID; stamp "HALT: step child not (yet) a group leader (pgid=$STEP_PGID); signalling pid only"; fi
+-    stamp "HALT: step '$STEP_LABEL' pid=$STEP_PID pgid=$STEP_PGID → SIGTERM to $TARGET (reap wait ≤${REAP_TERM_WAIT}s)"
+-    kill -TERM -- "$TARGET" 2>/dev/null
+-    for ((i=0;i<REAP_TERM_WAIT*10;i++)); do [ -z "$(owned_scan)" ] && break; sleep 0.1; done
+-    if [ -n "$(owned_scan)" ]; then
+-      stamp "HALT: owned work still present after TERM → SIGKILL to $TARGET (reap wait ≤${REAP_KILL_WAIT}s)"
+-      kill -KILL -- "$TARGET" 2>/dev/null
+-      for ((i=0;i<REAP_KILL_WAIT*10;i++)); do [ -z "$(owned_scan)" ] && break; sleep 0.1; done
++halt_owned_work(){   # O1/O2: targets = every recorded group that still has members (not the leader pid); bounded, deadline-clipped; no blocking wait
++  local t0=$(now_s) left groups g
++  groups=$(live_groups)
++  if [ -n "$groups" ]; then
++    stamp "HALT: live owned groups [$(echo $groups)] (current step '$STEP_LABEL' pid=${STEP_PID:-none}) → SIGTERM to each group (reap wait ≤${REAP_TERM_WAIT}s, remaining ${CLEANUP_DEADLINE:+$(remaining)s}${CLEANUP_DEADLINE:-unbounded-pre-cleanup})"
++    for g in $groups; do kill -TERM -- "-$g" 2>/dev/null; done
++    if ! poll_until_quiet "$REAP_TERM_WAIT"; then
++      groups=$(live_groups); stamp "HALT: owned work still present after TERM → SIGKILL to groups [$(echo $groups)] (reap wait ≤${REAP_KILL_WAIT}s)"
++      for g in $groups; do kill -KILL -- "-$g" 2>/dev/null; done
++      poll_until_quiet "$REAP_KILL_WAIT" || true
++    fi
++    if [ -n "${STEP_PID:-}" ]; then
++      if kill -0 "$STEP_PID" 2>/dev/null; then stamp "HALT: step child pid=$STEP_PID STILL ALIVE after KILL budget — not waiting on it (unreapable/blocked); counted as survivor"
++      else wait "$STEP_PID" 2>/dev/null; stamp "HALT: step child pid=$STEP_PID reaped (wait status $?) after $(( $(now_s)-t0 ))s"; fi
+     fi
+-    wait "$STEP_PID" 2>/dev/null; stamp "HALT: step child pid=$STEP_PID reaped (wait status $?) after $(( $(date +%s)-t0 ))s"
+   fi
+   left=$(owned_scan)
+   if [ -n "$left" ]; then REAP=FAILED; stamp "REAP FAILED: owned-work processes survive (listed in QUARANTINE.txt):"; echo "$left" | sed 's/^/  survivor: /' | tee -a "$S" > "$OUT/QUARANTINE.txt"
+-  else REAP=ok; stamp "REAP ok: no owned-work process survives (group ${STEP_PGID:-none}, anchored scan)"; fi
+-  STEP_PID=; STEP_PGID=
++  else REAP=ok; stamp "REAP ok: no owned-work process survives (recorded groups [$(echo ${OWNED_PGIDS:-none})], anchored scan)"; fi
++  STEP_PID=; STEP_PGID=   # group ids stay in OWNED_PGIDS (O1)
+ }
+ on_signal(){
+   local sig=$1 code
+   trap '' TERM INT HUP
+-  CLEANUP_T0=$(date +%s.%N); SIGNAL=$sig
++  CLEANUP_T0=$(date +%s.%N); SIGNAL=$sig; CLEANUP_DEADLINE=$(( $(now_s) + CLEANUP_BUDGET ))   # O2: deadline starts at the signal
+   case $sig in TERM) code=143;; INT) code=130;; HUP) code=129;; *) code=1;; esac
+   stamp "SIGNAL SIG$sig at $(date -u +%FT%TZ) during step '$STEP_LABEL' (pid=${STEP_PID:-none} pgid=${STEP_PGID:-none}); owned work halts BEFORE any fixture stop; first_exit=$code (outer timeout itself reports 124)"
+   case $STEP_LABEL in 10*) RC_GUARD="interrupted($sig)";; 20*) RC_R20="interrupted($sig)";; 21*) RC_R21="interrupted($sig)";;
+@@ -118,10 +139,25 @@
+   STEP_PID=$!; STEP_PGID=
+   for ((i=0;i<40;i++)); do STEP_PGID=$(ps -o pgid= -p "$STEP_PID" 2>/dev/null | tr -d ' '); [ "$STEP_PGID" = "$STEP_PID" ] && break; kill -0 "$STEP_PID" 2>/dev/null || break; sleep 0.05; done
+   if [ "$STEP_PGID" != "$STEP_PID" ] && kill -0 "$STEP_PID" 2>/dev/null; then
+-    stamp "$label: ISOLATION ANOMALY pid=$STEP_PID pgid=$STEP_PGID (not its own group leader) → TERM by pid, refuse (70)"; kill -TERM "$STEP_PID" 2>/dev/null; wait "$STEP_PID" 2>/dev/null; STEP_PID=; STEP_PGID=; finish 70
++    # O2: bounded anomaly handling — TERM by pid, poll ≤ANOMALY_WAIT, KILL, poll ≤1 s, never an unconditional wait on a live pid
++    stamp "$label: ISOLATION ANOMALY pid=$STEP_PID pgid=$STEP_PGID (not its own group leader) → TERM by pid (≤${ANOMALY_WAIT}s), refuse (70)"; kill -TERM "$STEP_PID" 2>/dev/null
++    for ((i=0;i<ANOMALY_WAIT*10;i++)); do kill -0 "$STEP_PID" 2>/dev/null || break; sleep 0.1; done
++    if kill -0 "$STEP_PID" 2>/dev/null; then kill -KILL "$STEP_PID" 2>/dev/null; for ((i=0;i<10;i++)); do kill -0 "$STEP_PID" 2>/dev/null || break; sleep 0.1; done; fi
++    if kill -0 "$STEP_PID" 2>/dev/null; then stamp "$label: anomaly pid=$STEP_PID still alive after KILL; recorded, not waited on"; [ -n "$STEP_PGID" ] && OWNED_PGIDS="$OWNED_PGIDS $STEP_PGID"; else wait "$STEP_PID" 2>/dev/null; fi
++    STEP_PID=; STEP_PGID=; finish 70
+   fi
++  OWNED_PGIDS="$OWNED_PGIDS $STEP_PGID"   # O1: retained for the whole run, never cleared
+   wait "$STEP_PID"; local rc=$?
+   [ "$SIGNAL" != none ] && return 1   # a trapped signal already took over; never record this rc
++  # O1: post-exit quiescence — the leader (timeout) exited; the GROUP must be empty before the stage counts as finished
++  local end=$(( $(now_s) + QUIESCE_WAIT )) left
++  while pgrep -g "$STEP_PGID" >/dev/null 2>&1 && [ "$(now_s)" -lt "$end" ]; do sleep 0.1; done
++  left=$(pgrep -g "$STEP_PGID" -a 2>/dev/null | grep -vE "^[0-9]+ (pgrep|grep) ")
++  if [ -n "$left" ]; then
++    stamp "$label: leader pid=$STEP_PID exited rc=$rc but group $STEP_PGID still has members after ${QUIESCE_WAIT}s → stage NOT accepted; halting the group (owned survivors after step exit):"; echo "$left" | sed 's/^/  member: /' | tee -a "$S"
++    halt_owned_work
++    [ "$rc" -ne 0 ] && finish "$rc" || finish 70
++  fi
+   STEP_PID=; STEP_PGID=; STEP_LABEL=none
+   return $rc
+ }
+@@ -129,8 +165,9 @@
+ cleanup(){
+   trap - EXIT; trap '' TERM INT HUP
+   [ -n "$CLEANUP_T0" ] || CLEANUP_T0=$(date +%s.%N)
++  [ -n "$CLEANUP_DEADLINE" ] || CLEANUP_DEADLINE=$(( $(now_s) + CLEANUP_BUDGET ))   # O2: elapsed deadline (starts at signal if one was trapped)
+   [ "$FIRST_EXIT" = unset ] && FIRST_EXIT=1
+-  stamp "CLEANUP begin $(date -u +%FT%TZ) first_exit=$FIRST_EXIT signal=$SIGNAL lock=$(lock_probe) (held by this runner) budget: reap ${REAP_TERM_WAIT}+${REAP_KILL_WAIT}s, stop ${STOP_BUDGET}+${STOP_KILL}s, status ${STATUS_BUDGET}+${STATUS_KILL}s, scan/hash ${SCAN_HASH_ALLOW}s → worst ${WORST}s of outer grace ${OUTER_GRACE}s (margin ${MARGIN}s)"
++  stamp "CLEANUP begin $(date -u +%FT%TZ) first_exit=$FIRST_EXIT signal=$SIGNAL lock=$(lock_probe) (held by this runner) budget: reap ${REAP_TERM_WAIT}+${REAP_KILL_WAIT}s, stop ${STOP_BUDGET}+${STOP_KILL}s, status ${STATUS_BUDGET}+${STATUS_KILL}s, scan/hash ${SCAN_HASH_ALLOW}s → worst ${WORST}s; ENFORCED elapsed deadline ${CLEANUP_BUDGET}s (remaining $(remaining)s) of outer grace ${OUTER_GRACE}s"
+   # Owned work must be gone BEFORE the fixture is touched — on the normal path as well as after a signal.
+   [ "$REAP" = unchecked ] && halt_owned_work
+   if [ "$REAP" = FAILED ]; then
+@@ -138,23 +175,29 @@
+     stamp "QUARANTINE: owned work not reaped → fixture stop REFUSED, no further mutation (fixture_started=$FIXTURE_STARTED). Nothing erased. Parent must inspect QUARANTINE.txt before any other slot."
+   elif [ "$FIXTURE_STARTED" != 0 ] && [ "${S2_KEEP_FIXTURE:-0}" != 1 ]; then
+     # Stop attempted whenever a start was ATTEMPTED. Bounded here (the fixture's own pg_ctl -w default is 60 s, which alone would exceed outer grace).
+-    timeout --foreground -k $STOP_KILL $STOP_BUDGET $FIXTURE stop >"$OUT/50-fixture-stop.log" 2>&1 9>&-; RC_STOP=$?
+-    stamp "50 fixture-stop exit=$RC_STOP (124=stop budget ${STOP_BUDGET}s exceeded) $(tail -1 "$OUT/50-fixture-stop.log" 2>/dev/null)"
+-    timeout --foreground -k $STATUS_KILL $STATUS_BUDGET $FIXTURE status >"$OUT/51-fixture-status-after-stop.log" 2>&1 9>&-; stamp "51 fixture-status-after-stop: $(head -1 "$OUT/51-fixture-status-after-stop.log")"
++    local sb=$STOP_BUDGET rem; rem=$(remaining); [ $((rem-STOP_KILL-STATUS_BUDGET-STATUS_KILL-SCAN_HASH_ALLOW)) -lt $sb ] && sb=$((rem-STOP_KILL-STATUS_BUDGET-STATUS_KILL-SCAN_HASH_ALLOW))   # O2: clip to remaining deadline
++    if [ "$sb" -lt 3 ]; then RC_STOP="SKIPPED(deadline)"; DEADLINE_EXCEEDED=yes; stamp "50 fixture-stop SKIPPED: cleanup deadline leaves ${rem}s (<3 s usable); fixture left as is, reported as cleanup failure"
++    else
++      timeout --foreground -k $STOP_KILL $sb $FIXTURE stop >"$OUT/50-fixture-stop.log" 2>&1 9>&-; RC_STOP=$?
++      stamp "50 fixture-stop exit=$RC_STOP (124=stop bound ${sb}s exceeded; nominal ${STOP_BUDGET}s) $(tail -1 "$OUT/50-fixture-stop.log" 2>/dev/null)"
++      rem=$(remaining); if [ "$rem" -ge $((STATUS_BUDGET+STATUS_KILL)) ]; then timeout --foreground -k $STATUS_KILL $STATUS_BUDGET $FIXTURE status >"$OUT/51-fixture-status-after-stop.log" 2>&1 9>&-; stamp "51 fixture-status-after-stop: $(head -1 "$OUT/51-fixture-status-after-stop.log")"; else stamp "51 fixture-status SKIPPED (remaining ${rem}s)"; fi
++    fi
+   fi
+   # process evidence: fixture postgres, any owned-work child, any $PORT listener (anchored cmdline starts; see v4.1 false-positive note)
+   SURVIVORS=$( { pgrep -af "$FIXTURE_PAT|$OWNED_PAT" 2>/dev/null | grep -vE "^[0-9]+ (pgrep|grep) " | awk -v me=$$ '$1!=me'; ss -ltnH 2>/dev/null | grep -E ":${PORT}\b"; } | sed 's/^/  survivor: /' )
+   if [ -n "$SURVIVORS" ]; then stamp "CLEANUP: surviving processes/listeners after cleanup:"; echo "$SURVIVORS" | tee -a "$S"; SURVIVORS=present; else SURVIVORS=none; stamp "CLEANUP: no surviving fixture/owned-work processes, nothing listening on $PORT"; fi
+   if [ "$CLEANUP_EXIT" = unset ]; then
+-    if { [ "$RC_STOP" != notrun ] && [ "$RC_STOP" != 0 ]; } || [ "$SURVIVORS" = present ]; then CLEANUP_EXIT=71; stamp "CLEANUP FAILURE: class 71 (stop_exit=$RC_STOP survivors=$SURVIVORS)"; else CLEANUP_EXIT=0; fi
++    deadline_check; if { [ "$RC_STOP" != notrun ] && [ "$RC_STOP" != 0 ]; } || [ "$SURVIVORS" = present ] || [ "$DEADLINE_EXCEEDED" = yes ]; then CLEANUP_EXIT=71; stamp "CLEANUP FAILURE: class 71 (stop_exit=$RC_STOP survivors=$SURVIVORS deadline_exceeded=$DEADLINE_EXCEEDED)"; else CLEANUP_EXIT=0; fi
+   fi
+   if [ "$FIRST_EXIT" != 0 ]; then FINAL=$FIRST_EXIT; else FINAL=$CLEANUP_EXIT; fi
+   if [ "$REAP" = FAILED ] || [ "$SURVIVORS" = present ]; then stamp "LOCK: held by runner through cleanup ($(lock_probe)); NOT safely handed off — quarantine/survivors; parent must inspect before granting another slot"
+   else stamp "LOCK: held by runner through cleanup ($(lock_probe)); released by runner exit; no survivors (probe after exit with check-lock.sh)"; fi
+   local dur; dur=$(awk -v a="$CLEANUP_T0" -v b="$(date +%s.%N)" 'BEGIN{printf "%.2f", b-a}')
+-  stamp "end_utc=$(date -u +%FT%TZ) final_exit=$FINAL first_exit=$FIRST_EXIT cleanup_exit=$CLEANUP_EXIT signal=$SIGNAL reap=$REAP cleanup_seconds=$dur (budget worst ${WORST}s, grace ${OUTER_GRACE}s) guard_spec=$RC_GUARD refusal_hosted=$RC_R20 refusal_noconfirm=$RC_R21 fixture=$RC_FIXTURE composition=$RC_COMP s1_r4_discriminator=$RC_DISC fixture_stop=$RC_STOP survivors=$SURVIVORS"
+-  echo "final=$FINAL first_exit=$FIRST_EXIT cleanup_exit=$CLEANUP_EXIT signal=$SIGNAL reap=$REAP cleanup_seconds=$dur guard_spec=$RC_GUARD refusal_hosted=$RC_R20 refusal_noconfirm=$RC_R21 fixture=$RC_FIXTURE composition=$RC_COMP s1_r4_discriminator=$RC_DISC fixture_stop=$RC_STOP survivors=$SURVIVORS" > "$OUT/exit-codes.txt"
++  stamp "end_utc=$(date -u +%FT%TZ) final_exit=$FINAL first_exit=$FIRST_EXIT cleanup_exit=$CLEANUP_EXIT signal=$SIGNAL reap=$REAP cleanup_seconds=$dur deadline_exceeded=$DEADLINE_EXCEEDED (enforced ${CLEANUP_BUDGET}s, arithmetic worst ${WORST}s, grace ${OUTER_GRACE}s) owned_groups=[$(echo ${OWNED_PGIDS:-none})] guard_spec=$RC_GUARD refusal_hosted=$RC_R20 refusal_noconfirm=$RC_R21 fixture=$RC_FIXTURE composition=$RC_COMP s1_r4_discriminator=$RC_DISC fixture_stop=$RC_STOP survivors=$SURVIVORS"
++  echo "final=$FINAL first_exit=$FIRST_EXIT cleanup_exit=$CLEANUP_EXIT signal=$SIGNAL reap=$REAP cleanup_seconds=$dur deadline_exceeded=$DEADLINE_EXCEEDED guard_spec=$RC_GUARD refusal_hosted=$RC_R20 refusal_noconfirm=$RC_R21 fixture=$RC_FIXTURE composition=$RC_COMP s1_r4_discriminator=$RC_DISC fixture_stop=$RC_STOP survivors=$SURVIVORS" > "$OUT/exit-codes.txt"
+   ( cd "$OUT" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS )
++  # O2: honest total including the evidence hashing above; appended after the manifest so the manifest covers the registers, the total covers the manifest work
++  dur=$(awk -v a="$CLEANUP_T0" -v b="$(date +%s.%N)" 'BEGIN{printf "%.2f", b-a}'); echo "cleanup_seconds_total=$dur (after SHA256SUMS; not covered by SHA256SUMS)" >> "$OUT/exit-codes.txt"; stamp "cleanup_seconds_total=$dur"
+   exit "$FINAL"
+ }
+ trap cleanup EXIT
+@@ -230,13 +273,14 @@
+ # ---- 4) the real composition proof (guard preflight is the first thing the harness does)
+ export S1_PG_SUPER_URL="postgresql://s1_super:s1_local_synthetic@127.0.0.1:$PORT/postgres" S1_PG_PORT=$PORT
+ export S1_PG_DISPOSABLE_CONFIRM="DESTROY-127.0.0.1:$PORT/$DB,${DB}_lock" S2_COMP_OUT="$OUT/harness"
+-run_step 40-composition 1500 "$OUT/40-composition.log" -- $HARNESS "$DB"; RC_COMP=$?
++BOUND40=1500; [ -n "$STUBS" ] && [ -n "${STUB_STEP40_BOUND-}" ] && BOUND40=$STUB_STEP40_BOUND   # O3: stub mode only
++run_step 40-composition "$BOUND40" "$OUT/40-composition.log" -- $HARNESS "$DB"; RC_COMP=$?
+ stamp "40 composition exit=$RC_COMP end_utc=$(date -u +%FT%TZ) $(grep -E '^== [0-9]+ passed' "$OUT/40-composition.log" | tail -1)"
+ [ "$RC_COMP" -eq 0 ] || finish "$RC_COMP"
+ 
+ # ---- 5) S1 R4 discriminator (S1-owned, frozen) on the PROTECTED database the harness leaves behind, under the same hold.
+ mkdir -p "$OUT/s1-r4"
+-export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-r53-v5.3.1 pid=$$ fd9=$LOCK"
++export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-r54-v5.4 pid=$$ fd9=$LOCK"
+ run_step 45-s1-r4-discriminator 300 "$OUT/s1-r4/s1-r4-discriminator.log" -- $DISC "$DB"; RC_DISC=$?
+ stamp "45 s1-r4-discriminator exit=$RC_DISC $(grep -E 'passed|FAIL' "$OUT/s1-r4/s1-r4-discriminator.log" | tail -1)"
+ stamp "lock still held by runner after discriminator: $(lock_probe)"

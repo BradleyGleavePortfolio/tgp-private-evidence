@@ -1,0 +1,14 @@
+{
+  "slice": "S6-V2-ALLOCATION-REVIEW-B",
+  "addendum": 1,
+  "target": {"file": "execution/s6-diagnostic/v2/run-c5-setup-npm-ci.sh", "sha256": "6fa695109dfbb2bf6a7e5b7a72eb326a14e2656dd2597f6fa6ef2d2a78c83324"},
+  "frozen_report_unchanged": true,
+  "executed": false,
+  "findings": [
+    {"id": "A-1", "lines": "L82-L84", "class": "material_false_success", "path": "npm rc0 + reap_group SURVIVORS(cleanup_exit=1) -> FINAL rc=0, exit 0; survivor may hold inherited lock fd9", "closure": "capture CLEANUP_EXIT; die npm-ci-cleanup 7 if nonzero, after RC gate; first_exit preserved separately"},
+    {"id": "A-2", "lines": "L38,L99", "class": "material_false_success", "path": "ancestor CHANGED-report only in EXIT trap after unconditional 'ancestor unchanged' FINAL rc=0", "closure": "compute ANCESTOR_AFTER before FINAL; die ancestor-changed 8 on mismatch; FINAL text states only gated facts"},
+    {"id": "A-3", "lines": "L77-L80", "class": "disclosure_not_blocker", "path": "KILL path always exits nonzero (137/143); group state recorded via cleanup_exit and final owned members; FINAL/die line lacks cleanup result", "closure": "append cleanup_exit to die detail (shared with A-1); no change to wait/grace loop"}
+  ],
+  "disposition": "do not grant 6fa69510; grant fail-closed revision with new hash/manifest after S2 releases lock",
+  "unaffected": ["V3 instrument closure B-01 (cf470101)", "diagnostic runner findings B-02/B-03"]
+}

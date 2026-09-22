@@ -1,0 +1,16 @@
+PASS C1 candidate has one top-level beforeAll and afterAll block
+PASS C2 candidate declares `let teardownAuthorized = false` at module scope
+PASS C3 candidate sets teardownAuthorized = true inside beforeAll
+PASS C4 every sql/sqlAdmin before the flag is a SELECT (7 calls: SELECT current_setting('data_directory') | SELECT count(*) | SELECT current_setting('cluster_name') | SELECT shobj_description(oid,'pg_database') | SELECT count(*) | SELECT rolbypassrls||':'||rolcanlogin | SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',')
+PASS C5 read-only expect gates precede the flag
+PASS C6 the first mutation (GRANT), ALTER TABLE and resetData() all follow the flag
+PASS C7 flag is after the last read-only expect and before the first mutating statement
+PASS C8 afterAll checks the flag before its first sql()/resetData() call
+PASS C9 the refused branch returns without issuing SQL
+PASS C10 refusal is recorded as PG17_TEARDOWN_SKIPPED (no silent skip)
+PASS C11 authorized teardown body is unchanged: DROP CONSTRAINT x2, resetData(), DELETE ScoutImport
+PASS C12 all 287 predecessor expect( lines present in candidate (missing: 0)
+PASS C13 test case count unchanged (22)
+PASS P1 PREDECESSOR afterAll has no authorization check (frozen S5-R3-A-01)
+PASS P2 PREDECESSOR afterAll unconditionally issues DDL/DML (DROP CONSTRAINT, resetData DELETEs)
+SUMMARY pass=15 fail=0
