@@ -1,0 +1,21 @@
+# rev4 offline controls 20260922T000147Z — dist present, clusters/s5 absent, no DB action, no init
+## D1 fixture helper refuses standalone use
+s5-fixture.sh must be invoked by run-proof.sh (single lock holder); refusing standalone init
+rc=2
+## D2 full-stage offline guard: dist sha/provenance/helper pins pass, then password required
+REFUSED rc=2: G2_PG17_PASSWORD must come from the environment (fixture password; never from a file)
+PROOF_EXIT=2 STAGE=full TS=20260922T000147Z START=2026-09-22T00:01:47Z END=2026-09-22T00:01:47Z REFUSED
+rc=2
+## D3 stop stage under the lock with no cluster: helper runs via runner, pg_ctl fails honestly, exit preserved
+OFFLINE_GUARD_OK stage=stop rev=4
+PROOF_EXIT=75 STAGE=stop TS=20260922T000147Z START=2026-09-22T00:01:47Z END=2026-09-22T00:01:47Z LOCK_BUSY
+rc=75
+ls: cannot access '/home/user/pg17/clusters': No such file or directory
+## D4 stamp records dist provenance
+ls: cannot access 'logs/env-stop-*.log': No such file or directory
+## D5 existing data directory would be refused for init/full (simulate by pointing at an existing path is impossible: pin is literal) — check message path via mkdir of the real pin? NOT done (would create the directory). Logic: [ ! -e PIN_DATA_DIRECTORY ] || refuse 3
+108:    [ ! -e "$PIN_DATA_DIRECTORY" ] || refuse 3 "$PIN_DATA_DIRECTORY already exists; fresh init only — an unknown existing cluster is never marked, adopted or destroyed by this runner stage"
+## D6 lock free after run; no children
+none
+## D7 helper has no flock on code lines
+none

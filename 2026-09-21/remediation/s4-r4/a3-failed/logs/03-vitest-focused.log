@@ -1,0 +1,69 @@
+[2026-09-22T00:01:25Z] 03-vitest-focused wt=/home/user/workspace/worktrees/s4-r4 head=2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3 tree=3e23f91824689d1f179a116af948eae0ed5ae170 dirty_paths=0 diff_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 cmd: npx vitest run test/refresh-admission-epoch.spec.js test/session-ownership.spec.js test/refresh-coalesce.spec.js test/session-lifecycle.spec.js test/session-refresh-path.spec.js test/auth-body-deadline.spec.js test/start-import-hardening.spec.js test/ingest-auth.spec.js test/ingest-settlement.spec.js test/ingest-legacy-settlement.spec.js
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/workspace/worktrees/s4-r4[39m
+
+ [32m✓[39m test/auth-body-deadline.spec.js [2m([22m[2m24 tests[22m[2m)[22m[32m 92[2mms[22m[39m
+[90mstderr[2m | test/ingest-settlement.spec.js[2m > [22m[2msource auth loss — the started intent is still settled[2m > [22m[2mdoes not let a failed settlement mask the source failure
+[22m[39m{"src":"tgp-importer","event":"settlement_network_error"}
+
+ [32m✓[39m test/ingest-settlement.spec.js [2m([22m[2m21 tests[22m[2m)[22m[33m 13043[2mms[22m[39m
+     [33m[2m✓[22m[39m does not re-settle a rejected complete as failed [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m logs when the settlement POST fails on an engine-RETURNED failure, not just a throw [33m 1513[2mms[22m[39m
+     [33m[2m✓[22m[39m settles success after one 401 + refresh + retry on the complete POST [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m does not double-settle or break settlement-before-broadcast ordering on that retry [33m 1012[2mms[22m[39m
+     [33m[2m✓[22m[39m still surfaces ingest_failed if the retried complete also 401s (no refresh available) [33m 1014[2mms[22m[39m
+     [33m[2m✓[22m[39m routes to pairing without posting a complete it cannot authenticate [33m 3020[2mms[22m[39m
+     [33m[2m✓[22m[39m flushes the final counts before settling a run that threw [33m 1013[2mms[22m[39m
+     [33m[2m✓[22m[39m carries the committed counts on that final flush, not a reset [33m 1014[2mms[22m[39m
+     [33m[2m✓[22m[39m still settles when every progress post is rejected [33m 1012[2mms[22m[39m
+     [33m[2m✓[22m[39m puts no token material on that final flush [33m 1015[2mms[22m[39m
+ [32m✓[39m test/start-import-hardening.spec.js [2m([22m[2m7 tests[22m[2m)[22m[33m 4642[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the token out of broadcasts, storage, notifications, and ingest payloads [33m 1058[2mms[22m[39m
+     [33m[2m✓[22m[39m reports ingest_failed and never broadcasts success when complete returns 500 [33m 1013[2mms[22m[39m
+     [33m[2m✓[22m[39m finalises but reports ingest_partial (not success) when a page is skipped [33m 2527[2mms[22m[39m
+ [32m✓[39m test/ingest-legacy-settlement.spec.js [2m([22m[2m10 tests[22m[2m)[22m[33m 30735[2mms[22m[39m
+     [33m[2m✓[22m[39m settles terminal_status partial, not success, and shows the coach ingest_empty [33m 4065[2mms[22m[39m
+     [33m[2m✓[22m[39m carries an error_summary telling the coach to verify, and an empty tally [33m 4011[2mms[22m[39m
+     [33m[2m✓[22m[39m sends only ScoutCompleteDto fields and no token material [33m 4019[2mms[22m[39m
+     [33m[2m✓[22m[39m does not raise an OS notification claiming the import completed [33m 4011[2mms[22m[39m
+     [33m[2m✓[22m[39m settles success with final_counts keyed by entity type [33m 4041[2mms[22m[39m
+     [33m[2m✓[22m[39m tallies exactly what the backend acked, summed per entity type [33m 4015[2mms[22m[39m
+     [33m[2m✓[22m[39m carries no error_summary when records did come across [33m 4027[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the run rather than settling a tally that includes an unacked batch [33m 508[2mms[22m[39m
+     [33m[2m✓[22m[39m carries the already-ACKed tally into the failure settlement, not an omission [33m 1515[2mms[22m[39m
+     [33m[2m✓[22m[39m omits final_counts (rather than sending an empty object) when nothing was ACKed yet [33m 519[2mms[22m[39m
+[90mstderr[2m | test/session-ownership.spec.js[2m > [22m[2ma run whose session is replaced mid-refresh (S4-R3-A-02)[2m > [22m[2mstale refresh TIMEOUT after replacement: no clear, no auth_required, run stops
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+ [32m✓[39m test/session-ownership.spec.js [2m([22m[2m7 tests[22m[2m)[22m[33m 1137[2mms[22m[39m
+     [33m[2m✓[22m[39m replacement with NO 401 at all: the next batch is not sent under the replacement's bearer [33m 1006[2mms[22m[39m
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma rotation-persist FAILURE preserves prior state and fails closed (no torn pair)
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma refresh network error returns null and never throws out of refresh
+[22m[39m{"src":"tgp-importer","event":"refresh_network_error"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma refresh that times out returns null (bounded, never hangs)
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma malformed refresh body returns null (explicit parse, fail closed)
+[22m[39m{"src":"tgp-importer","event":"refresh_body_parse_error"}
+
+ [32m✓[39m test/session-lifecycle.spec.js [2m([22m[2m15 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+[90mstderr[2m | test/session-refresh-path.spec.js[2m > [22m[2mno refresh-token persistence regression[2m > [22m[2mkeeps the stored token when the network call rejects
+[22m[39m{"src":"tgp-importer","event":"refresh_network_error"}
+
+[90mstderr[2m | test/session-refresh-path.spec.js[2m > [22m[2mno refresh-token persistence regression[2m > [22m[2mkeeps the stored token when the response body is unparseable
+[22m[39m{"src":"tgp-importer","event":"refresh_body_parse_error"}
+
+ [32m✓[39m test/session-refresh-path.spec.js [2m([22m[2m19 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m test/refresh-admission-epoch.spec.js [2m([22m[2m5 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m test/ingest-auth.spec.js [2m([22m[2m4 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m test/refresh-coalesce.spec.js [2m([22m[2m1 test[22m[2m)[22m[32m 44[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m10 passed[39m[22m[90m (10)[39m
+[2m      Tests [22m [1m[32m113 passed[39m[22m[90m (113)[39m
+[2m   Start at [22m 00:01:25
+[2m   Duration [22m 51.39s[2m (transform 261ms, setup 0ms, import 274ms, tests 49.91s, environment 1ms)[22m
+
+[2026-09-22T00:02:17Z] 03-vitest-focused exit=0

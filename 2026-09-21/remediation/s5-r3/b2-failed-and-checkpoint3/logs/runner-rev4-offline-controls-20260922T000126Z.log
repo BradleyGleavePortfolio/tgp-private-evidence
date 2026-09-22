@@ -1,0 +1,23 @@
+# rev4 offline controls 20260922T000126Z — dist present, clusters/s5 absent, no DB action
+## D1 fixture helper refuses standalone use
+s5-fixture.sh must be invoked by run-proof.sh (single lock holder); refusing standalone init
+rc=2
+ls: cannot access '/home/user/pg17/clusters': No such file or directory
+## D2 fixture helper refuses init when directory exists (simulated with a temp DATA via runner pin check)
+(runner-level check below)
+## D3 runner full-stage offline guard passes up to password requirement (dist sha, provenance, helper pins)
+REFUSED rc=2: fixture helper pins differ from runner pins
+PROOF_EXIT=2 STAGE=full TS=20260922T000126Z START=2026-09-22T00:01:26Z END=2026-09-22T00:01:26Z REFUSED
+rc=2
+## D4 init stage offline guard OK then reaches lock (dry: fixture invoked with S5_RUNNER_PID) — use stop stage instead to avoid creating a cluster
+REFUSED rc=2: fixture helper pins differ from runner pins
+PROOF_EXIT=2 STAGE=stop TS=20260922T000126Z START=2026-09-22T00:01:26Z END=2026-09-22T00:01:26Z REFUSED
+rc=2
+ls: cannot access '/home/user/pg17/clusters': No such file or directory
+## D5 stamp records dist provenance
+grep: logs/env-stop-*.log: No such file or directory
+## D6 provenance tamper refused (copy with wrong sha, via PG_PROVENANCE override not possible — verify grep logic directly)
+23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+## D7 lock free after run; no children
+none
