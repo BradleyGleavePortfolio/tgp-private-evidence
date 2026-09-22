@@ -1,0 +1,960 @@
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true", see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+  console.warn
+    PG17_DATABASE {"database":"g2_s5_etq0_disposable","address":"127.0.0.1","port":54325,"directory":"/ctl/pg17/clusters/s5","version":"170006","user":"postgres","super":false,"bypassrls":true,"owner":"postgres"}
+
+    [0m [90m 56 |[39m   expect(sql([32m`SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`[39m))
+     [90m 57 |[39m     [33m.[39mtoBe([33mG2_PG17_DATABASE_MARKER[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+     [90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:58:11)
+
+  console.warn
+    PG17_TEARDOWN_SKIPPED {"reason":"setup refused before first mutation; no DDL/DML issued"}
+
+    [0m [90m 92 |[39m     [90m// Setup was refused before its first mutation: nothing of ours exists on this target, and the[39m
+     [90m 93 |[39m     [90m// target's identity was not accepted. Record the skip; issue no DDL/DML at all.[39m
+    [31m[1m>[22m[39m[90m 94 |[39m     console[33m.[39mwarn([32m'PG17_TEARDOWN_SKIPPED'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify({ reason[33m:[39m [32m'setup refused before first mutation; no DDL/DML issued'[39m }))[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 95 |[39m     [36mreturn[39m[33m;[39m
+     [90m 96 |[39m   }
+     [90m 97 |[39m   sql([32m`ALTER TABLE "Person" DROP CONSTRAINT IF EXISTS g2p_target_refusal;[39m[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:94:13)
+
+FAIL test/candidate.spec.ts
+  stage 1: E on a populated narrow base with the actual O binary
+    ✕ populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows (1 ms)
+    ✕ applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default (1 ms)
+    ✕ keeps the actual O writer and readers working on E, creating NULL provenance
+    ✕ retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim
+    ✕ refuses a wrong public index owner in up on the populated base
+    ✕ refuses a wrong public index owner in down on the populated base
+    ✕ schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact (1 ms)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+    ✕ rolls E back only while every provenance is NULL, preserving rows, then re-applies
+  stage 2: E recorded through the real release mechanism
+    ✕ prisma migrate deploy applies exactly E on the populated database and records history
+  stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17
+    ✕ claims historical NULL history at volume with honest multi-page accounting and identical replay (1 ms)
+    ✕ claims only the exact coach/intent/family identity and leaves adjacent tenants untouched
+    ✕ creates every outcome with actual provenance, isolates failures and replays honestly
+    ✕ claims historical NULL on reconstructed attempts (1 ms)
+    ✕ claims historical NULL on skipped attempts
+    ✕ claims historical NULL on failed attempts
+    ✕ rolls back new and pre-existing clients target changes on late mismatch
+    ✕ rolls back new and pre-existing workouts target changes on late mismatch
+    ✕ fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+    ✕ preserves success and reason on skip failure/skip, but still checks mismatch
+    ✕ preserves success and reason on throw failure/skip, but still checks mismatch (1 ms)
+    ✕ preserves success and reason on database failure/skip, but still checks mismatch
+    ✕ rejects invalid staging before writes and preserves narrow staging/ledger identities
+    ✕ cross-intent same source: same platform converges on one Person, different platform mints a second
+    ✕ characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source (1 ms)
+    ✕ characterizes actual O after T: provenance stays but O can downgrade success
+  stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17
+    ✕ concurrent success replays with false old winner converge on one target
+    ✕ concurrent success replays with true old winner converge on one target
+    ✕ two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+    ✕ retries real PostgreSQL serialization failure once for skip
+    ✕ retries real PostgreSQL serialization failure once for throw
+    ✕ retries real PostgreSQL serialization failure once for success
+    ✕ exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+    ✕ success holds claim while a failing false old writer waits
+    ✕ success holds claim while a failing true old writer waits
+    ✕ success holds claim while a skipped false old writer waits
+    ✕ success holds claim while a skipped true old writer waits
+    ✕ T success upgrades serialized skip while target write is open
+    ✕ T success upgrades serialized throw while target write is open
+    ✕ concurrent different-platform NULL claims serialize and the loser rolls back target changes
+  stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission
+    ✕ enumerates exact narrow-schema clients page union and retains NULL legacy history
+    ✕ enumerates exact narrow-schema workouts page union and retains NULL legacy history
+    ✕ characterizes clients ties ONLY in a temporary future-schema fixture
+    ✕ characterizes workouts ties ONLY in a temporary future-schema fixture
+    ✕ bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection (1 ms)
+    ✕ bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+  stage 5: rollout recovery boundaries after T has claimed provenance
+    ✕ refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+    ✕ E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+    ✕ characterizes down against an actual T claim transaction paused inside its interactive transaction (1 ms)
+    ✕ refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+  ● stage 1: E on a populated narrow base with the actual O binary › populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › keeps the actual O writer and readers working on E, creating NULL provenance
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in up on the populated base
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in down on the populated base
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › rolls E back only while every provenance is NULL, preserving rows, then re-applies
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 2: E recorded through the real release mechanism › prisma migrate deploy applies exactly E on the populated database and records history
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL history at volume with honest multi-page accounting and identical replay
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims only the exact coach/intent/family identity and leaves adjacent tenants untouched
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › creates every outcome with actual provenance, isolates failures and replays honestly
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on reconstructed attempts
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on skipped attempts
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on failed attempts
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing clients target changes on late mismatch
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing workouts target changes on late mismatch
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on skip failure/skip, but still checks mismatch
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on throw failure/skip, but still checks mismatch
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on database failure/skip, but still checks mismatch
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rejects invalid staging before writes and preserves narrow staging/ledger identities
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › cross-intent same source: same platform converges on one Person, different platform mints a second
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes actual O after T: provenance stays but O can downgrade success
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with false old winner converge on one target
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with true old winner converge on one target
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for skip
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for throw
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for success
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing false old writer waits
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing true old writer waits
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped false old writer waits
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped true old writer waits
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized skip while target write is open
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized throw while target write is open
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent different-platform NULL claims serialize and the loser rolls back target changes
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema clients page union and retains NULL legacy history
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema workouts page union and retains NULL legacy history
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes clients ties ONLY in a temporary future-schema fixture
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes workouts ties ONLY in a temporary future-schema fixture
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › characterizes down against an actual T claim transaction paused inside its interactive transaction
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "164"
+    Received: "165"
+
+    [0m [90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+    [31m[1m>[22m[39m[90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m    |[39m                               [31m[1m^[22m[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 62 |[39m   expect(hasColumn())[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 63 |[39m   expect(readFileSync(resolve(oldClient[33m![39m[33m,[39m [32m'schema.prisma'[39m)[33m,[39m [32m'utf8'[39m))[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:60:31)
+
+Test Suites: 1 failed, 1 total
+Tests:       51 failed, 51 total
+Snapshots:   0 total
+Time:        0.844 s, estimated 2 s
+Ran all test suites matching test/candidate.spec.ts.

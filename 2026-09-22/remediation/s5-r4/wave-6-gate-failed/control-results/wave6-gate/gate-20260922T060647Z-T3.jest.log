@@ -1,0 +1,858 @@
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true", see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+  console.warn
+    PG17_DATABASE {"database":"g2_s5_etq0_disposable","address":"127.0.0.1","port":54325,"directory":"/ctl/pg17/clusters/s5","version":"170006","user":"postgres","super":false,"bypassrls":true,"owner":"postgres"}
+
+    [0m [90m 56 |[39m   expect(sql([32m`SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`[39m))
+     [90m 57 |[39m     [33m.[39mtoBe([33mG2_PG17_DATABASE_MARKER[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 58 |[39m   console[33m.[39mwarn([32m'PG17_DATABASE'[39m[33m,[39m [33mJSON[39m[33m.[39mstringify(identity))[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 59 |[39m   [90m// Bootstrap leaves the full 164-migration O history and NO E column/history.[39m
+     [90m 60 |[39m   expect(appliedMigrations())[33m.[39mtoBe([32m'164'[39m)[33m;[39m
+     [90m 61 |[39m   expect(sql([32m`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(E)}`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:58:11)
+
+  console.warn
+    PG17_API_ROLE_TABLE_PRIVILEGES
+
+    [0m [90m 80 |[39m [32m    GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",[39m
+     [90m 81 |[39m [32m      public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`[39m)[33m;[39m
+    [31m[1m>[22m[39m[90m 82 |[39m   console[33m.[39mwarn([32m'PG17_API_ROLE_TABLE_PRIVILEGES'[39m[33m,[39m sql([32m`SELECT string_agg(table_name||'='||privileges,' ' ORDER BY table_name) FROM ([39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 83 |[39m [32m    SELECT table_name, string_agg(privilege_type,',' ORDER BY privilege_type) privileges[39m
+     [90m 84 |[39m [32m    FROM information_schema.role_table_grants WHERE grantee='anon' AND table_schema='public'[39m
+     [90m 85 |[39m [32m    AND table_name IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity') GROUP BY 1) g`[39m))[33m;[39m[0m
+
+      at Object.<anonymous> (test/candidate.spec.ts:82:11)
+
+FAIL test/candidate.spec.ts
+  stage 1: E on a populated narrow base with the actual O binary
+    ✕ populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows (1 ms)
+    ✕ applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+    ✕ keeps the actual O writer and readers working on E, creating NULL provenance
+    ✕ retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim (1 ms)
+    ✕ refuses a wrong public index owner in up on the populated base
+    ✕ refuses a wrong public index owner in down on the populated base
+    ✕ schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact (1 ms)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+    ✕ rolls E back only while every provenance is NULL, preserving rows, then re-applies (1 ms)
+  stage 2: E recorded through the real release mechanism
+    ✕ prisma migrate deploy applies exactly E on the populated database and records history
+  stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17
+    ✕ claims historical NULL history at volume with honest multi-page accounting and identical replay
+    ✕ claims only the exact coach/intent/family identity and leaves adjacent tenants untouched (2 ms)
+    ✕ creates every outcome with actual provenance, isolates failures and replays honestly
+    ✕ claims historical NULL on reconstructed attempts (1 ms)
+    ✕ claims historical NULL on skipped attempts
+    ✕ claims historical NULL on failed attempts
+    ✕ rolls back new and pre-existing clients target changes on late mismatch (1 ms)
+    ✕ rolls back new and pre-existing workouts target changes on late mismatch
+    ✕ fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+    ✕ preserves success and reason on skip failure/skip, but still checks mismatch
+    ✕ preserves success and reason on throw failure/skip, but still checks mismatch
+    ✕ preserves success and reason on database failure/skip, but still checks mismatch
+    ✕ rejects invalid staging before writes and preserves narrow staging/ledger identities (1 ms)
+    ✕ cross-intent same source: same platform converges on one Person, different platform mints a second
+    ✕ characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+    ✕ characterizes actual O after T: provenance stays but O can downgrade success
+  stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17
+    ✕ concurrent success replays with false old winner converge on one target
+    ✕ concurrent success replays with true old winner converge on one target (2 ms)
+    ✕ two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+    ✕ retries real PostgreSQL serialization failure once for skip
+    ✕ retries real PostgreSQL serialization failure once for throw
+    ✕ retries real PostgreSQL serialization failure once for success
+    ✕ exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+    ✕ success holds claim while a failing false old writer waits
+    ✕ success holds claim while a failing true old writer waits
+    ✕ success holds claim while a skipped false old writer waits
+    ✕ success holds claim while a skipped true old writer waits
+    ✕ T success upgrades serialized skip while target write is open
+    ✕ T success upgrades serialized throw while target write is open (1 ms)
+    ✕ concurrent different-platform NULL claims serialize and the loser rolls back target changes
+  stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission
+    ✕ enumerates exact narrow-schema clients page union and retains NULL legacy history (1 ms)
+    ✕ enumerates exact narrow-schema workouts page union and retains NULL legacy history
+    ✕ characterizes clients ties ONLY in a temporary future-schema fixture
+    ✕ characterizes workouts ties ONLY in a temporary future-schema fixture
+    ✕ bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+    ✕ bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection (1 ms)
+  stage 5: rollout recovery boundaries after T has claimed provenance
+    ✕ refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+    ✕ E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+    ✕ characterizes down against an actual T claim transaction paused inside its interactive transaction
+    ✕ refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+  ● stage 1: E on a populated narrow base with the actual O binary › populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › keeps the actual O writer and readers working on E, creating NULL provenance
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in up on the populated base
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in down on the populated base
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › rolls E back only while every provenance is NULL, preserving rows, then re-applies
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 2: E recorded through the real release mechanism › prisma migrate deploy applies exactly E on the populated database and records history
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL history at volume with honest multi-page accounting and identical replay
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims only the exact coach/intent/family identity and leaves adjacent tenants untouched
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › creates every outcome with actual provenance, isolates failures and replays honestly
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on reconstructed attempts
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on skipped attempts
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on failed attempts
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing clients target changes on late mismatch
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing workouts target changes on late mismatch
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on skip failure/skip, but still checks mismatch
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on throw failure/skip, but still checks mismatch
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on database failure/skip, but still checks mismatch
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rejects invalid staging before writes and preserves narrow staging/ledger identities
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › cross-intent same source: same platform converges on one Person, different platform mints a second
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes actual O after T: provenance stays but O can downgrade success
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with false old winner converge on one target
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with true old winner converge on one target
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for skip
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for throw
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for success
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing false old writer waits
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing true old writer waits
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped false old writer waits
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped true old writer waits
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized skip while target write is open
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized throw while target write is open
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent different-platform NULL claims serialize and the loser rolls back target changes
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema clients page union and retains NULL legacy history
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema workouts page union and retains NULL legacy history
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes clients ties ONLY in a temporary future-schema fixture
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes workouts ties ONLY in a temporary future-schema fixture
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › characterizes down against an actual T claim transaction paused inside its interactive transaction
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+    fake: ALTER TABLE failed after authorized GRANT (partial setup)
+
+    [0m [90m 29 |[39m   log([32m'sql'[39m[33m,[39m text)[33m;[39m
+     [90m 30 |[39m   [36mif[39m (mutating(text)) {
+    [31m[1m>[22m[39m[90m 31 |[39m     [36mif[39m (scenario [33m===[39m [32m'authorized-partial'[39m [33m&&[39m [35m/ADD CONSTRAINT g2p_target_refusal/[39m[33m.[39mtest(text)) [36mthrow[39m [36mnew[39m [33mError[39m([32m'fake: ALTER TABLE failed after authorized GRANT (partial setup)'[39m)[33m;[39m
+     [90m    |[39m                                                                                                    [31m[1m^[22m[39m
+     [90m 32 |[39m     [36mreturn[39m [32m''[39m[33m;[39m
+     [90m 33 |[39m   }
+     [90m 34 |[39m   [36mif[39m ([35m/pg_tables WHERE schemaname='public' AND tableowner<>'postgres'/[39m[33m.[39mtest(text)) [36mreturn[39m [32m'0'[39m[33m;[39m[0m
+
+      at sql (test/utils/g2-pg17-harness.ts:31:100)
+      at Object.<anonymous> (test/candidate.spec.ts:86:6)
+
+Test Suites: 1 failed, 1 total
+Tests:       51 failed, 51 total
+Snapshots:   0 total
+Time:        0.566 s, estimated 1 s
+Ran all test suites matching test/candidate.spec.ts.

@@ -1,0 +1,46 @@
+{
+  "task": "S2-V5.5-INDEPENDENT-CLOSURE B",
+  "reviewer": "s1_r4_independent_audit_b_muc6muwk",
+  "revision": 1,
+  "frozen": true,
+  "model": {"requested": "claude_fable_5", "observed": "not exposed at runtime; not asserted"},
+  "method": "read-only; sha256sum -c; diff line counts; cmp; static trace of runner/driver/stubs; no execution, no bash -n, no probes, no DB, no network; peer A current output not read",
+  "inputs": {
+    "outer_manifest": {"path": "execution/s2-runner55/SHA256SUMS.outer", "files": 16, "status": "all OK", "sha256": "0d7332992da568bb8855a9d19a540e2389cd9bd345ec914639cf295a072788a4"},
+    "runner_v55": {"sha256": "c3a4d2a9a234dda141122a44d46a3902a8575001a26ffcadc2029080a768de49", "lines": 357, "changed_lines_vs_v54": 134},
+    "driver_v55": {"sha256": "a5a2d73f8b0138362ef391c4cbd58ea846673be1846bfaf92561bde2a538312c", "lines": 236, "changed_lines_vs_v54": 102},
+    "stubs": {"harness.sh": "d519f41b9c718ae0fd14f07f62262b215c73b18722c0a255b1063e91059a5b95", "fixture.sh": "e415003c87fb118e809b9d8f732acdb76920993e4d5eda1556d4ef83e0cbcc61", "discriminator.sh": "535dc494cb47b09d284adcbe990c64837648d3ab4a53ac033577b0f9dce3a8f1", "guard_spec_and_k1": "byte-identical to r54"},
+    "documents": {"FINDINGS_MAP.md": "67d334d12befbcb7c2a0211d67249ac183360aa74c3b694afc4c5eb236283676", "CONTROL_REQUEST_08.md": "83100d303c0305e1698a036e7463917135bce27c46b3b1f900f61213deb5750a", "PROOF_REQUEST_09.md": "25f6d6a82f0753db235e2d6a79d1da6aa96a79273b674e77cfc922d3b9a5addf"},
+    "prior_reports": {"a_r54_REPORT": "f5000761fef24541679f07aa42d455ee5455a3de679c51cb203c11761a45f241", "b_r54_REPORT": "3b807e6ebf58032b513cd7f4cf7d82f825e9f1cabf1f95d48e0bc0bb2e42b428"},
+    "unchanged_pins": {"fixture": "9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881", "launcher": "8d0e2c7ce4721afaa7ff5bdfdfb2cb525790b424b8a163319c9de2e2eb4d7181", "v531_lane_manifest_failures": 0},
+    "contract": {"EXECUTION_REPAIR_WAVE_2.md": "cafda5fb0622f2afea568b6908f72a3c471c509b7289b3f081fc3ca4756342f5", "DISPATCHES.md": "e5cdb56dd93ae54b3cf6957f77a422abfac1d5f3578aba9c85b9abb7483ff4fb"},
+    "host_facts": {"runner_uid": 2000, "root_dir_owner_mode": "root:root 0755"}
+  },
+  "delta_closure_status": {
+    "P1_checkpoint_pin_client_bytes": {"status": "closed-at-source", "lines": "L75,L298,L299,L315,L318", "note": "consumers have no env -i/unset/env -u; historical egress inferred not observed; pin prospective"},
+    "P2_startup_identity_retirement": {"status": "closed-at-source but INOPERATIVE until S2-R55B-01", "lines": "L94,L103,L108,L109,L122,L161-181,L194"},
+    "P3_owned_stop_status": {"status": "closed-at-source", "lines": "L200-219,L237,L239,L248"},
+    "P4_deadline_before_first_exceptional_reap": {"status": "closed-at-source", "lines": "L104,L121,L147,L171,L189,L224"},
+    "P5_receipt_ordering": {"status": "closed-at-source", "lines": "L255,L258,L259-266"},
+    "driver_E1_E5": {"status": "closed-at-source", "lines": "L50-51,L52-59,L60-62,L67-74,L80,L89"}
+  },
+  "findings": [
+    {"id": "S2-R55B-01", "class": "DEFECT", "severity": "blocker", "title": "IDDIR reset to empty at end of L103 after being set at L94; identity files target '/'; every run refused at step 10 with final=70", "evidence": "runner L94, L103 (trailing token 'IDDIR='), L162, L202, L163-164, L166-179; grep shows no other assignment; uid 2000 cannot write to /", "safety": "fail-closed; only a TERM by pid to the runner's own timeout leader; would write outside lane if ever run as root", "closure": "delete trailing 'IDDIR=' on L103 (or move L94 after L103); new runner hash; new request"},
+    {"id": "S2-R55B-02", "class": "DEFECT-CONTROL", "severity": "high-for-request-08", "title": "Driver L119 K2 regex expects v5.4 text '(recorded groups [digits]' while v5.5 L141 prints '(owned groups [none] retired [...]'", "evidence": "driver L119; runner L141, L194; FINDINGS_MAP and request 08 state the new text", "closure": "update L119 regex to '\\(owned groups \\[none\\] retired \\[[0-9 ]+\\]'; all other expectations cross-checked consistent"},
+    {"id": "S2-R55B-03", "class": "INFO", "severity": "info", "title": "Watchdog sleeper orphaned by finish/abort (unnamed residue up to ~86 s); stale newest-id target between controls (pid-reuse class, low)", "evidence": "driver L98, L68, L75", "closure": "optional"},
+    {"id": "S2-R55B-04", "class": "INFO", "severity": "info", "title": "Unidentified cleanup-client leak branch unreachable (kill -0 after wait)", "evidence": "runner L207, L217", "closure": "moot after -01; else use pgrep -P/pattern"},
+    {"id": "S2-R55B-05", "class": "INFO", "severity": "info", "title": "Deadline/receipt verification: single anchor, clipped consumers, registers before hash, receipt after; K10 stub path traced to ~23 s within 20-30 window", "evidence": "runner L104,L117,L209,L213,L234-239,L243-266; stub fixture stop", "closure": "none"},
+    {"id": "S2-R55B-06", "class": "INFO", "severity": "info", "title": "Real-mode assumptions unchanged and not stub-covered (pg_ctl detach for start/stop census, engine children, harness blocker); checkpoint inheritance into npx/node first observed in a real run", "evidence": "runner L186,L209; harness L212,L224-225; request 09 text", "closure": "observe in first real run"}
+  ],
+  "proposed_only_controls": {
+    "N4_caller_group_decoy": {"necessary": false, "reason": "kill list is record-based; enclose records only published==$! and != own/parent (L56); owned_live excludes own/parent groups and $$/$PPID (L61); no log-pgid adoption (L43-49)"},
+    "N5_startup_interruption": {"necessary": false, "reason": "unconfirmed window is milliseconds before timeout execs; L122 TERM by pid; pattern scan -> 72 for named survivors"},
+    "N6_handoff_failure": {"necessary": "recommended, not blocking", "reason": "finish->4 path (L70-71) has no exercise; cheap to add (unrecorded pattern-matching sleeper after first control, expect 4)"}
+  },
+  "grantability": {
+    "control_request_08": {"grantable_as_issued": false, "reason": "outcome predetermined: k -> 1 at K2 (S2-R55B-01/-02), new1 -> 1 at K7, new2 -> 1 at K10, neg passes", "side_effect_safety": "acceptable (record/enclosure-only signals, signal-free refusal, lane-private lock, additive pre-runs)", "path": "fix L103 and L119 -> re-hash -> request 08a (optionally + N6) -> run once"},
+    "proof_request_09": {"status": "HOLD", "concrete_blocker": "S2-R55B-01 guarantees refusal at step 10 (final=70) - slot consumed for no evidence; also gated on 08a passing", "other_real_proof_blockers_in_delta": "none found"}
+  },
+  "dynamic_attestation": "PENDING - v5.5/v55 never executed; no inherited pass from r53/r54",
+  "non_goals_honoured": ["no execution", "no syntax check", "no probes", "no install", "no DB", "no network", "no source/fixture/runner/driver edits", "no current peer A reads", "all prior frozen outputs unchanged"]
+}

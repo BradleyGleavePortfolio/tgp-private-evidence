@@ -1,0 +1,11 @@
+--- ../s2-runner54/controls-proposed/stubs/harness.sh	2026-09-22 05:27:09.585839075 +0000
++++ controls-proposed/stubs/harness.sh	2026-09-22 05:50:50.301839075 +0000
+@@ -3,7 +3,7 @@
+ # r54 additions (A01/B01 counterexamples): leader-exit (same-group unnamed child outlives a rc=0 leader) | grandchild (same-group unnamed
+ # child for an inner step timeout) | escape-unnamed (setsid child with a plain 'sleep' cmdline: no group, no pattern — documented boundary).
+ # Every spawned pid is printed as 'spawned pid=<n>' so the control driver can record ownership WITHOUT relying on process names.
+-echo "stub harness db=$1 pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d ' ') fd9=$(readlink /proc/$$/fd/9 2>/dev/null || echo closed) mode=${STUB_HARNESS_MODE:-fast}"
++echo "stub harness db=$1 pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d ' ') fd9=$(readlink /proc/$$/fd/9 2>/dev/null || echo closed) mode=${STUB_HARNESS_MODE:-fast} CHECKPOINT_DISABLE=${CHECKPOINT_DISABLE-unset}"
+ case ${STUB_HARNESS_MODE:-fast} in
+   sleep)  sleep "${STUB_HARNESS_SLEEP:-30}";;
+   escape) setsid -f bash -c 'exec -a s2r53-stub-escapee sleep '"${STUB_HARNESS_SLEEP:-30}" </dev/null >/dev/null 2>&1; sleep 0.3; echo "escapee pid=$(pgrep -f '^s2r53-stub-escapee' | head -1)"; sleep "${STUB_HARNESS_SLEEP:-30}";;

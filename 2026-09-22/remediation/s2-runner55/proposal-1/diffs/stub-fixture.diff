@@ -1,0 +1,12 @@
+--- ../s2-runner54/controls-proposed/stubs/fixture.sh	2026-09-22 05:23:23.313839075 +0000
++++ controls-proposed/stubs/fixture.sh	2026-09-22 05:50:50.301839075 +0000
+@@ -3,6 +3,7 @@
+ case $1 in
+   init) echo "stub init fd9=$(readlink /proc/$$/fd/9 2>/dev/null || echo closed) caller=$PPID"; exit ${STUB_INIT_RC:-0};;
+   start) echo "stub started"; exit ${STUB_START_RC:-0};;
+-  status) echo "stub status";;
+-  stop) echo "stub stop rc=${STUB_STOP_RC:-0} hang=${STUB_STOP_HANG:-0}s $(date -u +%FT%TZ)"; [ "${STUB_STOP_HANG:-0}" -gt 0 ] && sleep "$STUB_STOP_HANG"; exit ${STUB_STOP_RC:-0};;   # r54: hanging-stop counterexample
++  status) echo "stub status pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d ' ')";;
++  stop) echo "stub stop rc=${STUB_STOP_RC:-0} hang=${STUB_STOP_HANG:-0}s pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d ' ') CHECKPOINT_DISABLE=${CHECKPOINT_DISABLE-unset} $(date -u +%FT%TZ)"
++        if [ "${STUB_STOP_HANG:-0}" -gt 0 ]; then sleep "$STUB_STOP_HANG" & echo "spawned pid=$! (hanging stop child, same group, cmd 'sleep')"; wait $!; fi; exit ${STUB_STOP_RC:-0};;   # r55: hanging child identity is published (R54-A-02)
+ esac

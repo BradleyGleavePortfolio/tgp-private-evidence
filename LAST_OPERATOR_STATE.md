@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 05:34 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
+Updated: 2026-09-22 06:12 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
 
 ## Mission and authority
 
@@ -34,19 +34,19 @@ Full independently executable slice records, writer surfaces, acceptance, recove
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
 | S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Both R4 source follow-ups frozen: quoted/pre-seed source-closed, no source defect established. TRUNCATE behavior/membership path/discriminator unobserved. B addendum688bc92d corrects revision1:56fb IS composed in21ea/d5cd; successful final dynamic proof is not. Offline24/24 exists;17/7 mutant bytes missing. No schema change ordered. |
-| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | R3 unchanged. Setup05 all0, no server. RunnerV5.4 3f404479/driver6638ec06 frozen, dual independent narrow review assigned; known unnamed-session escape boundary explicitly unresolved. Controls07 and real06b held; no reinstall. |
-| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Retained R2; PREP1 stagedtree78a4f0e8 preserved. Tooling identity passed, directcheck failed6 inherited S3files;40pass including3resolutions. Parent authorizes PREP2 formatting-only six-path expansion after S5cleanup, newtree/patchpreservation required. No appdeps/Prisma/hooks/commit; no Bradley decision needed. |
-| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow A/B sourceclosure; artifact held0/6historicalhooks. Both V2planreviews frozenHOLD. V3 execution-only repair assigned for nestedtimeoutownership, JSONpublication/startup/bounds/exittruth, actualwrappercontrols. No control/native grant or product edit. |
-| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R4 dirtypatchc36258b3 uncommitted. Wave2 failed28/1 retained; static15/15rc0. Wave5 fake destroy14/14 and genctl12/12 completed05:32:44, no survivors. Corrected pure-log L5checker1645406c/driver498ac54a granted once12+2s, no lifecycle rerun/realPG/install. |
-| S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 unchanged. Instrumentcf470101 positive, priorfailuresretained. B addendum2 clears setup91fe0f1b; once-onlysetup granted after S5fakewave/S3formattercleanup. Diagnostic1664held M1postcleanup progression/M2copyremoval gap; minimal3.1 additiveprep. No Jest/P1grant or causalclaim. Original/expanded manifests separately preserved. |
+| S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | R3 unchanged; setup05 all0, no server. Both V5.5 reviews frozen HOLD08/09, agree IDDIR reset/K2 predicate; parent retains A's additional startup/watchdog/deadline/predecessor-receipt/publication/CLI-order residuals despite B's narrower opinion. Minimal V5.6 preparation with N4/N5/N6 discriminators assigned. Checkpoint export and original post-hash mutation narrowly source-corrected only; no controls/reinstall/DB. |
+| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Retained R2; PREP2 write6/check46 both0, stagedtreea584a1b95423f95dae8daabf673ef3776604acbb reproduced from both parents, six formatted S3 blobs/three unchanged resolutions/0 unexpected. Request03e707ec2a and additive68872675 checkpoint-disable environment frozen. No application deps/Prisma/hooks/commit; upstream B3 then composed-lock proof and six-file applicability still required. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow A/B source closure; artifact held, historical hooks0/6. V3 A concrete HOLD retained despite narrower B. V4 frozen launcher23ebfbc3/libabfdd0bd/runner86a4f6cc, manifest3c9276aa, dual exact-successor reviews assigned. Private control lease/quarantine holder and340s bound requested, not granted. No controls/native/product edit. |
+| S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R4 dirty patchc36258b3/fingerprint6850b32e uncommitted. Setup74736a58 positive1117 packages/inner-FINAL-outer0, exact source/ancestor and identities preserved, no generated client/hooks. V6 real-Jest/fake-harness once06:06:47–52:12PASS/1FAIL on T3 JSON-escaping checker, outer1/no survivors; T1/T2 named refusals/zero mutation/skips positive, T0 NOTRUN. Selective read-only T3 checker plus T0-only driver preparation assigned, no repeat valid runs. All failed waves remain failed. |
+| S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 unchanged. Setup91fe0f1b positive1099packages/20 strict identities. C5b7b328a5 once: A/B/D0; C6/6/no overlap with preserved hang143 budget-TERM and nine snapshots of five600000ms refed singleton-Query GC timers. Cleanup0/five copies removed/ancestor unchanged/porcelain0; actual outer wait unobserved. B bounded result/proposal review assigned; trigger/app impact/historical extrapolation and test-only fix sufficiency not yet accepted. |
 
 Four advertised bundle identities were checked against current packet heads: S2 `3b6cee48…0f75`, S4 `f8de3d63…cf97`, S5 `e42aa021…5b48`, S6 `c0ad2994…9662`. Workers must verify prerequisite, actual tree and isolated clean restoration before edits. Restoration is not a new passing test or audit.
 
 ## Resource and truth boundaries
 
-Workspace2CPUs/about8GB,8.0GB disk free after S2setup. Installed /home/user/pg17/dist fixed17.6 and S2 d5cd node_modules are attributable; no cluster/server exists. Platform-owned /home/user/node_modules209entries unchanged, never delete/mislabel it. Canonical nonblocking lock:`/home/user/workspace/execution/test-validation.lock`. S3tooling-only and S5fakecontrols consumed; S3format-only active/then S6setup aftercleanup. Isolated formatter tooling installed, no S3 product dependencies.
+Workspace2CPUs/about8GB; disk6.4GB free observed06:09. Installed /home/user/pg17/dist fixed17.6 and isolated S2/S5/S6 application dependencies are attributable; no real cluster/server created. Platform-owned /home/user/node_modules is read-only: historical209 entries, contemporaneous S5/S6 setup inventory210 entries with before/after hash3bc7f2e3 unchanged. Acceptance uses each slot's hash equality, not a permanent count. Isolated Prettier3.9.6 tooling is installed, no S3 application dependencies.
 
-Source/preparation/review lanes remain parallel and isolated. S4/S6 probes and S5static allowance consumed. Named allocations: S5fake destroy/genctl then S3six-file formatter then S6setup91fe0f1b once, all after preceding cleanup. S4native/S6Jest/S5install/S2controls/realPGproof ungranted. A free lock is not permission; all assignments in synchronizedregister.
+Source/preparation/review lanes remain parallel and isolated. S6 diagnostic, S5 setup and S5 v6 allocations are consumed; v6 stopped on first checker failure, reporting no survivors. No new heavy allocation is granted. S5 selective preparation, S6 result review, S2 independent reviews and S4 V4 preparation are active; S2 realproof/S4native/new S6runtime remain held. A free lock is not permission.
 
 Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 A/B source reviews and B factual addendum are frozen, dynamic attestation pending. S4 A source acceptance is not artifact acceptance. All original reports remain unchanged. Every S-lane has stage-correct work.
 
@@ -61,12 +61,14 @@ Current truth: preserved and partially implemented/tested candidates, not overal
 - S6 C1 async-test corruption; C2/C3 behavioral6/6 but process failure. C4 exact runner `ac4037a518c241fcc162861f6e6739ab5859897a663310f8a1c87b69fde60779` ran once 01:05:40–01:07:20, behavioral6/6, zero overlapping-act warnings, timeout124 at100s, no handle header/stacks. Inconclusive ownership; previous cleanup verified at01:08:25. Existing controls and P1 remain NOTRUN/held.
 - Current synthetic failures: S5 V2 L2.exit stop-record mismatch and S6 instrument ReferenceError are retained, not product behavior results. S4 native V1 allocation has five material independent runner/evidence findings; these do not reopen the narrowly closed R6 product-source finding.
 - S2 plan A: A01 step-leader exit loses descendant ownership; A02 claimed48s cleanup is not an enforced deadline; A03 control refusal can signal pre-existing name matches; A04 driver returns0 on failed/incomplete work and lacks total bound. Hold06a/06b; A05 unknown status must not permit destroy, but destroy stays excluded. Separate setup may continue; independently read back fixed pins/actual exits/survivors, not merely setup stamps.
+- S2 v5.4/v5.5 and S4 V2/V3 execution-layer findings remain frozen. Their successive source corrections do not create runtime passes; deterministic checker defects and ownership/publication gaps must be closed before spending a control grant. S2 actual Prisma checkpoint path is source-reachable, not proof of historical network egress.
+- S6 C5 identifies actual persistent timers in that run; it does not retroactively observe C2–C4 handles. Singleton resource ownership is distinct from which product/test clear call caused each orphan. “Harmless in app” and teardown-only repair sufficiency are builder hypotheses pending bounded independent review. Missing outer.exit remains an evidence gap; actual caller flags hBc exclude errexit, tool-shell observer lifetime is only an inferred explanation.
 
 ## Dependency DAG and blockers
 
 S1 + S2 + retained S3 → authorized containment/governed landing/exact runtime → separately promoted G2 **E → T/Q0 → B/drain → R → N/Q1 → C** → G3 C1/server lifecycle/forward2.x contract freeze → compatible mobile/Roman, bounded extension, native writers/relationships → reconciliation → exact integrated browser/device candidate → authorized nonempty TrueCoach and structurally different source → measured pilot → importer acceptance → remaining V1.
 
-S3 isolated composition preparation and S4/S6 preparation run independently. S2/S5 cannot modify S1-owned schema/generators. S3 integration manual ownership is limited to r100 workflow plus r100-pathspec/r75-gate specs; retained security checker and retirement of volume quotas both survive. C1/G2 collision in `docs/contracts/importer-openapi.json` and `scripts/importer-contract.ts` blocks consumer freeze. Actual replay is164 parent migrations plus candidate165, never ledger-only.
+S3 isolated composition preparation and S4/S6 preparation run independently. S2/S5 cannot modify S1-owned schema/generators. S3 manual resolutions remain limited to r100 workflow and r100-pathspec/r75-gate specs, plus the separately authorized completed six-file formatting-only PREP2 delta. Retained security checker and retirement of volume quotas both survive; six formatted S3 blobs require new applicability validation. C1/G2 collision in `docs/contracts/importer-openapi.json` and `scripts/importer-contract.ts` blocks consumer freeze. Actual replay is164 parent migrations plus candidate165, never ledger-only.
 
 Prior live metadata observations are retained, not newly rechecked: 18 public relations without RLS/API-role CRUD plus effective TRUNCATE; postgres ownership does not identify application serving role. No customer rows or exploit proof. No ImportIntent, pairing intent binding or ledger platform provenance in observed live schema; staging uniqueness remains narrow. Backend/mobile hosted protection absent at last observation and main-push deploy not strictly gated. Effective flags, serving image/source equivalence and recovery remain unknown; failed CI does not establish serving state.
 
@@ -80,16 +82,16 @@ Success requires native reconciled completion, not staging/generic reconstructio
 
 ## Next six executable slices
 
-1. S2 runnerV5.4 independent applicability/known-boundary decision, bounded controls, then realproof on unchanged d5cd.
-2. S4 V3 minimal runner repair after both V2holds, independent closure/bounded controls, then native gates/framework/package/browser evidence.
-3. S5 preserve28 validwave2 checks, correctedL5 evidence/staticprobe, bounded destroy/genctl controls, then setup/hooks/commit and dualreview.
-4. S6 failclosedsetup/diagnostic successor withpositiveV3instrument, then setup andone causal runtimeobservation before P1.
-5. Guarded final S1/S2 real composition and S1 TRUNCATE discriminator, then dual exact-successor follow-up.
-6. S3 isolated three-file draft now; accepted integration only after upstream/changed-lock proof and dual exact-head review.
+1. S5 selective read-only T3 predicate closure and T0-only driver, independent narrow review, then separately granted execution. Preserve positive T1/T2 and original failed wave; later generation/hook/commit remains separate.
+2. S6 bounded independent C5 result/applicability review, then smallest justified discriminator or repair proposal preserving hazard assertions.
+3. Collect S2 v5.6 minimal successor against both frozen55 reviews, then independent closure and necessary discriminators before controls/realproof.
+4. S4 V4 independent exact closure and separately granted bounded controls, then native gates/framework/package/browser evidence.
+5. Guarded final S1/S2 unchanged-d5cd real composition and S1 TRUNCATE discriminator, then dual exact-successor follow-up.
+6. S3 request03 plus checkpoint-disable addendum awaits readiness/upstream proof; hook-enabled exact-tree merge, changed-lock release re-observation and dual exact-head reviews remain downstream.
 
 ## Bradley decision required
 
-NO for local engineering/review, including six-file formatting-only S3 scope. Hosted-review identity/security settings and production/customer actions reserved. Exact next action: finish S5fake controls then S3format successor, collect S2/S6 independent closures and S4V3 prep; grant only exact ready controls/setup. Never rerun valid S5 L1–L4 merely to clean up wave status.
+NO for current local engineering/review. Hosted-review identity/security settings and production/customer actions remain reserved. Next actions are the exact S5 control grant, S6 independent result review and held S2/S4 successor preparation; no speculative product edits or valid-control repetition.
 
 ## Evidence entry points
 

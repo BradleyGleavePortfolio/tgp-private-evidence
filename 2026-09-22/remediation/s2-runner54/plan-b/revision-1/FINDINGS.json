@@ -1,0 +1,54 @@
+{
+  "task": "S2-V5.4-INDEPENDENT-CLOSURE B",
+  "reviewer": "s1_r4_independent_audit_b_muc6muwk",
+  "revision": 1,
+  "frozen": true,
+  "model": {"requested": "claude_fable_5", "observed": "not exposed at runtime; not asserted"},
+  "method": "read-only; sha256sum -c; diff line count; cmp; grep of bundled Prisma CLI and d5cd sources; no execution, no bash -n, no probes, no DB, no network; peer A current output not read",
+  "inputs": {
+    "outer_manifest": {"path": "execution/s2-runner54/SHA256SUMS.outer", "files": 14, "status": "all OK", "sha256": "f38d9216ff03ff7aba8cfcc2d23a0921309af280abe4956b2170f0e336b411a8"},
+    "runner_v54": {"path": "execution/s2-runner54/run-composition-r54-v5.4-when-granted.sh", "sha256": "3f404479476c5b6a662c946268fd8ed59e3d69c867176431d921aca743604327", "changed_lines_vs_v531": 108},
+    "runner_v531": {"sha256": "fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925"},
+    "driver_v54": {"path": "execution/s2-runner54/controls-proposed/run-controls-v54.sh", "sha256": "6638ec06fd517a390546cfd28ae3d2a23398e56a5ee6e98c27872e348889c6a4", "lines": 198},
+    "stubs": {"harness.sh": "867b7695b4bf43a7ea1874fb3cb910be8ee0b763298592097051e429fc0c8002", "fixture.sh": "f4fa25434defa0fd0030dbbd5e30d45cd7f94d50d4fa687f33b16c4ec77012b0", "guard_spec_discriminator_k1": "byte-identical to s2-setup-prep copies"},
+    "fixture": {"sha256": "9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881", "unchanged": true},
+    "s2_setup_prep_frozen_manifest": {"failures": 0},
+    "prior_reports": {"a_r53_REPORT": "8556de4e834c86e4457ef1a3a03c6df13929d9a86016d5ed3a62e7cab4d97607", "b_r53_REPORT": "00cf283e2555069346a0aedc32c0287d6c3e3358ef6d7a086b1c6a06d5f6aa9d"},
+    "contract": {"path": "execution/EXECUTION_REPAIR_WAVE_2.md", "sha256": "bff0162d8e4675137868db603cd33e43e37d08623a3fd5f7461584f45197510b"},
+    "client_graph": {"prisma_cli_index_js": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0", "prisma_build_child_js": "237ba8edc4bc636f9045ca89a7b349faf845c235c03bcefcbb6c67a297da021d", "prisma_version": "6.19.3", "head": "d5cd9b8b"},
+    "host_fact": {"pid_max": 32768}
+  },
+  "closure_status": {
+    "A01_B01": {"status": "closed-at-source", "runner_lines": "L86,L90,L95,L100-118,L149-162", "dynamic": "K7/K8 NOTRUN", "caveats": ["S2-R54B-01", "S2-R54B-02"]},
+    "A02": {"status": "closed-at-source", "runner_lines": "L61,L88-89,L98,L111-114,L124,L142-147,L168,L178-183,L190", "dynamic": "K10 NOTRUN", "caveats": ["S2-R54B-03", "S2-R54B-04"]},
+    "A03": {"status": "closed-at-source", "driver_lines": "L26-27,L29-43,L49,L66-68", "dynamic": "N1 NOTRUN", "caveats": ["S2-R54B-02"]},
+    "A04": {"status": "closed-at-source", "driver_lines": "L44-54,L61,L70", "dynamic": "N2/N3 NOTRUN"},
+    "A05": {"status": "unchanged-by-design", "evidence": "fixture hash unchanged; runner never invokes destroy (comment L13 only)"}
+  },
+  "k9_reachability": {
+    "reachable_via_real_client_graph": true,
+    "mechanism": "Prisma CLI 6.19.3 runCheckpointClientCheck (bundled V1e) -> checkpoint check() -> child_process.fork(childPath, ..., {detached:true, stdio:'ignore'}) + unref; childPath = prisma/build/child; only gate CHECKPOINT_DISABLE; endpoint https://checkpoint.prisma.io; default 5000 ms",
+    "real_call_sites": ["scripts/release.sh L210,L249,L258,L290", "test/release/s1s2-composition.sh L147,L230", "test/db/s1-r4-truncate-discriminator.sh L69"],
+    "escapee_cmdline": "node .../node_modules/prisma/build/child {json} (own session; not matched by OWNED_PAT ^node .*prisma/build/index.js)",
+    "impact": "reap=ok/survivors=none not literally true for up to ~5 s after steps 40/45; unlisted outbound HTTPS egress and $HOME/.cache write per run; no DB/fixture/lock/$OUT contact (fd 9 closed, stdio ignore)",
+    "smallest_boundary": "export CHECKPOINT_DISABLE=1 in the runner before steps 40/45 (one line near L274-275); no containment framework; unshare design not necessary and known blocked for PG steps",
+    "other_setsid_producers_in_graph": "none found (pg_ctl start intentionally detaches the fixture postmaster; npx/node/psql/git rev-parse|archive/timeout --foreground do not detach)",
+    "byte_change_consequence": "new runner hash; CONTROL_REQUEST_07 must be re-issued; controls on 3f404479 would not transfer",
+    "builder_unshare_probe": "process execution outside syntax-only preparation; harmless; not validation evidence"
+  },
+  "findings": [
+    {"id": "S2-R54B-01", "class": "DEFECT", "severity": "medium", "title": "Prisma checkpoint detached child is a live K9 instance on every real run", "evidence": "see k9_reachability", "closure": "export CHECKPOINT_DISABLE=1 in runner env for steps 40/45"},
+    {"id": "S2-R54B-02", "class": "DEFECT", "severity": "medium", "title": "Dead process-group ids retained and later signalled; pid reuse (pid_max 32768) can hit an unrelated group", "evidence": "runner L149 append, L90/L95 pgrep -g expansion, L108/L110 kill -- -g; driver L32/L35 g<pgid> records, L38 expansion, L41-42 kill; pre-snapshot exclusion covers only start-time pids", "closure": "runner: prune STEP_PGID from OWNED_PGIDS when quiescence scan is empty (L161) and skip own pgid in live_groups/halt; driver: drop g<pgid> records once empty or expand only current control's records"},
+    {"id": "S2-R54B-03", "class": "EVIDENCE-DEFECT", "severity": "medium(real proof)/low(controls)", "title": "Run manifest self-invalidated: exit-codes.txt and stamp.txt appended after SHA256SUMS", "evidence": "runner L197 write, L198 manifest, L200 append + stamp; driver L105 depends on the appended line", "closure": "write cleanup_seconds_total to a separate file excluded from the L198 find and echo instead of stamp; adjust driver L105"},
+    {"id": "S2-R54B-04", "class": "INFO", "severity": "info", "title": "Deadline verification: single 50 s anchor confirmed; unclipped remainder is scans/hashing; pre-cleanup halt at L158 runs without deadline (~65 s worst case without outer signal); header L35/L40 stale text", "evidence": "runner L35,L40,L61,L88,L98,L124,L158,L168,L178-183,L187-192,L195-198", "closure": "document; optional constant text fix"},
+    {"id": "S2-R54B-05", "class": "DEFECT", "severity": "low", "title": "Anomaly branch may record runner's own pgid and self-signal", "evidence": "runner L142-147 with L108/L110", "closure": "exclude own pgid (same edit as -02)"},
+    {"id": "S2-R54B-06", "class": "INFO", "severity": "info", "title": "Driver observations: refusal signal-free; aggregate exits correct; k-set declared maxima 85 s > 60 s budget (honest exit 3 possible); K9 non-strike labelled boundary; K10 leaves unowned sleep 60 residue ~35 s past set end; K7pre/K8pre write additively into frozen v5.3.1 lane dir; PAT would refuse during a concurrent real proof; no canonical lock/DB/network", "evidence": "driver L14,L26,L44-54,L66-68,L130,L146,L157-162,L166,L177-183; runner L181", "closure": "STUB_STOP_HANG=25 or record runner pgid; re-verify 37-file frozen manifest after new1 set"},
+    {"id": "S2-R54B-07", "class": "INFO", "severity": "info", "title": "Real-mode assumptions not covered by stubs: pg_ctl postmaster detach (setsid), harness C7 blocker terminated L224-225, Prisma engine children non-detached; all fail-closed if wrong", "evidence": "s1s2-composition.sh L212,L224-225; stub fixture start spawns nothing", "closure": "observe in first real run stamp"}
+  ],
+  "grantability": {
+    "control_request_07": {"grantable_no_db": true, "caveats": ["S2-R54B-02 within each set", "S2-R54B-03 produced manifests fail for two files", "K7pre/K8pre additive writes into frozen lane dir"], "recommendation": "apply -01/-02/-03 closures first, re-hash, re-issue, run once"},
+    "real_proof_06b": {"status": "HOLD", "required_before_grant": ["S2-R54B-01", "S2-R54B-03", "controls actually executed on final bytes"], "strongly_recommended": ["S2-R54B-02"]}
+  },
+  "dynamic_attestation": "PENDING — all K1-K10 and N1-N3 NOTRUN; v5.3 results do not transfer to 3f404479",
+  "non_goals_honoured": ["no execution", "no syntax check", "no probes", "no install", "no DB", "no network", "no source/fixture/runner edits", "no current peer A reads", "all prior frozen outputs unchanged"]
+}

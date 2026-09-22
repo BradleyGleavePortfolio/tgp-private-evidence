@@ -1,0 +1,42 @@
+1a2,7
+> # C5-S6-RESOURCE-INVENTORY V3.1 — execution-only successor of V3 (1664fd47…) closing reviewer-B addendum-2 M-1/M-2:
+> #   M-1: a nonzero per-step cleanup_exit (owned group still has members after TERM/KILL) now STOPS the run immediately
+> #        (die rc 90) before any further child is spawned; the step's real first exit is preserved in FIRST_EXIT.
+> #   M-2: `rm -f` failure of a declared copy is logged and counted; worktree porcelain must be 0 after cleanup (gate).
+> #   Rebinds only the manifest name (MANIFEST.v3.1.sha256). Instrument cf470101…, hooks, specs, inputs unchanged.
+> # (V3 header kept below for lineage.)
+22,24c28,30
+< #   mkdir -p /home/user/workspace/execution/s6-diagnostic/logs/v3 && \
+< #   setsid nohup timeout -k 30 420 bash /home/user/workspace/execution/s6-diagnostic/v3/run-c5-resource-inventory.v3.sh \
+< #     > /home/user/workspace/execution/s6-diagnostic/logs/v3/run-c5.v3.out 2>&1 < /dev/null &
+---
+> #   mkdir -p /home/user/workspace/execution/s6-diagnostic/logs/v3.1 && \
+> #   setsid nohup timeout -k 30 420 bash /home/user/workspace/execution/s6-diagnostic/v3/run-c5-resource-inventory.v3.1.sh \
+> #     > /home/user/workspace/execution/s6-diagnostic/logs/v3.1/run-c5.v3.1.out 2>&1 < /dev/null &
+33c39
+< LOGS=$EX/logs/v3
+---
+> LOGS=$EX/logs/v3.1
+83c89,91
+<     if [ "$(sha "$dst")" = "$(sha "$src")" ]; then rm -f "$dst" && echo "$(ts) copy $f removed (hash-guarded, equal to frozen source)" >> "$EXIT_RECORD"
+---
+>     if [ "$(sha "$dst")" = "$(sha "$src")" ]; then
+>       if rm -f "$dst"; then echo "$(ts) copy $f removed (hash-guarded, equal to frozen source)" >> "$EXIT_RECORD"
+>       else echo "$(ts) copy $f rm FAILED — retained; counted" >> "$EXIT_RECORD"; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); fi
+85c93,95
+<   ( cd "$WT" && echo "$(ts) worktree porcelain after cleanup: $(git status --porcelain | wc -l) line(s) $(git status --porcelain | tr '\n' ' ')" >> "$EXIT_RECORD" ); }
+---
+>   local n; n=$(cd "$WT" && git status --porcelain | wc -l)
+>   ( cd "$WT" && echo "$(ts) worktree porcelain after cleanup: $n line(s) $(git status --porcelain | tr '\n' ' ')" >> "$EXIT_RECORD" )
+>   [ "$n" = 0 ] || { echo "$(ts) porcelain GATE FAILED ($n line(s) remain in worktree)" >> "$EXIT_RECORD"; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); }; }
+145c155
+<   reap_group "$CUR_PGID" 10 "post:$step"; local ce=$?; echo "$(ts) step=$step cleanup_exit=$ce" >> "$EXIT_RECORD"; [ "$ce" -eq 0 ] || CLEANUP_FAILURES=$((CLEANUP_FAILURES+1))
+---
+>   reap_group "$CUR_PGID" 10 "post:$step"; local ce=$?; echo "$(ts) step=$step cleanup_exit=$ce" >> "$EXIT_RECORD"
+146a157,158
+>   [ "$ce" -eq 0 ] || { CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); [ -n "$FIRST_EXIT" ] || FIRST_EXIT="$step rc=$RUN_RC how=$RUN_HOW"
+>     die "$step-cleanup-survivors" 90 "cleanup_exit=$ce; quarantined owned group unresolved — stop, do not start next step"; }
+182c194
+< (cd "$V3" && sha256sum -c --quiet MANIFEST.v3.sha256) > "$LOGS/c5v3.manifest-check.txt" 2>&1 || die manifest-mismatch-reattribution-required 3
+---
+> (cd "$V3" && sha256sum -c --quiet MANIFEST.v3.1.sha256) > "$LOGS/c5v3.manifest-check.txt" 2>&1 || die manifest-mismatch-reattribution-required 3

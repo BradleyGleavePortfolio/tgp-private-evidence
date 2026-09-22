@@ -1,0 +1,502 @@
+--- v2/runner/s4-r6-validate-v2.sh	2026-09-22 05:10:15.201839075 +0000
++++ v3/runner/s4-r6-validate-v3.sh	2026-09-22 05:35:47.985839075 +0000
+@@ -1,14 +1,16 @@
+ #!/usr/bin/env bash
+-# S4 R6 — native validation runner V2 for exact head 91990ae9 (execution-only successor of V1).
+-# Launch ONLY through v2/launcher/s4-r6-launch-v2.sh (fresh exclusive run dir, launch
+-# token, own session/process group, mandatory outer deadline). Direct invocation refuses.
++# S4 R6 — native validation runner V3 for exact head 91990ae9 (execution-only successor of V2).
++# Launch ONLY through v3/launcher/s4-r6-launch-v3.sh (fresh exclusive run dir, launch
++# token, own session, mandatory outer deadline). Direct invocation refuses.
++# Step wrapper / census / reap / latch / record writer live in runner/s4-r6-lib-v3.sh so the
++# V3 safety controls exercise the identical code (A-01/F-01, A-03/F-03).
+ #
+-# V2 closes the five frozen allocation findings of S4-R6-VALIDATION-PLAN-A:
+-#  VPA-01 ownership: the owned boundary is this runner's own process group (PGID == $$,
+-#          guaranteed by the launcher's setsid); census via `pgrep -g` written to a file
+-#          (no command-substitution subshell); reparented orphans keep the PGID; after
+-#          every step owned orphans are TERM→wait→KILL→verified; unverified = blocking.
+-#          Step children never inherit the lock descriptor (9>&-).
++# V3 closes the combined V2 findings (A-01..05 / F-01..03) on top of the V2 closures:
++#  VPA-01 ownership: the owned boundary is this runner's SESSION (SID == $$, guaranteed by the
++#          launcher's setsid); `timeout` puts each step into its own process group INSIDE that
++#          session, so a `pgrep -s` census sees step groups, reparented orphans, npm/Vitest
++#          workers and Chrome; after every step owned orphans are TERM→wait→KILL→verified;
++#          unverified = blocking. Step children never inherit the lock descriptor (9>&-).
+ #  VPA-02 truth: SUCCESS requires cleanup verified, final source clean at exact head, and
+ #          a parsed durable exit record; sentinel is written only after that record.
+ #  VPA-03 launch: token/session/deadline come from the launcher; every pre/post command
+@@ -23,13 +25,13 @@
+ ROOT=/home/user/workspace
+ WT=$ROOT/worktrees/s4-r6
+ VAL=$ROOT/execution/s4-r6-validation
+-V2=$VAL/v2
++V3=$VAL/v3
+ PRED=$ROOT/execution/s4-r6/predecessor-88287cff
+ PROBES=$ROOT/execution/s4-r6/probes
+ TOOLING=$VAL/tooling/gitleaks
+ LOCK=$ROOT/execution/test-validation.lock
+ CHROME=${TGP_CHROME:-/home/user/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome}
+-PIPE=$V2/runner/chrome-pipe-discriminator-v2.mjs
++PIPE=$V3/runner/chrome-pipe-discriminator-v3.mjs
+ 
+ EXPECT_HEAD=91990ae9aec72f47a67591892ac09fa1f59d2f16
+ EXPECT_TREE=840fb2855953d5363fbd144e11b3f81763d9cef7
+@@ -40,25 +42,23 @@
+ EXPECT_NPM=10.8.2
+ EXPECT_FULL_TESTS=1742        # R4 1714 + R5 25 + R6 3 — arithmetic expectation; mismatch BLOCKS and must be explained, never relabelled
+ EXPECT_PREFLIGHT_TESTS=19
+-# Approved input pins (execution/s4-r6/SHA256SUMS; V2 packet SHA256SUMS)
++# Approved input pins (execution/s4-r6/SHA256SUMS; pipe helper bytes identical to V2 c261ffb4…)
+ PIN_A01_LATE=890d45f782b4ae7ae3492e0c22ad65e37aea719dc945981bff0c68e1fd172fbc
+ PIN_R5_A01=d1e1d428c257115e0e3aaeaecd25e9a85705c28114d0af8c5ad154c246d5d342
+ PIN_R5_A02=934658813355cb8e6b4a23bc18f21cddc3ae546b2fdfc338213f9f4738045d16
+ PIN_R5_B=ae6d3e124a5fb8416d057d3aea9de18da0a1f9b056cb1afd7910ecd5262e3cef
+-PIN_PIPE_V2=c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b
++PIN_PIPE_V3=c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b
+ 
+ # ---- launch contract ------------------------------------------------------------
+ RUN_ID=${S4R6_RUN_ID:-}; OUT=${S4R6_OUT:-}; TOKEN=${S4R6_LAUNCH_TOKEN:-}; KIND=${S4R6_KIND:-}
+-[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V2 launcher (token/out mismatch)" >&2; exit 71; }
+-[[ $KIND == VALIDATION ]] || { echo "REFUSE: real runner only runs as kind=VALIDATION (got '$KIND'); control runs use stubs" >&2; exit 71; }
++[[ -n $RUN_ID && -n $OUT && -d $OUT && -f $OUT/LAUNCH_TOKEN && $(cat "$OUT/LAUNCH_TOKEN") == "$TOKEN" && $TOKEN == "$RUN_ID" ]] || { echo "REFUSE: not launched through the V3 launcher (token/out mismatch)" >&2; exit 71; }
++[[ $KIND == VALIDATION ]] || { echo "REFUSE: real runner only runs as kind=VALIDATION (got '$KIND'); control runs use the control stub" >&2; exit 71; }
+ [[ $(ps -o sid= -p $$ | tr -d ' ') == "$$" && $(ps -o pgid= -p $$ | tr -d ' ') == "$$" ]] || { echo "REFUSE: runner is not its own session/group leader" >&2; exit 73; }
++echo "$$" > "$OUT/RUNNER_PID"   # ownership handshake: launcher requires this to equal the pid it spawned (setsid exec-in-place)
+ [[ ! -e $OUT/RUN_COMPLETE.sentinel && ! -e $OUT/EXIT_RECORD.json && ! -e $OUT/steps && ! -e $OUT/dist ]] || { echo "REFUSE: run directory is not fresh" >&2; exit 71; }
+-PGID=$$
++SID=$$; SOURCE_CHECK=1
+ mkdir "$OUT/steps" "$OUT/dist" || exit 70
+-now() { date -u +%FT%TZ; }
+-sha() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+-SUMMARY=$OUT/EXIT_RECORD.json
+-FIRST_FAIL=""; FIRST_FAIL_RC=""; FIRST_FAIL_REASON=""; BLOCKS=(); WARNINGS=(); STEPS_JSON=()
++. "$V3/runner/s4-r6-lib-v3.sh"
+ RUN_START=$(now)
+ 
+ # ---- lock (held by this runner for the whole run; children get 9>&-) ------------
+@@ -66,70 +66,10 @@
+ if ! flock -n 9; then echo "LOCK BUSY: $LOCK — refusing ($RUN_ID)" >&2; exit 75; fi
+ echo "$$ $RUN_ID $(now)" >&9
+ 
+-# ---- latch ------------------------------------------------------------------------
+-# block <step> <rc> <reason>: latch the first blocking failure; dependents become NOTRUN.
+-block() {
+-  BLOCKS+=("$1 rc=$2: $3"); echo "BLOCK $1 rc=$2: $3" | tee -a "$OUT/blocks.log"
+-  [[ -z $FIRST_FAIL ]] && { FIRST_FAIL=$1; FIRST_FAIL_RC=$2; FIRST_FAIL_REASON=$3; }
+-}
+-warn() { WARNINGS+=("$1"); echo "WARN $1" | tee -a "$OUT/warnings.log"; }
+ INTERRUPTED=""
+-on_signal() { INTERRUPTED=$1; block "SIGNAL_$1" 143 "outer interruption"; census "$OUT/steps/signal-census.txt"; reap_owned "signal"; }
++on_signal() { INTERRUPTED=$1; block "SIGNAL_$1" 143 "outer interruption" 143; reap_owned "signal"; }
+ trap 'on_signal TERM' TERM; trap 'on_signal INT' INT
+ 
+-# ---- ownership census / reap (VPA-01) --------------------------------------------
+-# census <file>: live members of the owned group except this runner. pgrep runs as a
+-# direct child (no subshell) and excludes itself.
+-census() { pgrep -g "$PGID" > "$1.raw" 2>/dev/null; grep -vx "$$" "$1.raw" > "$1" || :; rm -f "$1.raw"; }
+-# reap_owned <label>: TERM every owned orphan, wait ≤10 s, KILL, wait ≤5 s, verify empty.
+-# Returns 0 only if the group is verifiably empty afterwards.
+-reap_owned() {
+-  local label=$1 f=$OUT/steps/reap-$label.txt i
+-  census "$f"
+-  [[ -s $f ]] || { echo "$(now) $label: no owned orphans" >> "$OUT/reaps.log"; return 0; }
+-  { echo "$(now) $label: owned orphans:"; while read -r p; do printf '  %s :: ' "$p"; tr '\0' ' ' < /proc/$p/cmdline 2>/dev/null | cut -c1-160; echo; done < "$f"; } >> "$OUT/reaps.log"
+-  while read -r p; do kill -TERM "$p" 2>/dev/null; done < "$f"
+-  for ((i=0;i<10;i++)); do census "$f"; [[ -s $f ]] || break; sleep 1; done
+-  if [[ -s $f ]]; then while read -r p; do kill -KILL "$p" 2>/dev/null; done < "$f"; for ((i=0;i<5;i++)); do census "$f"; [[ -s $f ]] || break; sleep 1; done; fi
+-  if [[ -s $f ]]; then echo "$(now) $label: SURVIVORS after KILL: $(tr '\n' ' ' < "$f")" >> "$OUT/reaps.log"; return 1; fi
+-  echo "$(now) $label: reaped, group verified empty" >> "$OUT/reaps.log"; return 0
+-}
+-
+-head_state() { git -C "$WT" rev-parse HEAD; git -C "$WT" rev-parse 'HEAD^{tree}'; git -C "$WT" status --porcelain | wc -l | tr -d ' '; }
+-
+-# step <id> <required:1|0> <timeout-s> <cwd> <command...>
+-# required=1: nonzero exit blocks. required=0: caller interprets the exit (expected-negative).
+-# Always: bounded by timeout(+30 s KILL), lock fd closed for the child, worktree identity
+-# stamped before/after, owned orphans reaped and verified after the command.
+-step() {
+-  local id=$1 required=$2 tmo=$3 cwd=$4; shift 4
+-  local log=$OUT/steps/$id.log meta=$OUT/steps/$id.json
+-  if [[ -n $FIRST_FAIL ]]; then
+-    printf '{"step":"%s","status":"NOTRUN","reason":"latched by %s (%s)"}\n' "$id" "$FIRST_FAIL" "$FIRST_FAIL_REASON" > "$meta"
+-    STEPS_JSON+=("$(cat "$meta")"); return 99
+-  fi
+-  read -r h0 t0 d0 < <(head_state | tr '\n' ' ')
+-  local start; start=$(now); local s0; s0=$(date +%s)
+-  echo "[$start] $id cwd=$cwd head=$h0 dirty=$d0 :: $*" | tee "$log"
+-  ( cd "$cwd" && exec timeout --kill-after=30 "$tmo" "$@" ) >>"$log" 2>&1 9>&-
+-  local rc=$?
+-  local end; end=$(now); local dur=$(( $(date +%s) - s0 ))
+-  local reap_ok=true; reap_owned "$id" || reap_ok=false
+-  local orphans; orphans=$(wc -l < "$OUT/steps/reap-$id.txt" 2>/dev/null | tr -d ' '); orphans=${orphans:-0}
+-  read -r h1 t1 d1 < <(head_state | tr '\n' ' ')
+-  local timed_out=false; [[ $rc == 124 || $rc == 137 ]] && timed_out=true
+-  local status=PASS; [[ $rc != 0 ]] && status=FAIL; [[ $required == 0 ]] && status="EXIT_$rc"
+-  local cmdjson; cmdjson=$(printf '%s ' "$@" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read().strip()))')
+-  printf '{"step":"%s","required":%s,"status":"%s","exit":%s,"timed_out":%s,"timeout_s":%s,"start":"%s","end":"%s","duration_s":%s,"head_before":"%s","dirty_before":%s,"head_after":"%s","tree_after":"%s","dirty_after":%s,"owned_orphans_after":%s,"orphans_reaped_verified":%s,"cwd":"%s","command":%s,"log":"%s"}\n' \
+-    "$id" "$required" "$status" "$rc" "$timed_out" "$tmo" "$start" "$end" "$dur" "$h0" "$d0" "$h1" "$t1" "$d1" "$orphans" "$reap_ok" "$cwd" "$cmdjson" "$log" > "$meta"
+-  STEPS_JSON+=("$(cat "$meta")")
+-  echo "[$end] $id exit=$rc (${dur}s) orphans=$orphans reaped_verified=$reap_ok" | tee -a "$log"
+-  [[ $reap_ok == true ]] || block "$id" 96 "owned orphan(s) survived TERM/KILL — cleanup unverified"
+-  [[ $h1 == "$EXPECT_HEAD" && $d1 == 0 ]] || block "$id" 98 "worktree not at exact clean head afterwards (head=$h1 dirty=$d1)"
+-  [[ $rc == 0 || $required == 0 ]] || block "$id" "$rc" "required step failed"
+-  return $rc
+-}
+-
+ # ---- S00 preconditions and input pins (read-only) ---------------------------------
+ {
+   ok=1; H=$(git -C "$WT" rev-parse HEAD); T=$(git -C "$WT" rev-parse 'HEAD^{tree}'); D=$(git -C "$WT" status --porcelain | wc -l | tr -d ' '); P=$(git -C "$WT" rev-parse HEAD^)
+@@ -145,7 +85,7 @@
+   chk "$(sha "$PROBES/reused/a01-preflight-barrier-discriminator.mjs")" "$PIN_R5_A01" pin_r5_a01
+   chk "$(sha "$PROBES/reused/a02-queued-refresh-discriminator.mjs")" "$PIN_R5_A02" pin_r5_a02
+   chk "$(sha "$PROBES/reused/bound-admission-probe.mjs")" "$PIN_R5_B" pin_r5_b
+-  chk "$(sha "$PIPE")" "$PIN_PIPE_V2" pin_pipe_v2
++  chk "$(sha "$PIPE")" "$PIN_PIPE_V3" pin_pipe_v3
+   # Predecessor export must equal the 88287cff tree file-for-file (the one added
+   # spec copy is excluded); compared by git blob id, not by advertised prose.
+   pred_mism=$(cd "$PRED" && find . -type f ! -name 'R6-CANDIDATE-COPY.*' | sed 's|^\./||' | sort | while read -r f; do
+@@ -154,7 +94,7 @@
+   chk "$pred_mism" 0 predecessor_blob_mismatches; chk "$pred_count" "$tree_count" predecessor_file_count
+   [[ -x $CHROME ]] || echo "NOTE: Chrome missing at $CHROME — S60 will fail as runtime-unavailable (not product failure)"
+   if pgrep -f "tgp-browser-proof-|tgp-pipe-discriminator-" >/dev/null; then echo "PRECONDITION leftover proof-Chrome processes (UNOWNED, not signalled; refuse)"; ok=0; fi
+-  echo "runner_sha256=$(sha "$V2/runner/s4-r6-validate-v2.sh") pipe_v2_sha256=$(sha "$PIPE") chrome=$CHROME chrome_sha256=$( [[ -x $CHROME ]] && sha "$CHROME" || echo missing ) pgid=$PGID run=$RUN_ID kind=$KIND"
++  echo "runner_sha256=$(sha "$V3/runner/s4-r6-validate-v3.sh") lib_sha256=$(sha "$V3/runner/s4-r6-lib-v3.sh") pipe_v3_sha256=$(sha "$PIPE") chrome=$CHROME chrome_sha256=$( [[ -x $CHROME ]] && sha "$CHROME" || echo missing ) sid=$SID run=$RUN_ID kind=$KIND"
+   [[ $ok == 1 ]]
+ } > "$OUT/steps/S00-preconditions.log" 2>&1
+ S00=$?; cat "$OUT/steps/S00-preconditions.log"
+@@ -211,7 +151,7 @@
+ step S44-r5B-bound-admission-candidate 1 60 "$WT" node "$PROBES/reused/bound-admission-probe.mjs" "$WT"
+ # Expected-negative: the candidate must FAIL the defect expectation with exit 1 exactly.
+ step S45-a01-late-reporting-candidate-expect-defect-must-fail 0 60 "$WT" node "$PROBES/a01-late-reporting-discriminator.mjs" "$WT" --expect defect
+-rc45=$?; if [[ $rc45 != 99 ]]; then [[ $rc45 == 1 ]] || block S45-a01-late-reporting-candidate-expect-defect-must-fail "$rc45" "expected-negative sign wrong (want exit 1 = FAIL_DEFECT_NOT_OBSERVED)"; fi
++rc45=$?; expect_exit S45-a01-late-reporting-candidate-expect-defect-must-fail "$rc45" 1 "candidate must FAIL the defect expectation: exit 1 = FAIL_DEFECT_NOT_OBSERVED"
+ 
+ # ---- S5x package + exact joins (VPA-04) ----------------------------------------------------
+ step S50-package 1 120 "$WT" node scripts/package-extension.mjs --root "$WT" --out "$OUT/dist"
+@@ -268,12 +208,12 @@
+ PY
+ fi
+ 
+-# ---- S7x final cleanup (owned group) + source state (VPA-01/02) -----------------------------------
++# ---- S7x final cleanup (owned session) + source state (VPA-01/02) ---------------------------------
+ CLEAN_RC=0
+ reap_owned final || CLEAN_RC=1
+ census "$OUT/steps/final-census.txt"; [[ -s $OUT/steps/final-census.txt ]] && CLEAN_RC=1
+ if pgrep -f "tgp-browser-proof-|tgp-pipe-discriminator-" > "$OUT/steps/final-proof-chrome-scan.txt"; then
+-  # Any such process NOT in our group is unowned: never signalled, recorded, and blocks success.
++  # Any such process NOT in our session is unowned: never signalled, recorded, and blocks success.
+   echo "proof-profile Chrome processes present after cleanup (owned ones already reaped; these are UNOWNED or unreaped): $(tr '\n' ' ' < "$OUT/steps/final-proof-chrome-scan.txt")" | tee -a "$OUT/reaps.log"; CLEAN_RC=2
+ fi
+ read -r FH FT FD < <(head_state | tr '\n' ' ')
+@@ -286,37 +226,6 @@
+ elif [[ $CLEAN_RC != 0 ]]; then RESULT=FAILED_CLEANUP
+ elif [[ $SOURCE_OK != true ]]; then RESULT=FAILED_SOURCE_STATE
+ elif [[ ${#WARNINGS[@]} -gt 0 ]]; then RESULT=WARNINGS; fi
+-python3 - "$SUMMARY.tmp" "$RUN_ID" "$KIND" "$RESULT" "$FIRST_FAIL" "${FIRST_FAIL_RC:-}" "$FIRST_FAIL_REASON" "$CLEAN_RC" "$SOURCE_OK" "$FH" "$FT" "$FD" "$RUN_START" "$RUN_END" "$PGID" "$HARNESS_BLOCKED" "$EXPECT_HEAD" "$EXPECT_TREE" "$V2/runner/s4-r6-validate-v2.sh" "$PIPE" "$CHROME" "${ZIP:-}" "${ZIP_SHA:-}" "${BLOCKS[@]}" --WARN-- "${WARNINGS[@]}" --STEPS-- "${STEPS_JSON[@]}" <<'PY'
+-import json,sys,hashlib
+-a=sys.argv[1:]; (out,run_id,kind,result,ff,ffrc,ffreason,clean_rc,source_ok,fh,ft,fd,start,end,pgid,blocked,head,tree,runner,pipe,chrome,zipp,zsha)=a[:23]
+-rest=a[23:]; w=rest.index("--WARN--"); s=rest.index("--STEPS--"); blocks=rest[:w]; warns=rest[w+1:s]; steps=[json.loads(x) for x in rest[s+1:]]
+-def h(p):
+-    try: return hashlib.sha256(open(p,'rb').read()).hexdigest()
+-    except Exception as e: return f"missing:{e}"
+-json.dump({"kind":kind,"run_id":run_id,"result":result,
+- "result_semantics":{"SUCCESS":"every required step exit 0, expected-negatives correct, all joins/pins verified, owned group verifiably empty, source clean at exact head, this record parsed — builder evidence only, NOT acceptance",
+-   "WARNINGS":"as SUCCESS but informational warnings recorded; not success","FAILED":"first blocking failure latched; dependents NOTRUN","HARNESS_BLOCKED":"browser transport/runtime unavailable; not a product failure; no retry",
+-   "FAILED_CLEANUP":"steps passed but owned-process cleanup not verified or unowned proof Chrome present","FAILED_SOURCE_STATE":"steps passed but worktree not clean at exact head afterwards"},
+- "first_failure":{"step":ff or None,"exit":int(ffrc) if ffrc else None,"reason":ffreason or None},"blocks":blocks,"warnings":warns,
+- "cleanup":{"exit":int(clean_rc),"owned_pgid":int(pgid),"final_source":{"head":fh,"tree":ft,"dirty":int(fd),"clean_at_exact_head":source_ok=="true"}},
+- "harness_blocked":blocked or None,"expected_head":head,"expected_tree":tree,
+- "lock":{"path":"/home/user/workspace/execution/test-validation.lock","holder_pid":int(pgid),"mode":"flock -n held by runner for whole run; step children 9>&-"},
+- "runner_sha256":h(runner),"pipe_v2_sha256":h(pipe),"chrome":{"path":chrome,"sha256":h(chrome)},"zip":{"path":zipp or None,"actual_sha256":zsha or None},
+- "start_utc":start,"end_utc":end,"steps":steps},open(out,"w"),indent=2)
+-PY
+-PUB_RC=$?
+-if [[ $PUB_RC == 0 ]] && python3 -c 'import json,sys;json.load(open(sys.argv[1]))' "$SUMMARY.tmp" 2>/dev/null && mv "$SUMMARY.tmp" "$SUMMARY"; then
+-  echo "$RESULT $(now) first_fail=${FIRST_FAIL:-none} cleanup_exit=$CLEAN_RC" > "$OUT/RUN_COMPLETE.sentinel"
+-else
+-  RESULT=FAILED_PUBLICATION; echo "exit record could not be written/parsed — NO sentinel" | tee -a "$OUT/blocks.log"
+-fi
+-echo "RESULT=$RESULT first_fail=${FIRST_FAIL:-none}(${FIRST_FAIL_RC:-}) blocks=${#BLOCKS[@]} warnings=${#WARNINGS[@]} cleanup_exit=$CLEAN_RC source_ok=$SOURCE_OK record=$SUMMARY"
+-case $RESULT in
+-  SUCCESS) exit 0;;
+-  WARNINGS) exit 3;;
+-  FAILED_CLEANUP) exit 4;;
+-  FAILED_SOURCE_STATE) exit 6;;
+-  FAILED_PUBLICATION) exit 7;;
+-  HARNESS_BLOCKED) exit 8;;
+-  *) exit "${FIRST_FAIL_RC:-1}";;
+-esac
++RESULT=$(publish_exit_record "$RESULT" "$CLEAN_RC" "$SOURCE_OK" "$FH" "$FT" "$FD" "$RUN_START" "$RUN_END" "$HARNESS_BLOCKED" "$EXPECT_HEAD" "$EXPECT_TREE" "$V3/runner/s4-r6-validate-v3.sh" "$PIPE" "$CHROME" "${ZIP:-}" "${ZIP_SHA:-}" 1)
++echo "RESULT=$RESULT first_fail=${FIRST_FAIL:-none}(validation_exit=${FIRST_FAIL_RC:-} observed=${FIRST_FAIL_OBSERVED:-}) blocks=${#BLOCKS[@]} warnings=${#WARNINGS[@]} cleanup_exit=$CLEAN_RC source_ok=$SOURCE_OK record=$OUT/EXIT_RECORD.json"
++exit "$(result_exit "$RESULT")"
+--- v2/launcher/s4-r6-launch-v2.sh	2026-09-22 05:04:18.617839075 +0000
++++ v3/launcher/s4-r6-launch-v3.sh	2026-09-22 05:36:49.317839075 +0000
+@@ -1,132 +1,159 @@
+ #!/usr/bin/env bash
+-# S4 R6 validation V2 — exact bounded detached launcher / supervisor (VPA-03, VPA-01, VPA-04).
++# S4 R6 validation V3 — exact bounded detached launcher / supervisor.
+ #
+-#   bash execution/s4-r6-validation/v2/launcher/s4-r6-launch-v2.sh
++#   bash execution/s4-r6-validation/v3/launcher/s4-r6-launch-v3.sh              (kind=VALIDATION)
++#   S4R6_CONTROL=1 S4R6_SCENARIO=<name> bash .../s4-r6-launch-v3.sh              (kind=CONTROL, stub runner)
+ #
+-# What it does, in order:
+-#   1. Generates a fresh safe run id and creates the run directory ATOMICALLY
+-#      (`mkdir` without -p; an existing directory or sentinel is a refusal, never
+-#      reuse). Reserves the console log INSIDE that directory before launching.
+-#   2. Starts the frozen runner with `setsid` so the runner PID is the leader of a
+-#      brand-new session and process group: every job the runner (or Vitest, npm,
+-#      Chrome, node probes) spawns stays in that group even if its parent exits
+-#      (reparented orphans keep their PGID). That PGID is the stable owned
+-#      boundary; nothing outside it is ever signalled.
+-#   3. Supervises with a MANDATORY outer deadline: OUTER_S total, then TERM to the
+-#      whole owned group, GRACE_S, then KILL to the group, then verifies the group
+-#      is empty (`pgrep -g`). Writes SUPERVISOR_RECORD.json regardless of whether
+-#      the runner managed to write its own exit record.
+-#   4. Overall exit: 0 only if the runner exited 0 AND wrote a parseable
+-#      EXIT_RECORD.json with result SUCCESS AND its sentinel AND the owned group is
+-#      verifiably empty. Any timeout, interruption, survivor, missing/unparseable
+-#      record → nonzero and a non-success classification.
+-#
+-# Control mode (fake safety controls only, separate grant): S4R6_CONTROL=1 with
+-# S4R6_RUNNER=<stub path> substitutes the runner; the record is stamped
+-# kind="CONTROL" and can never be mistaken for a validation run.
++# V3 changes versus V2 (frozen reviews S4-V2-A-01..05 / S4-R6-VPB-F01..03):
++#  * Ownership by construction, no startup sleep (A-03/F-03): the launcher refuses to run if it is
++#    itself a process-group leader, so util-linux `setsid` execs the runner IN PLACE and the runner
++#    pid RPID is the session leader: SID == PGID == RPID immediately. The runner (real or stub)
++#    writes its $$ to RUNNER_PID as a cross-check; a mismatch is classified, never assumed.
++#  * Owned boundary = the SESSION (A-01/F-01): census `pgrep -s SID`; deadline/interrupt signals go
++#    to every foreign process group in the session and to every listed pid, so `timeout`-wrapped
++#    step groups, npm/Vitest workers and Chrome are reached — not only the runner bash.
++#  * Bounded confirmation (A-03): no unconditional `wait`; runner exit is confirmed by bounded
++#    polling, otherwise QUARANTINED without blocking.
++#  * JSON-safe publication (A-02/F-02): every value reaches Python through argv; Booleans are
++#    coerced there. The supervisor record is written on EVERY exit path including refusals, and
++#    publication failure is a separate fact (publication_ok) from the primary outcome (overall).
++#  * Census + reap on every exit path, refusals included (F-03).
+ set -u
+ ROOT=/home/user/workspace
+ VAL=$ROOT/execution/s4-r6-validation
+-V2=$VAL/v2
+-RUNNER_DEFAULT=$V2/runner/s4-r6-validate-v2.sh
+-KIND=VALIDATION
+-RUNNER=$RUNNER_DEFAULT
+-if [[ ${S4R6_CONTROL:-0} == 1 ]]; then KIND=CONTROL; RUNNER=${S4R6_RUNNER:?control runner path required}; fi
+-OUTER_S=${S4R6_OUTER_S:-3300}   # mandatory total bound (validation default 55 min)
+-GRACE_S=${S4R6_GRACE_S:-45}     # TERM→KILL grace for the owned group
+-RUNS=$VAL/runs; [[ $KIND == CONTROL ]] && RUNS=$V2/control-runs
+-
++V3=$VAL/v3
++KIND=VALIDATION; RUNNER=$V3/runner/s4-r6-validate-v3.sh; RUNS=$VAL/runs
++if [[ ${S4R6_CONTROL:-0} == 1 ]]; then KIND=CONTROL; RUNNER=$V3/controls/s4-r6-control-stub-v3.sh; RUNS=$V3/control-runs; : "${S4R6_SCENARIO:?control scenario required}"; fi
++OUTER_S=${S4R6_OUTER_S:-3300}   # mandatory total bound for the runner (validation default 55 min)
++GRACE_S=${S4R6_GRACE_S:-45}     # TERM→KILL grace for the owned session
++CONFIRM_S=10                    # bounded wait for runner exit after KILL before QUARANTINED
+ now() { date -u +%FT%TZ; }
+ sha() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
++T0=$(date +%s); LAUNCH_START=$(now)
++
++# ---- state for the record (defaults so every exit path can publish) ----------------------------
++RUN_ID=""; OUT=""; CONSOLE=/dev/null; SUP=""; RPID=""; SID=""; RUNNER_SHA=""; RUNNER_PID_FILE=""
++RUNNER_RC=""; RUNNER_EXIT_CONFIRMED=false; TIMED_OUT=false; INTERRUPT=""; SIGNALLED=none
++MEMBERS_AT_DEADLINE=""; ORPHANS=""; REAPED_HERE=""; SURVIVORS=""; REFUSAL=""
++
++session_members() { [[ -n $SID ]] && pgrep -s "$SID" 2>/dev/null | tr '\n' ' '; }
++# signal_session <SIG>: every foreign process group in the owned session (-pgid), then every pid.
++signal_session() {
++  local sig=$1 p g
++  for p in $(session_members); do g=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' '); [[ -n $g ]] && kill "-$sig" -- "-$g" 2>/dev/null; done
++  for p in $(session_members); do kill "-$sig" "$p" 2>/dev/null; done
++  return 0
++}
++log() { echo "[$(now)] $*" | tee -a "$CONSOLE"; }
++
++publish_and_exit() {
++  local overall=$1 code=$2
++  local end; end=$(now)
++  local runner_result=MISSING_OR_UNPARSEABLE sentinel=no record_present=false runner_pid_seen=""
++  if [[ -n $OUT ]]; then
++    [[ -f $OUT/RUN_COMPLETE.sentinel ]] && sentinel=yes
++    [[ -f $OUT/EXIT_RECORD.json ]] && record_present=true
++    runner_result=$(python3 -c 'import json,sys
++try: print(json.load(open(sys.argv[1])).get("result","UNPARSEABLE"))
++except Exception: print("MISSING_OR_UNPARSEABLE")' "$OUT/EXIT_RECORD.json" 2>/dev/null)
++    [[ -f $RUNNER_PID_FILE ]] && runner_pid_seen=$(tr -d ' \n' < "$RUNNER_PID_FILE")
++  fi
++  local publication_ok=false
++  if [[ -n $SUP ]]; then
++    python3 - "$SUP.tmp" "$KIND" "${S4R6_SCENARIO:-}" "$RUN_ID" "$overall" "$code" "$RUNNER" "$RUNNER_SHA" "$RPID" "$RUNNER_RC" "$RUNNER_EXIT_CONFIRMED" "$runner_result" "$sentinel" "$record_present" "$SID" "$runner_pid_seen" "$SIGNALLED" "$MEMBERS_AT_DEADLINE" "$ORPHANS" "$REAPED_HERE" "$SURVIVORS" "$OUTER_S" "$GRACE_S" "$CONFIRM_S" "$TIMED_OUT" "$INTERRUPT" "$REFUSAL" "$LAUNCH_START" "$end" "$OUT" "$CONSOLE" <<'PY'
++import json,sys
++a=sys.argv[1:]
++(out,kind,scenario,run_id,overall,code,runner,runner_sha,rpid,runner_rc,exit_confirmed,runner_result,sentinel,record_present,sid,runner_pid_seen,signalled,members_at_deadline,orphans,reaped_here,survivors,outer_s,grace_s,confirm_s,timed_out,interrupt,refusal,start,end,outdir,console)=a
++def num(x):
++    try: return int(x)
++    except Exception: return None
++b=lambda x: x=="true"
++json.dump({"kind":kind,"scenario":scenario or None,"run_id":run_id or None,"overall":overall,"launcher_exit":num(code),
++ "overall_semantics":"SUCCESS only if runner exit 0 confirmed, runner EXIT_RECORD.result==SUCCESS, sentinel present, RUNNER_PID handshake matches, owned session empty without supervisor reaping; everything else is non-success. publication_ok is recorded separately by the caller after this file is parsed.",
++ "runner":{"path":runner,"sha256":runner_sha or None,"spawned_pid":num(rpid),"exit":num(runner_rc),"exit_confirmed":b(exit_confirmed),"exit_record_result":runner_result,"exit_record_present":b(record_present),"sentinel":sentinel=="yes","runner_pid_handshake":num(runner_pid_seen),"handshake_ok":(num(runner_pid_seen)==num(rpid)) if runner_pid_seen else None},
++ "owned_session":{"sid":num(sid),"signal_route":"kill -SIG -- -pgid for every foreign pgid in session, then kill -SIG pid for every member; never outside the session","signalled":signalled,"members_at_deadline":members_at_deadline.split(),"orphans_after_runner_exit":orphans.split(),"reaped_by_supervisor":reaped_here.split(),"survivors_after_kill":survivors.split()},
++ "bounds":{"outer_s":num(outer_s),"grace_s":num(grace_s),"confirm_s":num(confirm_s),"timed_out":b(timed_out),"interrupt":interrupt or None,"worst_case_s":num(outer_s)+num(grace_s)+num(confirm_s)+7},
++ "refusal":refusal or None,"start_utc":start,"end_utc":end,"out_dir":outdir or None,"console":console},open(out,"w"),indent=2)
++PY
++    if [[ $? == 0 ]] && python3 -c 'import json,sys;json.load(open(sys.argv[1]))' "$SUP.tmp" 2>/dev/null && mv "$SUP.tmp" "$SUP"; then publication_ok=true; fi
++  fi
++  log "OVERALL=$overall launcher_exit=$code publication_ok=$publication_ok runner_exit=${RUNNER_RC:-none} runner_result=$runner_result survivors='${SURVIVORS}' record=${SUP:-none}"
++  if [[ $publication_ok != true && $overall == SUCCESS ]]; then log "publication failed on a SUCCESS path — downgrading to FAILED_PUBLICATION"; code=7; fi
++  exit "$code"
++}
++
++# ---- 0. topology precondition (no sleep, no race): we must NOT be a group leader ------------------
++if [[ $(ps -o pgid= -p $$ | tr -d ' ') == "$$" ]]; then
++  echo "REFUSE: launcher is a process-group leader; setsid would fork and the spawned pid would not be the session leader. Start it as a plain child (e.g. 'bash launcher.sh' from a script or non-job-control shell)." >&2; exit 73
++fi
+ 
+-# 1. fresh exclusive run directory + safe id ------------------------------------
++# ---- 1. fresh exclusive run directory + safe id ------------------------------------------------------
+ mkdir -p "$RUNS" || exit 70
+-RUN_ID="${KIND}-V2-$(date -u +%Y%m%dT%H%M%SZ)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
++RUN_ID="${KIND}-V3-$(date -u +%Y%m%dT%H%M%SZ)-$$-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+ OUT=$RUNS/$RUN_ID
+ if ! mkdir "$OUT" 2>/dev/null; then echo "REFUSE: run directory exists: $OUT" >&2; exit 71; fi
+-[[ -e $OUT/RUN_COMPLETE.sentinel || -e $OUT/EXIT_RECORD.json ]] && { echo "REFUSE: stale completion marker in fresh dir" >&2; exit 71; }
+ CONSOLE=$OUT/console.log; : > "$CONSOLE" || exit 70
+-printf '%s\n' "$RUN_ID" > "$OUT/LAUNCH_TOKEN"   # runner refuses to run without this exact token
+-SUP=$OUT/SUPERVISOR_RECORD.json
++SUP=$OUT/SUPERVISOR_RECORD.json; RUNNER_PID_FILE=$OUT/RUNNER_PID
++printf '%s\n' "$RUN_ID" > "$OUT/LAUNCH_TOKEN"
+ RUNNER_SHA=$(sha "$RUNNER")
+-[[ -n $RUNNER_SHA ]] || { echo "REFUSE: runner missing $RUNNER" >&2; exit 72; }
+-echo "[$(now)] launch kind=$KIND run=$RUN_ID runner=$RUNNER sha256=$RUNNER_SHA outer=${OUTER_S}s grace=${GRACE_S}s" | tee -a "$CONSOLE"
++[[ -n $RUNNER_SHA ]] || { REFUSAL="runner missing: $RUNNER"; log "REFUSE: $REFUSAL"; publish_and_exit REFUSED 72; }
++log "launch kind=$KIND scenario=${S4R6_SCENARIO:-} run=$RUN_ID runner=$RUNNER sha256=$RUNNER_SHA outer=${OUTER_S}s grace=${GRACE_S}s confirm=${CONFIRM_S}s"
+ 
+-# 2. detached session/group -------------------------------------------------------
+-LAUNCH_START=$(now); T0=$(date +%s)
+-S4R6_RUN_ID=$RUN_ID S4R6_OUT=$OUT S4R6_LAUNCH_TOKEN=$RUN_ID S4R6_KIND=$KIND \
++# ---- 2. detached session; ownership by construction ----------------------------------------------------
++INTERRUPT=""; trap 'INTERRUPT=TERM' TERM; trap 'INTERRUPT=INT' INT
++S4R6_RUN_ID=$RUN_ID S4R6_OUT=$OUT S4R6_LAUNCH_TOKEN=$RUN_ID S4R6_KIND=$KIND S4R6_SCENARIO=${S4R6_SCENARIO:-} \
+   setsid bash "$RUNNER" >>"$CONSOLE" 2>&1 < /dev/null &
+ RPID=$!
+-# setsid forks only if the caller is already a group leader; resolve the actual
+-# session leader = the process whose SID equals its own PID among our children.
+-sleep 0.2
+-PGID=$(ps -o pgid= -p "$RPID" 2>/dev/null | tr -d ' ')
+-SID=$(ps -o sid= -p "$RPID" 2>/dev/null | tr -d ' ')
+-if [[ -z $PGID || $PGID == "$(ps -o pgid= -p $$ | tr -d ' ')" ]]; then
+-  # setsid re-forked: the leader is the child of RPID (or RPID already exited)
+-  CH=$(pgrep -P "$RPID" | head -1); [[ -n $CH ]] && { PGID=$(ps -o pgid= -p "$CH" | tr -d ' '); SID=$(ps -o sid= -p "$CH" | tr -d ' '); }
+-fi
+-echo "$PGID" > "$OUT/OWNED_PGID"
+-echo "[$(now)] owned session/group pgid=$PGID sid=$SID (runner wrapper pid $RPID)" | tee -a "$CONSOLE"
+-[[ -n $PGID && $PGID != "$(ps -o pgid= -p $$ | tr -d ' ')" ]] || { echo "REFUSE: could not establish a distinct owned process group" | tee -a "$CONSOLE"; kill -TERM "$RPID" 2>/dev/null; exit 73; }
++SID=$RPID   # non-leader child ⇒ setsid execs in place ⇒ runner pid is session leader (verified by RUNNER_PID handshake)
++echo "$SID" > "$OUT/OWNED_SID"
++log "owned session sid=$SID (runner pid $RPID)"
+ 
+-# 3. supervision with mandatory deadline ------------------------------------------
+-INTERRUPT=""; trap 'INTERRUPT=TERM' TERM; trap 'INTERRUPT=INT' INT
+-TIMED_OUT=false
++# ---- 3. supervision with mandatory deadline ---------------------------------------------------------------
+ while kill -0 "$RPID" 2>/dev/null; do
+-  if [[ -n $INTERRUPT ]]; then echo "[$(now)] supervisor received $INTERRUPT" | tee -a "$CONSOLE"; break; fi
+-  if (( $(date +%s) - T0 >= OUTER_S )); then TIMED_OUT=true; echo "[$(now)] OUTER DEADLINE ${OUTER_S}s reached" | tee -a "$CONSOLE"; break; fi
++  if [[ -n $INTERRUPT ]]; then log "supervisor received $INTERRUPT"; break; fi
++  if (( $(date +%s) - T0 >= OUTER_S )); then TIMED_OUT=true; log "OUTER DEADLINE ${OUTER_S}s reached"; break; fi
+   sleep 1
+ done
+-group_members() { pgrep -g "$PGID" 2>/dev/null | tr '\n' ' '; }
+-SIGNALLED=none
+ if [[ $TIMED_OUT == true || -n $INTERRUPT ]]; then
+-  echo "[$(now)] TERM owned group -$PGID members: $(group_members)" | tee -a "$CONSOLE"
+-  kill -TERM -- "-$PGID" 2>/dev/null; SIGNALLED=TERM
+-  for ((i=0;i<GRACE_S;i++)); do [[ -z $(group_members) ]] && break; sleep 1; done
+-  if [[ -n $(group_members) ]]; then
+-    echo "[$(now)] KILL owned group -$PGID survivors: $(group_members)" | tee -a "$CONSOLE"
+-    kill -KILL -- "-$PGID" 2>/dev/null; SIGNALLED=TERM+KILL; sleep 2
+-  fi
++  MEMBERS_AT_DEADLINE=$(session_members)
++  log "TERM owned session $SID members: $MEMBERS_AT_DEADLINE"
++  signal_session TERM; SIGNALLED=TERM
++  for ((i=0;i<GRACE_S;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done
++  if [[ -n $(session_members) ]]; then log "KILL owned session survivors: $(session_members)"; signal_session KILL; SIGNALLED=TERM+KILL; fi
+ fi
+-wait "$RPID" 2>/dev/null; RUNNER_RC=$?
+-# Final ownership census: after a normal runner exit the group must ALREADY be
+-# empty (the runner reaps its own jobs); anything left is an owned orphan the
+-# runner failed to reap → reap it here, verify, and classify non-success.
+-ORPHANS=$(group_members)
+-REAPED_HERE=""
++# bounded confirmation of the runner's exit (never an unconditional wait)
++for ((i=0;i<CONFIRM_S;i++)); do kill -0 "$RPID" 2>/dev/null || break; sleep 1; done
++if kill -0 "$RPID" 2>/dev/null; then
++  RUNNER_EXIT_CONFIRMED=false; SURVIVORS=$(session_members)
++  publish_and_exit QUARANTINED_SURVIVORS 5
++fi
++wait "$RPID" 2>/dev/null; RUNNER_RC=$?; RUNNER_EXIT_CONFIRMED=true
++
++# ---- 4. census + reap on every path (refusals included) --------------------------------------------------------
++ORPHANS=$(session_members)
+ if [[ -n $ORPHANS ]]; then
+-  echo "[$(now)] owned orphans after runner exit: $ORPHANS — TERM/KILL" | tee -a "$CONSOLE"
+-  for p in $ORPHANS; do tr '\0' ' ' < /proc/$p/cmdline 2>/dev/null | cut -c1-160; echo; done >> "$OUT/orphans.log"
+-  kill -TERM -- "-$PGID" 2>/dev/null; sleep 5; [[ -n $(group_members) ]] && kill -KILL -- "-$PGID" 2>/dev/null; sleep 2
++  log "owned orphans after runner exit: $ORPHANS — TERM/KILL"
++  for p in $ORPHANS; do printf '%s :: ' "$p"; tr '\0' ' ' < /proc/$p/cmdline 2>/dev/null | cut -c1-160; echo; done >> "$OUT/orphans.log"
++  signal_session TERM; for ((i=0;i<5;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done
++  if [[ -n $(session_members) ]]; then signal_session KILL; for ((i=0;i<3;i++)); do [[ -z $(session_members) ]] && break; sleep 1; done; fi
+   REAPED_HERE=$ORPHANS
+ fi
+-SURVIVORS=$(group_members)
+-LAUNCH_END=$(now)
++SURVIVORS=$(session_members)
+ 
+-# 4. classification + durable supervisor record -------------------------------------
+-RESULT_RUNNER=$(python3 -c 'import json,sys
+-try:
+-  d=json.load(open(sys.argv[1])); print(d.get("result","UNPARSEABLE"))
+-except Exception as e: print("MISSING_OR_UNPARSEABLE")' "$OUT/EXIT_RECORD.json")
+-SENTINEL=$([[ -f $OUT/RUN_COMPLETE.sentinel ]] && echo yes || echo no)
+-if [[ $TIMED_OUT == true ]]; then OVERALL=TIMEOUT
+-elif [[ -n $INTERRUPT ]]; then OVERALL=INTERRUPTED
+-elif [[ -n $SURVIVORS ]]; then OVERALL=QUARANTINED_SURVIVORS
+-elif [[ -n $REAPED_HERE ]]; then OVERALL=FAILED_RUNNER_LEFT_ORPHANS
+-elif [[ $RUNNER_RC != 0 ]]; then OVERALL=RUNNER_NONZERO
+-elif [[ $RESULT_RUNNER != SUCCESS || $SENTINEL != yes ]]; then OVERALL=FAILED_PUBLICATION
+-else OVERALL=SUCCESS; fi
+-python3 - "$SUP" <<PY
+-import json
+-json.dump({"kind":"$KIND","run_id":"$RUN_ID","overall":"$OVERALL",
+- "overall_semantics":"SUCCESS only if runner exit 0, runner EXIT_RECORD.result==SUCCESS, sentinel present, owned group empty without supervisor reaping; everything else is non-success",
+- "runner":{"path":"$RUNNER","sha256":"$RUNNER_SHA","wrapper_pid":$RPID,"exit":$RUNNER_RC,"exit_record_result":"$RESULT_RUNNER","sentinel":"$SENTINEL"},
+- "owned_group":{"pgid":"$PGID","sid":"$SID","signal_route":"kill -- -PGID (whole owned group only)","signalled":"$SIGNALLED","orphans_after_runner_exit":"$ORPHANS","reaped_by_supervisor":"$REAPED_HERE","survivors_after_kill":"$SURVIVORS"},
+- "bounds":{"outer_s":$OUTER_S,"grace_s":$GRACE_S,"timed_out":$TIMED_OUT,"interrupt":"$INTERRUPT"},
+- "start_utc":"$LAUNCH_START","end_utc":"$LAUNCH_END","out_dir":"$OUT","console":"$CONSOLE"},open("$SUP","w"),indent=2)
+-PY
+-PUB_RC=$?
+-python3 -c 'import json,sys;json.load(open(sys.argv[1]))' "$SUP" 2>/dev/null || { OVERALL=FAILED_PUBLICATION; PUB_RC=1; }
+-echo "[$(now)] OVERALL=$OVERALL runner_exit=$RUNNER_RC runner_result=$RESULT_RUNNER survivors='${SURVIVORS}' record=$SUP" | tee -a "$CONSOLE"
+-case $OVERALL in SUCCESS) exit 0;; TIMEOUT) exit 124;; INTERRUPTED) exit 143;; QUARANTINED_SURVIVORS) exit 5;; FAILED_RUNNER_LEFT_ORPHANS) exit 6;; FAILED_PUBLICATION) exit 7;; *) exit $(( RUNNER_RC == 0 ? 1 : RUNNER_RC ));; esac
++# ---- 5. classification ---------------------------------------------------------------------------------------------
++HANDSHAKE=""; [[ -f $RUNNER_PID_FILE ]] && HANDSHAKE=$(tr -d ' \n' < "$RUNNER_PID_FILE")
++RES=$(python3 -c 'import json,sys
++try: print(json.load(open(sys.argv[1])).get("result","UNPARSEABLE"))
++except Exception: print("MISSING_OR_UNPARSEABLE")' "$OUT/EXIT_RECORD.json" 2>/dev/null)
++SENT=no; [[ -f $OUT/RUN_COMPLETE.sentinel ]] && SENT=yes
++if   [[ $TIMED_OUT == true ]]; then publish_and_exit TIMEOUT 124
++elif [[ -n $INTERRUPT ]]; then publish_and_exit INTERRUPTED 143
++elif [[ -n $SURVIVORS ]]; then publish_and_exit QUARANTINED_SURVIVORS 5
++elif [[ -n $REAPED_HERE ]]; then publish_and_exit FAILED_RUNNER_LEFT_ORPHANS 6
++elif [[ $RUNNER_RC == 71 || $RUNNER_RC == 73 || $RUNNER_RC == 75 ]]; then REFUSAL="runner refused with exit $RUNNER_RC (see console.log)"; publish_and_exit RUNNER_REFUSED "$RUNNER_RC"
++elif [[ $RUNNER_RC != 0 ]]; then publish_and_exit RUNNER_NONZERO "$RUNNER_RC"
++elif [[ -n $HANDSHAKE && $HANDSHAKE != "$RPID" ]]; then publish_and_exit FAILED_OWNERSHIP_HANDSHAKE 9
++elif [[ -z $HANDSHAKE ]]; then publish_and_exit FAILED_OWNERSHIP_HANDSHAKE 9
++elif [[ $RES != SUCCESS || $SENT != yes ]]; then publish_and_exit FAILED_PUBLICATION 7
++else publish_and_exit SUCCESS 0
++fi
+# pipe helper: byte-identical to V2 (c261ffb4…)
+# NEW FILES (no V2 counterpart): v3/runner/s4-r6-lib-v3.sh, v3/controls/s4-r6-control-stub-v3.sh, v3/controls/control-predicates-v3.py, v3/controls/run-controls-v3.sh
+# RETIRED (not carried into V3): v2/controls/C1..C4 stubs

@@ -1,0 +1,66 @@
+[
+  {
+    "label": "Checkpoint default and detach",
+    "path": "worktrees/s2-runner53/node_modules/prisma/build/index.js",
+    "sha256": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0",
+    "line": 49,
+    "character_offset": 411156,
+    "excerpt": "async function check(e){let r=getCacheFile(e.product,e.cli_path_hash||\"default\"),n=lpe(),i=e.endpoint||process.env.PRISMA_TELEMETRY_ENDPOINT||TELEMETRY_ENDPOINT_URL_PRODUCTION,a={product:e.product,version:e.version,cli_install_type:e.cli_install_type||\"\",information:e.information||\"\",local_timestamp:e.local_timestamp||rfc3339(new Date),project_hash:e.project_hash,cli_path:e.cli_path||\"\",cli_path_hash:e.cli_path_hash||\"\",endpoint:i,disable:typeof e.disable>\"u\"?!1:e.disable,arch:e.arch||os__default.default.arch(),os:e.os||os__default.default.platform(),node_version:e.node_version||process.version,ci:typeof e.ci<\"u\"?e.ci:n.isCI,ci_name:typeof e.ci_name<\"u\"?e.ci_name||\"\":n.name||\"\",command:e.command||\"\",schema_providers:e.schema_providers||[],schema_preview_features:e.schema_preview_features||[],schema_generators_providers:e.schema_generators_providers||[],cache_file:e.cache_file||r,cache_duration:typeof e.cache_duration>\"u\"?ms(\"12h\"):e.cache_duration,remind_duration:typeof e.remind_duration>\"u\"?ms(\"48h\"):e.remind_duration,force:typeof e.force>\"u\"?!1:e.force,timeout:getTimeout(e.timeout),unref:typeof e.unref>\"u\"?!0:e.unref,child_path:e.child_path||childPath,now:()=>Date.now(),client_event_id:e.client_event_id||\"\",previous_client_event_id:e.previous_client_event_id||\"\",check_if_update_available:!1};if((process.env.CHECKPOINT_DISABLE||a.disable)&&!a.force)return{status:\"disabled\"};let o=await Config.new(a),u=await o.checkCache(a);a.check_if_update_available=u.stale===!0||!u.cache;let c=spawn(a);if(a.unref&&(c.unref(),c.disconnect()),u.stale===!0||!u.cache)return{status:\"waiting\",data:c};for(let p of Object.keys(a))a[p]&&await o.set({[p]:a[p]});return a.now()-u.cache.last_reminder<a.remind_duration?{status:\"reminded\",data:u.cache.output}:(await o.set({last_reminder:a.now()}),{status:\"ok\",data:u.cache.output})}function getCacheFile(e,r){let n=paths(\"checkpoint\");return path__default.default.join(n.cache,`${e}-${r}`)}function getTimeout(e){if(typeof e<\"u\")return e;let r=process.env.CHECKPOINT_TIMEOUT;if(typeof r>\"u\")return 5e3;let n=parseInt(r,10);return isNaN(n)?5e3:n}function getForkOpts(e){return e.unref===!0?{detached:!0,stdio:process.env.CHECKPOINT_DEBUG_STDOUT?\"inherit\":\"ignore\",env:process.env}:{detached:!1,stdio:\"pipe\",env:process.env}}function spawn(e){return child_process.fork(childPath,[JSON.stringify(e)],getForkOpts(e))}function rfc3339(e){function r(i){return i<10?\"0\"+i:i}function n(i){let a;return i===0?\"Z\":(a=i>0?\"-\":\"+\",i=Math.abs(i),a+r(Math.floor(i/60))+\":\"+r(i%60))}return e.getFullYear()+\"-\"+r(e.getMonth()+1)+\"-\"+r(e.getDate())+\"T\"+r(e.getHours())+\":\"+r(e.getMinutes())+\":\"+r(e.getSeconds())+n(e.getTimezoneOffset())}exports.check=check;exports"
+  },
+  {
+    "label": "Checkpoint fork options",
+    "path": "worktrees/s2-runner53/node_modules/prisma/build/index.js",
+    "sha256": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0",
+    "line": 49,
+    "character_offset": 413253,
+    "excerpt": "function getForkOpts(e){return e.unref===!0?{detached:!0,stdio:process.env.CHECKPOINT_DEBUG_STDOUT?\"inherit\":\"ignore\",env:process.env}:{detached:!1,stdio:\"pipe\",env:process.env}}function spawn(e){return child_process.fork(childPath,[JSON.stringify(e)],getForkOpts(e))}function rfc3339(e){function r(i){return i<10?\"0\"+i:i}function n(i){let a;return i===0?\"Z\":(a=i>0?\"-\":\"+\",i=Math.abs(i),a+r(Math.floor(i/60))+\":\"+r(i%60))}return e.getFullYear()+\"-\"+r(e.getMonth()+1)+\"-"
+  },
+  {
+    "label": "Reached CLI checkpoint call",
+    "path": "worktrees/s2-runner53/node_modules/prisma/build/index.js",
+    "sha256": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0",
+    "line": 4062,
+    "character_offset": 2541224,
+    "excerpt": "async function V1e({schemaPathFromConfig:e}){if(process.env.CHECKPOINT_DISABLE)return Ah(\"runCheckpointClientCheck() is disabled by the CHECKPOINT_DISABLE env var.\"),0;let r=process.argv.slice(2),n=Ye(r,{\"--schema\":String,\"--telemetry-information\":String},!1,!0),i=typeof n[\"--schema\"]==\"string\"?n[\"--schema\"]:void 0;try{let a=performance.now(),[o,{schemaProvider:u,schemaPreviewFeatures:c,schemaGeneratorsProviders:l}]=await Promise.all([Hb(i,e),pxt(i,e)]),p=zb(),g=performance.now()-a;Ah(`runCheckpointClientCheck(): Execution time for getting info: ${g} ms`);let v={product:\"prisma\",version:lxt.version,cli_path_hash:p,project_hash:o,schema_providers:u?[u]:void 0,schema_preview_features:c,schema_generators_providers:l,cli_install_type:ph()?\"global\":\"local\",command:oq([...r]).join(\" \"),information:n[\"--telemetry-information\"]||process.env.PRISMA_TELEMETRY_INFORMATION,cli_path:process.argv[1]},x=performance.now(),b=await G1e.check(v),D=performance.now()-x;return Ah(`runCheckpointClientCheck(): Execution time for \"await checkpoint.check(data)\": ${D} ms`),b}catch(a){return Ah(\"Error from runCheckpointClientCheck()\"),Ah(a),0}}async function pxt(e,r){let n,i,a;try{let o=await Ir({schemaPathFromArg:e,schemaPathFromConfig:r,ignoreEnvVarErrors:!0,printLoadMessage:!1});o.datasources.length>0&&(n=o.datasources[0].provider),a=o.generators.filter(c=>c&&c.provider).map(c=>oi(c.provider));let u=o."
+  },
+  {
+    "label": "Command dispatch calls checkpoint",
+    "path": "worktrees/s2-runner53/node_modules/prisma/build/index.js",
+    "sha256": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0",
+    "line": 4084,
+    "character_offset": 2549291,
+    "excerpt": "let p=this.cmds[l];if(p){let f=V1e({schemaPathFromConfig:n.schema}).catch(()=>{});this.ensureBinaries.includes(l)&&await(0,pq.ensureNeededBinariesExist)({clientEngineType:c,download:this.download,hasMigrateAdapterInConfig:a});let g;i[\"--experimental\"]?g=[...i._.slice(1),`--experimental=${i[\"--experimental\"]}`]:i[\"--preview-feature\"]?g=[...i._.slice(1),`--preview-feature=${i[\"--preview-feature\"]}`]:i[\"--early-access\"]?g=[...i._.slice(1),`--early-access=${i[\"--early-access\"]}`]:g=i._.slice(1);let v=await p.parse(g,n);return H1e(await f),v}return Vm(this.help(),i._[0])}help(r){return r?new nt(`\n${H(Ae(\"!\"))} ${r}\n${e.help}`):e.help}static tryPdpMessage=`Optimize performance through connection pooling and caching with Prisma Accelerate\nand capture real-time events from your database with Prisma Pulse.\nLearn more at ${Ze(\"https://pris.ly/cli/pdp\")}`;static boxedTryPdpMessage=_w({height:this.t"
+  },
+  {
+    "label": "Schema engine spawn",
+    "path": "worktrees/s2-runner53/node_modules/prisma/build/index.js",
+    "sha256": "c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0",
+    "line": 3371,
+    "character_offset": 2430116,
+    "excerpt": "this.child=(0,WEe.spawn)(o,u,{cwd:c,stdio:[\"pipe\",\"pipe\",this.debug?process.stderr:\"pipe\"],env:{RUST_LOG:\"info\",RUST_BACKTRACE:\"1\",...a}}),this.isRunning=!0,this.child.on(\"error\",l=>{console.error(\"[schema-engine] error: %s\",l),this.rejectAll(l),n(l)}),this.child.on(\"exit\",l=>{let p=x=>{this.rejectAll(x),n(x)},f=this.messages.join(`\n`),g=this.lastError?.message||f,v=()=>{let x=`[EXIT_PANIC]\n${f}\n${this.last"
+  },
+  {
+    "label": "npm inherits client environment",
+    "path": "/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/make-spawn-args.js",
+    "sha256": "f64e3554c3988aae0c28d4602e60a2b7b6b64646ba7b018ba4d9f6a5aae7a7e8",
+    "line_start": 19,
+    "line_end": 37,
+    "excerpt": "  const spawnEnv = setPATH(path, binPaths, {\n    // we need to at least save the PATH environment var\n    ...process.env,\n    ...env,\n    npm_package_json: resolve(path, 'package.json'),\n    npm_lifecycle_event: event,\n    npm_lifecycle_script: cmd,\n    npm_config_node_gyp,\n  })\n\n  const spawnOpts = {\n    env: spawnEnv,\n    stdioString,\n    stdio,\n    cwd: path,\n    shell: scriptShell,\n  }\n\n  return [cmd, args, spawnOpts]"
+  },
+  {
+    "label": "Generated Prisma client library engine",
+    "path": "/home/user/workspace/worktrees/s2-runner53/node_modules/.prisma/client/index.js",
+    "sha256": "87b9fc5e5e1c31a1ad328b992a200798fbba630f03b7d5c165c434f5be8c2b94",
+    "line_start": 3333,
+    "line_end": 3350,
+    "excerpt": "      \"fromEnvVar\": null,\n      \"value\": \"prisma-client-js\"\n    },\n    \"output\": {\n      \"value\": \"/home/user/workspace/worktrees/s2-runner53/node_modules/@prisma/client\",\n      \"fromEnvVar\": null\n    },\n    \"config\": {\n      \"engineType\": \"library\"\n    },\n    \"binaryTargets\": [\n      {\n        \"fromEnvVar\": null,\n        \"value\": \"debian-openssl-3.0.x\",\n        \"native\": true\n      }\n    ],\n    \"previewFeatures\": [],"
+  },
+  {
+    "label": "Checkpoint worker lifecycle and optional request",
+    "path": "/home/user/workspace/worktrees/s2-runner53/node_modules/prisma/build/child.js",
+    "sha256": "237ba8edc4bc636f9045ca89a7b349faf845c235c03bcefcbb6c67a297da021d",
+    "line_start": 82814,
+    "line_end": 82909,
+    "excerpt": "// run main\nmain()\n  .then(() => process.exit(0))\n  .catch((err) => {\n    console.error(err);\n    process.exit(1);\n  });\n\nasync function main() {\n  const state = JSON.parse(process.argv[2]);\n  await Promise.race([check(state), timeout(state.timeout)]);\n}\n\nasync function check(state) {\n  // make the cache file if we haven't already\n  const config = await Config.new(state);\n  // get the signature\n  const signature = await getSignature();\n\n  const clientEventID = state.client_event_id || v4();\n\n  // format the URL\n  const urlObj = Url__default[\"default\"].parse(state.endpoint, true);\n  const basepath = (urlObj.pathname || '').replace(/\\/$/, '');\n  urlObj.pathname = `${basepath}/v1/check/${state.product}`;\n  urlObj.query = {\n    checkpoint_version: CHECK_VERSION.toString(),\n    local_timestamp: state.local_timestamp,\n    information: state.information,\n    schema_providers: state.schema_providers,\n    schema_preview_features: state.schema_preview_features,\n    schema_generators_providers: state.schema_generators_providers,\n    command: state.command,\n    client_event_id: clientEventID,\n    signature,\n    project_hash: state.project_hash,\n    cli_path_hash: state.cli_path_hash,\n    arch: state.arch,\n    os: state.os,\n    node_version: state.node_version,\n    version: state.version,\n    ci: typeof state.ci !== 'undefined' ? String(state.ci) : undefined,\n    ci_name: state.ci_name || '',\n    cli_install_type: state.cli_install_type,\n    previous_client_event_id: await _asyncOptionalChain([(await config.get('output')), 'optionalAccess', async _ => _.client_event_id]),\n    check_if_update_available: String(state.check_if_update_available),\n  };\n\n  // When env.CHECKPOINT_DEBUG_STDOUT !== undefined,\n  // print what would be sent to the telemetry server without actually sending it\n  if (process.env.CHECKPOINT_DEBUG_STDOUT !== undefined) {\n    process.stdout.write('[checkpoint-client] debug\\n');\n    process.stdout.write(JSON.stringify(urlObj, null, '  '));\n    return\n  }\n\n  // send the request\n  const response = await fetch(Url__default[\"default\"].format(urlObj), {\n    method: 'get',\n    timeout: state.timeout,\n    headers: {\n      Accept: 'application/json',\n      'User-Agent': 'prisma/js-checkpoint',\n    },\n  });\n  if (!response.ok) {\n    throw new Error(`checkpoint response error: ${response.status} ${response.statusText}`)\n  }\n  // read the response body\n  const output = await response.json();\n\n  // create or update the configuration\n  // Only do so if there's a need to check if an update is available\n  // That is to say, if the cache is stale or doesn't exist\n  if (state.check_if_update_available) {\n    await config.set({\n      last_reminder: 0,\n      cached_at: Date.now(),\n      version: state.version,\n      cli_path: state.cli_path,\n      output,\n    });\n  }\n\n  // write to process.stdout\n  process.stdout.write(JSON.stringify(output, null, '  '));\n}\n\n// this should take a maximum of 5 seconds\nasync function timeout(millis) {\n  await sleep(millis);\n  throw new Error(`checkpoint-client: process timed out after ${ms(millis)}`)\n}\n\n// sleep helper method\nfunction sleep(ms) {"
+  }
+]

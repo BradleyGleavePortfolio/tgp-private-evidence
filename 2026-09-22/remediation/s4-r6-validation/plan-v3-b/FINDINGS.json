@@ -1,0 +1,83 @@
+{
+  "slice": "S4-V3-INDEPENDENT-PLAN B",
+  "tier": "T4",
+  "worker_id": "s4_v2_independent_plan_b_muc845lh",
+  "frozen_at_utc": "2026-09-22T05:53:00Z",
+  "verdicts": {
+    "source_closures_launcher_lib_runner": "NARROWLY_CLOSED",
+    "stage1_control_grant_on_exact_frozen_bytes": "NOT_RECOMMENDED — control 2 predicate encodes inverted latch order (V3B-01); driver would stop with 94 for a non-defect and consume the grant",
+    "stage2_real_validation": "GRANTABLE_ONLY_AFTER_CORRECTED_STAGE1_PASSES; invocation must come from a non-job-control parent and never under non-foreground timeout",
+    "control_total_bound_185s": "ADEQUATE — finite by construction; driver stops at first failure so at most one control reaches its failure worst case; arithmetic precheck is not a hard deadline; optional hardening only",
+    "product": "UNCHANGED 91990ae9 / 840fb285; not re-audited; hooks 0/6"
+  },
+  "scope": {
+    "reviewed_only": "execution/s4-r6-validation/v3 (frozen packet) + V2_TO_V3.diff",
+    "packet_hash_check": "sha256sum -c v3/SHA256SUMS: 9/9 OK; manifest non-self-including",
+    "input_sha256": {
+      "execution/s4-r6-validation/v3/SHA256SUMS": "4304a82302bff8932c407f5f30e024ee4f5db8b66968a2eb3fa9f703b9bc4fdf",
+      "execution/s4-r6-validation/v3/SLOT_REQUEST_V3.md": "0b5e6a6cef3f5af2227d41d19a07382485be0323ff49625991726d0a63b8fcd6",
+      "execution/s4-r6-validation/v3/V2_TO_V3.diff": "67ae964cdfae94cb1a09366132393e58ce120133c54e2d322d16ea8abdb83035",
+      "execution/s4-r6-validation/v3/launcher/s4-r6-launch-v3.sh": "1113fde0e0d8204fcfe99372eb2446ee385de5831f392e30a282b9985bb55208",
+      "execution/s4-r6-validation/v3/runner/s4-r6-validate-v3.sh": "9ac2195eb9d2d1d0755afd822159928dd5b4bba3a112c638efa751780c670e02",
+      "execution/s4-r6-validation/v3/runner/s4-r6-lib-v3.sh": "4b3573641f84ff9bfa28bd1e427796aac6d806cff045ca55f293b52f3dbdf718",
+      "execution/s4-r6-validation/v3/runner/chrome-pipe-discriminator-v3.mjs": "c261ffb408dc5a724a17c5ad0889b500918fde5d1aa29420b39ced4c4d04531b",
+      "execution/s4-r6-validation/v3/controls/s4-r6-control-stub-v3.sh": "7e306209be6e5fb2971ccb0abefb8e1ff1f9a41eb26d7c208cbb18d91d7a3d47",
+      "execution/s4-r6-validation/v3/controls/control-predicates-v3.py": "e9d01d45d30fa8d31c8989d8679dc2d59eaf774bbac226c58b1c5202ad61b8ee",
+      "execution/s4-r6-validation/v3/controls/run-controls-v3.sh": "fe0de076441e7aa686444a5325622a0078b0daae5e507a8ae5baeac1e589bb06"
+    },
+    "pipe_helper": "byte-identical to V2 (cmp), path renamed only",
+    "prior_frozen_reports_read": ["execution/audits/s4-r6-validation/v2/a/REPORT.md", "execution/audits/s4-r6-validation/v2/b/REPORT.md"],
+    "current_peer_conclusions_read": false,
+    "peer_dir_observed_not_read": "execution/audits/s4-r6-validation/v3/a",
+    "environment_facts_static": {"pid1": "systemd (reaps orphans)", "zombies_observed": 0, "timeout": "uutils 0.8.0 (per-step group, same session)", "pgrep": "procps 4.0.4 (-s session supported)", "setsid": "util-linux 2.41.3 (execs in place when caller is not a group leader)", "bash": "5.3.9"}
+  },
+  "closure_verification": [
+    {"finding": "A-01/F-01 session ownership", "status": "CLOSED", "lines": {"lib": "42,45-50,53-63,85", "launcher": "39-46,117-123"}, "note": "session census + foreign-pgid and per-pid signalling; recorded setsid() limitation accurate"},
+    {"finding": "A-02/F-02 JSON truth", "status": "CLOSED", "lines": {"launcher": "63-78,81,99,128,149-158", "lib": "109-141"}, "note": "argv-only, quoted heredocs, coerced booleans, tmp->parse->rename, record on every path with an output dir"},
+    {"finding": "A-03/F-03 startup/fast exit/bounded wait", "status": "CLOSED", "lines": {"launcher": "86-88,103-107,125-130,133-141,144,153-156", "runner": "57", "stub": "15"}, "note": "leader refusal before spawn, SID=RPID by construction, handshake, CONFIRM_S=10, census+reap on refusals"},
+    {"finding": "A-04 exit truth", "status": "CLOSED", "lines": {"lib": "18-24,28-34,98-100,143-148", "runner": "153-154"}},
+    {"finding": "A-05 control bound", "status": "CLOSED", "lines": {"driver": "16,25-31,36,47,49,52-58"}, "note": "see N-1 accounting"},
+    {"finding": "VPA-04 joins / VPA-05 latch", "status": "PRESERVED", "evidence": "V2_TO_V3.diff hunks -66,70/+66,10; -211,7/+151,7; -286,37/+226,6; S00/S50b/S62b/S63b unchanged"}
+  ],
+  "material_findings": [
+    {
+      "id": "S4-R6-V3B-01",
+      "title": "Control 2 predicate expects C-live-step latched before SIGNAL_TERM; bash runs the pending TERM trap before the next command, so SIGNAL_TERM is latched first",
+      "blocks": "Stage 1 grant on exact frozen bytes",
+      "safety_or_truth_defect": false,
+      "locations": {"predicates": ["75", "76", "77"], "stub": ["21", "34-36"], "request": ["65"], "lib": ["85-86", "98"], "launcher": ["43"]},
+      "mechanism": "signal_session TERMs the session leader (stub bash) first, then the timeout group; sleep dies, timeout exits 143, foreground subshell at lib 85 completes; bash executes the pending trap before `local rc=$?` (restoring $?), so on_signal -> block SIGNAL_TERM 143 sets FIRST_FAIL before block C-live-step at lib 98. Record: first_failure.step=SIGNAL_TERM, observed_exit=143, later C-live-step block. Predicate 75 misses -> driver exit 94 -> V4 by packet rule.",
+      "minimal_closure": "Predicate/prose only: 75 expect SIGNAL_TERM; 76 observed 143; 77 require a C-live-step block; reword request 65 and stub comment 34-35. New predicate hash + manifest; launcher/lib/runner/stub logic unchanged. Do not change on_signal/step ordering."
+    }
+  ],
+  "nonmaterial_observations": [
+    {"id": "N-1", "where": "launcher 75; driver 24; request 81", "note": "worst_case_s uses +7 but post-exit reap loops are 5+3 s plus publish; request says <=22 s. Practical effect nil (stop at first failure). Optional: timeout --foreground --kill-after=10 $((worst+10)) around driver line 39."},
+    {"id": "N-2", "where": "launcher 153", "note": "RUNNER_REFUSED derived from exit 71/73/75 alone; a required step with such an exit would be mislabelled (exit code still truthful). Refinement: also require record_present=false."},
+    {"id": "N-3", "where": "launcher 86-88; request 78", "note": "Stage 2 command typed at a job-control shell refuses 73 by design; grant text must specify a non-job-control parent and no non-foreground timeout wrapper."},
+    {"id": "N-4", "where": "driver 15,17", "note": "control-runs/ and DRIVER-*.log are written inside the frozen v3/ directory; listed hashes remain valid."},
+    {"id": "N-5", "where": "lib 42; launcher 39", "note": "session census lists zombies until reaped; systemd PID 1 here; fail-closed (survivor/quarantine), never success."},
+    {"id": "N-6", "where": "runner 74-99; launcher 98; lib 80; runner S00 pgrep -f", "note": "retained V2 non-material items N-01/N-03/N-05/N-06/N-07 as declared by builder."}
+  ],
+  "controls_static_assessment": {
+    "1 nested-orphan-after-exit": "executable, nonvacuous: TERM-immune reparented sleep in a leaderless timeout group; census found=1 deterministic (inner subshell reaped by bash -c before exit); KILL path; ~12 s < outer 25",
+    "2 live-step-interrupt": "launcher facts attainable (TIMEOUT 124, members>=2, survivors []); runner record present within 6 s grace; predicate 75 wrong (V3B-01)",
+    "3 predicate-rc0": "executable; 89/observed 0/EXIT_0 attainable",
+    "4 record-without-sentinel": "executable and discriminating (runner.exit 0 + result SUCCESS + sentinel false)",
+    "5 refuse": "executable; no discovery race; handshake null; refusal recorded; census on refusal path",
+    "6 direct-runner-refusal": "executable; token check precedes session check so the non-foreground timeout wrapper is harmless; message and runs/ unchanged asserted"
+  },
+  "what_success_would_not_prove": ["real gates/Vitest/gitleaks/package/browser/pipe results", "artifact/release or native import attestation", "widening of the narrow source acceptance", "hooks remain 0/6"],
+  "identity": {
+    "role": "S4-V3-INDEPENDENT-PLAN B, independent non-author T4 reviewer",
+    "requested_model": "Claude Fable5 (register DISPATCHES.md line 26)",
+    "actual_runtime_model_version_setting": "unexposed / not attested",
+    "candidate_author": false,
+    "builder_contact": false,
+    "current_peer_conclusions_read": false
+  },
+  "execution": {
+    "controls": false, "runner": false, "probe": false, "syntax_check": false, "test": false, "install": false, "timeout_target": false,
+    "browser": false, "network": false, "database": false, "worktree_mutation": false, "source_edit": false, "packet_edit": false,
+    "actions": "Read-only file inspection, sha256 verification, cmp, /proc and dpkg metadata reads; wrote only execution/audits/s4-r6-validation/v3/b"
+  }
+}

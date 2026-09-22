@@ -1,0 +1,116 @@
+{
+  "task": "S2-V5.5-INDEPENDENT-CLOSURE-A",
+  "revision": 1,
+  "evidence_class": "SOURCE_ONLY_NOTRUN",
+  "new_findings": [
+    {
+      "id": "S2-R55-A-01",
+      "severity": "high",
+      "title": "Identity directory cleared before use",
+      "lines": [
+        "runner:94,103,162-164,202-203"
+      ],
+      "blocks": [
+        "control08-all",
+        "proof09"
+      ],
+      "smallest_closure": "Remove reset, guard invocation output directory, gate exec on publication success. No root-file cleanup.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    },
+    {
+      "id": "S2-R55-A-02",
+      "severity": "high",
+      "title": "Startup/unknown acquisition not consistently fail-closed",
+      "lines": [
+        "runner:122-153,163-181,203-218",
+        "driver:54-58"
+      ],
+      "blocks": [
+        "control08-all",
+        "proof09",
+        "N5-required"
+      ],
+      "smallest_closure": "Recover/acknowledge exclusive identity before client work; signal-time resolution; unknown dead/acquiring clients quarantine/nonzero; bounded PID fallback only.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    },
+    {
+      "id": "S2-R55-A-03",
+      "severity": "high",
+      "title": "Watchdog bypasses retirement and does not implement total deadline",
+      "lines": [
+        "driver:42,50-80,97-98,215-234"
+      ],
+      "blocks": [
+        "control08-all"
+      ],
+      "smallest_closure": "Use current validated authority, retire PID/group identities, own/reap watchdog sleeper, bound driver cancellation and final publication.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    },
+    {
+      "id": "S2-R55-A-04",
+      "severity": "medium",
+      "title": "K2 stale output predicate and predecessor receipt mismatch",
+      "lines": [
+        "driver:85-89,119,163-170,180",
+        "runner:141,194",
+        "predecessor:153-158"
+      ],
+      "blocks": [
+        "control08-k",
+        "control08-new1"
+      ],
+      "smallest_closure": "Assert current active/retired predicate; version-specific predecessor/successor evidence predicates; verify predecessor manifest from its own directory.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    },
+    {
+      "id": "S2-R55-A-05",
+      "severity": "medium",
+      "title": "Receipt failure and final evidence work are not fully gated/bounded",
+      "lines": [
+        "runner:257-266"
+      ],
+      "blocks": [
+        "authoritative-control-receipts",
+        "proof09"
+      ],
+      "smallest_closure": "Own/bound entire evidence operation, check all publication statuses, preserve acyclic hash layout, classify actual exit after final deadline/publication outcome.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    },
+    {
+      "id": "S2-R55-A-06",
+      "severity": "medium",
+      "title": "CLI hash refusal follows first CLI execution",
+      "lines": [
+        "runner:290-299"
+      ],
+      "blocks": [
+        "proof09-only"
+      ],
+      "smallest_closure": "Move client existence/hash verification before version invocation; keep CHECKPOINT_DISABLE export.",
+      "status": "OPEN_SOURCE_FINDING_NO_EXECUTION"
+    }
+  ],
+  "stable_dispositions": {
+    "S2-R54-A-04 / S2-R54B-01": "CHECKPOINT_DISABLE export/inheritance source-closed for exact inspected bytes; new use-before-hash issue F06; dynamic notrun",
+    "S2-R54-A-01": "Normal K1 exclusive enclosure corrected; startup/watchdog residual F02/F03 and N4 pending",
+    "S2-R54-A-02": "Owned stop/group census and published sleeper improve source; F01/F02 block full closure",
+    "S2-R53-A-01": "Startup continuation remains open via F01/F02; no blanket inherited closure",
+    "S2-R53-A-02": "First exceptional reap anchor source-closed; whole receipt/deadline F05 remains open",
+    "S2-R54-A-03 / S2-R54B-03": "Original post-hash mutation source-closed; distinct publication success F05 remains open",
+    "S2-R54B-02": "Ordinary group retirement partial; watcher historical IDs/plain PID list remain active signal authority F03",
+    "S2-R53-A-03": "Pre-existing-refusal source closure retained; dynamic N1 pending",
+    "S2-R53-A-04": "Finish survivor/lock gate improved; aggregate and helper ownership F03 open; N6 pending",
+    "S2-R53-A-05": "Unchanged future-destroy hold; destroy forbidden"
+  },
+  "necessary_control_gaps": {
+    "N4": "Caller-group decoy survives actual enclosure cleanup, distinct from precondition refusal.",
+    "N5": "Fast exit/publication failure and deterministic startup interruption accounting.",
+    "N6": "Final private-lock or known-owned-survivor handoff failure returns4, no next set, bounded controller-owned cleanup; include watchdog sleeper and retired IDs."
+  },
+  "aliases": {
+    "runner": "execution/s2-runner55/run-composition-r55-v5.5-when-granted.sh",
+    "driver": "execution/s2-runner55/controls-proposed/run-controls-v55.sh",
+    "predecessor": "execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh"
+  },
+  "details": "REPORT.md"
+}

@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# S5 R4 Tier 2 control v5 (successor of controls-v3/teardown-gate/ctl-teardown-gate.sh; NOT EXECUTED): real installed
+# jest-circus hook semantics on the REAL candidate and PREDECESSOR spec texts with the byte-identical FAKE recording
+# harness (no connection, no psql, no child process). v5 adds only: (a) pinned-input hash gate for the fake harness,
+# control jest config and spec copies; (b) each Jest run is an OWNED child in its own process group with a budget
+# (TERM -> grace -> KILL), reaped and censused before the next run; any survivor is a check failure (stop); (c) explicit
+# per-run and aggregate elapsed records; (d) dependency gate: worktree node_modules from the granted setup-v1 with
+# jest 30.4.2 / ts-jest 29.4.9 / typescript 5.9.3 resolved strictly inside the worktree. No spec/assertion changes.
+# Requires S5_CTL_GRANT=granted-by-parent. Takes NO lock, no network, no DB, no npx, no install, no Prisma generate.
+# Budget: <= 90 s per Jest run (cold ts-jest), 4 runs, aggregate bound 380 s; recommended outer: timeout --foreground -k 20 400.
+source "$(dirname "${BASH_SOURCE[0]}")/../controls-v3/lib.sh"
+control_preconditions
+W=$CANDIDATE_WORKTREE; V3=$(cd "$(dirname "${BASH_SOURCE[0]}")/../controls-v3/teardown-gate" && pwd)
+PIN_HARNESS=2de5fe248126637b28cd0687fea3e4ce43e0c1552ba6a034b21479fac088ab21
+PIN_CONFIG=a6eeb1cd1797388a2f81e5b2980bcc9b62e25852e3cd9923aa8168d482ab5e71
+PIN_HEAD=143d451ead6ccdbebd92ca3031ba7a89867d6cfc
+RUN_BUDGET=90; RUN_GRACE=10; AGG_BOUND=380; T0=$(date +%s)
+OWNED_PGIDS=""
+# ---- dependency + input gates (all refusals rc 2, before any child)
+[ "$(git -C "$W" rev-parse HEAD)" = "$PIN_HEAD" ] || { log "REFUSE: worktree HEAD != $PIN_HEAD"; exit 2; }
+[ -x "$W/node_modules/.bin/jest" ] || { log "REFUSE: $W/node_modules/.bin/jest absent; granted setup-v1 required first"; exit 2; }
+ids="$(cd "$W" && node -e 'const p=require("path");const w=process.cwd();let bad=0;for(const [m,v] of [["jest","30.4.2"],["ts-jest","29.4.9"],["typescript","5.9.3"],["jest-circus",null]]){let r;try{r=require.resolve(m+"/package.json",{paths:[w]})}catch(e){console.log("BAD "+m+" unresolved");bad++;continue}const got=require(r).version;const inside=r.startsWith(p.join(w,"node_modules")+p.sep);const ok=inside&&(!v||v===got);console.log((ok?"OK ":"BAD")+" "+m+"@"+got+" "+r);if(!ok)bad++}process.exit(bad?1:0)' 2>&1)"; idrc=$?
+log "DEPENDENCY_IDENTITIES rc=$idrc"; printf '%s\n' "$ids" | while read -r l; do log "  $l"; done
+[ "$idrc" = 0 ] || { log "REFUSE: strict jest/ts-jest/typescript identities not satisfied"; exit 2; }
+[ "$(sha256sum "$V3/fake-harness.ts" | cut -c1-64)" = "$PIN_HARNESS" ] || { log "REFUSE: fake-harness.ts hash != pinned $PIN_HARNESS"; exit 2; }
+[ "$(sha256sum "$V3/jest.control.config.js" | cut -c1-64)" = "$PIN_CONFIG" ] || { log "REFUSE: jest.control.config.js hash != pinned $PIN_CONFIG"; exit 2; }
+# ---- private control root
+CR="$(mktemp -d /tmp/s5-r4-gate-XXXXXX)"; export CR
+reap_owned() { local pg m; for pg in $OWNED_PGIDS; do m=$(pgrep -g "$pg" || true); [ -z "$m" ] && continue; log "CLEANUP pgid=$pg TERM members=[${m//$'\n'/,}]"; kill -TERM -- "-$pg" 2>/dev/null; local i=0; while [ $i -lt "$RUN_GRACE" ] && pgrep -g "$pg" >/dev/null; do sleep 1; i=$((i+1)); done; pgrep -g "$pg" >/dev/null && { kill -KILL -- "-$pg" 2>/dev/null; sleep 1; }; m=$(pgrep -g "$pg" || true); [ -n "$m" ] && log "CLEANUP SURVIVORS pgid=$pg [${m//$'\n'/,}]"; done; }
+on_exit() { reap_owned; local surv=0 pg; for pg in $OWNED_PGIDS; do pgrep -g "$pg" >/dev/null && surv=1; done; if [ "$surv" = 1 ] || [ "${S5_CTL_KEEP:-}" = 1 ]; then log "CONTROL_ROOT_RETAINED $CR (keep=${S5_CTL_KEEP:-0} survivors=$surv)"; else rm -rf "$CR"; fi; log "AGGREGATE_ELAPSED $(( $(date +%s) - T0 ))s"; }
+trap on_exit EXIT; trap 'log SIGNAL; exit 143' TERM INT HUP
+mkdir -p "$CR/test/utils" "$CR/fakeroot/node_modules/.prisma/client" "$CR/fakeroot/oldroot/src/scout" "$CR/fakeroot/oldclient"
+cp "$W/test/rls-g2-pg17-etq0.spec.ts" "$CR/test/candidate.spec.ts"
+git -C "$W" show "$PIN_HEAD:test/rls-g2-pg17-etq0.spec.ts" > "$CR/test/predecessor.spec.ts"
+cp "$W/test/utils/g2-pg17-db.ts" "$CR/test/utils/g2-pg17-db.ts"
+cp "$V3/fake-harness.ts" "$CR/test/utils/g2-pg17-harness.ts"; cp "$V3/jest.control.config.js" "$CR/jest.config.js"
+ln -s "$W/node_modules" "$CR/node_modules"
+printf 'model ScoutReconstructionLedger {\n  id String\n}\n' > "$CR/fakeroot/oldclient/schema.prisma"
+printf 'model ScoutReconstructionLedger {\n  id String\n  source_platform String?\n}\n' > "$CR/fakeroot/node_modules/.prisma/client/schema.prisma"
+for f in scout-reconstruct.service.ts scout-roster.service.ts scout-entities.service.ts; do printf 'fake O service source\n' > "$CR/fakeroot/oldroot/src/scout/$f"; done
+cand_sha=$(sha256sum "$CR/test/candidate.spec.ts" | cut -c1-64); wt_sha=$(sha256sum "$W/test/rls-g2-pg17-etq0.spec.ts" | cut -c1-64)
+log "GATE_CONTROL_ROOT $CR candidate_spec_sha256=$cand_sha (worktree $wt_sha) predecessor_spec_sha256=$(sha256sum "$CR/test/predecessor.spec.ts" | cut -c1-64) fake_harness_sha256=$PIN_HARNESS config_sha256=$PIN_CONFIG"
+check I0.inputs "$( [ "$cand_sha" = "$wt_sha" ]; echo $? )" "candidate spec copy is byte-identical to the dirty worktree file"
+run_gate() { # <id> <spec> <scenario>  -> GATE_RC, and check <id>.owned (no survivors)
+  local rec="$OUT/gate-$CTL_TS-$1.jsonl" out="$OUT/gate-$CTL_TS-$1.jest.log" t0 pid pg w=0 how=exited; : > "$rec"
+  local left=$((AGG_BOUND - ($(date +%s) - T0))); [ "$left" -gt 5 ] || { log "AGGREGATE_BOUND_HIT before $1"; GATE_RC=124; return; }
+  local budget=$RUN_BUDGET; [ "$budget" -gt "$left" ] && budget=$left
+  t0=$(date +%s)
+  ( cd "$CR" && exec setsid env -i PATH="/usr/local/bin:/usr/bin:/bin" HOME="$CR" G2_CTL_ROOT="$CR" G2_CTL_RECORD="$rec" G2_CTL_FAKEROOT="$CR/fakeroot" G2_CTL_SCENARIO="$3" NODE_OPTIONS=--max-old-space-size=2048 CI=1 \
+      "$W/node_modules/.bin/jest" --config "$CR/jest.config.js" --runInBand "test/$2" ) > "$out" 2>&1 < /dev/null &
+  pid=$!; sleep 0.2; pg=$(ps -o pgid= "$pid" 2>/dev/null | tr -d ' '); [ -z "$pg" ] && pg=$pid; OWNED_PGIDS="$OWNED_PGIDS $pg"
+  log "$1 START pid=$pid pgid=$pg scenario=$3 spec=$2 budget=${budget}s"
+  while kill -0 "$pid" 2>/dev/null && [ $w -lt "$budget" ]; do sleep 1; w=$((w+1)); done
+  if kill -0 "$pid" 2>/dev/null; then how=budget-TERM; kill -TERM -- "-$pg" 2>/dev/null; local g=0; while kill -0 "$pid" 2>/dev/null && [ $g -lt "$RUN_GRACE" ]; do sleep 1; g=$((g+1)); done; kill -0 "$pid" 2>/dev/null && { how=budget-KILL; kill -KILL -- "-$pg" 2>/dev/null; }; fi
+  wait "$pid"; GATE_RC=$?
+  local m; m=$(pgrep -g "$pg" || true); [ -n "$m" ] && { kill -TERM -- "-$pg" 2>/dev/null; sleep 2; kill -KILL -- "-$pg" 2>/dev/null; sleep 1; m=$(pgrep -g "$pg" || true); }
+  log "$1 EXIT jest_rc=$GATE_RC how=$how elapsed=$(( $(date +%s) - t0 ))s record_lines=$(wc -l < "$rec") survivors=[${m//$'\n'/,}] (nonzero jest rc is EXPECTED: beforeAll throws)"
+  check "$1.owned" "$( [ -z "$m" ] && [ "$how" = exited ]; echo $? )" "jest child exited within budget and its process group is empty"
+}
+mut() { grep -c '"mutating":true' "$1"; }
+run_gate T1 candidate.spec.ts refused-identity; R="$OUT/gate-$CTL_TS-T1.jsonl"
+check T1.zero_mutation "$( [ "$(mut "$R")" = 0 ] && [ "$(wc -l < "$R")" -ge 1 ]; echo $? )" "candidate refused-identity: $(mut "$R") mutating calls of $(wc -l < "$R") recorded (expected 0)"
+check T1.skipped_marker "$( grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T1.jest.log"; echo $? )" "PG17_TEARDOWN_SKIPPED emitted by afterAll"
+check T1.jest_failed "$( [ "$GATE_RC" != 0 ]; echo $? )" "jest exit $GATE_RC recorded (a refused setup must not look like a passing suite)"
+run_gate T2 candidate.spec.ts refused-prestate; R="$OUT/gate-$CTL_TS-T2.jsonl"
+check T2.zero_mutation "$( [ "$(mut "$R")" = 0 ] && grep -q '_prisma_migrations' "$R"; echo $? )" "candidate refused-prestate: $(mut "$R") mutating calls (expected 0); identity gates reached"
+check T2.skipped_marker "$( grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T2.jest.log"; echo $? )" "PG17_TEARDOWN_SKIPPED emitted"
+run_gate T3 candidate.spec.ts authorized-partial; R="$OUT/gate-$CTL_TS-T3.jsonl"
+check T3.setup_partial "$( grep -q '"mutating":true.*GRANT USAGE' "$R" && grep -q 'ADD CONSTRAINT g2p_target_refusal' "$R"; echo $? )" "authorized setup began (GRANT) and ALTER failed"
+check T3.teardown_ran "$( grep -q 'DROP CONSTRAINT IF EXISTS g2p_target_refusal' "$R" && grep -q '"fn":"resetData"' "$R" && grep -q 'DELETE FROM "ScoutImport"' "$R"; echo $? )" "teardown still cleaned up after partial authorized setup"
+check T3.no_skip "$( ! grep -q PG17_TEARDOWN_SKIPPED "$OUT/gate-$CTL_TS-T3.jest.log"; echo $? )" "no TEARDOWN_SKIPPED for an authorized setup"
+run_gate T0 predecessor.spec.ts refused-identity; R="$OUT/gate-$CTL_TS-T0.jsonl"
+check T0.defect "$( [ "$(mut "$R")" -ge 2 ] && grep -q 'DROP CONSTRAINT IF EXISTS g2p_target_refusal' "$R" && grep -q '"fn":"resetData"' "$R"; echo $? )" "PREDECESSOR refused-identity: $(mut "$R") mutating teardown calls recorded (frozen S5-R3-A-01 under real Jest hook semantics; FAILING behaviour)"
+summary

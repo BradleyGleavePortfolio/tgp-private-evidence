@@ -1,0 +1,155 @@
+{
+  "review": "S4-V3-INDEPENDENT-PLAN-A",
+  "status": "HOLD_V3_ALLOCATION",
+  "packet_manifest_sha256": "4304a82302bff8932c407f5f30e024ee4f5db8b66968a2eb3fa9f703b9bc4fdf",
+  "control_grantability": {
+    "recommend_grant": false,
+    "status": "HOLD",
+    "proposed_aggregate_seconds": 185,
+    "blockers": [
+      "S4-V3-A-01",
+      "S4-V3-A-02",
+      "S4-V3-A-03"
+    ],
+    "grant_issued": false
+  },
+  "native_validation_grantability": {
+    "recommend_grant": false,
+    "status": "HOLD",
+    "blockers": [
+      "S4-V3-A-01",
+      "S4-V3-A-02",
+      "S4-V3-A-03",
+      "S4-V3-A-04"
+    ],
+    "grant_issued": false
+  },
+  "product_source_acceptance": "Prior narrow acceptance neither widened nor withdrawn; not re-audited",
+  "artifact_acceptance": "HELD",
+  "release_attestation": "HELD",
+  "final_independent_evidence_attestations": "HELD; two remain required",
+  "historical_hooks": "0/6",
+  "real_vitest_package_browser_proof": "NOTRUN in this review; not supplied by controls",
+  "findings": [
+    {
+      "id": "S4-V3-A-01",
+      "severity": "high",
+      "material": true,
+      "title": "Dependent local initializer expands unset label before local assignment",
+      "applies_to": [
+        "controls",
+        "native_validation"
+      ],
+      "locations": [
+        "runner/s4-r6-lib-v3.sh:53-55,85-88",
+        "runner/s4-r6-validate-v3.sh:24,61,104",
+        "controls/s4-r6-control-stub-v3.sh:6,18,30"
+      ],
+      "basis": "Single local builtin argument expansion precedes assignments; no preceding label is initialized; set -u aborts before census. Carried forward from V2 and missed in earlier reviews.",
+      "minimal_closure": "Separate label initialization from dependent f assignment; keep shared controls and expectations.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V3-A-02",
+      "severity": "medium",
+      "material": true,
+      "title": "Deferred TERM trap wins the latch before active step result",
+      "applies_to": [
+        "controls",
+        "native_validation"
+      ],
+      "locations": [
+        "controls/s4-r6-control-stub-v3.sh:21-22,32-36",
+        "runner/s4-r6-validate-v3.sh:69-71",
+        "runner/s4-r6-lib-v3.sh:18-23,85-100",
+        "controls/control-predicates-v3.py:65-77",
+        "launcher/s4-r6-launch-v3.sh:41-44,118-122"
+      ],
+      "basis": "Pending trap is handled when foreground command ends, before following result/latch commands; SIGNAL_TERM blocks first, contradicting live-step predicate requiring C-live-step first. Independent residual after A-01 is corrected.",
+      "minimal_closure": "Record pending signal during active step; capture/latch actual step result before secondary signal and avoid reentrant step cleanup; define idle handler separately.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V3-A-03",
+      "severity": "medium",
+      "material": true,
+      "title": "Aggregate control deadline and receipt/cleanup allowance are not enforced",
+      "applies_to": [
+        "controls",
+        "native_validation"
+      ],
+      "locations": [
+        "controls/run-controls-v3.sh:16-24,34-60",
+        "launcher/s4-r6-launch-v3.sh:49-82,112-159",
+        "SLOT_REQUEST_V3.md:54-56,81-82,90"
+      ],
+      "basis": "Pre-admission arithmetic does not interrupt foreground launcher or cover subsequent predicates/publication; +7 record allowance is shorter than 5+3 sleep loops alone; request says +22.",
+      "minimal_closure": "Freeze exact aggregate cancellation/deadline route including detached-session cleanup and receipt processing; reserve real cleanup time and reconcile code/record/request budgets.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V3-A-04",
+      "severity": "high",
+      "material": true,
+      "title": "Runner-held lock is released before supervisor cleanup verification",
+      "applies_to": [
+        "native_validation"
+      ],
+      "locations": [
+        "runner/s4-r6-validate-v3.sh:64-67",
+        "runner/s4-r6-lib-v3.sh:85",
+        "launcher/s4-r6-launch-v3.sh:41-44,120-141"
+      ],
+      "basis": "Whole-session KILL includes sole runner lock holder; step children closed fd9; supervisor then verifies/reaps without canonical exclusion. Controls intentionally never take the lock.",
+      "minimal_closure": "Keep authoritative lock outside killable workload until verified quiescence, or terminate/verify step members before lock-holder exit; unverified survivors must prevent handoff.",
+      "runtime_observed": false
+    }
+  ],
+  "closures": {
+    "V2_A01_B_F01": "Session selector fixes nested-PG visibility in source; shared reaper abort and native lock-through-quiescence remain open",
+    "V2_A02_B_F02": "Narrow source closure: quoted argv Boolean coercion",
+    "V2_A03_B_F03": "Narrow source closure for documented non-job-control launch: no delayed discovery; retained SID, handshake, bounded pre-wait confirmation; source-shared controls with discriminating publication predicates",
+    "V2_A04": "Partial: expected-negative observed0/validation89 fixed, normal failure-before-cleanup/source order fixed; active-signal primary latch remains open",
+    "V2_A05": "Open: explicit grace/pre-admission estimate is not enforced aggregate deadline",
+    "V1_VPA04": "Preserved narrow source closure for fresh output/native artifact joins",
+    "V1_VPA05": "Preserved narrow source closure for prerequisite latch/NOTRUN"
+  },
+  "control_assessment": {
+    "nested-orphan-after-exit": "Uses actual nested step wrapper but A-01 prevents specified runner cleanup evidence",
+    "live-step-interrupt": "Actual wrapper; A-01 plus independent A-02 attribution mismatch",
+    "predicate-rc0": "Correct expected-negative mapping in source; A-01 prevents completed shared-step path",
+    "record-without-sentinel": "Parsed-success/no-sentinel predicates now discriminate intended cause; A-01 prevents completed shared-step path",
+    "refuse": "Fast refusal retains SID and reaches census/classification in source; not executed",
+    "direct-refusal": "Token check precedes lock/worktree use when launch variables absent; not executed"
+  },
+  "accounting": {
+    "control_declared_worst_cases": [
+      48,
+      30,
+      33,
+      33,
+      33
+    ],
+    "sum": 177,
+    "direct_refusal_reserve": 5,
+    "sum_including_direct": 182,
+    "remaining_from_185": 3,
+    "post_exit_sleep_loops": [
+      5,
+      3
+    ],
+    "post_exit_sleep_total": 8,
+    "launcher_extra_allowance": 7,
+    "native_request_extra_allowance": 22,
+    "arithmetic_is_not_hard_deadline": true
+  },
+  "nonblocking_observations": [
+    {
+      "locations": [
+        "launcher/s4-r6-launch-v3.sh:86-95"
+      ],
+      "finding": "Pre-spawn launcher refusals have no supervisor record despite every-path wording; no child workload launched, so wording limitation alone does not block allocation."
+    }
+  ],
+  "next_action": "Canonical builder freezes smallest additive successor; independent review before separate controls/native grants; no product repair or prior report rewrite."
+}
