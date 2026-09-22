@@ -1,6 +1,6 @@
 # Active TGP execution register
 
-Updated 2026-09-21 23:52 UTC. EXECUTE active; reconnaissance closed. This register tracks current workers, not historical session labels. Parent: GPT 6 Astra, orchestrator only.
+Updated 2026-09-22 00:05 UTC. EXECUTE active; reconnaissance closed. This register tracks current workers, not historical session labels. Parent: GPT 6 Astra, orchestrator only.
 
 ## Current ownership
 
@@ -9,8 +9,10 @@ Updated 2026-09-21 23:52 UTC. EXECUTE active; reconnaissance closed. This regist
 | S1 R3 audit A | `s1_r3_independent_audit_a_mubv6s64` | Inherited orchestrator model | `execution/audits/s1-r3/a/` only | Frozen review complete, NOT CLEARED: S1-R3-A-01 effective TRUNCATE gap; composition evidence pending |
 | S1 R3 audit B | `s1_r3_independent_audit_b_mubv6s76` | Claude Fable 5 / High | `execution/audits/s1-r3/b/` only | Frozen review complete; bounded isolated-lane attestation, composition/live/PG15 reserved; does not waive A's finding |
 | S1 R4 verifier fixer | `s1_r4_verifier_fixer_mubvep31` | Claude Fable 5 / High | `worktrees/s1-r4`, `execution/s1-r4` | Source frozen clean at 41f4d6a9; new DB proof unrun, supplied to S2 |
-| S2 R3 composition builder | `s2_r3_release_composition_mubv6s70` | Claude Fable 5 / High | `worktrees/s2-composition`, `execution/s2-composition` | Frozen 9742037b includes S1 R4; SLOT A2 shared toolchain setup granted |
-| S4 R4 fixer | `s4_r4_auth_race_fixer_mubv6s6j` | Claude Fable 5 / High | `worktrees/s4-r4`, `execution/s4-r4` | Frozen 2bcf1563; L1 coalescer/stale-success controls pass, predecessor fails; full validation queued |
+| S2 R3 composition builder | `s2_r3_release_composition_mubv6s70` | Claude Fable 5 / High | `worktrees/s2-composition`, `execution/s2-composition` | Frozen 9742037b; A2 setup passed; runner v3 offline-proven, next for guarded composition after S4 |
+| S4 R4 fixer | `s4_r4_auth_race_fixer_mubv6s6j` | Claude Fable 5 / High | `worktrees/s4-r4`, `execution/s4-r4` | Frozen 2bcf1563; A3 runner2 active since00:01:19; install, formatting, focused113 tests passed; full validation ongoing |
+| S4 R4 audit A | `s4_r4_independent_audit_a_mubww490` | Inherited orchestrator model | `execution/audits/s4-r4/a/` only | Independent source review active; final attestation awaits actual final validation/artifact packet |
+| S4 R4 audit B | `s4_r4_independent_audit_b_mubww49h` | Claude Fable 5 / High | `execution/audits/s4-r4/b/` only | Independent source review active; no peer report access; final attestation awaits packet |
 | S5 R3 validation fixer | `s5_r3_validation_fixer_mubv6s6r` | Claude Fable 5 / High | `worktrees/s5-r3`, `execution/s5-r3` | Frozen cf3e72f9; install + guard 27/27 passed; slot released23:50:27; real DB 51-case proof pending |
 | S6 R3 fixer + S6-P1 follow-up | `s6_r3_identity_fixer_mubv6s7c` | Claude Fable 5 / High | `worktrees/s6-r3`, `execution/s6-r3` | Frozen d51a1910, unvalidated; setup queued; bounded persisted-cache identity proof/fix authorized |
 
@@ -18,7 +20,9 @@ All cumulative lanes are T4 under `EXECUTION_MANDATE.md`. S1's recovered b7d7fe5
 
 ## Validation slot
 
-**SLOT A2-S2-SETUP granted to S2 only:** corrected request S10 clients → S20 pinned shared PG17.6 distribution → S30 locked npm install/Prisma generate, maximum25minutes. No initdb/server/DB connection or proof in this allocation. Canonical lock: `/home/user/workspace/execution/test-validation.lock`, nonblocking. Verify live process plus final exit; all lanes now have durable-launch handling.
+**SLOT A3-S4-VALIDATION granted to S4 only:** maximum15minutes from actual launch, at most2CPUs/<2GB. Locked install, applicable tests/gates, discriminating auth controls, package and fresh positive/negative browser proof. Before advancing, owned runner must enforce expected-negative predicates/exits, stop unexpected failures, refuse stale artifacts, and record actual completion. No DB, live backend or remote push. Canonical lock: `/home/user/workspace/execution/test-validation.lock`, nonblocking; verify live process and final exit, not log presence.
+
+A2 setup completed23:58:00, each S10/S20/S30 exit0; source9742037b remains clean. psql18.6, pinned PG17.6 distribution, locked Prisma6.19.3 are installed. No server/DB action occurred. Parent found S2 proof-runner premature exits/uninitialized status and nested-lock conflict before launch. Original runner preserved; v3 `2d09fd68…` now has offline reachability, failure propagation, partial-start cleanup and survivor controls. S2 is next for guarded B1, not yet running. S5's rev4 fresh-cluster request is ready and queued; no DB permission yet.
 
 A1 closed at23:50:27: corrected install and offline guard27/27 passed; first launch remains INTERRUPTED without a pass claim. Lightweight L1-S4 closed: two offline dependency-free probes, candidate0/predecessor1 for both; no heavy lock needed, about2seconds total. Four earlier wrong-path invocations never ran probe code and remain preserved as harness errors, not candidate results.
 

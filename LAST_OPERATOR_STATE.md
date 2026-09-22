@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-21 23:52 UTC. Operator: GPT 6 Astra, executive orchestrator only.
+Updated: 2026-09-22 00:05 UTC. Operator: GPT 6 Astra, executive orchestrator only.
 
 ## Mission and authority
 
@@ -18,7 +18,7 @@ G01–G22 remain effective. The supplied PDF explicitly preserves Bradley's Sept
 | Mobile | `a5933fd6de5616493de75f0db907098b149b955c` |
 | Extension | `0111be661922234d670bbf23e23d270eec1b4a4e` |
 | Context | `1ebbed76188e33c970fc17c1e7b252f535d040d0` |
-| Private evidence | `c03253d640621e8116cbf154deaf27c9dbbdc2b5` (before this handoff publication; query GitHub for newer evidence commits) |
+| Private evidence | `32c2620a0da363949cf4638f64ccc724a6a31125` (before this handoff publication; query GitHub for newer evidence commits) |
 
 Product mains and importer-critical PR heads are unchanged; context/evidence advanced beyond the previous state's pre-refresh references. Main remains staging/generic reconstruction, not proven native reconciled completion. No real-source acceptance, zero-touch proof, five-minute native completion or pilot acceptance was established.
 
@@ -33,15 +33,15 @@ Five current source bundles were hash-checked, verified, and restored clean unde
 | Lane | Last preserved head | Exact next exit |
 |---|---|---|
 | S1 containment | `41f4d6a985e5037bf53831a38ed00a9a4314cf7d` | R4 verifier/test repair frozen clean, new DB proof unrun; S2 receives it for shared-fixture composition. Both R3 reviews complete; A's effective-TRUNCATE gap remains open pending proof and dual follow-up. Historical 89/89 and prior guard/atomicity closures retained only within unchanged inputs. |
-| S2 delivery/composition | `9742037b153221de565e651ad8ba3b721bc0fb31` | Clean composition of preserved S2 e15, S1 b7, owned harness and S1 R4 41f4. SLOT A2 shared toolchain setup active; real release/discriminator proof unrun. Historical S2 proof is not automatic composition clearance. |
+| S2 delivery/composition | `9742037b153221de565e651ad8ba3b721bc0fb31` | Setup passed, clean source unchanged. Runner-only defects caught before DB execution are repaired in v3 with offline reachability/failure/cleanup controls; original bytes retained. Next for guarded composition after S4, real release/discriminator proof still unrun. |
 | S3 reliability | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Preserve accepted bounded R2 proof unchanged. Recheck only material integration applicability; landing still depends on S1/S2. |
-| S4 extension | `2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3` | R4 fixes frozen; fresh bundle import verified. L1 admission/stale-success probes pass on candidate and fail on84471e99; initial path-invocation errors preserved separately. Full tests/gates/package/browser and two attestations pending; old1,702-test/zip proof is not clearance. |
+| S4 extension | `2bcf1563d85bc2109e99805e4ce1b06fce4dcdb3` | A3 validation active since00:01:19: install, format and focused113 tests passed; full tests/gates/package/browser pending. Two independent R4 source reviews started in parallel; final attestations require the actual final validation/artifact packet. L1 candidate/predecessor discrimination retained. |
 | S5 provenance validation | `cf3e72f90ad63d40c1831d8b86141f2d16b7ba05` | Locked install/Prisma generate and offline guard27/27 passed, clean head unchanged. Real marked-server51-case proof unrun. Validation-only; no schema ownership. |
-| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 identity/cache/copy/wait repairs frozen, unvalidated. S6-P1 persisted-query identity hazard mapped from pinned library/source; same owner authorized narrowly to prove/fix it before release, using committed auth/bootstrap authority rather than cached-user identity alone. Tests and both flag exports still required; old 3,839-test pass is not clearance. |
+| S6 mobile | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 frozen, unvalidated. S6-P1 hazard/regression tests prepared outside the clean worktree; implementation must follow discriminating baseline proof, use committed auth/bootstrap authority, and fence actual delayed storage/restore operations. Setup queued; no heavy grant. |
 
-S4 R4 and S6's dirty R3 source are **not present in the inspected private archive**. S1/S2 final R3 reports and real composition results are also unpublished there. The one targeted prior-session recovery attempt returned "Session has no entries to load." This does not prove global loss; that bounded route is exhausted. Reimplement only unpreserved deltas from the verified heads and label them honestly. No further historical reconnaissance.
+At initialization, the prior session's S4 R4 and dirty S6 R3 deltas were absent from the inspected archive; the targeted session recovery returned "Session has no entries to load." That bounded route is exhausted, not proof of global loss. Their new source checkpoints above are explicitly reimplementations and are now privately preserved. Both new S1 R3 reviews are also preserved; actual S1/S2 composition proof is still unrun. No further historical reconnaissance.
 
-Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. A1 closed23:50:27; first launcher remains interrupted, corrected install/guard passed. S2 now owns A2 shared toolchain setup only, then guarded composition; S4/S5/S6 validation follows. One moderate/heavy slot at a time, with explicitly bounded lightweight independent probes allowed; actual process/exit must corroborate logs. Composition replays actual **164 parent migrations plus candidate =165**, never ledger-only baselining.
+Old workers/SLOT E are historical. Current ownership/scope: `execution/DISPATCHES.md`. A1 install/guard passed after an interrupted first launcher; A2 setup passed. A3 belongs to S4; S2's corrected proof runner is next, followed by ready S5/S6 allocations. One moderate/heavy slot at a time, with explicitly bounded lightweight independent probes allowed; actual process/exit must corroborate logs. Composition must replay actual **164 parent migrations plus candidate =165**, never ledger-only baselining.
 
 ## Current blockers and reserved boundaries
 
