@@ -1,0 +1,78 @@
+name: R100 Quality Gate
+
+# Enforces AGENT_RULES R75 / R104 (banned weak-cast tokens). Runs on every PR;
+# required check for merge.
+#
+# Hard rule (causes failure):
+#   - Banned cast tokens (R75 / R100.A2): net positive count PER TOKEN in the PR
+#     diff = P0. No exemptions. The banned-casts job runs the committed checker
+#     `scripts/check-r75.js` against the declarative policy `.github/r75-policy.json`;
+#     the pre-commit hook (lefthook.yml) runs the SAME checker against the index,
+#     so the hook and CI cannot diverge.
+#
+# Retired 2026-09-20 (G01/G08 — generic volume quotas are not quality
+# evidence): the former `loc-budget` (400 net-LOC cap, [LOC-EXEMPT:] waiver)
+# and `test-density` (2.0 test:src ratio, [TEST-EXEMPT:] waiver) jobs. Their
+# check names "LOC budget (R100.A3)" and "Test density (R100.A1)" must not be
+# listed as required checks; see scripts/setup-branch-protection.sh.
+#
+# Measurement scope for the banned-cast diff is NOT defined in this workflow:
+# it is the `scan` block of `.github/r75-policy.json` (roots, extensions,
+# includeFiles, exclusions; application AND test sources are in scope), which
+# test/ci/r75-boundaries.spec.ts and test/ci/r100-pathspec.spec.ts assert.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: r100-quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  banned-casts:
+    name: Banned cast tokens (R75 / R100.A2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '20.20.1'
+      - name: Diff banned tokens
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # workflow_dispatch carries no pull-request base. Rather than fabricate
+          # one (which would silently certify an unmeasured diff), this run is
+          # declared NON-CERTIFYING and does not assert R75 compliance.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "NON-CERTIFYING RUN: event '$EVENT_NAME' provides no pull-request base."
+            echo "R75 / R100.A2 was NOT measured. Only the pull_request run certifies R75."
+            exit 0
+          fi
+          # In pull_request context a missing/malformed base is an infrastructure
+          # failure, never an empty diff that passes.
+          if [ -z "${BASE_SHA:-}" ]; then
+            echo "FAIL — pull_request event carried no base SHA; refusing to certify R75." >&2
+            exit 1
+          fi
+          if [ -z "${HEAD_SHA:-}" ]; then
+            echo "FAIL — pull_request event carried no head SHA; refusing to certify R75." >&2
+            exit 1
+          fi
+          node --version
+          # Single committed implementation, shared verbatim with the pre-commit
+          # hook. Real Git range semantics (base...head, i.e. merge base) and
+          # per-token net counting live in the checker, not in this YAML.
+          node scripts/check-r75.js --mode=range --base="$BASE_SHA" --head="$HEAD_SHA"

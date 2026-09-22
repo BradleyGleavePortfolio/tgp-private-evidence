@@ -1,0 +1,40 @@
+--- originals/setup-20-pg17.sh.96a2a443.orig	2026-09-22 04:49:19.045839075 +0000
++++ infra/setup-20-pg17.sh	2026-09-22 04:51:02.921839075 +0000
+@@ -3,6 +3,11 @@
+ # Maven Central). Provenance: Maven publishes SHA1 (and MD5) only for this artifact; the pinned SHA1 is
+ # verified AND the SHA256 of the downloaded jar and of the inner txz are recorded here so the limitation
+ # is explicit and future downloads can be compared byte-for-byte. Extract only; no lifecycle hooks run.
++# S2-SETUP-FIXTURE-PREP copy (2026-09-22) of checkpoint-1/infra/setup-20-pg17.sh sha256 96a2a44340a56b5d4164f4a9081b5e0549eb5c8bea2066985bcc777b4916c5b0.
++# Changes: C1 an existing dist WITHOUT matching provenance is REFUSED (exit 70) instead of being rm -rf'd and re-extracted; C2 extraction
++# no longer rm -rf's $PG17_HOME/dist (a fresh sandbox has none; a present one is refused by C1); C3 installed_by path. All pinned
++# SHA1/SHA256 values and the Maven artifact are unchanged. Prerequisites here: curl/unzip/tar/xz/sha1sum present; /home/user/pg17 ABSENT;
++# needs network to repo1.maven.org. Original header follows.
+ # Copied from the S1 R3 evidence packet (infra/setup-20-pg17.sh). S2 change: the SHA256 of the jar, the inner txz,
+ # and the postgres/initdb binaries must ALSO equal the values S1 recorded in PG17_PROVENANCE.txt (2026-09-20), so this
+ # lane provably runs the same PG 17.6 bytes as S1 run 4; any mismatch refuses (exit 70).
+@@ -22,7 +27,7 @@
+    && [ "$(grep '^initdb_sha256=' "$PROV" | cut -d= -f2)" = "$(sha "$PG17_HOME/dist/bin/initdb")" ]; then
+   echo "binaries accepted via recorded provenance:"; sed 's/^/  prov: /' "$PROV"; step_end; exit 0
+ fi
+-[ -d "$PG17_HOME/dist" ] && echo "dist present WITHOUT matching provenance -> verified re-download/extract"
++[ -d "$PG17_HOME/dist" ] && { echo "REFUSED: $PG17_HOME/dist present WITHOUT matching provenance; not deleting, not re-extracting (parent must inspect)"; exit 70; }   # C1
+ rm -f "$PROV" "$ART" "$ART.sha1"
+ set +e; timeout --foreground 300 curl -fsSLo "$ART" "$BASE/$ART"; rc=$?; set -e; echo "curl_jar_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+ set +e; timeout --foreground 60 curl -fsSLo "$ART.sha1" "$BASE/$ART.sha1"; rc=$?; set -e; echo "curl_sha1_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+@@ -34,7 +39,7 @@
+ unzip -o -q "$ART" postgres-linux-x86_64.txz
+ echo "txz_sha256=$(sha postgres-linux-x86_64.txz) txz_bytes=$(stat -c %s postgres-linux-x86_64.txz)"
+ [ "$(sha postgres-linux-x86_64.txz)" = "$S1_TXZ_SHA256" ] || { echo "txz sha256 != S1-recorded $S1_TXZ_SHA256; refusing"; exit 70; }
+-rm -rf "$PG17_HOME/dist" && mkdir -p "$PG17_HOME/dist" && tar -xJf postgres-linux-x86_64.txz -C "$PG17_HOME/dist"
++mkdir -p "$PG17_HOME/dist" && tar -xJf postgres-linux-x86_64.txz -C "$PG17_HOME/dist"   # C2: no rm -rf (dist absent here; present-without-provenance already refused)
+ V=$(LD_LIBRARY_PATH="$PG17_HOME/dist/lib" "$PG17_HOME/dist/bin/postgres" --version)
+ echo "server_binary=$V"
+ [ "${V##* }" = "17.6" ] || { echo "not 17.6; refusing"; exit 70; }
+@@ -42,6 +47,6 @@
+ [ "$(sha "$PG17_HOME/dist/bin/postgres")" = "$S1_POSTGRES_SHA256" ] && [ "$(sha "$PG17_HOME/dist/bin/initdb")" = "$S1_INITDB_SHA256" ] || { echo "server binaries sha256 != S1-recorded; refusing"; exit 70; }
+ { echo "artifact=$BASE/$ART"; echo "maven_sha1=$PINNED_SHA1 (Maven publishes SHA1/MD5 only)"; echo "jar_sha256=$(sha "$ART")"; echo "txz_sha256=$(sha postgres-linux-x86_64.txz)"
+   echo "postgres_sha256=$(sha "$PG17_HOME/dist/bin/postgres")"; echo "initdb_sha256=$(sha "$PG17_HOME/dist/bin/initdb")"; echo "server_binary=$V"
+-  echo "installed_by=execution/s2-composition/infra/setup-20-pg17.sh"; echo "utc=$(date -u +%FT%TZ)"; echo "log=$STEP_LOG"; echo "result=success"; } > "$PROV"
++  echo "installed_by=execution/s2-setup-prep/infra/setup-20-pg17.sh"; echo "utc=$(date -u +%FT%TZ)"; echo "log=$STEP_LOG"; echo "result=success"; } > "$PROV"
+ echo "provenance_written=$PROV"
+ step_end

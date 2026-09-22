@@ -1,0 +1,18 @@
+--- originals/launch-detached.sh.64302b3e.orig	2026-09-22 04:49:19.049839075 +0000
++++ infra/launch-detached.sh	2026-09-22 04:51:44.905839075 +0000
+@@ -1,4 +1,6 @@
+ #!/usr/bin/env bash
++# S2-SETUP-FIXTURE-PREP copy (2026-09-22) of setup-and-runner-readiness/launch-detached.sh sha256 64302b3e77de039a8c74f601227cf431d655f8e1251d5489febb4fb72db0a36d.
++# ONLY change: LANE repointed to execution/s2-setup-prep (runs/ under it). Original header follows.
+ # Durable launcher for the S2 lane's long steps (setup S10/S20/S30, runner). The sandbox tears down the tool-call
+ # process group when a call returns, so a plain `nohup … &` child dies. This starts the step in its OWN session
+ # (setsid, new process group, stdin from /dev/null), records the real PID, and writes an EXIT sentinel with the
+@@ -9,7 +11,7 @@
+ #   launch-detached.sh wait <name> [secs]          → polls until sentinel or timeout; prints status
+ # Nothing here changes the child's own locking: the step scripts still take the canonical flock -n themselves.
+ set -u
+-LANE=/home/user/workspace/execution/s2-composition
++LANE=/home/user/workspace/execution/s2-setup-prep
+ RUNS=$LANE/runs; mkdir -p "$RUNS"
+ mode=${1-}; name=${2-}; [ -n "$mode" ] && [ -n "$name" ] || { echo "usage: $0 start|status|wait <name> [command...]"; exit 2; }
+ PID=$RUNS/$name.pid; LOGF=$RUNS/$name.log; EXITF=$RUNS/$name.exit; CMDF=$RUNS/$name.cmd

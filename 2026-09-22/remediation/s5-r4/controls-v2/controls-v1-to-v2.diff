@@ -1,0 +1,59 @@
+diff -ru controls/ctl-genctl.sh controls-v2/ctl-genctl.sh
+--- controls/ctl-genctl.sh	2026-09-22 04:47:45.913839075 +0000
++++ controls-v2/ctl-genctl.sh	2026-09-22 04:56:26.505839075 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S5 R4 control: genctl refusal-class discrimination (A-05, runner part). NOT EXECUTED by the builder.
++# S5 R4 control v2: genctl refusal-class discrimination (A-05, runner part). NOT EXECUTED by the builder.
+ # Requires S5_CTL_GRANT=granted-by-parent. Budget: <= 20 s wall. No DB, no network, no npm: the derived
+ # runner's genctl stage is driven with a FAKE prisma CLI whose exit code and stderr are scripted.
+ #   G1 intended refusal (rc 1 + "Could not resolve @prisma/client") -> negative accepted, positive
+@@ -31,6 +31,9 @@
+ scenario G2 1 "Error: something unrelated failed" 3 "GENCTL_FAIL negative control failed for a reason other than the intended missing-client refusal"
+ scenario G3 2 "Error: schema parsing error" 3 "GENCTL_FAIL negative control exited 2, not the intended refusal class"
+ scenario G4 0 "" 3 "GENCTL_FAIL negative control exited 0, not the intended refusal class"
+-# The runner leaves its mktemp scratch dirs (/tmp/s5-genctl-*) as evidence; the control removes only those it caused.
+-for d in /tmp/s5-genctl-*; do [ -d "$d" ] && [ "$(stat -c %Y "$d")" -ge "$(stat -c %Y "$CR")" ] && rm -rf "$d"; done
++# v2: the derived runner's mktemp scratch dirs are identified EXACTLY from its own CMD lines
++# ("CMD (cwd=/tmp/s5-genctl-XXXXXX/no-root) ...") and RETAINED as evidence; nothing under /tmp is removed
++# by glob or mtime. Their paths are recorded here for the parent.
++for R in "$LOGS"/run-genctl-*.log; do sed -n 's/^CMD (cwd=\(\/tmp\/s5-genctl-[^/]*\)\/no-root).*/\1/p' "$R"; done | sort -u > "$OUT/genctl-scratch-dirs-$CTL_TS.txt"
++log "GENCTL_SCRATCH_RETAINED $(tr '\n' ' ' < "$OUT/genctl-scratch-dirs-$CTL_TS.txt")"
+ summary
+diff -ru controls/lib.sh controls-v2/lib.sh
+--- controls/lib.sh	2026-09-22 04:44:42.045839075 +0000
++++ controls-v2/lib.sh	2026-09-22 04:56:26.505839075 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S5 R4 frozen control library (NOT EXECUTED by the builder; prepared for parent inspection and a
++# S5 R4 frozen control library v2 (NOT EXECUTED by the builder; prepared for parent inspection and a
+ # separately granted narrow no-DB slot). Everything here is synthetic: a private control root under
+ # /tmp, a lane-private lock file, fake pg_ctl/initdb/postgres/psql/jest/prisma binaries, and a
+ # DERIVED copy of the candidate runner + fixture in which ONLY the "lane constants" block is rewritten
+@@ -21,16 +21,21 @@
+ RESULT_LOG="$OUT/control-$CTL_TS.log"
+ PASS=0; FAIL=0
+ log() { echo "$(date -u +%FT%TZ) $*" | tee -a "$RESULT_LOG"; }
+-check() { # <id> <expr-result-rc> <description>
+-  if [ "$2" = 0 ]; then PASS=$((PASS + 1)); log "PASS $1 $3"; else FAIL=$((FAIL + 1)); log "FAIL $1 $3"; fi
++check() { # <id> <expr-result-rc> <description>  — v2: the FIRST failed check stops the driver (owned cleanup via
++  # the EXIT trap), preserving the unexplained failure instead of running later scenarios over it.
++  if [ "$2" = 0 ]; then PASS=$((PASS + 1)); log "PASS $1 $3"; else
++    FAIL=$((FAIL + 1)); log "FAIL $1 $3"
++    log "STOP_ON_FIRST_FAILURE driver=$(basename "$0") failed_check=$1 pass_so_far=$PASS; control root and logs retained for inspection"
++    export S5_CTL_KEEP=1; exit 1
++  fi
+ }
+ # Refuse to run if the canonical lock is held by anyone or if a real lane artefact would be touched.
+ control_preconditions() {
+   [ ! -e /home/user/workspace/execution/s5-r4/QUARANTINE ] || { log "REFUSE: real lane QUARANTINE exists; controls do not run over it"; exit 4; }
+   [ "${S5_CTL_GRANT:-}" = "granted-by-parent" ] || { log "REFUSE: S5_CTL_GRANT=granted-by-parent not set; controls are prepared, not authorized"; exit 2; }
+-  # Controls never touch the canonical lock; they only record whether it is free at start (a free lock is not permission).
+-  if exec 8>>/home/user/workspace/execution/test-validation.lock && flock -n 8; then log "CANONICAL_LOCK_FREE_AT_START (not acquired; fd released immediately)"; else log "CANONICAL_LOCK_BUSY_AT_START (controls do not need it; continuing)"; fi
+-  exec 8>&-
++  # v2: the canonical lock is NOT opened, created or flock-probed by any control (v1 did so momentarily; removed).
++  # Only a read-only stat of the path is recorded, for chronology.
++  log "CANONICAL_LOCK_PATH_STAT $(stat -c 'exists mtime=%y' /home/user/workspace/execution/test-validation.lock 2>/dev/null || echo absent) (not opened, not probed)"
+ }
+ 
+ # ---- Control root -------------------------------------------------------------------------------

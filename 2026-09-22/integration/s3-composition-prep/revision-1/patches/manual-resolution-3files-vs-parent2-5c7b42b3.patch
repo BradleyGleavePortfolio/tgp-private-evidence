@@ -1,0 +1,307 @@
+diff --git a/.github/workflows/r100-quality-gate.yml b/.github/workflows/r100-quality-gate.yml
+index 7dab203a..0ad6eb8b 100644
+--- a/.github/workflows/r100-quality-gate.yml
++++ b/.github/workflows/r100-quality-gate.yml
+@@ -1,34 +1,25 @@
+ name: R100 Quality Gate
+ 
+-# Enforces AGENT_RULES R75 (banned cast tokens), R24-R78 (R100 quality bar),
+-# A1 (test:src density), A3 (LOC budget), and R104 (no weak casts).
+-# Runs on every PR; required check for merge per R102/R107.
++# Enforces AGENT_RULES R75 / R104 (banned weak-cast tokens). Runs on every PR;
++# required check for merge.
+ #
+-# Hard rules (cause failure):
++# Hard rule (causes failure):
+ #   - Banned cast tokens (R75 / R100.A2): net positive count PER TOKEN in the PR
+-#     diff = P0. The banned-casts job runs the committed checker
++#     diff = P0. No exemptions. The banned-casts job runs the committed checker
+ #     `scripts/check-r75.js` against the declarative policy `.github/r75-policy.json`;
+ #     the pre-commit hook (lefthook.yml) runs the SAME checker against the index,
+-#     so the hook and CI cannot diverge. Scan scope for R75 lives in the policy
+-#     file, not in this workflow.
+-#   - LOC budget (R100.A3): net LOC > 400 = failure unless the PR title
+-#     contains [LOC-EXEMPT: <reason>]. There is no warning band — 400 is the
+-#     hard cap per R100.A3.
+-#   - test:src ratio (R100.A1): added-test-lines / added-src-lines < 2.0
+-#     = failure unless PR title contains [TEST-EXEMPT: <reason>].
++#     so the hook and CI cannot diverge.
+ #
+-# Measurement scope (LOC + src-side of test density):
+-#   src/**, test/**, prisma/migrations/**, scripts/**, dangerfile.js,
+-#   .github/workflows/**, and *.config.json. Infrastructure files (workflows,
+-#   shell scripts, dangerfile, config) ARE counted toward the LOC cap so an
+-#   infra-heavy PR cannot bypass the gate by reporting 0 LOC. Lock files and
+-#   generated artifacts remain excluded.
++# Retired 2026-09-20 (G01/G08 — generic volume quotas are not quality
++# evidence): the former `loc-budget` (400 net-LOC cap, [LOC-EXEMPT:] waiver)
++# and `test-density` (2.0 test:src ratio, [TEST-EXEMPT:] waiver) jobs. Their
++# check names "LOC budget (R100.A3)" and "Test density (R100.A1)" must not be
++# listed as required checks; see scripts/setup-branch-protection.sh.
+ #
+-# Exemption markers (place in the PR title):
+-#   [LOC-EXEMPT: <reason>]   waives the 400-LOC cap (operator sign-off needed).
+-#   [TEST-EXEMPT: <reason>]  waives the 2.0 test:src ratio (e.g. workflows are
+-#                            validated by actionlint/shellcheck, not unit tests).
+-
++# Measurement scope for the banned-cast diff is NOT defined in this workflow:
++# it is the `scan` block of `.github/r75-policy.json` (roots, extensions,
++# includeFiles, exclusions; application AND test sources are in scope), which
++# test/ci/r75-boundaries.spec.ts and test/ci/r100-pathspec.spec.ts assert.
+ on:
+   pull_request:
+     branches: [main]
+@@ -85,114 +76,3 @@ jobs:
+           # hook. Real Git range semantics (base...head, i.e. merge base) and
+           # per-token net counting live in the checker, not in this YAML.
+           node scripts/check-r75.js --mode=range --base="$BASE_SHA" --head="$HEAD_SHA"
+-
+-  loc-budget:
+-    name: LOC budget (R100.A3)
+-    runs-on: ubuntu-latest
+-    steps:
+-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+-        with:
+-          fetch-depth: 0
+-      - name: Compute net LOC
+-        env:
+-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+-          PR_NUMBER: ${{ github.event.pull_request.number }}
+-          # Fallback only; the live title is fetched below. The event-payload
+-          # title is captured when the pull_request event fires and goes STALE
+-          # if the title is edited afterwards (e.g. an operator adds the
+-          # [LOC-EXEMPT:] marker post-open) without a new push to refresh it.
+-          PR_TITLE_EVENT: ${{ github.event.pull_request.title }}
+-          GH_TOKEN: ${{ github.token }}
+-        run: |
+-          set -euo pipefail
+-          if [ -z "$BASE_SHA" ]; then echo "Not a PR; skip."; exit 0; fi
+-          # Read the LIVE PR title (honors the operator-signed [LOC-EXEMPT:]
+-          # marker per R23/R76 exception protocol even when added after open).
+-          # Fall back to the event-payload title if the API read fails.
+-          PR_TITLE="$(gh pr view "$PR_NUMBER" --json title --jq .title 2>/dev/null || true)"
+-          if [ -z "$PR_TITLE" ]; then PR_TITLE="$PR_TITLE_EVENT"; fi
+-          echo "PR title (live): $PR_TITLE"
+-          # Net added lines across code, tests, AND infrastructure (workflows,
+-          # scripts, dangerfile, config). Lock files & generated artifacts are
+-          # excluded. Infra files are counted so an infra-heavy PR cannot
+-          # bypass the cap by reporting 0 LOC.
+-          NET=$(git diff --numstat "$BASE_SHA"...HEAD -- \
+-            'src/**' 'test/**' 'prisma/migrations/**' \
+-            'scripts/**' 'dangerfile.js' '.github/workflows/**' '*.config.json' \
+-            ':(exclude)package-lock.json' \
+-            | awk '{ a += $1; r += $2 } END { print a - r }')
+-          NET=${NET:-0}
+-          echo "Net LOC: $NET"
+-          if [ "$NET" -le 400 ]; then
+-            echo "OK — under the 400 LOC cap."
+-            exit 0
+-          fi
+-          if printf '%s' "$PR_TITLE" | grep -qE '\[LOC-EXEMPT:'; then
+-            echo "OK — over 400 but exempted via [LOC-EXEMPT: <reason>] in PR title."
+-            exit 0
+-          fi
+-          echo "FAIL — $NET LOC > 400 (hard cap, R100.A3) and no [LOC-EXEMPT: <reason>] in title."
+-          echo "       Split the PR or add an operator-signed [LOC-EXEMPT: <reason>] marker."
+-          exit 1
+-
+-  test-density:
+-    name: Test density (R100.A1)
+-    runs-on: ubuntu-latest
+-    steps:
+-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+-        with:
+-          fetch-depth: 0
+-      - name: Compute test:src ratio
+-        env:
+-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+-          PR_NUMBER: ${{ github.event.pull_request.number }}
+-          # Fallback only — see the LOC-budget job: the event-payload title goes
+-          # STALE if the title is edited (e.g. adding [TEST-EXEMPT:]) after the
+-          # event fires. Read the live title below per R23/R76 (R100.A1).
+-          PR_TITLE_EVENT: ${{ github.event.pull_request.title }}
+-          GH_TOKEN: ${{ github.token }}
+-        run: |
+-          set -euo pipefail
+-          if [ -z "$BASE_SHA" ]; then echo "Not a PR; skip."; exit 0; fi
+-          # Read the LIVE PR title so a post-open [TEST-EXEMPT:] marker is
+-          # honored. Fall back to the event-payload title on API failure.
+-          PR_TITLE="$(gh pr view "$PR_NUMBER" --json title --jq .title 2>/dev/null || true)"
+-          if [ -z "$PR_TITLE" ]; then PR_TITLE="$PR_TITLE_EVENT"; fi
+-          echo "PR title (live): $PR_TITLE"
+-          # src side covers every executable production extension the banned-cast
+-          # scan covers — .ts/.tsx/.js/.jsx under src/, scripts/*.{ts,js}, and
+-          # dangerfile.js. A scripts/*.ts-only denominator let a production .js
+-          # module escape the ratio; :(glob) also counts top-level files. Non-TS/
+-          # JS infra (YAML, shell) is validated by infra-lint; cover it with a
+-          # [TEST-EXEMPT: <reason>] marker. Co-located specs are counted as TEST.
+-          SRC=$(git diff --numstat "$BASE_SHA"...HEAD -- \
+-            ':(glob)src/**/*.ts' ':(glob)src/**/*.tsx' ':(glob)src/**/*.js' ':(glob)src/**/*.jsx' \
+-            ':(glob)scripts/**/*.ts' ':(glob)scripts/**/*.js' 'dangerfile.js' \
+-            ':(exclude,glob)src/**/*.spec.*' ':(exclude,glob)src/**/*.test.*' \
+-            ':(exclude,glob)scripts/**/*.spec.*' ':(exclude,glob)scripts/**/*.test.*' \
+-            | awk '{ a += $1 } END { print a + 0 }')
+-          TEST=$(git diff --numstat "$BASE_SHA"...HEAD -- \
+-            ':(glob)test/**/*.ts' ':(glob)test/**/*.tsx' ':(glob)test/**/*.js' \
+-            ':(glob)src/**/*.spec.*' ':(glob)src/**/*.test.*' \
+-            ':(glob)scripts/**/*.spec.*' ':(glob)scripts/**/*.test.*' \
+-            | awk '{ a += $1 } END { print a + 0 }')
+-          echo "src lines added: $SRC"
+-          echo "test lines added: $TEST"
+-          if [ "$SRC" -eq 0 ]; then
+-            echo "OK — no src additions; ratio not applicable."
+-            exit 0
+-          fi
+-          # Compute ratio in integer math: ratio*100 = TEST*100/SRC
+-          RATIO_X100=$(( TEST * 100 / SRC ))
+-          printf "ratio test:src ≈ %d.%02d\n" $((RATIO_X100 / 100)) $((RATIO_X100 % 100))
+-          if [ "$RATIO_X100" -ge 200 ]; then
+-            echo "OK — ratio ≥ 2.0."
+-            exit 0
+-          fi
+-          if printf '%s' "$PR_TITLE" | grep -qE '\[TEST-EXEMPT:'; then
+-            echo "OK — exempted via [TEST-EXEMPT: <reason>] in PR title."
+-            exit 0
+-          fi
+-          echo "FAIL — test:src ratio below 2.0 and no [TEST-EXEMPT: <reason>] in title."
+-          echo "       Add tests, mark exempt with a reason, or split out src changes."
+-          exit 1
+diff --git a/test/ci/r100-pathspec.spec.ts b/test/ci/r100-pathspec.spec.ts
+index 5bb7f460..be6676d6 100644
+--- a/test/ci/r100-pathspec.spec.ts
++++ b/test/ci/r100-pathspec.spec.ts
+@@ -1,7 +1,13 @@
+-// Regression tests for the R100 quality-gate measurement pathspecs. git
+-// pathspecs default to fnmatch with FNM_PATHNAME OFF, so a bare `src/**/*.ts`
+-// SKIPS a top-level file like src/main.ts; the :(glob) prefix makes `**` match
+-// zero-or-more segments. Exercises the exact `git diff -- <pathspec>` plumbing.
++// Regression tests for the R100 quality-gate measurement scope. git pathspecs
++// default to fnmatch with FNM_PATHNAME OFF, so a bare `src/**/*.ts` SKIPS a
++// top-level file like src/main.ts; the :(glob) prefix makes `**` match
++// zero-or-more segments. The first block exercises the exact
++// `git diff -- <pathspec>` plumbing that motivated the fix. The workflow no
++// longer carries any pathspec: the banned-casts job delegates to
++// scripts/check-r75.js, whose scope is the `scan` block of
++// .github/r75-policy.json (prefix/suffix filtering in code, so top-level files
++// are in scope by construction). The second block guards that delegation and
++// the policy data; the checker itself is executed by test/ci/r75-*.spec.ts.
+ 
+ import { execFileSync } from 'child_process';
+ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
+@@ -111,32 +117,80 @@ describe('R100 pathspec coverage (git diff — the gate plumbing)', () => {
+   });
+ });
+ 
+-describe('R100 workflow guards against reintroducing the bare pathspec', () => {
++describe('R100 workflow delegates measurement scope to the committed checker and policy', () => {
+   const yml = readFileSync(
+     join(__dirname, '../../.github/workflows/r100-quality-gate.yml'),
+     'utf8',
+   );
++  const policy = JSON.parse(
++    readFileSync(join(__dirname, '../../.github/r75-policy.json'), 'utf8'),
++  ) as {
++    scan: {
++      includeExtensions: string[];
++      includeRoots: string[];
++      includeFiles: string[];
++      excludeSuffixes: string[];
++      excludeSegments: string[];
++    };
++  };
++
++  // Mirrors scripts/check-r75.js inScope() over the policy DATA so a scope
++  // regression in the JSON is caught here; the checker's own behaviour against
++  // real Git objects is covered by test/ci/r75-boundaries.spec.ts.
++  const inPolicyScope = (path: string): boolean => {
++    const { scan } = policy;
++    if (
++      scan.excludeSegments.some((part) => path.startsWith(part) || path.includes(`/${part}`)) ||
++      scan.excludeSuffixes.some((suffix) => path.endsWith(suffix))
++    ) {
++      return false;
++    }
++    return (
++      scan.includeFiles.includes(path) ||
++      (scan.includeExtensions.some((suffix) => path.endsWith(suffix)) &&
++        scan.includeRoots.some((root) => path.startsWith(root)))
++    );
++  };
+ 
+-  // Semantic guard (finding #4): catch a bare quoted file-glob for ANY
+-  // directory ('<seg>/**/....<ext>' with no :(...glob...) prefix — the buggy
+-  // form). Bare directory recursion like 'src/**' is intentionally left alone.
+-  const bareFileGlob = /'[\w.-]+\/\*\*\/[^']*\.[A-Za-z]+'/g;
+-  const globbed = /:\((?:exclude,)?glob\)[\w.-]+\/\*\*\//g;
++  it('the banned-casts job runs the committed checker instead of an inline scan', () => {
++    expect(yml).toContain('node scripts/check-r75.js --mode=range');
++    expect(yml).toMatch(/--base="\$BASE_SHA"/);
++    expect(yml).toMatch(/--head="\$HEAD_SHA"/);
++  });
+ 
+-  it('uses :(glob) directory file-globs (guard is not vacuous)', () => {
+-    expect(yml.match(globbed)?.length ?? 0).toBeGreaterThan(0);
++  it('carries no pathspec or token list of its own (no second implementation to drift)', () => {
++    // Bare or :(glob) file-globs, a PATHSPEC array, or a grep-based counter in
++    // the workflow would mean scope/tokens are defined in two places again.
++    const bareFileGlob = /'[\w.-]+\/\*\*\/[^']*\.[A-Za-z]+'/g;
++    expect(yml.match(bareFileGlob) ?? []).toEqual([]);
++    expect(yml).not.toMatch(/:\((?:exclude,)?glob\)/);
++    expect(yml).not.toMatch(/PATHSPEC=\(/);
++    expect(yml).not.toMatch(/TOKENS=\(/);
++    expect(yml).not.toMatch(/grep\s+-c/);
+   });
+ 
+-  it('contains no bare directory file-glob pathspec (semantic regression guard)', () => {
+-    // Strip the glob'd forms first; any bare file-glob left is an offender
+-    // regardless of which directory it names.
+-    const withoutGlobbed = yml.replace(/:\((?:exclude,)?glob\)[^']*/g, '');
+-    expect(withoutGlobbed.match(bareFileGlob) ?? []).toEqual([]);
++  it('the header names the policy file as the scope authority, not a scope list', () => {
++    expect(yml).toContain('.github/r75-policy.json');
++    expect(yml).not.toMatch(/excluding \*\.d\.ts/);
++  });
++
++  it('policy scope covers top-level and nested src TS/JS, scripts .js and dangerfile.js', () => {
++    for (const path of [
++      'src/top.ts',
++      'src/nested/deep.ts',
++      'src/top.js',
++      'src/nested/widget.jsx',
++      'scripts/relevance.js',
++      'dangerfile.js',
++    ]) {
++      expect({ path, scanned: inPolicyScope(path) }).toEqual({ path, scanned: true });
++    }
+   });
+ 
+-  it('density SRC denominator covers scripts/**/*.js and src js/jsx (production JS counted)', () => {
+-    expect(yml).toContain(":(glob)scripts/**/*.js'");
+-    expect(yml).toContain(":(glob)src/**/*.js'");
+-    expect(yml).toContain(":(glob)src/**/*.jsx'");
++  it('policy scope includes test sources (R75 applies to tests) and never a workflow file', () => {
++    expect(inPolicyScope('test/top.spec.ts')).toBe(true);
++    expect(inPolicyScope('src/top.spec.ts')).toBe(true);
++    expect(inPolicyScope('.github/workflows/gate.yml')).toBe(false);
++    expect(inPolicyScope('.github/r75-policy.json')).toBe(false);
+   });
+ });
+diff --git a/test/ci/r75-gate.spec.ts b/test/ci/r75-gate.spec.ts
+index d7dcaa6e..04190bd6 100644
+--- a/test/ci/r75-gate.spec.ts
++++ b/test/ci/r75-gate.spec.ts
+@@ -466,10 +466,8 @@ describe('R75 gate — CI and the pre-commit hook invoke the one committed check
+     expect(workflow).toMatch(/pull_request event carried no base SHA/);
+   });
+ 
+-  it('the LOC and density jobs keep their own measurement pathspecs', () => {
+-    // Ownership boundary: this repair touches the banned-casts job only.
+-    expect(workflow).toContain('loc-budget:');
+-    expect(workflow).toContain('test-density:');
+-    expect(workflow).toContain(":(glob)scripts/**/*.js'");
+-  });
++  // The former `loc-budget` / `test-density` jobs were retired (G01/G08); the
++  // workflow now has only `banned-casts`. That invariant is asserted by
++  // test/ci/delivery-artifact.spec.ts, and the absence of any inline pathspec or
++  // token list by test/ci/r100-pathspec.spec.ts.
+ });

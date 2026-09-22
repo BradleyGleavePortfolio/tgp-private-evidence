@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September21,2026 9:49PM PDT / September22 04:49UTC. Exact requested filename preserved.
+Updated September21,2026 10:04PM PDT / September22 05:04UTC. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -10,9 +10,9 @@ EXECUTE continues without a new Bradley decision. No product code is authored by
 
 ## Material transition
 
-S2 runnerv5.3 is frozen with bounded stub controls; its builder now prepares the missing exact-fixture successor and setup/launcher packet, without execution. S4 R6 candidate91990ae9 is frozen and has two independent source follow-ups active; its builder prepares native validation only. S5 R4 validation-safety repair and S6 resource-diagnostic preparation remain active. All child/cumulative S-lanes remain T4. All64 open public PRs have explicit individual grades/full heads, including honest provisional ratings for inactive unrefreshed scope. Current worker/grant truth is synchronized in `execution/DISPATCHES.md`.
+S2 setup-only05 is granted as sole heavy owner after S5 cleanup; independent runner/fixture A/B reviews run read-only. S4 R6 A/B both source-close the finding, but native V1 allocation is held on five execution/evidence defects; builder repairs V2 without product edits. S5 first synthetic control failed L2.exit after8passes and stopped; no further drivers or retry. S6 instrument selfcheck failed ReferenceError before observing product; no repeat/Jest/install. Both failures are preserved and being diagnosed narrowly. All children remain T4; all64 public PR grades remain explicit.
 
-All six lanes are moving at their actual stage. S1 `56fb0d22` R4 reviewer A has frozen narrow source acceptance, quoted/pre-seed source closure and TRUNCATE source-fixed/behavior-pending disposition; B continues independently. Real proof/final dynamic attestation remains pending. S3 `5c7b42b3` has a Fable integration-applicability analyst, not an unnecessary fixer or repeated R2 audit. Both sources remain unchanged; contracts are in `execution/S1_S3_CONTINUATION_BRIEF.md`. No old worker ID, process, fixture, dependency installation or slot is presumed live in this fresh workspace.
+S1 R4 A/B source verdicts and B factual addendum are frozen:56fb is already source-composed in21ea/d5cd; successful final dynamic proof/discriminator is the missing state. S3 isolated three-file draft is frozen at index tree78a4f0e8, uncommitted because hooks are absent; parents d5cd/5c7b and original R2 evidence are preserved. Final composed tests/lock evidence and dual independent reviews remain required. Platform-owned /home/user/node_modules exists; do not delete it or confuse it with project installation.
 
 ## Preserved source and failed evidence
 
@@ -25,13 +25,14 @@ All original source bundles, reports and failures remain immutable under existin
 
 ## Immediate next steps
 
-1. Inspect frozen S2 runner controls and S4 minimal successor evidence as they return; use independent non-builder review, not parent self-certification.
-2. Review S5's proposed no-DB controls before granting execution.
-3. Review S6's single causal diagnostic and setup requirements before a bounded slot.
-4. After runner safety, allocate real S1/S2 composition and TRUNCATE discriminator; keep164-parent+candidate165 replay.
-5. Obtain dual independent applicable final-head attestations; S3 integration applies later and is not already in composition.
+1. Collect S5 L2 rootcause/owned-cleanup proof and S6 failed-selfcheck receipt; minimal fixes only, new grants before rerun.
+2. Progress S2 setup-only while independent runner/fixture A/B review; no server/real proof yet.
+3. Collect S4 B source and validation-plan disposition; prepare safe native evidence run.
+4. S6 selfcheck, safe setup/diagnostic successor, then one causal runtime run before any P1 fix.
+5. Final S1/S2 real composition/discriminator after safety/setup;164-parent+candidate165 replay.
+6. S3 hook-enabled commit and applicable composed-lock checks plus dual exact-head reviews; no prerequisite advancement from an uncommitted draft.
 
-No heavy slot is currently granted. Only scoped ≤60s S2 fake controls and S4 dependency-free probes are authorized; no DB/network/shared lock in those allowances. A free canonical lock is never permission.
+S2 setup-only05 is sole heavy allocation (sequential external1560/480/2160s+60s bounds), after S5 controls stop/cleanup. No PG server/real proof. All S4 offline allowances and S6 selfcheck consumed; S5 remaining drivers suspended after first failure. A free canonical lock is never permission.
 
 ## Remaining outcome and authority
 

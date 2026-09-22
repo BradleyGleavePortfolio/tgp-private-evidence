@@ -1,0 +1,23 @@
+# S5 R4 frozen no-DB control request (preparation only; NOT executed by the builder)
+
+Frozen at 2026-09-22 ~04:45 UTC. Nothing below has run. Only `bash -n` / `node --check` were executed on these files. No DB, network, install, canonical lock, destroy or test execution occurred in this session; the sandbox has no node_modules, no /home/user/pg17, no quarantine, no old cluster.
+
+## Inputs (hashes in SHA256SUMS; runner files are outside Git)
+- Worktree `/home/user/workspace/worktrees/s5-r4`, HEAD `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, DIRTY. Dirty fingerprint `6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0` = sha256 of (`git diff HEAD` + porcelain status). Patch `s5-r4-dirty-from-143d451e.patch` sha256 `c36258b39d0c92f0b760f11982a61427c6e7cce963eecffe2554f447346c5491`.
+- Runner rev 7 `run-proof.sh`, fixture rev 2 `s5-fixture.sh`, launcher rev 2 `launch-full.sh`, `npm-ci.sh` rev 3 (path-only successor). Controls under `controls/`.
+
+## Tier 1 controls — dependency-free (bash 5, coreutils, util-linux, git, node 20; NO node_modules, NO npm)
+All refuse unless `S5_CTL_GRANT=granted-by-parent`. Each builds a private root under `/tmp/s5-r4-ctl-*`, uses a lane-private lock `$CR/X/test-validation.lock`, fake pg_ctl/initdb/postgres/psql/jest/prisma, and a DERIVED copy of the candidate runner/fixture differing only in the `lane constants` block (diff recorded as `*.derivation.diff`, asserted by checks L6/D5). Owned pids are recorded and cleaned by the control; survivors are reported, never hidden. Results go to `control-results/` (override `S5_CTL_OUT`). Exact commands (run sequentially, one at a time):
+
+| Control | Command | Wall budget | Positive criteria | Negative/expected-failing |
+|---|---|---|---|---|
+| Lifecycle A-02/A-04 | `S5_CTL_GRANT=granted-by-parent bash controls/ctl-lifecycle.sh` | <= 75 s | L1 clean resume, lock HELD during stop; L2 TERM → owned group reaped, grandchild dead, stop under held lock, FIRST_RC=143; L3 inner deadline → 124, reaped, stopped; L4 failed stop → FIRST_RC=0/PROOF_EXIT=3, QUARANTINE, next stage and destroy refuse rc 4; L5 2 sessions → refuse rc 3, no generate-only/live child, fixture stopped | runner rcs 143/124/3/4/3 are expected and asserted as records, not turned into passes |
+| Destroy A-03 | `S5_CTL_GRANT=granted-by-parent bash controls/ctl-destroy.sh` | <= 30 s | D1 stop fails → rc 4, dir retained, quarantine; D2 rm fails → rc 5, no OK; D3 no confirm → rc 2, no child; D4 stopped+confirmed → rc 0 only after absence verified | D0 = PREDECESSOR fixture (checkpoint-5 bytes, PG17_HOME line derived) prints DESTROY_OK and removes the dir with a live fake postmaster — the frozen defect, asserted as failing behaviour |
+| genctl A-05 | `S5_CTL_GRANT=granted-by-parent bash controls/ctl-genctl.sh` | <= 20 s | G1 rc1+"Could not resolve @prisma/client" → GENCTL_OK | G2 rc1 other message, G3 rc2, G4 rc0 → GENCTL_FAIL/PROOF_EXIT=3 (predecessor accepted any nonzero: static reference run-proof.sh rev6:283-286) |
+| Spec wiring A-01 (static) | `node controls/probe-spec-wiring.cjs /home/user/workspace/worktrees/s5-r4` | <= 5 s | C1–C13: gate declared, set after last read-only expect and before first GRANT, afterAll returns before any sql/resetData, teardown body unchanged, all predecessor `expect(` lines and test count preserved | P1/P2: predecessor afterAll has no gate and issues DDL/DML |
+
+## Tier 2 control — needs node_modules (separately granted `npm-ci.sh` under the canonical lock first)
+`S5_CTL_GRANT=granted-by-parent bash controls/teardown-gate/ctl-teardown-gate.sh` (<= 120 s). Runs the REAL candidate spec and the PREDECESSOR spec (`git show 143d451e:test/rls-g2-pg17-etq0.spec.ts`) under installed jest-circus in a private root whose `test/utils/g2-pg17-harness.ts` is the FAKE recording harness (`controls/teardown-gate/fake-harness.ts`: no connection, no psql, no child process; every sql/sqlAdmin/resetData appended to a JSONL record). T1/T2 candidate refused (identity / 165+E present) → 0 mutating calls and `PG17_TEARDOWN_SKIPPED`; T3 authorized-partial (GRANT ok, ALTER throws) → teardown DROP CONSTRAINT/resetData/DELETE still recorded; T0 predecessor refused → mutating teardown recorded (defect under real hook semantics). Jest exit is expected nonzero in all four and is recorded, not a pass. Never uses npx.
+
+## Not requested here
+No DB/PG bootstrap, no `full`/`resume` on real PG, no destroy of any historical cluster (none exists in this sandbox), no install. Any real lifecycle proof needs a new grant and a fresh request after these controls and two independent successor attestations.

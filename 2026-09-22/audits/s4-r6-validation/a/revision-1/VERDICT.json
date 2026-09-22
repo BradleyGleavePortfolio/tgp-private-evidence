@@ -1,0 +1,93 @@
+{
+  "frozen_at": "2026-09-22T04:59:43.363449+00:00",
+  "slice": "S4-R6-VALIDATION-PLAN-A",
+  "tier": "T4",
+  "runner_sha256": "b3cb55d68a51d8ede5fd28cafc2e2223e803048c0a2ff0656adeab1081d6ffc9",
+  "pipe_sha256": "799c2cadee322f6c06b73699df4b5b84bc6c98f17f85cae8925189958885e8fe",
+  "request_sha256": "02d99bb8f782455d17b31e83f03c110574d761459390d8abac3c545a42667b03",
+  "product_head": "91990ae9aec72f47a67591892ac09fa1f59d2f16",
+  "product_tree": "840fb2855953d5363fbd144e11b3f81763d9cef7",
+  "allocation_verdict": "HOLD_V1",
+  "product_source_verdict": "UNCHANGED_PRIOR_NARROW_ACCEPTANCE",
+  "findings": [
+    {
+      "id": "S4-R6-VPA-01",
+      "severity": "high",
+      "material": true,
+      "scope": "cleanup ownership",
+      "locations": [
+        "runner/s4-r6-validate.sh:57-66,224-238",
+        "runner/chrome-pipe-discriminator.mjs:100-123,147",
+        "scripts/browser-load-proof.mjs:672-675"
+      ],
+      "summary": "Current-descendant enumeration includes its own transient enumeration shell, omits reparented jobs, and does not verify reaping; profile-name grep cannot establish full owned-job absence.",
+      "counterexample": "Command parent exits during timeout while a child survives reparented without a profile marker; collector no longer owns/discovers it.",
+      "minimal_closure": "Record/verify stable owned execution boundary; exclude enumeration helpers; retain ownership across parent exit; bounded TERM/KILL and final reap/absence evidence; no unowned signalling."
+    },
+    {
+      "id": "S4-R6-VPA-02",
+      "severity": "high",
+      "material": true,
+      "scope": "truthful result and publication",
+      "locations": [
+        "runner/s4-r6-validate.sh:225-269",
+        "runner/chrome-pipe-discriminator.mjs:125-147"
+      ],
+      "summary": "Cleanup failure is excluded from SUCCESS/process exit; final source identity only printed; exit-record writer status unchecked before success sentinel.",
+      "counterexample": "FIRST_FAIL empty, no anomalies, CLEAN_RC=2 yields SUCCESS and exit 0.",
+      "minimal_closure": "Require cleanup success, final exact clean source and validated durable record before success marker; preserve first failure and cleanup separately; nonzero overall if cleanup/publication fails."
+    },
+    {
+      "id": "S4-R6-VPA-03",
+      "severity": "high",
+      "material": true,
+      "scope": "exact bounded launch",
+      "locations": [
+        "SLOT_REQUEST_V1.md:39-49",
+        "runner/s4-r6-validate.sh:39,57-66,84,100-140,224-264"
+      ],
+      "summary": "Supplied redirect targets absent runs directory; outer timeout optional and signal/grace/supervisor contract unspecified; commands outside step timeout can hang.",
+      "counterexample": "Initial documented command fails redirection before runner mkdir; after correcting that ad hoc, an unwrapped provenance command can block without mandatory outer deadline.",
+      "minimal_closure": "One frozen exact launcher creates/reserves output before redirection, mandates total timeout and owned signal target, bounds cleanup grace, and preserves supervisor receipts; separately authorize targeted safety controls."
+    },
+    {
+      "id": "S4-R6-VPA-04",
+      "severity": "medium",
+      "material": true,
+      "scope": "artifact/input binding",
+      "locations": [
+        "runner/s4-r6-validate.sh:18-22,39,118-119,166-221,264"
+      ],
+      "summary": "Reused output directories/sentinels permitted; first wildcard ZIP selected; inventory hashes checked against HEAD but actual ZIP hash not joined to inventory or browser receipts; external probe/predecessor approved hashes not enforced.",
+      "counterexample": "Existing output contains an earlier selected ZIP with changed bytes and unchanged exact-head inventory; newly written package is not necessarily selected, and old inventory can pass binding.",
+      "minimal_closure": "Fresh exclusive safe run directory; explicit sole new package selection; ZIP/inventory/member/HEAD and browser hash equality; enforce approved runner/probe/predecessor hashes before execution."
+    },
+    {
+      "id": "S4-R6-VPA-05",
+      "severity": "medium",
+      "material": true,
+      "scope": "dependency fail-stop",
+      "locations": [
+        "runner/s4-r6-validate.sh:77-79,98,127-175"
+      ],
+      "summary": "Setup/assertion/evidence failures recorded only as anomalies do not inhibit later required steps.",
+      "counterexample": "Missing installed hook or unreadable Vitest JSON records anomaly yet can continue to package/browser.",
+      "minimal_closure": "Latch blocking prerequisite/evidence failures with truthful reason and exit; affected steps NOTRUN; keep intentional expected-negative semantics distinct."
+    }
+  ],
+  "native_contract_review": {
+    "packager_cli_schema": "MATCHES_REVIEWED_CALLS",
+    "browser_cli_schema": "MATCHES_REVIEWED_CALLS",
+    "negative_criterion": "Appropriate stricter syntax + no-receiver + unrelated-failure + mutation design; artifact binding prerequisites unresolved",
+    "vitest": "Real framework selected but not installed/executed or accepted in this static review",
+    "browser_scope": "Synthetic loader/internal-message boundary only; no R6 concurrency/native completion proof",
+    "secret_scans": "Exact-range and full-history native interfaces match requested use; NOTRUN"
+  },
+  "execution": "NONE: runner/tests/install/browser/network/DB prohibited and not performed",
+  "artifact_attestation": "WITHHELD",
+  "release_attestation": "WITHHELD",
+  "historical_commit_hooks": "0/6 unchanged",
+  "peer_current_conclusions_read": false,
+  "original_source_packet_unchanged": true,
+  "next_action": "Separate minimal versioned runner successor and independent safety/applicability follow-up; no product repair; no allocation on V1"
+}

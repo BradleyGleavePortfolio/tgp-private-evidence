@@ -1,0 +1,45 @@
+--- originals/setup-30-npm-ci.sh.74c5af93.orig	2026-09-22 04:49:19.049839075 +0000
++++ infra/setup-30-npm-ci.sh	2026-09-22 04:51:35.393839075 +0000
+@@ -1,4 +1,11 @@
+ #!/usr/bin/env bash
++# S2-SETUP-FIXTURE-PREP copy (2026-09-22) of checkpoint-1/infra/setup-30-npm-ci.sh sha256 74c5af935e9e5a615a375c54a095653c1292a4936fe74d3f730fb3ace3489dc6.
++# Changes: P1 WT=worktrees/s2-runner53 and EXPECT_HEAD pinned to d5cd9b8b (the S2_EXPECT_HEAD env override is REMOVED — no overrides);
++# P2 auto-install guard: PRISMA_GENERATE_SKIP_AUTOINSTALL=1, `prisma generate` only after node_modules/prisma exists in $WT, and the
++# platform-owned /home/user/node_modules (209 entries, no prisma; not ours, never touched) plus /home/user/package{,-lock}.json are
++# snapshotted before and re-checked after — any change refuses (70) and is reported (S5 incident class: Prisma auto-installed outside the
++# pinned root); P3 installed_by path; P4 records psql/node/npm identities in the stamp. package-lock sha 62b05b90… unchanged (identical
++# at 9742037b and d5cd9b8b, verified in execution/s2-runner53/restore). Needs network (npm registry), ~5 min historically (1118 packages).
+ # Copied from the S1 R3 evidence packet (infra/setup-30-npm-ci.sh); retargeted to worktrees/s2-composition and the composition head. Same lockfile hash 62b05b90… (identical at S1 head, S2 head, base and merge).
+ # Step 30: ONE locked backend dependency tree for S1 and S2 (identical package.json/package-lock graph,
+ # parent-verified sha256 62b05b90…1390 / blob a23abae6). Installed into worktrees/s1-r3 (node_modules is
+@@ -6,9 +13,12 @@
+ # R2. S2 consumes read-only: S1_PRISMA_CLI=/home/user/workspace/worktrees/s1-r3/node_modules/prisma/build/index.js
+ # (or `node <that path> …`). No standalone Prisma install anywhere else.
+ . "$(dirname "$0")/_common.sh"; step_begin setup-30-npm-ci
+-WT=$ROOT/worktrees/s2-composition; cd "$WT"
++WT=$ROOT/worktrees/s2-runner53; cd "$WT"
+ EXPECT_LOCK=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390   # parent-verified full sha256
+-EXPECT_HEAD=${S2_EXPECT_HEAD:-9742037b153221de565e651ad8ba3b721bc0fb31}   # composition head incl. frozen S1 R4 41f4d6a9; override ONLY with the parent-named frozen head
++EXPECT_HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c   # P1: frozen R3 successor restored in worktrees/s2-runner53; NO override
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1   # P2
++OUTSIDE_BEFORE="nm=$(ls -1 /home/user/node_modules 2>/dev/null | wc -l) pkg=$([ -e /home/user/package.json ] && echo present || echo absent) lock=$([ -e /home/user/package-lock.json ] && echo present || echo absent) prisma_outside=$([ -e /home/user/node_modules/prisma ] || [ -e /home/user/node_modules/@prisma ] && echo PRESENT || echo absent)"
++echo "outside_root_before: $OUTSIDE_BEFORE"
+ STAMP=node_modules/.s2-composition-install-stamp
+ HEAD=$(git rev-parse HEAD)
+ echo "head=$HEAD clean_before=$([ -z "$(git status --porcelain --untracked-files=all)" ] && echo yes || echo NO)"
+@@ -28,9 +38,14 @@
+   set +e; timeout --foreground 1500 npm ci --ignore-scripts --no-audit --no-fund --loglevel=error; rc=$?; set -e
+   echo "npm_ci_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+ fi
++[ -f node_modules/prisma/build/index.js ] || { echo "REFUSED: node_modules/prisma/build/index.js missing after npm ci; not generating (would invite auto-install)"; exit 70; }   # P2
++[ -d node_modules/@prisma/client ] || { echo "REFUSED: node_modules/@prisma/client missing after npm ci; not generating"; exit 70; }   # P2
+ set +e; timeout --foreground 600 node node_modules/prisma/build/index.js generate --schema prisma/schema.prisma; rc=$?; set -e
+ echo "prisma_generate_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+-{ echo "head=$EXPECT_HEAD"; echo "lock=$EXPECT_LOCK"; echo "prisma_cli_sha256=$(sha node_modules/prisma/build/index.js)"; echo "installed_by=execution/s2-composition/infra/setup-30-npm-ci.sh"; echo "utc=$(date -u +%FT%TZ)"; echo "log=$STEP_LOG"; echo "result=success"; } > "$STAMP"
++OUTSIDE_AFTER="nm=$(ls -1 /home/user/node_modules 2>/dev/null | wc -l) pkg=$([ -e /home/user/package.json ] && echo present || echo absent) lock=$([ -e /home/user/package-lock.json ] && echo present || echo absent) prisma_outside=$([ -e /home/user/node_modules/prisma ] || [ -e /home/user/node_modules/@prisma ] && echo PRESENT || echo absent)"
++echo "outside_root_after:  $OUTSIDE_AFTER"
++[ "$OUTSIDE_BEFORE" = "$OUTSIDE_AFTER" ] || { echo "REFUSED: files appeared/changed outside the pinned package root (/home/user); unapproved install — leave in place for parent inspection"; exit 70; }   # P2
++{ echo "head=$EXPECT_HEAD"; echo "lock=$EXPECT_LOCK"; echo "prisma_cli_sha256=$(sha node_modules/prisma/build/index.js)"; echo "installed_by=execution/s2-setup-prep/infra/setup-30-npm-ci.sh"; echo "node=$(node --version) npm=$(npm --version) psql=$(psql --version 2>&1 | head -1)"; echo "utc=$(date -u +%FT%TZ)"; echo "log=$STEP_LOG"; echo "result=success"; } > "$STAMP"
+ echo "stamp_written=$STAMP"
+ echo "prisma_cli=$WT/node_modules/prisma/build/index.js"
+ echo "prisma_cli_sha256=$(sha node_modules/prisma/build/index.js)"

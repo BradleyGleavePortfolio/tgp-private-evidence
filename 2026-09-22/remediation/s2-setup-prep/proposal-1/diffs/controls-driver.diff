@@ -1,0 +1,36 @@
+--- /home/user/workspace/execution/s2-runner53/controls/run-controls.sh	2026-09-22 04:39:26.917839075 +0000
++++ controls-proposed/run-runner-controls-v531.sh	2026-09-22 04:53:21.773839075 +0000
+@@ -1,10 +1,13 @@
+ #!/usr/bin/env bash
++# PROPOSED, NOT EXECUTED under S2-SETUP-FIXTURE-PREP (2026-09-22). Derived from execution/s2-runner53/controls/run-controls.sh
++# sha256 4d4bc661978eccb666bd22596c0282db78f1c627c16db9e7df9f6cbebc64e689: paths -> s2-setup-prep, runner -> v5.3.1, outputs -> runner-selftest-r531/,
++# results -> controls-proposed/results/<utc>/. Stubs byte-identical to the s2-runner53 stubs. Expectations unchanged (K1..K6).
+ # S2-RUNNER-53 bounded no-DB / no-network fake-process controls. ONE control at a time, sequential, ≤60 s total wall clock,
+ # lane-private lock ($STUBS/test-validation.lock), synthetic temp paths only, explicit owned PID/group cleanup, one-strike stop.
+ # Never touches /home/user/workspace/execution/test-validation.lock, any database, network, product source or unowned process.
+ set -u
+-LANE=/home/user/workspace/execution/s2-runner53; RUNNER=$LANE/run-composition-r3-v5.3-when-granted.sh; STUBS=$LANE/controls/stubs
+-CTL=$LANE/controls/$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$CTL"; R=$CTL/CONTROLS_RESULT.txt
++LANE=/home/user/workspace/execution/s2-setup-prep; RUNNER=$LANE/run-composition-r53-v5.3.1-when-granted.sh; STUBS=$LANE/controls-proposed/stubs
++CTL=$LANE/controls-proposed/results/$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$CTL"; R=$CTL/CONTROLS_RESULT.txt
+ T0=$(date +%s.%N); BUDGET=60; SOFT=45
+ say(){ echo "$*" | tee -a "$R"; }
+ now(){ awk -v a="$T0" -v b="$(date +%s.%N)" 'BEGIN{printf "%.2f", b-a}'; }
+@@ -12,7 +15,7 @@
+ descendants(){ local p; for p in "$@"; do echo "$p"; descendants $(pgrep -P "$p" 2>/dev/null); done; }
+ # explicit owned cleanup: only pids matched by our stub patterns and their descendants
+ owned_cleanup(){ local pids; pids=$(descendants $(owned_pids) | sort -un); if [ -n "$pids" ]; then say "  owned cleanup: TERM pids [$(echo $pids)] $(ps -o pid=,pgid=,cmd= -p $(echo $pids | tr ' ' ',') | tr '\n' ';')"; kill -TERM $pids 2>/dev/null; sleep 0.5; pids=$(descendants $(owned_pids) | sort -un); [ -n "$pids" ] && { say "  owned cleanup: KILL pids [$(echo $pids)]"; kill -KILL $pids 2>/dev/null; sleep 0.3; }; fi; say "  owned processes after cleanup: [$(owned_pids | tr '\n' ' ')]"; }
+-latest_out(){ ls -1dt "$LANE"/runner-selftest-r53/*/ 2>/dev/null | head -1; }
++latest_out(){ ls -1dt "$LANE"/runner-selftest-r531/*/ 2>/dev/null | head -1; }
+ expect(){ # expect <file> <regex> <description>
+   if grep -qE "$2" "$1" 2>/dev/null; then say "  PASS: $3"; else say "  FAIL: $3 (expected /$2/ in $1)"; STRIKE=1; fi; }
+ gate(){ local e; e=$(now); if awk -v e="$e" -v s="$SOFT" 'BEGIN{exit !(e>s)}'; then say "BUDGET GATE: elapsed ${e}s > ${SOFT}s soft limit — remaining controls NOT RUN"; finish; fi; [ "${STRIKE:-0}" = 1 ] && { say "ONE-STRIKE STOP: previous control failed its expectation — remaining controls NOT RUN"; finish; }; }
+@@ -25,7 +28,7 @@
+ # ---------- K1: predecessor MECHANISM counterexample (reimplemented v5.1 shape; NOT v5.1 bytes)
+ say; say "== K1 predecessor-mechanism (v5.1 shape) under timeout --foreground -k 5 2 — expect: outer 124, fixture stop ran, step-40 child tree SURVIVES runner exit  [t=$(now)s]"
+ K1=$CTL/k1; mkdir -p "$K1"
+-timeout --foreground -k 5 2 bash "$LANE/controls/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$?
++timeout --foreground -k 5 2 bash "$LANE/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$?
+ say "  K1 outer exit=$rc; stamp:"; sed 's/^/    /' "$K1/stamp.txt" | tee -a "$R"
+ surv=$(descendants $(owned_pids) | sort -un | tr '\n' ' ')
+ say "  K1 step-40 child tree after runner exit: [$surv] $(ps -o pid=,pgid=,cmd= -p $(echo $surv | tr ' ' ',') 2>/dev/null | tr '\n' ';')"
