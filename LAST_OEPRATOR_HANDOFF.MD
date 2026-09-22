@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September 21, 2026 at 5:55 PM PDT / September 22 at 00:55 UTC. Filename retained exactly as requested: `LAST_OEPRATOR_HANDOFF.MD`.
+Updated September 21, 2026 at 6:08 PM PDT / September 22 at 01:08 UTC. Filename retained exactly as requested: `LAST_OEPRATOR_HANDOFF.MD`.
 
 ## Executive check-in
 
@@ -13,19 +13,19 @@ The current bottleneck is completing reliable, exact-candidate validation and re
 | Lane | Current head | Current position | Next acceptance requirement |
 |---|---|---|---|
 | S1 containment | `56fb0d22` | R4 test-only successor frozen; SQL and guards unchanged from the earlier fix. Quoted-diagnostic offline spec passed24/24. | Real TRUNCATE discriminator on S2's protected fixture, then both independent successor reviews. No real discriminator result yet. |
-| S2 release/composition | `d5cd9b8b` | R3 cumulative composition successor frozen. Previous real run at21ea passed66 and failed2 because C0 still exported the historical release script; release-metric repairs themselves passed. New successor changes only that test fixture. | A newly exposed outer-timeout child-survival defect must be fixed and controlled in runner v5.2 before fresh68-check composition plus S1 discriminator. Then dual follow-up review. Not cleared. |
+| S2 release/composition | `d5cd9b8b` | R3 cumulative composition successor frozen. Previous real run at21ea passed66 and failed2 because C0 exported the historical release script; release-metric repairs themselves passed. v5.2 controls address observed step-child survival. | Named v5.3 must bound cleanup within outer grace and avoid stopping the fixture when owned work survives. Then fresh68-check composition plus S1 discriminator and dual follow-up review. No B3 grant yet. |
 | S3 reliability | `5c7b42b3` | Retained bounded R2 acceptance remains intact; no redundant repair underway. | Material applicability recheck when integrated with S1/S2. S3 is not yet included in the current S2 composition. |
-| S4 extension | `88287cff` | R5 source repair frozen; builder's focused42/42 and old/new race discriminators recorded. Both independent R5 source reviews are active. | Exact-head source closure, fresh full suite/gates/secret scan/package and browser positive plus genuine negative control. R4's package/full-suite proof cannot validate changed shipping bytes. |
+| S4 extension | `88287cff` | Both R5 reviews frozen. Original credential-ownership defects narrowly source-closed; A found a later stale authentication-notification race not observed by B. Parent holds clearance and authorized an isolated narrow R6 reporting fix. | Exact-successor dual source closure, fresh full suite/gates/secret scan/package and browser positive plus genuine negative control. No post-ack notification, credential misuse or browser reproduction is claimed for the new finding. |
 | S5 validation | `143d451e` | Both R3 reviews frozen. A says NOT CLEARED; B accepts bounded resume evidence with conditions. Parent preserves27/27 and51/51 but holds cumulative acceptance on A's concrete safety findings. | Canonical builder authorized a narrow isolated R4 safety/provenance repair. No new execution or destructive recovery granted. Final-head fresh-bootstrap proof remains unclaimed. |
-| S6 mobile identity | `d51a1910` | P1 product fix has not begun. Corrected baseline C2 and C3 each passed all6 behavioral cases, reproducing all3 hazards and retaining the sign-out positive control, but Jest still failed to exit. | Targeted open-handle diagnosis, clean baseline and existing controls, then the bounded identity-cache implementation and exact-head validation/audits. No forceExit or blind rerun. |
+| S6 mobile identity | `d51a1910` | P1 product fix has not begun. C2/C3 behavioral6/6 but process failure; C4 with Jest's handle detector again passed6/6, timed out124 at100s and printed no handle owners. Cleanup verified. | An execution-only resource-ownership diagnostic is being proposed; no speculative teardown or baseline retry. Clean baseline and existing controls still precede bounded P1 implementation and validation. |
 
 ## Immediate queue and resource state
 
-At00:50 UTC the parent independently verified the canonical lock free, no validation listeners on54321/54325 and no remaining validation processes. The only visible Node processes were the platform's own processes; a free lock is not permission for a worker to start.
+At01:08:25 UTC the parent independently verified C4's process group empty, no canonical lock owner, no validation listeners on54321/54325 and no remaining validation processes. The only visible Node processes were the platform's own processes; a free lock is not permission for a worker to start.
 
-- **S2 next real proof:** v5.0's DB constant/request mismatch was corrected in separate v5.1. A new private-lock timeout control then showed that the step child can survive while the fixture is stopped. Parent refused v5.1 execution and authorized a named v5.2 cleanup-only repair: terminate/reap the owned active child tree before stopping its database, retain the lock through cleanup, and record the interrupted step honestly. Actual DB run remains ungranted.
-- **S6 targeted diagnosis:** prepared `run-c4-detect-open-handles.sh`, SHA-256 `ac4037a518c241fcc162861f6e6739ab5859897a663310f8a1c87b69fde60779`. One unchanged v4 hazard file, `--detectOpenHandles`, no existing controls, no install or product edit. Awaiting a separate bounded slot.
-- **S4 independent review:** A and B are reviewing exact88287cff independently in separate R5 directories. Neither may read the other's current-round conclusions before both freeze. Full artifact assessment follows fresh validation.
+- **S2 next real proof:** v5.2 `7e280683…5ccb` demonstrates owned-step termination before normal stub cleanup, but its real stop could consume60s after up to25s reaping, exceeding outer kill grace. It could also stop the fixture after unsuccessful reaping. Parent authorized named v5.3 execution-only closure and causal private-lock controls, not a DB run. Frozen requests03/03A/03B and their corrections remain intact.
+- **S6 targeted diagnosis:** C4 runner `ac4037a518c241fcc162861f6e6739ab5859897a663310f8a1c87b69fde60779` ran once01:05:40–01:07:20 under the canonical lock, unchanged v4 hazard plus staging adapter. It returned124 with6/6 cases and0 overlapping-act warnings, but no handle header or owner stacks. This is an inconclusive diagnostic, not evidence that no handle exists.
+- **S4 independent review:** both exact88287cff source packets are frozen. A's four late-reporting interleavings block the complete truthful-reporting boundary; B's independent negative observation does not refute them. The canonical builder may implement only the isolated R6 reporting-authority repair and bounded attributable checks; no full/package/browser slot is granted.
 - **S5 independent review:** both reports are frozen and independently produced. Parent holds acceptance on A's refusal/cleanup/destroy findings; B's proposed destroy-plus-full sequence is not authorized. The canonical builder may make a scoped isolated successor and prepare no-DB controls, but must obtain a separate grant before executing those controls.
 
 ## Failures and qualifications that must survive handoff
@@ -34,12 +34,14 @@ At00:50 UTC the parent independently verified the canonical lock free, no valida
 - **S2 B2:** exact21ea3252,66 passed/2 failed; C0 historical-export fixture error. Cleanup succeeded and the stopped cluster is retained. The actual runner was14ca1e85 while the grant quoted7642c3c4 after a pre-grant in-place readiness change; actual bytes and the explicitly reconstructed predecessor are preserved, without rewriting authorization history.
 - **S2 manifests:** `SHA256SUMS.b2-frozen` has a stale self-hash; all other listed artifacts verify. Preserve the original and use a separate non-self-including outer archive manifest, not a silent correction.
 - **S4 R4:** focused113/full1714/gates/package passed, but browser proof aborted before any checks and the negative control did not run. Independent review found material preflight and refresh-token ownership gaps; R5 addresses these in source but is not yet accepted.
+- **S4 R5:** both audits preserve narrow closure of the original credential findings. A's new S4-R5-A-01 concerns a notification after replacement becomes current but before its acknowledgement continuation; do not promote it to post-ack, credential misuse or browser proof. A known-good base ZIP is a comparison, never an expected-failing negative.
 - **S5 B2:** live tests never compiled because of a missing type import. Bootstrap also silently auto-installed Prisma outside the pinned package root; this was an unapproved install, not excused by byte-equivalent packages.
 - **S5 quarantine:** `/home/user/{node_modules,package.json,package-lock.json}` were moved intact to `/home/user/tgp-quarantine/s5-unapproved-20260922T0011/`. Do not restore them into module resolution or delete the evidence. Original npm debug logs are no longer at their cited paths; retained bootstrap warnings and quarantined material corroborate the incident, but raw argv/cwd cannot currently be independently rechecked.
 - **S5 B3 limits:** final143d proved pinned generate-only plus resume against the earlier bootstrap, not fresh init/roles/database/164-migration bootstrap at that final head. Cluster `s5` is stopped but was mutated by the51 tests; it is not a pristine resume target.
 - **S5 audit A blockers:** failed setup gates can still invoke destructive teardown; timeout cleanup can lose lock ownership; destroy masks stop failure. Other findings concern busy-session enforcement, provenance hashing, recreation instructions and evidence retention. None establishes that B3's observed assertions failed.
 - **S6 C1:** unawaited asynchronous test lifecycle calls corrupted later controls,4/2 result, then termination. C2 corrected those and reached6/6 but hung.
 - **S6 C3:** temporary-client teardown did not eliminate all handles. Functional6/6 is preserved; exact Jest child25695 was terminated at00:49:33, child143/runner7, existing persister/sign-out controls NOTRUN. The earlier causal explanation was incomplete; no further speculative edit or retry is authorized.
+- **S6 C4:** functional6/6 is again retained separately from timeout124. Jest's detector did not provide ownership evidence; cause remains open, no new teardown fix is established, and existing controls remain NOTRUN.
 
 ## Source and evidence entry points
 
@@ -48,15 +50,15 @@ Full identities, constraints and public stacks remain in `LAST_OPERATOR_STATE.md
 | Subject | Primary local entry point |
 |---|---|
 | S1 frozen successor | `execution/s1-r4/REPORT.md`; `INTEGRATION_FOR_S2.md` |
-| S2 failed run and successor | `execution/s2-composition/B2_RESULT_AND_FINGERPRINT_NOTE.md`; `SLOT_REQUEST_03_B3_R3_FROZEN_20260922T0048Z.md` with its pending separately named correction |
+| S2 failed run and successor | `execution/s2-composition/B2_RESULT_AND_FINGERPRINT_NOTE.md`; requests03/03A/03B retained; v5.3 final request pending |
 | S4 R5 source | `execution/s4-r5/REPORT.md`; `VALIDATION_REQUEST_1.md`; `artifacts/s4-r5-88287cff.bundle` |
-| S4 R5 independent reviews | `execution/audits/s4-r5/a/`; `execution/audits/s4-r5/b/` |
+| S4 R5 independent reviews | `execution/audits/s4-r5/a/`; `execution/audits/s4-r5/b/`; `execution/S4_R5_PARENT_DISPOSITION.md` |
 | S5 frozen proof | `execution/s5-r3/B3_MANIFEST.md`; `SLOT_B3_RESULT.md`; `checkpoint-5-B3/` |
 | S5 independent reviews | `execution/audits/s5-r3/a/REPORT.md`; `execution/audits/s5-r3/b/REPORT.md`; parent disposition `execution/S5_R3_PARENT_DISPOSITION.md` |
-| S6 failed baselines | `execution/s6-r3/logs/C2-RESULT.md`; `C3-RESULT.md`; exact exit records and v3/v4 manifests |
+| S6 failed baselines and diagnostic | `execution/s6-r3/logs/C2-RESULT.md`; `C3-RESULT.md`; `c4.EXIT_RECORD`; `c4.detect-open-handles.log`; `c4.summary.txt`; v3/v4 manifests |
 | Governance and execution | `execution/EXECUTION_MANDATE.md`; `execution/S4_R4_PARENT_DISPOSITION.md` |
 
-Private evidence already published through commit `344ce2a39587a1157bcf3d82ade689dc93bb7da3` includes S1's frozen successor, S5's pinned-resume packet and S6's failed C1 baseline. The present check-in additionally preserves S2 B2/R3 source, S6 C2/C3, S4 R5 checkpoint, both frozen S5 R3 reviews and the parent disposition under new immutable snapshot directories; its publication commit is recorded separately after verification.
+Last verified private publication is `ed4be6936e1c2e148c8f4b52da9c80a84a75e596`. It preserves S2 B2/R3 source, S6 C2/C3, S4 R5 source checkpoint, both frozen S5 R3 reviews and the parent disposition, plus the earlier S1 successor/S5 B3/S6 C1 packets. The new R5 review disposition, S6 C4 and runner follow-up above are local subsequent work until a separately verified publication.
 
 ## Continuing authority and safety rules
 
