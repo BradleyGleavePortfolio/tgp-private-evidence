@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated September22,2026 1:47PM PDT / 20:47UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
+Updated September22,2026 1:52PM PDT / 20:52UTC. Operator **op 88 / v12vantage88**, session e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038. Exact requested filename preserved.
 
 ## Current handoff point
 
@@ -13,7 +13,7 @@ Bradley explicitly instructed all six existing continuations in parallel IF SAFE
 - S5 / T4: Fable selective V7 checker/T0-only driver preparation. Preserve dirty patch on143d451e, failed V6 and valid T1/T2/rawT3 evidence. Independent narrow review then separately granted execution.
 - S6 / T4: independent Fable C5 raw-evidence/causal-applicability review on unchangedd51a1910. Six behavioral passes plus hang143 are not acceptance; no speculative teardown/product fix.
 - S2 / T4: Fable V5.6 minimal fixer against BOTH frozen55 reports, unchanged productd5cd9b8b. No control or real DB grant; dual exact-successor reviews after freeze.
-- S4 / T4: fresh separate inherited A/Fable B reviews of frozen V4 runner. Product91990ae9 source closure remains narrow; no artifact acceptance. No current peer conclusions shared.
+- S4 / T4: V4 A frozen HOLD both stages, six material source counterexamples, manifest63de35c3 verified; B review independently active, no A sharing. Product91990ae9 source closure remains narrow; no controls/artifact acceptance. Consolidate both frozen verdicts before one runner-only fixer.
 - S1/S3 / T4: Fable builder restores exact preserved inputs/PREP2 tree without code edits; runtime composition and integration remain dependency-gated, not independently executable now.
 
 ## Resource and evidence truth

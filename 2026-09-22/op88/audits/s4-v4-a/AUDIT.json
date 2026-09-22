@@ -1,0 +1,193 @@
+{
+  "audit": "OP88-S4-V4-A",
+  "status": "FROZEN_INDEPENDENT_READ_ONLY_REVIEW",
+  "tier": "T4",
+  "input_fingerprints": "INPUTS.json",
+  "source_root_for_locations": "/home/user/workspace/tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4",
+  "verdicts": {
+    "stage1_private_lease_control_grantability": {
+      "status": "HOLD",
+      "recommend_grant": false,
+      "blockers": ["S4-V4-A-01", "S4-V4-A-02", "S4-V4-A-03", "S4-V4-A-04", "S4-V4-A-05", "S4-V4-A-06"],
+      "scope": "Exact seven-control request, including private lease and possible detached quarantine resource; no canonical-lock grant"
+    },
+    "stage2_native_applicability": {
+      "status": "HOLD",
+      "recommend_grant": false,
+      "direct_blockers": ["S4-V4-A-01", "S4-V4-A-02", "S4-V4-A-03", "S4-V4-A-04", "S4-V4-A-06"],
+      "dependency_blocker": "A corrected and discriminating Stage1 must first pass under a separate grant",
+      "artifact_acceptance": "HELD",
+      "product_source_acceptance": "Prior narrow closure unchanged; not re-audited"
+    },
+    "runtime_truth": "No controls, native gates, framework suite, package, browser or probes ran in this review",
+    "implemented_vs_tested": "V4 changes reviewed in frozen source; hash/diff verification only, not behavioral validation",
+    "historical_hooks": "0/6 (inherited, not re-observed)",
+    "historical_hooks_and_acceptance_reference": "[V4 request, lines 3-8 and 89-96](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L89-L96)"
+  },
+  "closure_ledger": [
+    {
+      "prior_id": "S4-V3-A-01",
+      "status": "SOURCE_CLOSED",
+      "basis": "The dependent reaper filename is now initialized by a separate command after label, closing the specific unset-local expansion defect without weakening control 1. [Library, lines 54-57](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L54-L57)",
+      "behavioral_status": "UNRUN"
+    },
+    {
+      "prior_id": "S4-V3-A-02 / V3B-01",
+      "status": "PARTIAL_SOURCE_CLOSURE",
+      "basis": "The first deferred signal now records pending state and allows capture of the actual step exit, and the live-step predicate still requires the step first rather than accepting SIGNAL_TERM as primary; clearing STEP_ACTIVE before latching leaves the repeated-signal counterexample in A-01. [Library, lines 73-77 and 99-118](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L99-L118) [Predicates, lines 80-87](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L80-L87)"
+    },
+    {
+      "prior_id": "S4-V3-A-03",
+      "status": "PARTIAL_SOURCE_CLOSURE",
+      "basis": "Launcher phases now advertise +25 rather than +7, the driver polls its active launcher, and the writer/predicate have timeout wrappers, but the full elapsed cancellation/publication boundary remains open as A-02. [Driver, lines 20-56 and 73-99](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L20-L56) [Launcher, lines 63-97](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L63-L97)"
+    },
+    {
+      "prior_id": "S4-V3-A-04",
+      "status": "NORMAL_PATH_SOURCE_CLOSED_FAILURE_PATHS_OPEN",
+      "basis": "The launcher acquires exclusion before spawn and normally survives workload termination through cleanup, but timeout/interrupt survivor handling and quarantine handoff remain open as A-03/A-04. [Launcher, lines 115-129 and 147-181](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L115-L181)",
+      "scope_delta": "The failure-path issue now applies to private-control exclusion as well as native canonical exclusion"
+    }
+  ],
+  "material_findings": [
+    {
+      "id": "S4-V4-A-01",
+      "severity": "MEDIUM",
+      "material": true,
+      "title": "Active-step protection ends before primary failure is latched",
+      "owner": "Canonical S4 execution-layer builder",
+      "applies_to": ["stage1", "stage2"],
+      "locations": ["runner/s4-r6-lib-v4.sh:19-23,73-77,99-118", "launcher/s4-r6-launch-v4.sh:55-58", "controls/control-predicates-v4.py:80-87"],
+      "mechanism": "STEP_ACTIVE is cleared at 104, but the primary block does not run until 115, after head-state collection, Python command encoding and metadata/log writes, so a signal in that interval takes the no-active-step handler and wins the first-failure latch. [Library, lines 73-77 and 101-118](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L101-L118)",
+      "static_counterexample": "After TERM ends C-live-step and rc is captured, let a second TERM arrive after line 104 and before 115: SIGNAL_TERM is appended and latched first, then the C-live-step block is appended later; the launcher itself has both group and per-PID TERM passes, so repeated delivery is within its signal route rather than an invented new workload. [Launcher, lines 55-58](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L55-L58) [Library, lines 19-23 and 104-116](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L104-L116)",
+      "consequence": "The actual failing command loses primary attribution and the unchanged exact control-2 order can fail despite the first deferred trap being corrected. [Predicates, lines 82-87](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L82-L87)",
+      "smallest_correction": "Retain active-step signal deferral until the captured command failure is latched; handle pending signals only after that latch, without reopening reentrant cleanup during metadata work.",
+      "closure_discriminator_requested_not_executed": "Synchronize a second TERM after reap but before primary latch and require actual step exit first, secondary signal next, valid JSON and no survivors.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V4-A-02",
+      "severity": "HIGH",
+      "material": true,
+      "title": "Cancellation can abandon detached work, and claimed total bounds still omit executing phases",
+      "owner": "Canonical S4 execution-layer builder",
+      "applies_to": ["stage1", "stage2"],
+      "locations": ["controls/run-controls-v4.sh:20-56,73-99", "launcher/s4-r6-launch-v4.sh:53-58,63-97,123-177", "SLOT_REQUEST_V4.md:34,53-56,80-84"],
+      "mechanism": "The driver cancels only ACTIVE_PID, KILLs that launcher after ten one-second waits, then unconditionally waits; on the cancellation result it exits at 81 before the owned-session and lease checks at 86-89, and interrupt traps exit without those checks as well. [Driver, lines 34-56 and 79-89](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L34-L89)",
+      "static_counterexample": "Interrupt the driver while a launcher is delayed in a foreground census/receipt operation: TERM only records the launcher's INTERRUPT flag, the driver can KILL the launcher before its cleanup finishes, and then the driver takes exit 96 or its interrupt exit without scanning, reaping or quarantining the detached SID it caused to exist. [Launcher, lines 123-143 and 174-177](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L123-L177) [Driver, lines 34-56 and 81-89](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L34-L89)",
+      "bound_gap": "340 seconds is still tested only for admission, the launch phase counts polling iterations instead of elapsed time, SCAN_S is never applied, and final scans/logging have no enclosing deadline; native classification and pre-/post-writer parse, rename and logging are outside the five-second writer timeout, with no outer cancellation controller after the runner loop. [Driver, lines 22-29,48-56,73-100](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L48-L100) [Launcher, lines 63-97 and 174-189](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L63-L97)",
+      "bound_counterexample": "A delayed EXIT_RECORD reader at launcher 175 can continue beyond the advertised native 3370 seconds after the runner has exited because that reader is outside PUBLISH_S and the supervision loop is finished; likewise a delayed final tee or session scan has no aggregate cancellation path in the driver. [Launcher, lines 133-177](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L133-L177) [Driver, lines 83-100](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L83-L100)",
+      "consequence": "The requested hard allocation and verified recovery are not established, even though return codes remain nonzero on the ordinary cancellation branch; increasing constants or adding a wrapper that only kills the driver would not close detached-session ownership. [Driver, lines 34-56 and 81-89](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/run-controls-v4.sh#L34-L89)",
+      "smallest_correction": "Use one enforceable elapsed deadline through classification/publication, budget the complete child-owned phase and cleanup, and require verified owned-session termination or checked lease-retaining recovery before every cancellation exit; do not perform an unconditional wait after an unconfirmed KILL.",
+      "closure_discriminator_requested_not_executed": "Force driver cancellation while launcher cleanup is pending and while receipt processing is delayed; verify bounded caller completion, exact current process identities, owned helper/session accounting and retained exclusion on unresolved cleanup.",
+      "qualification": "This is a missing coverage/ownership path, not an assertion that a frozen V4 command has hung or a promise of real-time completion under arbitrary kernel failure; no GNU timeout behavior is assumed.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V4-A-03",
+      "severity": "HIGH",
+      "material": true,
+      "title": "Timeout and interrupt classification bypass quarantine for surviving step descendants",
+      "owner": "Canonical S4 execution-layer builder",
+      "applies_to": ["stage1", "stage2"],
+      "locations": ["launcher/s4-r6-launch-v4.sh:51,147-181", "runner/s4-r6-lib-v4.sh:100"],
+      "mechanism": "When the runner is confirmed exited but SURVIVORS remains nonempty, TIMEOUT and INTERRUPTED branches execute before the survivor branch that calls hold_quarantine_lease. [Launcher, lines 160-181](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L160-L181)",
+      "static_counterexample": "Set the reachable failure state TIMED_OUT=true, runner exit confirmed, and a step descendant still listed after KILL/verification; line 179 publishes TIMEOUT 124 without calling the holder function, leaving released_at_launcher_exit=true and no quarantine holder even though cleanup is unverified. [Launcher, lines 51,167-181](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L167-L181)",
+      "consequence": "Once the launcher and its short-lived helpers exit, a surviving workload child that closed fd 9 does not retain exclusion, so another holder can acquire the private or canonical lease before prior owned work is verified gone. [Library, line 100](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L100) [Launcher, lines 179-181](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L179-L181)",
+      "smallest_correction": "Determine and secure cleanup/quarantine state before outcome precedence on every exit; retain TIMEOUT/INTERRUPTED as primary cause if desired, but never let that bypass unresolved-survivor lease retention.",
+      "closure_discriminator_requested_not_executed": "A deterministic runner-exited/survivor-present timeout and interrupt case must retain the private lease with truthful recovery evidence.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V4-A-04",
+      "severity": "HIGH",
+      "material": true,
+      "title": "Quarantine transfer asserts lease retention without verifying creation or durable recoverable identity",
+      "owner": "Canonical S4 execution-layer builder",
+      "applies_to": ["stage1", "stage2"],
+      "locations": ["launcher/s4-r6-launch-v4.sh:147-158,181", "SLOT_REQUEST_V4.md:35,74-75", "controls/s4-r6-control-stub-v4.sh:43-48", "controls/control-predicates-v4.py:45-50,106-117"],
+      "mechanism": "hold_quarantine_lease backgrounds setsid sleep infinity, immediately sets released_at_launcher_exit=false from $!, ignores the PID-file write result, and has no holder startup/lease confirmation or failure branch before the original holder exits. [Launcher, lines 147-158](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L147-L158)",
+      "static_counterexamples": [
+        "If setsid/sleep fails to exec or the child exits before handoff, $! still supplies a numeric PID but the original supervisor exits claiming retained exclusion with no confirmed holder. [Launcher, lines 151-158](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L151-L158)",
+        "If the holder starts but both the PID-file and supervisor publication fail, the detached infinite holder can persist without a durable recovery receipt because neither write failure prevents supervisor exit. [Launcher, lines 77-97 and 151-158](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L151-L158)",
+        "If a recorded holder later exits and its PID is reused, the request's instruction to kill that PID has no start-time/session/lease identity check to distinguish the replacement process. [Request, lines 35 and 74-75](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L74-L75) [Launcher, lines 151-154](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L151-L154)"
+      ],
+      "control_applicability_limit": "Control 5 attempts an independent open while both supervisor and runner are alive, and checks no quarantine holder; it neither distinguishes which inherited descriptor retains the lock nor exercises holder creation, publication, failure or checked recovery. [Stub, lines 19-21 and 43-48](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/s4-r6-control-stub-v4.sh#L43-L48) [Predicates, lines 45-50 and 106-117](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L106-L117)",
+      "consequence": "The exceptional path can either release exclusion with unresolved work or leave an unaccounted permanent lease holder, and a later bare-PID recovery instruction can target the wrong process. [Launcher, lines 147-158](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L147-L158) [Request, lines 74-75](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L74-L75)",
+      "smallest_correction": "Make any exceptional lease transfer a checked owned-resource handoff with verifiable current identity, confirmed lease retention and checked durable publication; define creation/publication failure behavior and identity-checked termination before releasing the prior owner.",
+      "closure_discriminator_requested_not_executed": "Use only the private lease to test holder-exec failure, recovery-receipt failure and holder disappearance/replacement, with no unrecorded survivors and no signal to a replacement PID.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V4-A-05",
+      "severity": "MEDIUM",
+      "material": true,
+      "title": "Control checker skips required evidence assertions when records or steps are missing",
+      "owner": "Canonical S4 execution-layer builder",
+      "applies_to": ["stage1", "stage2_stage1_dependency"],
+      "locations": ["controls/control-predicates-v4.py:14-21,61-71,79-87,109-117,127-131"],
+      "mechanism": "The live-step branch does not require a locally parsed EXIT_RECORD before its conditional assertions, while nested-orphan and lease branches condition all step/result assertions on a truthy steps list without requiring that list. [Predicates, lines 61-87 and 109-117](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L61-L117)",
+      "static_data_counterexamples": [
+        "Keep every required live-step supervisor field at its expected value, including exit_record_present=true, but supply malformed EXIT_RECORD.json: load returns {_unparseable: ...}, lines 80-87 are skipped and all accumulated checks can still be true. [Predicates, lines 14-21,72-87,127-131](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L72-L87)",
+        "For a nested-orphan record with steps=[], retain the expected supervisor fields and required reaps.log substrings: the required found=1, verified cleanup, step exit and record-result assertions are never added. [Predicates, lines 55-71](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L55-L71)",
+        "For a lease-control record with steps=[], retain expected supervisor fields and the PREDICATE_OK log line: the required C-lease-outside-probe/EXIT_3 assertions are skipped. [Predicates, lines 106-117](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L106-L117)"
+      ],
+      "consequence": "A passing checker would not establish all the exact record/step predicates claimed by the Stage1 request; these are checker acceptance counterexamples, not claims that V4 has produced such corrupt records. [Request, lines 64-72](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L64-L72) [Predicates, lines 127-131](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/control-predicates-v4.py#L127-L131)",
+      "smallest_correction": "Require parsed records and required nonempty, correctly typed step evidence before field checks; keep all primary-order and observed-exit requirements unchanged.",
+      "closure_discriminator_requested_not_executed": "Reject malformed/missing runner record and missing/empty required steps using frozen data-only counterexamples.",
+      "runtime_observed": false
+    },
+    {
+      "id": "S4-V4-A-06",
+      "severity": "MEDIUM",
+      "material": true,
+      "title": "Both requested caller commands replace failure with the trailing echo's status",
+      "owner": "Canonical request/grant author",
+      "applies_to": ["stage1", "stage2"],
+      "locations": ["SLOT_REQUEST_V4.md:51-56,78-84"],
+      "static_counterexample": "If the driver exits 94 or the launcher exits 124, the requested bash -c command prints that number but normally returns the final echo's 0, so the external observer does not receive the raw workload status. [Request, lines 53 and 80](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L51-L84)",
+      "consequence": "An allocation receipt based on the enclosing tool/shell exit can falsely report success despite the command's printed failure. [Request, lines 53 and 80](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/SLOT_REQUEST_V4.md#L51-L84)",
+      "smallest_correction": "Capture status in a guarded if/else immediately, record it separately with checked publication, and exit with that saved status; guard cd failure too.",
+      "illustrative_nonexecuted_stage1_caller": "bash -c 'cd /home/user/workspace/execution/s4-r6-validation/v4 || exit 70; if bash controls/run-controls-v4.sh; then rc=0; else rc=$?; fi; printf \"driver exit=%s\\n\" \"$rc\"; exit \"$rc\"'",
+      "illustrative_nonexecuted_stage2_caller": "bash -c 'cd /home/user/workspace/execution/s4-r6-validation/v4 || exit 70; if bash launcher/s4-r6-launch-v4.sh; then rc=0; else rc=$?; fi; printf \"launcher exit=%s\\n\" \"$rc\"; exit \"$rc\"'",
+      "command_status": "Illustration only, not a grant and not executed; does not repair any other finding",
+      "runtime_observed": false
+    }
+  ],
+  "preserved_positive_source_properties": [
+    {
+      "property": "Session selection, fast-exit topology, handshake and argv-safe JSON",
+      "disposition": "The V4 source retains session census/signalling, non-group-leader launcher precondition, construction of SID from spawned PID, runner handshake and quoted argv record writers; no broad source reopening is justified by this delta. [Launcher, lines 53-58,77-93,100-103,123-129,174-189](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L100-L189) [Library, lines 130-152](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L130-L152)"
+    },
+    {
+      "property": "Actual expected-negative exit split and prerequisite latch",
+      "disposition": "Observed 0 is still retained separately from validation failure 89, later required work is NOTRUN after a latched failure, and native S45 still uses expect_exit rather than recasting observed success as an actual command failure. [Library, lines 19-34 and 89-95](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L19-L34) [Runner, lines 157-159](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-validate-v4.sh#L157-L159)"
+    },
+    {
+      "property": "Native pins, package and browser artifact joins",
+      "disposition": "The reviewed delta preserves precondition pins, sole ZIP/inventory selection, actual ZIP hash/size and HEAD blob comparison, positive receipt join and syntax-specific negative receipt joined to the same original ZIP; this is applicability of unchanged checks, not executed artifact binding. [Runner, lines 78-106,164-180,194-213](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-validate-v4.sh#L164-L213) [Frozen diff, lines 86-192](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/V3_TO_V4.diff#L86-L192)"
+    },
+    {
+      "property": "Private lease separation",
+      "disposition": "In the intended control environment, CONTROL selects the private lease before open/flock, the stub checks that path, and the direct real-runner refusal occurs before native lease/worktree activity when launch credentials are absent; no canonical lock was opened by this auditor. [Launcher, lines 35-37 and 115-117](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L35-L37) [Stub, lines 19-21](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/controls/s4-r6-control-stub-v4.sh#L19-L21) [Runner, lines 55-74](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-validate-v4.sh#L55-L74)"
+    }
+  ],
+  "nonblocking_observations": [
+    {
+      "id": "S4-V4-A-N01",
+      "note": "Native EXIT_RECORD.lock still labels the runner SID as holder and says flock was held by the runner, whereas the supervisor lease record identifies the new acquiring launcher; correct this stale provenance during the owned successor, but the consistent authoritative supervisor record can distinguish the normal path and this wording is not an additional grant blocker. [Library, line 147](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/runner/s4-r6-lib-v4.sh#L147) [Launcher, line 90](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L90)"
+    },
+    {
+      "id": "S4-V4-A-N02",
+      "note": "Pre-spawn topology/output-directory refusals still need not produce supervisor JSON, but no workload exists on those paths; retain the already-disclosed wording limitation without inventing a new safety finding. [Launcher, lines 100-110](../../../../tgp-private-evidence/2026-09-22/remediation/s4-r6-validation/proposal-4/launcher/s4-r6-launch-v4.sh#L100-L110)"
+    }
+  ],
+  "smallest_next_action": "Canonical builder prepares one additive execution-only successor closing these exact counterexamples, with checked recovery and guarded caller exits, then both independent reviewers assess that exact delta before any separate private-control grant; leave V3/V4, prior reports, product source and historical failed evidence unchanged.",
+  "independence": {
+    "candidate_author": false,
+    "current_peer_output_accessed": false,
+    "prior_frozen_v3_a_b_read": true,
+    "reviewer_runtime_identity": "Parent-inherited A; no fabricated model/settings telemetry",
+    "candidate_execution_or_mutation": false,
+    "findings_are_source_reasoning_not_observed_runtime_failures": true
+  }
+}

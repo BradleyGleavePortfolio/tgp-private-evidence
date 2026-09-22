@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 20:47 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
+Updated: 2026-09-22 20:52 UTC. Executive orchestrator: **op 88 / v12vantage88**, session `e9bd7cce-d7f3-4f33-b3c3-e2b7adbe9038`.
 
 ## Mission and authority
 
@@ -38,7 +38,7 @@ Current independently executable slice records, writer surfaces, acceptance, rec
 | S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | R4 source follow-ups remain frozen; no new source defect. Fresh upstream builder restoring exact composition/discriminator inputs only. TRUNCATE behavior/membership path/final dynamic proof pending; 56fb IS composed in21ea/d5cd. Prior offline24/24 remains qualified. No schema change. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Product R3 unchanged. Fresh Fable fixer preparing V5.6 against BOTH frozen V5.5 HOLD reviews, including A's material ownership/deadline/receipt residuals. N4/N5/N6 controls unrun; dual exact-successor review required before execution. Historical setup05 is not an installation in this sandbox. |
 | S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Retained bounded R2 acceptance; fresh integration builder restoring PREP2 treea584a1b95423f95dae8daabf673ef3776604acbb and request03/addendum inputs without new edits. Upstream B3, hook-enabled exact-tree integration, composed-lock proof and changed-six-file applicability remain pending. |
-| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow source closure retained; artifact held, historical hooks0/6. Frozen V4 launcher23ebfbc3/libabfdd0bd/runner86a4f6cc, manifest3c9276aa under fresh independent A/B review. Private controls/native execution NOT GRANTED. |
+| S4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | R6 narrow source closure retained; artifact held, historical hooks0/6. V4 A frozen HOLD both stages with six material source counterexamples; manifest63de35c3 verified, no probes run. Independent B still active and has not received A. No controls/native grant; one additive runner repair follows both frozen reports. |
 | S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | R4 patchc36258b3/fingerprint6850b32e preserved uncommitted. Fresh Fable fixer preparing JSON-aware T3 log checker and T0-only driver. V6 remains12PASS/1FAIL, outer1; valid T1/T2 and raw T3 evidence retained, no replay. Historical1117-package setup not present here. |
 | S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | R3 unchanged. Fresh independent B reviewing C5 raw evidence/proposal applicability; no product/teardown fix granted. Prior C5 A/B/D0, C6/6+hang143 and five600000ms Query timers preserved; causal trigger/app impact/history/test-only-fix sufficiency unproven. Outer wait remains unobserved. |
 
@@ -53,6 +53,8 @@ Source/preparation/review lanes are active in parallel and isolated. All prior e
 Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. S1 A/B source reviews and B factual addendum are frozen, dynamic attestation pending. S4 A source acceptance is not artifact acceptance. All original reports remain unchanged. Every S-lane has stage-correct work.
 
 ## Material failed evidence and findings
+
+- op88 S4 V4 A: six material source findings S4-V4-A-01..06 (signal latch gap, incomplete cancellation/deadline ownership, timeout-survivor quarantine bypass, unchecked quarantine-holder handoff, skipped mandatory checker predicates, masked caller exits). Both stages HOLD. Initialization defect source-closed; artifact joins and other positive properties retained. These are static counterexamples, not new executed failures. Original report frozen under `2026-09-22/op88/audits/s4-v4-a`; B independence retained.
 
 - S1 effective TRUNCATE gap prompted41f4/56fb; final discriminator remains unrun.21ea explicitly merged56fb into3f49 and d5cd descends from it. B revision1's contrary source-composition claim is superseded only by additive correction, not rewritten history. Membership path, MAINTAIN coverage, PG15 and hosted serving-role boundaries remain unproven.
 - S2 B1 exact9742037b: 63 pass/4 fail, real release telemetry defects. B2 exact21ea3252: 66 pass/2 fail in C0 historical-export fixture; d5cd corrects that harness path only. Discriminator NOTRUN. Actual B2 runner14ca1e85 differed from grant7642c3c4; actual bytes, reconstructed predecessor and chronology retained without rewriting authorization. Stale self-hash in `SHA256SUMS.b2-frozen` remains qualified by separate outer manifest.
