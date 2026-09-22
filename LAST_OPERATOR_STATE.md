@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated: 2026-09-22 04:35 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
+Updated: 2026-09-22 04:38 UTC. Executive orchestrator session: `8fc3af28-e515-4342-8e32-b79aa3b06b74`.
 
 ## Mission and authority
 
@@ -33,9 +33,9 @@ Full independently executable slice records, writer surfaces, acceptance, recove
 
 | Lane / tier | Preserved exact head | Current execution and evidence |
 |---|---|---|
-| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Frozen; no new writer. Historical quoted-diagnostic 24/24, unquoted predecessor 17/7; SQL/guard unchanged from 41f4. Real TRUNCATE discriminator and successor dual review pending. Sole schema/migration/generator ownership reserved to S1. |
+| S1 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Frozen tree79ebf175, restored clean. Two fresh independent R4 source follow-up reviewers active; neither writes source. Historical24/24 and predecessor17/7 retained. Real TRUNCATE discriminator/composition remains pending and final dynamic attestation held. Sole schema/migration/generator ownership reserved. |
 | S2 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | S2-RUNNER-53 dispatched to Fable. Execution-only child/cleanup-budget repair; product source stays frozen. Last archived named runner is v5.1; verify current packet before claiming later bytes recovered. At most 60s of bounded private-lock fake-process controls allowed; no DB/heavy grant. |
-| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Unchanged, retained bounded R2 acceptance. Not yet included in S2 composition. Recheck material integration applicability only when ready; do not rerun gratuitously. |
+| S3 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Unchanged, retained bounded R2 acceptance. Fresh Fable integration-applicability analyst compares exact5c7b/d5cd ancestry, overlap and prior proof; no duplicate R2 audit/tests or product composition authorized. S3 not yet included in S2 composition. |
 | S4 / T4 | `88287cff47240aa58b5f0fea5da08670f1e87df6` | S4-R6-REPORTING dispatched to Fable. Frozen R5 A counterexample remains material despite B not observing it. Minimal synchronous reporting-generation repair and bounded dependency-free probes allowed; no full/package/browser slot. |
 | S5 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | S5-R4-VALIDATION-SAFETY dispatched to Fable. Refusal cleanup, lock ownership, destroy failure, busy-session, provenance and recreation repair. Preparation/static/syntax only; no control execution, install, DB or destruction yet. |
 | S6 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | S6-DIAGNOSTIC-PROPOSAL dispatched to Fable. Restore unchanged source and prepare one causal ownership diagnostic. No test/install/product P1 execution. C4 remains inconclusive. |
@@ -48,7 +48,7 @@ Fresh workspace: 2 CPUs, about 8 GB memory; baseline clones and private archive 
 
 Source reads/edits are parallel in isolated areas. Only the brief's bounded S2 fake-process and S4 dependency-free probes have execution permission. S5/S6 require separate proposed and reviewed allocations. A free lock is not a grant; changed source/runner bytes invalidate a prior grant's attribution.
 
-Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. No new audit has yet been dispatched in this session. Prior frozen reports remain original evidence and are not rewritten.
+Current truth: preserved and partially implemented/tested candidates, not overall audited/merged/deployed/enabled/customer-accepted state. Two independent S1 R4 source follow-ups are active; other current-round candidate reviews await frozen builder evidence. Prior frozen reports remain original evidence and are not rewritten. All six S-lanes now have appropriately staged active work.
 
 ## Material failed evidence and findings
 
@@ -87,12 +87,13 @@ Success requires native reconciled completion, not staging/generic reconstructio
 
 ## Bradley decision required
 
-NO for these local engineering and independent-review slices. Concrete hosted-review identity/security settings and production/customer actions remain reserved at their actual boundaries. Exact next action: collect four worker checkpoints, verify their attribution, dispatch independent reviewers on frozen candidates, and grant only the smallest ready validation slot.
+NO for these local engineering and independent-review slices. Concrete hosted-review identity/security settings and production/customer actions remain reserved at their actual boundaries. Exact next action: collect four builder/diagnostic checkpoints plus S1 independent follow-ups and S3 integration analysis, verify attribution, dispatch next reviews on frozen candidates, and grant only the smallest ready validation slot.
 
 ## Evidence entry points
 
 - Intake truth and original continuation: Git commit `4aeacc694fb8ca8b6e0302e3c184fc57e15059f2`.
 - Current slice contracts: `execution/CONTINUATION_20260922.md`.
+- S1/S3 stage-correct follow-up contracts: `execution/S1_S3_CONTINUATION_BRIEF.md`.
 - Fresh worker ownership: `execution/DISPATCHES.md`, identical root mirror.
 - Immutable prior source/tests/reports: `2026-09-20/` and `2026-09-21/`.
 - Governance: `BradleyGleavePortfolio/tgp-agent-context/AGENT_RULES.md`, effective G01–G22.

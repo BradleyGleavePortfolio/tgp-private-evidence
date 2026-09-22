@@ -1,11 +1,14 @@
 # Active TGP execution register
 
-Updated 2026-09-22 04:35 UTC; synchronized during current takeover. Current session `8fc3af28-e515-4342-8e32-b79aa3b06b74`; EXECUTE active. `execution/DISPATCHES.md` is the authoritative register; this root copy is an identical compatibility mirror, not a separate authority. Old-session worker/slot ownership is superseded.
+Updated 2026-09-22 04:38 UTC. Current session `8fc3af28-e515-4342-8e32-b79aa3b06b74`; EXECUTE active. `execution/DISPATCHES.md` is the authoritative register; this root copy is an identical compatibility mirror, not a separate authority. Old-session worker/slot ownership is superseded.
 
 ## Current workers
 
 | Slice | Worker ID | Requested model | Sole writes | State |
 |---|---|---|---|---|
+| S1-R4-SOURCE-FOLLOWUP A / T4 | `s1_r4_independent_audit_a_muc6muvy` | Inherited parent; actual runtime identity unexposed | `execution/audits/s1-r4-current/a` only | Independent read-only R4 source follow-up on56fb/tree79eb; real discriminator/composition attestation explicitly pending. No current peer access. |
+| S1-R4-SOURCE-FOLLOWUP B / T4 | `s1_r4_independent_audit_b_muc6muwk` | Claude Fable 5; High policy, actual setting unexposed | `execution/audits/s1-r4-current/b` only | Independent read-only R4 source follow-up on same frozen56fb; no current peer access, DB or test execution. |
+| S3-R2-INTEGRATION-APPLICABILITY / T4 | `s3_r2_integration_applicability_muc6muwe` | Claude Fable 5; actual setting unexposed | isolated restored source, `execution/s3-integration-applicability` | Read-only applicability/composition preparation for retained5c7b against d5cd; not a duplicate R2 audit or new clearance. |
 | S2-RUNNER-53 / T4 | `s2_t4_runner_cleanup_muc6cvij` | Claude Fable 5; High policy, actual setting unexposed | `worktrees/s2-runner53`, `execution/s2-runner53` | Dispatched; execution-only runner repair from preserved d5cd, bounded private-lock fake controls ≤60s. No DB/heavy grant. |
 | S4-R6-REPORTING / T4 | `s4_t4_reporting_repair_muc6cvir` | Claude Fable 5; High policy, actual setting unexposed | `worktrees/s4-r6`, `execution/s4-r6` | Dispatched; minimal reporting-generation repair from88287, offline dependency-free probes ≤60s. No suite/package/browser grant. |
 | S5-R4-VALIDATION-SAFETY / T4 | `s5_t4_fixture_safety_muc6cvj2` | Claude Fable 5; High policy, actual setting unexposed | `worktrees/s5-r4`, `execution/s5-r4` | Dispatched; isolated source/runner/provenance repair from143d, prepare controls only. No execution/install/DB/destroy. |
@@ -13,9 +16,9 @@ Updated 2026-09-22 04:35 UTC; synchronized during current takeover. Current sess
 
 Parent is sole private publisher and current-state writer. Worker contract is `execution/CONTINUATION_20260922.md`; it contains all mandatory slice fields, objective exits, recovery and non-goals. Every preserved open public PR has a separate explicit grade in `execution/pr-grades/PUBLIC_PR_GRADES.md` with full identities and reported bases in the adjacent JSON; a cumulative S-lane label is not its substitute.
 
-## Unassigned preserved ownership
+## Preserved source ownership and independence
 
-S1 schema/migration/generator lane is reserved and frozen at56fb; S2/S5 may not edit it. S3 unchanged5c7b remains accepted only within its historical bounded R2 scope. No fresh auditor is yet assigned; all prior A/B reports remain frozen history. Two independent non-builder final-head reviews are mandatory for every changed T4 candidate.
+S1 schema/migration/generator lane is reserved and frozen at56fb; neither current reviewer nor S2/S5 may edit it. S3 unchanged5c7b remains accepted only within its historical bounded R2 scope. Fresh S1 A/B follow-up is active under `execution/S1_S3_CONTINUATION_BRIEF.md`; prior reports remain frozen history. Two independent non-builder final-head reviews remain mandatory; current source review does not waive pending real proof.
 
 ## Validation allocation
 
