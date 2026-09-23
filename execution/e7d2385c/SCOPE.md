@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists in this sandbox. S6's minimum npm ci setup completed and released20:19:59Z; the parent transferred the slot to S5 executor for the dual-granted one fresh51. S6 P3 is frozen; builder may apply its exact one-file patch to the installed worktree and prepare constant validation bindings source-only. No S6 test/typecheck/commit starts until dual delta closure and explicit runtime transfer after S5 release. Missing setup wrapper status is qualified under S6_SETUP_DISPOSITION.md, not an installation-rerun grant.
+One heavy runtime slot exists in this sandbox. S5's full attempt refused at the old-root remaining-process check before DB initialization; it released20:24:03Z. S6 owns the slot for dual-granted P3 validation00–09 only, under S6_P3_VALIDATION_ACTIVATION.md. Commit20–23 remains gated on actual results. S5 correction is source-only under S5_RUNNER_CORRECTION.md; no candidate/fixture/helper change. Missing S6 setup wrapper status remains C, no installation rerun.
 
 ## Individually graded work
 
@@ -33,6 +33,7 @@ One heavy runtime slot exists in this sandbox. S6's minimum npm ci setup complet
 | S5 exact fresh51 execution | T4 | Existing real-PG proof; same builder/executor; bounded T1 NO | One execution under S5_FRESH51_ACTIVATION.md after runtime transfer; dual same-review actual-result attestations |
 | S6 minimum fresh setup | T4 | Install exact unchanged lock for sensitive identity proof; same builder; bounded T1 NO | One bounded npm ci, disclosed prerequisites, no source change/test/typecheck/commit |
 | S6 P3 identity-test correction | T4 | Remaining Class B04 proof defect; same builder; bounded T1 NO | S6_P3_TEST_CORRECTION.md: one test file only, eight P2 files unchanged, independent delta closure then existing validation |
+| S5 observed runner refusal correction | T4 | Concrete proof prerequisite B; same builder; bounded T1 NO | External runner only, preserve actual failure and zero terminal survivors, dual changed-runner closure then existing execution |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
@@ -48,8 +49,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Complete the activated S5 fresh51 on dual-granted exact head98d39610; preserve raw results for same-review final attestations.
-2. In parallel, complete S6's independent one-file P3 delta reviews. Both reachability dispositions are C, A01/A02 source closure remains applicable, and no extra product fix/test is authorized.
-3. Bind the existing S6 validation to P3 and the installed substrate, then explicitly transfer runtime after S5 release.
+1. Complete S6's dual-granted existing00–09 validation; actual results gate ordinary commit20–23.
+2. In parallel, correct only S5's observed proof-runner refusal without product/fixture changes, then obtain the same reviewers' changed-runner grant.
+3. Transfer runtime explicitly for existing S5 fresh51; preserve the failed prior attempt and no fabricated live result.
 4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
 5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
