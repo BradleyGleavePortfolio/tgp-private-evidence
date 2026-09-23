@@ -1,0 +1,7 @@
+R=/home/user/workspace/execution/e8d546f9/s4-native-result; C=/home/user/workspace/execution/e8d546f9/s4-native-prep/native-caller-v2.cmd; S=/home/user/workspace/execution/s4-r6-validation/native-caller-v2/s4-r6-native-caller-v2.sh
+[ -e "$R/native.log" ] && { echo "REFUSED: $R/native.log exists — single run only; no re-run without a new grant"; exit 3; }
+[ "$(sha256sum "$C" | cut -d' ' -f1)" = ef45fd8d8cc6276de070a9cd0a1674e34174360863327db09c564345d52bae84 ] && [ "$(sha256sum "$S" | cut -d' ' -f1)" = ba73a99b2602e5640a6339b3e1ec0e79e02272e00914fc5a60faf22f5630a1c1 ] || { echo "REFUSED: caller bytes changed"; exit 4; }
+( cd /home/user/workspace/execution/s4-r6-validation/v6 && sha256sum -c --quiet SHA256SUMS && [ "$(sha256sum SHA256SUMS | cut -d' ' -f1)" = 671d08c3633378ef392a4aee6bbb70b78319994727d74e439b75830a6d63d8ee ] ) || { echo "REFUSED: staged packet is not the frozen 671d08c3 bytes"; exit 5; }
+mkdir -p "$R" && cd "$R" || exit 70
+setsid -f bash -c 'echo "launch_utc=$(date -u +%FT%TZ) pid=$$ pgid=$(ps -o pgid= -p $$ | tr -d " ") sid=$(ps -o sid= -p $$ | tr -d " ") caller_sha256=$(sha256sum "$1" | cut -d" " -f1)"; bash "$1"; rc=$?; echo "end_utc=$(date -u +%FT%TZ) exit=$rc"; printf "%s\n" "$rc" > "$2.tmp" && mv -f "$2.tmp" "$2"; exit "$rc"' _ "$C" "$R/native.exit" </dev/null >"$R/native.log" 2>&1
+sleep 2; head -1 "$R/native.log"; sed -n 's/^launch_utc=.* pid=\([0-9]*\) .*/\1/p' "$R/native.log" | head -1 > "$R/native.pid"; echo "wrapper pid=$(cat "$R/native.pid") log=$R/native.log exit_receipt=$R/native.exit"

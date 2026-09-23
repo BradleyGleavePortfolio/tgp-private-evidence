@@ -42,13 +42,20 @@ Full current dispatch contract: execution/e8d546f9/SCOPE.md and subsequent exact
 | S4 native-caller-v2 independentB | s4_v6_1_delta_audit_b_mudeb4nm | Claude Fable5 | frozen audits/s4-native-caller-v2-b | COMPLETE8bece05b; independent A01 closure, V1 miss acknowledged |
 | S2 V59 result independentA | s2_v5_7_audit_a_muddwj9p | Parent inheritance | frozen audits/s2-v59-result-a | COMPLETE96e4d876; placement cause confirmed, P1/W1/C1/K1/K2 preserved |
 | S2 V59 result independentB | s2_v5_7_audit_b_muddwjaj | Claude Fable5 | frozen audits/s2-v59-result-b | COMPLETE41b5b5e0; same cause/status/cleanup; repeat scope governed by exact applicability |
-| S2 V60 K3 placement | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | execution/e8d546f9/s2-v60 | SOURCE ONLY attributable failure correction; preserve runner/assertions and valid prior evidence |
+| S2 V60 K3 placement | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | frozen execution/e8d546f9/s2-v60 | Intermediate2eb52088; brief edit/revert disclosed, present hashes restored; not executed or separately audited |
+| S2 V61 placement continuation | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | frozen execution/e8d546f9/s2-v61 | COMPLETEed24134220/20; K3/K4/N4b event placement only, runner/stubs unchanged |
+| S2 V61 independentA | s2_v5_7_audit_a_muddwj9p | Parent inheritance | frozen audits/s2-v61-a | COMPLETE4f90e206; source closed, retained subset applicable, continuation conditionally grantable |
+| S2 V61 independentB | s2_v5_7_audit_b_muddwjaj | Claude Fable5 | audits/s2-v61-b | ACTIVE independent exact final review |
 | S5 setup exclusion V3 | s4_v6_1_narrow_repair_muddwjaa | Claude Fable5 | frozen execution/e8d546f9/s5-setup-exclusion-v3 | COMPLETE8b128b4d13/13; launcher-only material delta, dual review active |
-| S5 setup V3 independentA | setup_exclusion_audit_a_mude0dvj | Parent inheritance | audits/s5-setup-v3-a | DISPATCHED exact four findings/delta/applicability, no peer/execution |
-| S5 setup V3 independentB | setup_exclusion_audit_b_mude0dw5 | Claude Fable5 | audits/s5-setup-v3-b | DISPATCHED same independently, no peer/execution |
+| S5 setup V3 independentA | setup_exclusion_audit_a_mude0dvj | Parent inheritance | frozen audits/s5-setup-v3-a | COMPLETEd9104403; prior four examples closed, V3-specific proof needed |
+| S5 setup V3 independentB | setup_exclusion_audit_b_mude0dw5 | Claude Fable5 | frozen audits/s5-setup-v3-b | COMPLETE3bb45135; prior four closed, new early-refusal dead end holds canonical |
+| S5 setup V3.1 correction/proof prep | s4_v6_1_narrow_repair_muddwjaa | Claude Fable5 | s5-setup-exclusion-v31; s5-setup-v3-controls | SOURCE ONLY current-attempt early-refusal closure and smallest deterministic private proof; no runtime |
 | S6 V101 consumer adaptation | s5_v10_1_narrow_repair_muddwjam | Claude Fable5 | frozen execution/e8d546f9/s6-owned-launch-v101 | COMPLETE6b2be23820/20 but known exclusion residual holds; not final-review/runtime ready |
 | S6 exclusion scoping | s5_v10_1_narrow_repair_muddwjam | Claude Fable5 | execution/e8d546f9/s6-exclusion-scope | MAP ONLY minimal exact outer-holder reuse for two consumers; no implementation/runtime |
-| S4 native prep/execution | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | frozen s4-native-prep; active exact native outputs/s4-native-result | ACTIVE since01:50:31UTC under grant20d42065; three receipts separate, no retry/recovery shortcut |
+| S4 native prep/execution | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | frozen s4-native-prep/s4-native-result; s4-native-npm-log-addendum | COMPLETE02df9f60111/111 actual0/observer0/SUCCESS; slot closed, logs supplement699a554a sealed |
+| S4 native result independentA | s4_v6_1_delta_audit_a_mudeb4mr | Parent inheritance | audits/s4-native-result-a | ACTIVE exact execution evidence review, no peer/runtime |
+| S4 native result independentB | s4_v6_1_delta_audit_b_mudeb4nm | Claude Fable5 | audits/s4-native-result-b | ACTIVE same independently, no peer/runtime |
+| S5 V2 private diagnostic executor | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | s5-setup-v2-control-result plus exact private outputs | ACTIVE from02:04:59UTC after log supplement sealed, grant a30e1602; V2 only, no canonical lock |
 
 V10B worker `shared_launch_v10_audit_b_muddwjag` is BLOCKED by provider safety classifier on passive review; follow-up clarification also blocked. No verdict, independence or approval inferred. Stopped affected task; no substitute model/tool used to bypass provider restriction. Original status artifact retained.
 
@@ -58,7 +65,7 @@ Parent alone writes canonical telemetry/private publication and owns remote oper
 
 Fresh conditional S2SETUP grant is recorded in execution/e8d546f9/S2_SETUP_GRANT.md: sole executor restore_upstream_proof_inputs_muddwjad, after exact restoration/hash/capacity checks. Existing setup05 bytes only; client/PG-binary/locked dependency installation, no server/DB/control/test/product changes. Other workers remain read/source/syntax-only as assigned. No other process/control/install/runtime/browser/canonical-lock/hook/commit/product/hosted/release/customer grant.
 
-S2SETUP CLOSED9c114363; S4_STAGE1 CLOSED/PASS9c84eab2; S5_V101_CONTROL CLOSED/PASS8e16701b; S2_V59_CONTROL CLOSED/STOPd749a4b1 at01:37:09UTC, all with attributable clean accounting. S4_NATIVE_V2_GRANT ACTIVE from01:50:31UTC; exact activation recorded separately. S5_SETUP_V2_CONTROL_GRANT QUEUED only, no automatic launch. Source/restoration and reviews remain parallel; no competing runtime grant.
+S2SETUP CLOSED9c114363; S4_STAGE1 CLOSED/PASS9c84eab2; S5_V101_CONTROL CLOSED/PASS8e16701b; S2_V59_CONTROL CLOSED/STOPd749a4b1; S4_NATIVE_V2 execution CLOSED02df9f60 at01:56:02UTC with independent acceptance pending and qualified global-fd visibility. S5_SETUP_V2_CONTROL conditionally activated after S4 log preservation, fake-only under a30e1602. Source/reviews parallel; no competing runtime.
 
 Canonical nonblocking lock /home/user/workspace/execution/test-validation.lock was absent00:44UTC; absence grants nothing. Later exact execution grants require frozen commands/inputs, expected raw statuses, owned signals/writes, bounds and cleanup evidence. Source/review stays parallel; heavy resources serialized.
 

@@ -1,0 +1,50 @@
+utc=2026-09-23T02:02:25Z A2: attribution cross-check against run records (read-only)
+--- step windows (EXIT_RECORD)
+S10-npm-ci                                    2026-09-23T01:50:54Z → 2026-09-23T01:50:57Z  cmd=npm ci --no-audit --no-fund --loglevel=info
+S10b-toolchain-provenance                     2026-09-23T01:50:58Z → 2026-09-23T01:51:00Z  cmd=bash -c 
+  echo "node_modules_package_lock_sha256=$(sha256sum node_modules/.package-lock.j
+S11-gitleaks-install                          2026-09-23T01:51:01Z → 2026-09-23T01:51:01Z  cmd=bash scripts/install-gitleaks.sh /home/user/workspace/execution/s4-r6-validation/tooling/g
+S11b-gitleaks-version                         2026-09-23T01:51:02Z → 2026-09-23T01:51:02Z  cmd=bash -c [[ $(gitleaks version) == 8.30.0 ]] || { echo "gitleaks version $(gitleaks version
+S20-gates                                     2026-09-23T01:51:03Z → 2026-09-23T01:51:35Z  cmd=npm run gates
+S30-focused-vitest                            2026-09-23T01:51:39Z → 2026-09-23T01:51:53Z  cmd=npx --no-install vitest run --reporter=default --reporter=json --outputFile.json=/home/use
+S31-full-suite                                2026-09-23T01:51:54Z → 2026-09-23T01:55:21Z  cmd=npx --no-install vitest run --passWithNoTests=false --reporter=default --reporter=json --o
+S45-a01-late-reporting-candidate-expect-defect-must-fail 2026-09-23T01:55:27Z → 2026-09-23T01:55:27Z  cmd=node /home/user/workspace/execution/s4-r6/probes/a01-late-reporting-discriminator.mjs /hom
+S50-package                                   2026-09-23T01:55:28Z → 2026-09-23T01:55:29Z  cmd=node scripts/package-extension.mjs --root /home/user/workspace/worktrees/s4-r6 --out /home
+--- S20 gates step command (npm run sub-calls?)
+npm run gates
+--- worktree package.json scripts relevant to gates/hooks (source at 91990ae9):
+  prepare: lefthook install
+  check:banned: node scripts/check-banned.mjs
+  check:flags: node scripts/check-flag-discipline.mjs
+  check:fixtures: node scripts/check-production-fixtures.mjs
+  check:production-preflight: node scripts/check-deploy-readiness.mjs
+  check:hooks: node scripts/check-hook-config.mjs
+  lint: eslint --max-warnings=0 --config scripts/eslint.config.mjs .
+  type-check: tsc -p jsconfig.json && tsc -p jsconfig.scripts.json
+  format:check: node scripts/check-format.mjs
+  gates: npm run check:banned && npm run check:flags && npm run check:fixtures && npm run check:production-preflight && npm run check:hooks && npm run lint && npm run ty
+  devDependencies.lefthook = 2.1.12
+--- 'importer-gate' temp-dir origin in source (test that spawns npm run type-check):
+worktrees/s4-r6/test/policy-gates.spec.js
+worktrees/s4-r6/test/policy-gates.spec.js:18:  const dir = mkdtempSync(join(tmpdir(), "importer-gate-"));
+--- lefthook hook creation evidence
+14:npm http fetch GET 200 https://registry.npmjs.org/lefthook/-/lefthook-2.1.12.tgz 607ms (cache miss)
+64:npm http fetch GET 200 https://registry.npmjs.org/lefthook-linux-x64/-/lefthook-linux-x64-2.1.12.tgz 2055ms (cache miss)
+68:npm info run lefthook@2.1.12 postinstall node_modules/lefthook node postinstall.js
+69:npm info run lefthook@2.1.12 postinstall { code: 0, signal: null }
+72:> lefthook install
+hook file: worktrees/s4-r6/.git/hooks/pre-commit exists=yes sha256=ea98e08eb1f6e072 mtime=2026-09-23T01:50:57Z lines=71 mentions_lefthook=32
+other hooks created: pre-commit 
+S10b assertion (runner source L116-117):   echo "npm_ls_all_json_sha256=$(npm ls --all --json 2>/dev/null | sha256sum | cut -d" " -f1)"
+  if [[ -f .git/hooks/pre-commit ]] && grep -q lefthook .git/hooks/pre-commit; then echo hook_installed=yes; else echo hook_installed=NO; exit 90; fi
+check:hooks gate output (S20 log):
+4:> npm run check:banned && npm run check:flags && npm run check:fixtures && npm run check:production-preflight && npm run check:hooks && npm run lint && npm run type-check && npm run format:check
+5-
+6-
+7-> tgp-importer-extension@0.3.0-rc.1 check:banned
+--
+35:> tgp-importer-extension@0.3.0-rc.1 check:hooks
+36-> node scripts/check-hook-config.mjs
+37-
+did any git commit/push run? console/step logs 'git commit'/'git push' occurrences: 0; worktree reflog entries added during run: 2 total, HEAD unchanged 91990ae9
+utc_end=2026-09-23T02:02:25Z

@@ -1,0 +1,52 @@
+[2026-09-23T01:51:03Z] S20-gates cwd=/home/user/workspace/worktrees/s4-r6 head=91990ae9aec72f47a67591892ac09fa1f59d2f16 dirty=0 :: npm run gates
+
+> tgp-importer-extension@0.3.0-rc.1 gates
+> npm run check:banned && npm run check:flags && npm run check:fixtures && npm run check:production-preflight && npm run check:hooks && npm run lint && npm run type-check && npm run format:check
+
+
+> tgp-importer-extension@0.3.0-rc.1 check:banned
+> node scripts/check-banned.mjs
+
+OK: banned-token net clean (source patterns + 0111be661922234d670bbf23e23d270eec1b4a4e commit identity)
+
+> tgp-importer-extension@0.3.0-rc.1 check:flags
+> node scripts/check-flag-discipline.mjs
+
+flag discipline — PAIRING_ENABLED=true (sole auth path)
+OK: sole auth path is enabled — no dark-merged dead-end
+
+> tgp-importer-extension@0.3.0-rc.1 check:fixtures
+> node scripts/check-production-fixtures.mjs
+
+production fixture exclusion — scanned=44 violations=0
+OK: production modules do not reference test fixtures or mocks
+
+> tgp-importer-extension@0.3.0-rc.1 check:production-preflight
+> node scripts/check-deploy-readiness.mjs
+
+PRODUCTION STATIC PREFLIGHT (manifest, entrypoint, markers only)
+PASS  manifest-v3
+PASS  background-worker-declared
+PASS  background-worker-exists
+PASS  version-format
+PASS  forbidden-production-markers
+EXIT: STATIC PREFLIGHT CHECKS CLEAR
+
+> tgp-importer-extension@0.3.0-rc.1 check:hooks
+> node scripts/check-hook-config.mjs
+
+OK: pinned pre-commit hook semantically checks the effective 117-file production/test/scripts set and formatting
+
+> tgp-importer-extension@0.3.0-rc.1 lint
+> eslint --max-warnings=0 --config scripts/eslint.config.mjs .
+
+
+> tgp-importer-extension@0.3.0-rc.1 type-check
+> tsc -p jsconfig.json && tsc -p jsconfig.scripts.json
+
+
+> tgp-importer-extension@0.3.0-rc.1 format:check
+> node scripts/check-format.mjs
+
+OK: Prettier checked 52 tracked files with no ignored or unformatted file
+[2026-09-23T01:51:35Z] S20-gates exit=0 (32s) orphans_found=0 reaped_verified=true

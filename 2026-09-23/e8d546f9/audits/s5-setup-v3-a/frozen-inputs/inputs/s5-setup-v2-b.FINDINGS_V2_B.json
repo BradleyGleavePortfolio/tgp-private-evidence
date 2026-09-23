@@ -1,0 +1,85 @@
+{
+  "slice": "OP88-S5-SETUP-EXCLUSION v2 (S5-V101-BUILD)",
+  "reviewer": "B (independent passive nonbuilder; read-only; nothing executed; no bash -n; current peer s5-setup-v2-a not read)",
+  "reviewed_at_utc": "2026-09-23T01:38:23Z",
+  "input_manifest_sha256": "b96dc732fcc63544fe7db05c753793403fd47ae8f43d51d7d91c0297fd02c06c",
+  "input_entries": 33,
+  "input_verification": "sha256sum -c 33/33 OK; embedded OWN-BLOCK v10.1 4aebf96f byte-identical in launcher v2, runner v101x, runner v101; all 7 shipped diffs equal recomputed diff -u; v101->v101x = header + exact v10x inherited-lease hunk only; PIN_RUNNER/PIN_L match; 0 code refs to RECOVERY_ACCEPT/handoff/census_state/own_census in consumer; 0 rm -rf/pkill/pgrep -f in ctl/fake; 11 checks",
+  "candidate_hashes": {
+    "launch-s5-setup-exclusion.v2.sh": "b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09",
+    "run-s5-setup-npm-ci.v101x.sh": "81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a",
+    "observe-s5-setup-exclusion.v2.sh": "b70b04ea0421b4e016406191ea8b3f864fa0d1001f1e159bb2414ab2bad3745c",
+    "controls-exclusion/ctl-exclusion.v2.sh": "62a7233fc1c3405b0ed6874c0ebdc8ff64eaa210691db59b6190f2d16df1fd3c",
+    "controls-exclusion/fake-runner.v2.sh": "5c18e3b320f6be15053a0a6667009cf14cbfe29f337090ae5a966962ffdbee0f",
+    "own-block-v101": "4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5"
+  },
+  "prior_findings_closure": {
+    "S5X-A-01 / SEB-B-01": "closed (inner_sids by runner-published IDENTITY self_sid==SESSION; typed session_state; release requires empty; inner never signalled)",
+    "S5X-A-02": "closed (census_state deleted; no registry decisions; foreign/unknown -> SELF-HOLD; v10.1 retains session authority)",
+    "S5X-A-03 / SEB-B-03": "closed (normal caller -> self_hold; nothing-launched -> say + exit 74)",
+    "S5X-A-04": "closed by deletion (0 code references; RECOVERY=none)",
+    "S5X-A-05": "closed with gap V2-B-02 (observer v2 snapshot/token match; preserve_prior omits LEASE_HOLDER)",
+    "S5X-A-06": "closed (X1 OWN_ROOT path; X2/X3/X4 assertions bound to records and actual exit)",
+    "S5X-A-07": "closed (latch_raw; pub_add accumulation; RELEASE written before holder update, rewritten once on failure)",
+    "SEB-B-02": "closed (repair_marker_dir removes only <name>.tmp.<launcher pid> then rmdir; bounded retries; no rm -rf/pkill)",
+    "SEB-B-06": "closed (fake subsession-90 models setsid sub-session + IDENTITY/EXIT_RECORD truth + exit 90; typed pid_gone)"
+  },
+  "verdicts": {
+    "fake_only_11_check_request": "READY (bounded private diagnostic; all 11 checks trace to PASS statically; conditions: fresh S5X_OUT outside packet, actual driver exit recorded, retained-holder recovery = fixture directory repair only, no kill/handoff)",
+    "canonical_setup_readiness": "NOT READY (needs the control run with 11 PASS + records; V2-B-01/V2-B-02 fixed or explicitly accepted; fresh prerequisites; V10.1 primitive/T0 verdicts; dual final-head)",
+    "v101_primitive_applicability_for_this_consumer": "POSITIVE, explicit, narrow: consumer decisions never read registry; v10.1 changes affect evidence lines and outer-authority retention only; consumer also correct with v10 block; not inherited"
+  },
+  "findings": [
+    {
+      "id": "V2-B-01",
+      "severity": "Medium",
+      "scope": "canonical use only (fresh EXD per fake case is unaffected)",
+      "title": "runner_truth reads the shared setup.EXIT_RECORD without binding to this attempt; stale prior-attempt content becomes this attempt's recorded runner truth",
+      "evidence": [
+        "launcher v2 L167-L171 runner_truth reads $EX/logs/setup-v1/setup.EXIT_RECORD; no token/holder binding",
+        "runner v101x L206 truncates EXIT_RECORD only at its own START; L212 writes 'lease INHERITED ... token=<TOKEN> holder_pid=...' (usable binding, unused)",
+        "launcher L211-L212 not-released path -> exceptional -> session_state reads whatever EXIT_RECORD exists"
+      ],
+      "consequence": "stale 'state=released' with no IDENTITY bound to SESSION -> unknown -> indefinite SELF-HOLD with nothing running, no handoff (out-of-band file move recovers); RUNNER_NOTE in SELF_HOLD/LEASE_RELEASE may describe another attempt (record-identity truth). No false-release path.",
+      "smallest_fix": "runner_truth requires 'lease INHERITED .* token=$TOKEN ' else RUNNER_NOTE=exit_record=not-this-attempt and treat as absent (new launcher hash, PIN_L update, dual re-review)",
+      "blocks": ["canonical readiness unless explicitly accepted by parent"]
+    },
+    {
+      "id": "V2-B-02",
+      "severity": "Medium",
+      "scope": "canonical use only (retention)",
+      "title": "preserve_prior does not preserve the prior attempt's LEASE_HOLDER (or $LOGS/SELF_HOLD fallback); a crashed prior holder's only identity record is overwritten",
+      "evidence": [
+        "launcher v2 L147 for f in LEASE_RELEASE SELF_HOLD",
+        "launcher v2 L151 own_record $EX/LEASE_HOLDER replaces in place",
+        "approved map L6 also specified refusing a live prior LEASE_HOLDER; omitted in v2 (redundant with flock -n, but a deviation to record)"
+      ],
+      "consequence": "prior unresolved exit (state=RUNNING/SELF-HOLD without RELEASE) and its holder pid/sid/pgid/start_time are not reconstructable from $EX; launcher.EXIT_RECORD retains states/token only",
+      "smallest_fix": "add LEASE_HOLDER (and $LOGS/SELF_HOLD) to preserve_prior, mv by token",
+      "blocks": ["canonical readiness unless explicitly accepted by parent"]
+    }
+  ],
+  "residuals_noted": [
+    "foreign inner/outer sid number -> indefinite observable SELF-HOLD (parent disposition)",
+    "unadopted gate child in own session not censused; never execs workload; self-exits <=5 s",
+    "second TERM during SELF-HOLD -> second outer escalation + nested self_hold overwriting $EX/SELF_HOLD reason (log retains)",
+    "launcher KILL at 30 s may cut the runner's own npm reap; launcher then holds on inner census, never signals inner",
+    "no EXIT trap (declined): unexpected abort frees lock silently; no new set -u hazards found in added code",
+    "pid-number reuse detection is the primitive's sid==pgid heuristic (not re-audited)"
+  ],
+  "static_control_traces": {
+    "X1": "PASS", "X2": "PASS (~34 s)", "X3": "PASS (124)", "X4": "3 checks PASS (repair converges within one heartbeat even under race)",
+    "X5": "2 checks PASS (~13 s; v1 would have released with verified-empty)", "X6": "2 checks PASS", "X7": "PASS (143 expected; 124/137 accepted)",
+    "driver_total_estimate_s": "105-130 (< 230)"
+  },
+  "smallest_next_proof": {
+    "grant_now": "CONTROL_REQUEST_V2.md exact command; S5X_OUT fresh and outside the packet; record driver exit; retain all listed records; retained-holder recovery limited to fixture directory repair",
+    "before_canonical": [
+      "control run 11 PASS with records",
+      "V2-B-01 + V2-B-02 fixed (two launcher edits, new hash, dual exact re-review) or explicit parent acceptance",
+      "fresh source/dependency/resource/grant prerequisites",
+      "V10.1 primitive and T0 verdicts",
+      "dual final-head attestation on exact bytes"
+    ]
+  }
+}

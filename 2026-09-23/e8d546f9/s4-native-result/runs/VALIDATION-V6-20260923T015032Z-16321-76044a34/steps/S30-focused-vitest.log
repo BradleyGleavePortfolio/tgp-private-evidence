@@ -1,0 +1,57 @@
+[2026-09-23T01:51:39Z] S30-focused-vitest cwd=/home/user/workspace/worktrees/s4-r6 head=91990ae9aec72f47a67591892ac09fa1f59d2f16 dirty=0 :: npx --no-install vitest run --reporter=default --reporter=json --outputFile.json=/home/user/workspace/execution/s4-r6-validation/runs/VALIDATION-V6-20260923T015032Z-16321-76044a34/steps/S30-focused.vitest.json test/session-ownership-preflight.spec.js test/refresh-admission-epoch.spec.js test/session-ownership.spec.js test/refresh-coalesce.spec.js test/ingest-auth.spec.js test/session-refresh-path.spec.js test/session-establishment.spec.js test/start-import-hardening.spec.js test/session-lifecycle.spec.js
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/workspace/worktrees/s4-r6[39m
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2maccepted Start binds its owner before the cold preflight refresh (S4-R4-A-01)[2m > [22m[2mstart_import: preflight refresh TIMEOUT after the replacement landed → replaced, not 'login required'
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2ma refresh on behalf of an obsolete run never presents the replacement's token (S4-R4-A-02)[2m > [22m[2mcontrol — rotation persist FAILURE for the current session: no new token published, auth_required exactly once, no replacement involved
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+ [32m✓[39m test/session-ownership-preflight.spec.js [2m([22m[2m19 tests[22m[2m)[22m[33m 4834[2mms[22m[39m
+     [33m[2m✓[22m[39m start_import: replacement queued behind the preflight refresh's rotation persist (C3 barrier) → run stops, replacement never used [33m 618[2mms[22m[39m
+     [33m[2m✓[22m[39m control — start_import cold preflight with no transition: mints once and imports under the minted bearer [33m 1012[2mms[22m[39m
+     [33m[2m✓[22m[39m control — pending establish FAILURE during the preflight refresh: the OLD session stays current and the run proceeds under it [33m 1009[2mms[22m[39m
+     [33m[2m✓[22m[39m settlement (complete) 401 → refresh queued behind the replacement's establish: nothing presented, run left unsettled, replacement intact [33m 1012[2mms[22m[39m
+     [33m[2m✓[22m[39m control — ingest 401 → refresh with no transition: OLD presented once, retry under the minted bearer, success [33m 1005[2mms[22m[39m
+ [32m✓[39m test/refresh-admission-epoch.spec.js [2m([22m[2m14 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+[90mstderr[2m | test/session-ownership.spec.js[2m > [22m[2ma run whose session is replaced mid-refresh (S4-R3-A-02)[2m > [22m[2mstale refresh TIMEOUT after replacement: no clear, no auth_required, run stops
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+ [32m✓[39m test/session-ownership.spec.js [2m([22m[2m7 tests[22m[2m)[22m[33m 1138[2mms[22m[39m
+     [33m[2m✓[22m[39m replacement with NO 401 at all: the next batch is not sent under the replacement's bearer [33m 1007[2mms[22m[39m
+ [32m✓[39m test/start-import-hardening.spec.js [2m([22m[2m7 tests[22m[2m)[22m[33m 4628[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the token out of broadcasts, storage, notifications, and ingest payloads [33m 1050[2mms[22m[39m
+     [33m[2m✓[22m[39m reports ingest_failed and never broadcasts success when complete returns 500 [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m finalises but reports ingest_partial (not success) when a page is skipped [33m 2523[2mms[22m[39m
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma rotation-persist FAILURE preserves prior state and fails closed (no torn pair)
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma refresh network error returns null and never throws out of refresh
+[22m[39m{"src":"tgp-importer","event":"refresh_network_error"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma refresh that times out returns null (bounded, never hangs)
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-lifecycle.spec.js[2m > [22m[2mrefresh serialization vs logout (no stale resurrection)[2m > [22m[2ma malformed refresh body returns null (explicit parse, fail closed)
+[22m[39m{"src":"tgp-importer","event":"refresh_body_parse_error"}
+
+ [32m✓[39m test/session-lifecycle.spec.js [2m([22m[2m15 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m test/session-establishment.spec.js [2m([22m[2m19 tests[22m[2m)[22m[32m 145[2mms[22m[39m
+[90mstderr[2m | test/session-refresh-path.spec.js[2m > [22m[2mno refresh-token persistence regression[2m > [22m[2mkeeps the stored token when the network call rejects
+[22m[39m{"src":"tgp-importer","event":"refresh_network_error"}
+
+[90mstderr[2m | test/session-refresh-path.spec.js[2m > [22m[2mno refresh-token persistence regression[2m > [22m[2mkeeps the stored token when the response body is unparseable
+[22m[39m{"src":"tgp-importer","event":"refresh_body_parse_error"}
+
+ [32m✓[39m test/session-refresh-path.spec.js [2m([22m[2m19 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m test/ingest-auth.spec.js [2m([22m[2m4 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m test/refresh-coalesce.spec.js [2m([22m[2m1 test[22m[2m)[22m[32m 38[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[32m105 passed[39m[22m[90m (105)[39m
+[2m   Start at [22m 01:51:40
+[2m   Duration [22m 13.38s[2m (transform 1.05s, setup 0ms, import 1.02s, tests 10.99s, environment 1ms)[22m
+
+JSON report written to /home/user/workspace/execution/s4-r6-validation/runs/VALIDATION-V6-20260923T015032Z-16321-76044a34/steps/S30-focused.vitest.json
+[2026-09-23T01:51:53Z] S30-focused-vitest exit=0 (14s) orphans_found=0 reaped_verified=true

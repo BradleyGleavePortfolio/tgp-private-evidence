@@ -1,0 +1,7 @@
+R=/home/user/workspace/execution/e8d546f9/s4-native-result; VAL=/home/user/workspace/execution/s4-r6-validation
+cp -a "$VAL/caller-receipts" "$R/caller-receipts" 2>/dev/null; cp -a "$VAL/runs" "$R/runs" 2>/dev/null; ( cd "$VAL/v6" && sha256sum -c --quiet SHA256SUMS && echo "staged packet still 671d08c3: $(sha256sum SHA256SUMS | cut -c1-16)" ) > "$R/packet-after-run.txt"
+( cd "$R" && find . -type f ! -name SHA256SUMS.native | sort | xargs sha256sum > SHA256SUMS.native )
+echo "[1] transport observer exit (native.exit) = $(cat "$R/native.exit")"
+echo "[2] caller receipt(s):"; ls "$R"/caller-receipts/NATIVE-CALLER-*.txt 2>/dev/null; grep -h 'ACTUAL_LAUNCHER_EXIT=' "$R"/caller-receipts/NATIVE-CALLER-*.txt 2>/dev/null; echo "receipt complete (SEMANTICS line present): $(grep -c '^SEMANTICS:' "$R"/caller-receipts/NATIVE-CALLER-*.txt 2>/dev/null)"; ls "$VAL"/caller-receipts/*.tmp 2>/dev/null && echo "PARTIAL .tmp receipt present — not a result"
+echo "[3] SUPERVISOR_RECORD:"; ls "$R"/runs/VALIDATION-V6-*/SUPERVISOR_RECORD.json 2>/dev/null; for f in "$R"/runs/VALIDATION-V6-*/SUPERVISOR_RECORD.json; do [ -f "$f" ] && python3 -c 'import json,sys;L=json.load(open(sys.argv[1]));print("overall=",L.get("overall"),"launcher_exit=",L.get("launcher_exit"),"runner.exit=",(L.get("runner") or {}).get("exit"),"lease.self_hold=",(L.get("lease") or {}).get("self_hold"))' "$f"; done
+echo "stdout contract lines:"; grep -h -E '^(launcher exit=|caller receipt=)' "$R/native.log"

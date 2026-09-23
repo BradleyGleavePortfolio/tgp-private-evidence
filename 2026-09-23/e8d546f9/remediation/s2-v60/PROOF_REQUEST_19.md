@@ -1,0 +1,24 @@
+# PROOF_REQUEST_19 — real S2 composition proof with runner v5.7 (NOT executed; separate grant AFTER CONTROL_REQUEST_18 is green and its control evidence has two independent reviews)
+
+Carry-forward of PROOF_REQUEST_17: the runner is BYTE-IDENTICAL to V57/V58/V59 (efa273c7…); only the candidate-check/invocation paths (V60 lane) change. The bound qualification is retained unchanged. The runner's real-mode output stays under its pinned lane `execution/op88/s2-v57/composition-r57/<utc>/` (runner L97/L120) and its lock is the canonical `execution/test-validation.lock`.
+
+Executes the real PG17 fixture, real harness `test/release/s1s2-composition.sh`, pinned Prisma CLI inside `worktrees/s2-runner53` (d5cd, unchanged). Supersedes PROOF_REQUEST_13 only by path (see above); P-01/P-02/P-03 corrections retained.
+
+## Preconditions (runner refuses 70 on any failure; verify and stamp before start)
+1. CONTROL_REQUEST_18 green (continued sets all 0) together with the retained V59 probe/wdtest/wdcancel results (0/0/3), and two independent reviews of that control evidence, results frozen and reviewed by two independent auditors.
+2. Fresh setup executed and receipted: `execution/e8d546f9/s2-setup-result/SETUP_RESULT.md` (0f51a22e…; stages S10/S20/S30 raw 0; stamp `lock=62b05b90…`, `prisma_cli_sha256=c2a77456…`; PG 17.6 pins re-hashed; worktree clean at d5cd) — applicable environment evidence, no reinstall requested. Original requirement retained for the record: PG17 binaries at the fixture's expected path; `npm ci` from the pinned lockfile (sha 62b05b90… == `EXPECT_LOCK_SHA`) with Prisma CLI `node_modules/prisma/build/index.js` sha c2a77456… == `EXPECT_PRISMA_CLI_SHA`; **the setup MUST write `worktrees/s2-runner53/node_modules/.s2-composition-install-stamp` containing the line `lock=62b05b90…` (full EXPECT_LOCK_SHA)** — runner L409–L411 refuses 70 without it (P-02).
+3. Worktree at d5cd9b8b…, `git status --porcelain` empty; fixture **`execution/s2-setup-prep/infra/s2-fixture-r53.sh`** sha 9fcc3696… == `EXPECT_FIXTURE_SHA` with `^PORT=…;` and `^NS=…` pins (runner L101, L121, L415–L416) (P-03); product unchanged.
+4. Canonical lane lock `/home/user/workspace/execution/test-validation.lock`: one explicitly granted slot (a free lock is not permission); runner holds fd 9 through cleanup.
+5. `S2_RUNNER_STUBS` unset; `CHECKPOINT_DISABLE=1`, `env -i` behaviour as in v5.5/v5.6 (unchanged).
+
+## Invocation (one slot; outer bound reconciled with the runner header, P-01)
+```
+export GIT_OPTIONAL_LOCKS=0
+cd /home/user/workspace/execution/e8d546f9/s2-v60 && sha256sum -c --quiet SHA256SUMS.outer \
+ && timeout --foreground -k 60 2100 bash run-composition-r57-v5.7-when-granted.sh; echo "runner=$?"
+```
+Bound qualification (corrects the false derivation carried since PROOF_REQUEST_11/13/15; B57-04, S2-V58-A scope note): `timeout --foreground -k 60 2100` (runner header L108) is a REAL-TIME SAFETY CAP, not a sum of declared step maxima. The runner's declared per-step maxima total 2430 s (steps 10/20/21/30/31 at 120 s each = 600; step 32 = 30; step 40 `BOUND40=1500` (L457); step 45 = 300), plus `CLEANUP_BUDGET=50` = 2480 s, plus `OUTER_GRACE=60` = 2540 s — MORE than 2100 s. This is accepted, not hidden: steps 10–32 and 45 realistically take seconds to low minutes, so step 40's full 1500 s fits inside 2100 s with margin; if the cap is reached the result is a visible `final=143`/`signal=TERM` (runner) or 124 (outer `timeout`) with cleanup inside the 60 s grace — never a false pass, never a silent extension. Raising the bound would need a runner header change (not authorized); the 900 s bound (PROOF_REQUEST_11) stays withdrawn.
+Output: `execution/op88/s2-v57/composition-r57/<utc>/` (runner-pinned lane) with stamp.txt, step logs, exit-codes.txt, SHA256SUMS, RECEIPT.txt, SHA256SUMS.outer, PUBLICATION.txt. Expected `final=0`, `receipt_status=ok`, `publication_status=ok deadline_exceeded_at_publication=no`, `survivors=none`. Stdout last line: `RECEIPT: … PUBLICATION: status=ok publication_file=ok deadline_at_publication=no process_exit=0`.
+
+## Exclusions
+No destroy beyond the runner's own bounded `fixture stop` of the fixture it started; nothing erased on refused/quarantined paths (70/72). No network, commits, canonical publication, product/fixture/schema/lockfile changes. No retries: return the frozen output directory and stop. 75 (lock busy)/70 (refusal) are valid non-failing stops; 71/72 require parent inspection of QUARANTINE.txt before any other slot.

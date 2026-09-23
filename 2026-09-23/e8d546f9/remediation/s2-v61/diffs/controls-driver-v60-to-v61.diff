@@ -1,0 +1,171 @@
+--- a/s2-v60/controls-proposed/run-controls-v60.sh
++++ b/s2-v61/controls-proposed/run-controls-v61.sh
+@@ -1,23 +1,27 @@
+ #!/usr/bin/env bash
+-# PROPOSED, NOT EXECUTED (S2-V60, 2026-09-23). Successor of execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh
+-# (924768a25c644da980f320d331d1d767fc202343f03260177c62fddb4b839706, immutable) — v60 delta bound ONLY to the ACTUAL V59 control failure S2-V59-K3-PLACEMENT
+-# (execution/e8d546f9/s2-v59-control-result, set k aggregate 1 at 2026-09-23T01:37:09Z; FINDINGS_MAP_V60.md):
++# PROPOSED, NOT EXECUTED (S2-V61, 2026-09-23). Successor of execution/e8d546f9/s2-v60/controls-proposed/run-controls-v60.sh (19f8602a81df91031bb418fc6104dd04f4784bb3a0efc09d067a2f6bbda60e17,
++# frozen, K3-only — NOT to be executed: its predicted K4 failure is known) and of execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh
++# (924768a25c644da980f320d331d1d767fc202343f03260177c62fddb4b839706, immutable, the actually executed driver). v61 delta bound ONLY to the ACTUAL V59 control failure
++# S2-V59-K3-PLACEMENT (execution/e8d546f9/s2-v59-control-result, set k aggregate 1 at 2026-09-23T01:37:09Z; Result-A S2-V59-RESULT-A01 96e4d876…, Result-B 41b5b5e0…;
++# FINDINGS_MAP_V61.md) and to its two same-class sites confirmed by both frozen result reviews (parent-permitted, NOT RUN, not new observed failures):
+ #   K3-PLACEMENT  v59 K3 placed its "TERM during step 40" by an ELAPSED-TIME GUESS: the enclosure's outer bound (`run_runner … 3` → `timeout … 3`) fired at +3 s,
+ #                 but on this host the unchanged runner reaches step 40 only ≈3.6 s after enclosure start (steps 20/21 are the REAL harness refusals, ≈1.2 s
+ #                 each: K2 acks 20→21→30→40 at +0.65/+1.82/+3.01/+3.57 s; the K3 TERM landed at 01:37:08 while step 30 was active). The runner's own
+ #                 behaviour under that TERM was clean (143, reap ok, cleanup 0, lock held); the control's placement, not the runner, missed.
+-#                 v60: the K3 TERM is sent ONLY after the runner's OWN attributable evidence that step 40 is ACTIVE — its adoption ack
+-#                 `<out>/.pgid/40-composition.pgid.ack` (runner L155, written before the leader execs) AND the harness workload line
+-#                 `stub harness … mode=sleep` in `<out>/40-composition.log` — by a controller-listed, identity-validated controller of exactly the N5b
+-#                 seam-controller shape (ctrl_arm/ctrl_book latch; runner pid taken from the runner's `lock acquired pid=` stamp and validated to be in
+-#                 the CURRENT enclosure authority before the single `kill -TERM <pid>`; a timed-out wait sends NOTHING and STRIKEs). Consequences that
+-#                 are NOT weakenings: the enclosure bound becomes a fail-safe (12 s) instead of the trigger, so the outer status expected from `timeout`
+-#                 is the runner's own 143 (TERM delivered by the controller) rather than 124 — the SAME status/shape N5b already asserts — and one
+-#                 assertion is ADDED: the runner's stamp must say the SIGTERM arrived during step '40-composition' (placement confirmed, not inferred).
+-#                 Every K3 composition/stop/ordering/lock/survivor predicate is unchanged. K3's declared max 12 → 18 (bound 12 + grace 5 + bookkeeping).
+-#   Lanes: driver/stubs/K1/results in execution/e8d546f9/s2-v60 ($R60); runner BYTE-IDENTICAL to v5.7 (efa273c7…), pinned lane execution/op88/s2-v57 ($RLANE, parent-accepted).
+-#   NOT changed (reported for the parent BEFORE any expansion, FINDINGS_MAP_V60.md §necessity): K4 (`KA=20 run_runner … 3`, escape mode needs step 40 active)
+-#                 and N4b (`KA=8 run_runner … 4`, asserts TERM during step '40-composition') place their TERM by the SAME elapsed-time guess (3 s / 4 s vs ≈3.6 s).
++#                 Same class, NOT RUN: K4 (v59 D312 `KA=20 run_runner … 3`, escape mode spawns the escapee INSIDE step 40) and N4b (v59 D451 `KA=8 run_runner … 4`,
++#                 asserts TERM during step '40-composition').
++#   v61 mechanism (ONE driver-only helper pair, step40_arm/step40_wait, defined after OUT57; used at exactly K3, K4, N4b): the TERM is sent ONLY after the runner's
++#                 OWN attributable evidence that step 40 is ACTIVE — its adoption ack `<out>/.pgid/40-composition.pgid.ack` (runner L155, written before the leader
++#                 execs) AND the harness workload line `stub harness … mode=<mode>` in `<out>/40-composition.log` (K4 additionally: the harness `escapee pid=<n>
++#                 start=<ticks>` line, so the quarantine scenario exists) — by a controller-listed, identity-validated controller of exactly the N5b seam-controller
++#                 shape (ctrl_arm/ctrl_book latch; runner pid taken from the runner's `lock acquired pid=` stamp and validated to be in the CURRENT enclosure
++#                 authority before the single `kill -TERM <pid>`; a timed-out wait (8 s) sends NOTHING and STRIKEs). Consequences that are NOT weakenings: the
++#                 enclosure bound becomes a fail-safe (K3 12 s, K4 25 s = 3.6 s + reap 10+5 s + margin, N4b 12 s) instead of the trigger, so the outer status
++#                 expected from `timeout` is the runner's own 143 (TERM delivered by the controller) rather than 124 — the SAME status/shape N5b already asserts —
++#                 and at K3 and K4 one assertion is ADDED: the runner's stamp must say the SIGTERM arrived during step '40-composition' (N4b already asserted it).
++#                 Declared maxima (truthful budgets): K3 12→18, K4 25→32, N4 34→40. Every scenario/status/ordering/lock/survivor predicate, the runner, stubs,
++#                 K1 mechanism, ownership/cleanup authority, set budgets and selectors are unchanged. No larger sleep anywhere.
++#   Lanes: driver/stubs/K1/results in execution/e8d546f9/s2-v61 ($R61); runner BYTE-IDENTICAL to v5.7 (efa273c7…), pinned lane execution/op88/s2-v57 ($RLANE, parent-accepted).
+ # ---- v59 header retained below for provenance ----
+ # PROPOSED, NOT EXECUTED (S2-V59, 2026-09-23). Successor of execution/e8d546f9/s2-v58/controls-proposed/run-controls-v58.sh
+ # (1e2e32eb15a7d045dd0f398d96997a65eea09a21575be74387dad5cc9cd277ef, immutable) — v59 delta bound ONLY to frozen audit S2-V58-A01 (FINDINGS_MAP_V59.md):
+@@ -96,16 +100,16 @@
+ # v5.3.1 bytes read-only to reproduce the finding; their outputs land under s2-setup-prep/runner-selftest-r531/ (additive; the 37 frozen files
+ # are untouched). One invocation = one set. CTL_BUDGET default 60.
+ set -u
+-R60=/home/user/workspace/execution/e8d546f9/s2-v60; RUNNER=$R60/run-composition-r57-v5.7-when-granted.sh; STUBS=$R60/controls-proposed/stubs
+-RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R60 (parent-accepted dual-lane arrangement)
++R61=/home/user/workspace/execution/e8d546f9/s2-v61; RUNNER=$R61/run-composition-r57-v5.7-when-granted.sh; STUBS=$R61/controls-proposed/stubs
++RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R61 (parent-accepted dual-lane arrangement)
+ PRE_RUNNER=/home/user/workspace/execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh   # frozen v5.3.1 fb0d7ce4…, read-only (restored per upstream-prereqs-2)
+ SET=${CTL_SET:-k}; BUDGET=${CTL_BUDGET:-60}; RESERVE=8; INJECT_FAIL=${CTL_INJECT_FAIL:-0}
+-CTL=$R60/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
++CTL=$R61/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
+ CTRL=$CTL/controller-pids.txt; : > "$CTRL" || exit 2   # A06: controller resources (decoy/holder/seam controller/cancel sleeper) — separate registry with its own finally path
+ MY_PGID=$(ps -o pgid= -p $$ | tr -d ' '); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d ' '); ENCL=$CTL/.encl; mkdir -p "$ENCL" || exit 2
+ CURF=$ENCL/CURRENT; : > "$CURF" || exit 2   # E7: the single current validated enclosure authority (one pgid or empty); the ONLY watchdog target source
+ mkdir -p "$RLANE/runtime"; LANE_LOCK=$RLANE/runtime/test-validation.lock   # A07: lane-private lock in the enumerated runtime/ write set (same path the stub-mode runner uses: runner L115 under ITS lane)
+-PRE_LOCK=$STUBS/test-validation.lock   # A03(V57): the UNCHANGED v5.3.1 predecessor (L52) opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock — enumerated write (new1 only, CONTROL_REQUEST_18), asserted per run, probed at handoff
++PRE_LOCK=$STUBS/test-validation.lock   # A03(V57): the UNCHANGED v5.3.1 predecessor (L52) opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock — enumerated write (new1 only, CONTROL_REQUEST_20), asserted per run, probed at handoff
+ T0=$(date +%s.%N); T0_EPOCH=${T0%.*}; STRIKE=0; RUN=0; PLANNED=0; WATCHDOG=; WD_CENSUS=; DRIVER_PID=$$; CUR=none; FINISHED=0; PENDING_ENC=; ENC_PGID=; RC=; O=
+ PENDING_CTRL=; PENDING_CTRL_KIND=p; PENDING_CTRL_OWNED=; PENDING_CTRL_PREV=   # A05(V57): controller-acquisition latch (armed before a controller spawn, released by ctrl_book, resolved in finish)
+ WD_TERM_AT=$((BUDGET-RESERVE)); WD_KILL_AT=$((BUDGET-RESERVE/2)); WD_CANCEL_AT=$((WD_KILL_AT+2))   # E7 escalation schedule (s from T0); 2 s between KILL and driver cancellation lets a control that observed the KILL finish normally
+@@ -267,8 +271,24 @@
+     [ -s "$O/SHA256SUMS" ] && say "  PASS: $CUR predecessor inner manifest present (v5.3.1 format; NOT re-verified: v5.3.1 has the known post-hash stamp mutation, R54-A-03/R54B-03)" || { say "  FAIL: $CUR predecessor inner manifest missing"; STRIKE=1; }
+   fi; }
+ OUT57=$RLANE/runner-selftest-r57; OUT531=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531
++step40_arm(){ # step40_arm <name> <harness-mode> [<extra-regex>] : v61 K3-PLACEMENT — arms a controller-listed step-40 controller (exactly the N5b seam-controller shape) BEFORE
++  # the runner launch. It waits (≤ 8 s, 0.1 s poll) for the NEW runner output dir to carry the runner's OWN evidence that step 40 is ACTIVE: the adoption ack
++  # `.pgid/40-composition.pgid.ack` (runner L155, written before the step-40 leader execs) AND the harness workload line `stub harness … mode=<mode>` in 40-composition.log
++  # (and, when given, <extra-regex> there too — K4 needs the escapee line); then validates that the runner pid (its own `lock acquired pid=` stamp) is in the CURRENT
++  # enclosure authority and sends ONE `kill -TERM <pid>` (exit 0). Timed-out wait → exit 1, NO signal (refused timed-out synchronization); pid not in the current
++  # enclosure → exit 2, NO signal. Never a group, never the caller's group. Sets S40C/S40LOG for step40_wait. The enclosure bound passed to run_runner is then only a fail-safe.
++  local name=$1 mode=$2 extra=${3:-}; S40BEFORE=$(ls -1d "$OUT57"/*/ 2>/dev/null); S40LOG=$CTL/$name.step40-controller.log; ctrl_arm "$name-step40-controller" p owned   # A05: latched acquisition (p<pid>:<start>, owned + controller-listed)
++  ( for ((i=0;i<80;i++)); do d=$(comm -13 <(echo "$S40BEFORE") <(ls -1d "$OUT57"/*/ 2>/dev/null) | tail -1)
++      [ -n "$d" ] && [ -e "$d/.pgid/40-composition.pgid.ack" ] && grep -q "^stub harness .* mode=$mode" "$d/40-composition.log" 2>/dev/null && { [ -z "$extra" ] || grep -qE "$extra" "$d/40-composition.log" 2>/dev/null; } && break; sleep 0.1; done
++    if [ "$i" -ge 80 ]; then echo "step-40 controller ($name): ACTIVE STEP 40 NOT SEEN within 8 s (adoption ack + harness line${extra:+ + /$extra/}) → no signal sent (refused timed-out synchronization)"; exit 1; fi
++    p=$(sed -n 's/^lock acquired pid=\([0-9]*\) .*/\1/p' "$d/stamp.txt" 2>/dev/null | head -1); cur=$(tr -dc '0-9' < "$CURF" 2>/dev/null); ppg=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')
++    if [ -n "$p" ] && [ -n "$cur" ] && [ "$ppg" = "$cur" ]; then echo "step-40 controller ($name): step 40 ACTIVE after $((i/10)).$((i%10))s in $d (adoption ack + harness workload line${extra:+ + /$extra/}); runner pid=$p validated in CURRENT enclosure $cur → TERM"; kill -TERM "$p"; exit 0
++    else echo "step-40 controller ($name): runner pid=${p:-NONE} pgid=${ppg:-NONE} NOT in CURRENT enclosure ${cur:-NONE} → no signal sent"; exit 2; fi ) >"$S40LOG" 2>&1 & S40C=$!; ctrl_book "$S40C" || say "  FAIL: $name step-40 controller pid=$S40C could not be booked"; }
++step40_wait(){ # step40_wait <label> : after run_runner returned — reaps the controller (top-level wait), echoes its log into the result, PASS/FAIL on its rc
++  wait "$S40C" 2>/dev/null; local rc=$?; sed 's/^/    /' "$S40LOG" | tee -a "$R"
++  [ "$rc" = 0 ] && say "  PASS: $1 step-40 controller saw the ACTIVE step and signalled a validated pid" || { say "  FAIL: $1 step-40 controller rc=$rc (no valid signal was sent; any interruption came from the outer fail-safe bound)"; STRIKE=1; }; }
+ 
+-say "S2-V60 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
++say "S2-V61 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
+ detect > "$CTL/pre-snapshot.txt"
+ say "pre-snapshot pattern matches (never signalled): [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")]"
+ [ -s "$CTL/pre-snapshot.txt" ] && abort "pre-existing pattern matches [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")] — not ours; refusing without cleanup"
+@@ -291,7 +311,7 @@
+ if [ "$SET" = k ]; then
+   # ---------- K1 predecessor MECHANISM counterexample (v5.1 shape; unchanged from s2-runner53)
+   need K1-predecessor-mechanism 8; K1=$CTL/k1; mkdir -p "$K1"
+-  enclose k1 2 5 bash "$R60/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
++  enclose k1 2 5 bash "$R61/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
+   say "  K1 outer exit=$rc; stamp:"; sed 's/^/    /' "$K1/stamp.txt" | tee -a "$R"; surv=$(owned_live | tr '\n' ' ')
+   say "  K1 recorded-owned processes alive after runner exit: [$surv]"
+   [ "$rc" = 124 ] && say "  PASS: outer timeout fired (124)" || { say "  FAIL: outer exit $rc"; STRIKE=1; }
+@@ -317,19 +337,10 @@
+   expect "$O/50-fixture-stop.log" 'CHECKPOINT_DISABLE=1' "K2 cleanup client inherited CHECKPOINT_DISABLE=1 (E6)"
+   expect "$O/stamp.txt" '^50-fixture-stop: group [0-9]+ census empty after exit' "K2 owned stop client fully reaped (P3)"
+   [ "$RC" = 0 ] || { say "  FAIL: exit $RC"; STRIKE=1; }; owned_cleanup
+-  # ---------- K3 TERM during step 40 (v60 K3-PLACEMENT: evidence-placed, not elapsed-time-placed). A controller-listed step-40 controller (N5b shape) waits
+-  # (bounded 8 s, 0.1 s poll) for the runner's OWN evidence that step 40 is ACTIVE — the adoption ack `.pgid/40-composition.pgid.ack` (runner L155) AND the
+-  # harness workload line `stub harness … mode=sleep` in 40-composition.log — then validates that the runner pid (its `lock acquired pid=` stamp) is in the
+-  # CURRENT enclosure authority and sends ONE TERM to that pid. A timed-out wait sends nothing → STRIKE (refused timed-out synchronization). The enclosure
+-  # bound (12 s) is now only the fail-safe; the interruption is expected from the controller, so the outer status is the runner's own 143 (as N5b).
+-  need K3-term-during-step40 18; CUR=k3; before=$(ls -1d "$OUT57"/*/ 2>/dev/null); ctrl_arm k3-step40-controller p owned   # A05: latched acquisition (p<pid>:<start>, owned + controller-listed)
+-  ( for ((i=0;i<80;i++)); do d=$(comm -13 <(echo "$before") <(ls -1d "$OUT57"/*/ 2>/dev/null) | tail -1); [ -n "$d" ] && [ -e "$d/.pgid/40-composition.pgid.ack" ] && grep -q '^stub harness .* mode=sleep' "$d/40-composition.log" 2>/dev/null && break; sleep 0.1; done
+-    if [ "$i" -ge 80 ]; then echo "step-40 controller: ACTIVE STEP 40 NOT SEEN within 8 s (ack + harness line) → no signal sent (refused timed-out synchronization)"; exit 1; fi
+-    p=$(sed -n 's/^lock acquired pid=\([0-9]*\) .*/\1/p' "$d/stamp.txt" 2>/dev/null | head -1); cur=$(tr -dc '0-9' < "$CURF" 2>/dev/null); ppg=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')
+-    if [ -n "$p" ] && [ -n "$cur" ] && [ "$ppg" = "$cur" ]; then echo "step-40 controller: step 40 ACTIVE after $((i/10)).$((i%10))s in $d (adoption ack + harness workload line); runner pid=$p validated in CURRENT enclosure $cur → TERM"; kill -TERM "$p"; exit 0
+-    else echo "step-40 controller: runner pid=${p:-NONE} pgid=${ppg:-NONE} NOT in CURRENT enclosure ${cur:-NONE} → no signal sent"; exit 2; fi ) >"$CTL/k3.step40-controller.log" 2>&1 & K3C=$!; ctrl_book "$K3C" || say "  FAIL: step-40 controller pid=$K3C could not be booked"
+-  run_runner "$RUNNER" "$OUT57" 12 STUB_HARNESS_MODE=sleep STUB_HARNESS_SLEEP=30 S2_RUNNER_STUBS=$STUBS; wait "$K3C" 2>/dev/null; k3c=$?; sed 's/^/    /' "$CTL/k3.step40-controller.log" | tee -a "$R"
+-  [ "$k3c" = 0 ] && say "  PASS: step-40 controller saw the ACTIVE step and signalled a validated pid" || { say "  FAIL: step-40 controller rc=$k3c (no valid signal was sent; any interruption came from the outer bound)"; STRIKE=1; }
++  # ---------- K3 TERM during step 40 (v61 K3-PLACEMENT: evidence-placed by step40_arm/step40_wait, not elapsed-time-placed; enclosure bound 12 s = fail-safe only,
++  # so the outer status is the runner's own 143 as in N5b)
++  need K3-term-during-step40 18; CUR=k3; step40_arm k3 sleep
++  run_runner "$RUNNER" "$OUT57" 12 STUB_HARNESS_MODE=sleep STUB_HARNESS_SLEEP=30 S2_RUNNER_STUBS=$STUBS; step40_wait K3
+   surv=$(owned_live | tr '\n' ' '); say "  K3 recorded-owned alive after runner exit: [$surv]"
+   expect "$O/stamp.txt" "^SIGNAL SIGTERM .* during step '40-composition'" "K3 TERM arrived during the ACTIVE composition step (placement confirmed by the runner's stamp, not inferred)"
+   expect "$O/exit-codes.txt" '^final=143 first_exit=143 cleanup_exit=0 signal=TERM reap=ok' "K3 signal exit recorded as first exit; cleanup class 0"
+@@ -340,8 +351,12 @@
+   expect "$O/stamp.txt" 'LOCK: held by runner through cleanup \(HELD\)' "K3 lock held through cleanup"
+   say "  K3 timing: $(grep -o 'cleanup_seconds=[0-9.]*' "$O/exit-codes.txt") $(grep -o 'cleanup_seconds_total=[0-9.]*' "$O/RECEIPT.txt")"
+   [ "$RC" = 143 ] || { say "  FAIL: outer exit $RC (expected 143: the TERM is delivered to the runner pid by its validated controller; 124 would mean the 12 s fail-safe bound fired instead)"; STRIKE=1; }; owned_cleanup
+-  # ---------- K4 escapee → quarantine 72
+-  need K4-escapee-quarantine 25; CUR=k4; KA=20 run_runner "$RUNNER" "$OUT57" 3 STUB_HARNESS_MODE=escape STUB_HARNESS_SLEEP=40 S2_RUNNER_STUBS=$STUBS
++  # ---------- K4 escapee → quarantine 72 (v61 K3-PLACEMENT same-class site: the TERM is sent only once step 40 is ACTIVE in escape mode AND the harness has
++  # recorded the escapee (`escapee pid=<n> start=<ticks>`), so the quarantine scenario exists when the signal arrives; fail-safe bound 25 s covers the runner's
++  # reap 10+5 s after the TERM; outer status = runner's own 143)
++  need K4-escapee-quarantine 32; CUR=k4; step40_arm k4 escape '^escapee pid=[0-9]+ start=[0-9]+'
++  run_runner "$RUNNER" "$OUT57" 25 STUB_HARNESS_MODE=escape STUB_HARNESS_SLEEP=40 S2_RUNNER_STUBS=$STUBS; step40_wait K4
++  expect "$O/stamp.txt" "^SIGNAL SIGTERM .* during step '40-composition'" "K4 TERM arrived during the ACTIVE composition step (placement confirmed by the runner's stamp)"
+   say "  K4 recorded-owned alive after runner exit (expected: the quarantined escapee): [$(owned_live | tr '\n' ' ')]"
+   expect "$O/exit-codes.txt" '^final=143 first_exit=143 cleanup_exit=72 signal=TERM reap=FAILED' "K4 quarantine class 72 separate from first exit 143"
+   expect "$O/exit-codes.txt" 'fixture_stop=REFUSED survivors=present' "K4 fixture stop REFUSED, survivors present"
+@@ -349,7 +364,7 @@
+   expect "$O/stamp.txt" 'LOCK: held by runner through cleanup \(HELD\); NOT safely handed off' "K4 lock not declared handed off"
+   [ -f "$O/50-fixture-stop.log" ] && { say "  FAIL: fixture stop ran after failed reap"; STRIKE=1; } || say "  PASS: no fixture stop after failed reap"
+   say "  K4 timing: $(grep -o 'cleanup_seconds=[0-9.]*' "$O/exit-codes.txt") (reap 10+5 s)"
+-  [ "$RC" = 124 ] || { say "  FAIL: outer exit $RC"; STRIKE=1; }; owned_cleanup
++  [ "$RC" = 143 ] || { say "  FAIL: outer exit $RC (expected 143: TERM delivered by the validated step-40 controller; 124 would mean the 25 s fail-safe bound fired)"; STRIKE=1; }; owned_cleanup
+   # ---------- K5 normal-path stop failure → 71
+   need K5-stop-failure 15; CUR=k5; run_runner "$RUNNER" "$OUT57" 15 STUB_STOP_RC=1 S2_RUNNER_STUBS=$STUBS
+   expect "$O/exit-codes.txt" '^final=71 first_exit=0 cleanup_exit=71 signal=none reap=ok' "K5 cleanup class 71 with first exit 0 preserved"
+@@ -471,7 +486,7 @@
+   # ---------- N4: caller-group decoy — a process in the DRIVER's own group, unrecorded as owned work, name outside every pattern, must survive a normal (K2-like)
+   # and an exceptional (K3-like TERM into step 40) runner cleanup, the driver's owned cleanup, and the active-vs-retired checks. It IS a controller resource (A06):
+   # its state is acknowledged before use and controller_cleanup ends it on every exit path.
+-  need N4-caller-group-decoy 34
++  need N4-caller-group-decoy 40   # v61: N4b bound 4+8 → 12+5 (fail-safe), declared max 34 → 40
+   ctrl_arm n4-decoy p; bash -c 'exec -a s2r56-caller-decoy sleep 60' </dev/null >/dev/null 2>&1 & DECOY=$!; ctrl_book "$DECOY" || say "  FAIL: decoy pid=$DECOY could not be booked as a controller resource"   # A05(V57): controller-listed BEFORE the 0.2 s acknowledgement wait (never owned work)
+   sleep 0.2; dpg=$(ps -o pgid= -p "$DECOY" 2>/dev/null | tr -d ' ')
+   if alive "$DECOY" && [ "$dpg" = "$MY_PGID" ]; then say "  decoy ACKNOWLEDGED: pid=$DECOY alive in the driver's own group $dpg (controller-listed, NOT owned-work, outside every pattern)"
+@@ -480,10 +495,10 @@
+   expect "$O/exit-codes.txt" '^final=0 first_exit=0 cleanup_exit=0 signal=none reap=ok' "N4a normal path final=0"
+   alive "$DECOY" && say "  PASS: decoy survived the normal-path runner cleanup" || { say "  FAIL: decoy killed by normal path"; STRIKE=1; }
+   owned_cleanup
+-  CUR=n4b; KA=8 run_runner "$RUNNER" "$OUT57" 4 STUB_HARNESS_MODE=sleep STUB_HARNESS_SLEEP=30 S2_RUNNER_STUBS=$STUBS   # outer TERM at 4 s while step 40 sleeps (K3 shape)
++  CUR=n4b; step40_arm n4b sleep; run_runner "$RUNNER" "$OUT57" 12 STUB_HARNESS_MODE=sleep STUB_HARNESS_SLEEP=30 S2_RUNNER_STUBS=$STUBS; step40_wait N4b   # v61: TERM placed by step-40 evidence while step 40 sleeps (K3 shape); 12 s = fail-safe
+   expect "$O/stamp.txt" "^SIGNAL SIGTERM .* during step '40-composition'" "N4b TERM reached the sleeping composition step (A06: scenario confirmed, not inferred)"
+   expect "$O/exit-codes.txt" '^final=143 first_exit=143 cleanup_exit=0 signal=TERM reap=ok' "N4b exceptional (TERM) path: signal exit, cleanup clean"
+-  [ "$RC" = 124 ] || { say "  FAIL: N4b outer exit $RC (expected 124)"; STRIKE=1; }
++  [ "$RC" = 143 ] || { say "  FAIL: N4b outer exit $RC (expected 143: TERM delivered by the validated step-40 controller; 124 would mean the fail-safe bound fired)"; STRIKE=1; }
+   alive "$DECOY" && say "  PASS: decoy survived the exceptional-path runner cleanup (group signals hit only self-published groups)" || { say "  FAIL: decoy killed by exceptional path"; STRIKE=1; }
+   owned_cleanup
+   alive "$DECOY" && say "  PASS: decoy survived the driver's owned cleanup (identity-validated records only)" || { say "  FAIL: decoy killed by owned cleanup"; STRIKE=1; }

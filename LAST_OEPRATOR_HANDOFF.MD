@@ -10,11 +10,11 @@ Current continuation is op88 next-proof, NOT awaiting EXECUTE/S0. Prior worker �
 
 ## Work underway
 
-- S2V59: one granted run STOP/k1 with K3 placement miss (signal in30, not intended40), manifestd749a4b1; probe0/wdtest0/wdcancel3 and K1/K2 passed, later controls NOTRUN. Clean slot closed, failure unchanged. Independent result reviews plus source-only V60 correction, no retry/reinstall/real proof.
+- S2V59: STOPd749a4b1 preserved, P1/W1/C1/K1/K2 independently retained. Final V61 controlsed241342 correct K3/K4/N4b event placement; A4f90e206 clear, B active. Continue five remaining sets only after dual closure/grant; no real proof yet.
 - S4V6.1: Stage1 PASS9c84eab2,158/158; raw0/all12controls/363predicates/87s, no retained owner, slot closed. Native source/probes restored; parent completed pinned-base unshallow with candidate/tree/lock clean and unchanged. Only known native-caller correction now assigned, no repeated Stage1 or native execution.
 - S5V10: independent B provider-blocked twice despite passive-review clarification, no verdict/approval; unchanged diagnostic remains held. Existing A preserved, expectedC3 source counterexample not a run. No provider-safeguard bypass.
-- S5V10.1: private diagnostic PASS8e16701b176/176 preserved. SetupV2 Afa876aa6/B8b1b53a7 ready for exact fake11 only; canonical A01/A02/B01/B02 remain held, narrow V3 source correction assigned. Exact source/fingerprint ready, no setup/T0 grant.
-- S4 native caller: V2 7bff8f2c7/7 independently clear A1b2634a0/B8bece05b; prepf96700eb sealed, grant20d42065 ACTIVE, one native run started01:50:31UTC. No result yet, no Stage1 rerun; caller/observer/supervisor facts stay separate.
+- S5V10.1: private diagnostic PASS8e16701b preserved. Exact V2 fake11 conditionally activated after S4 debug logs. V3 prior four examples source-closed but B3bb45135 identifies early-refusal dead end; V3.1 correction/small private proof preparation active. Canonical setup/T0 held.
+- S4 native: one run COMPLETE02df9f60111/111 at01:56:02; actual0/observer0/SUCCESS, full1742/1742 and package/browser positives/negative observed. A/B result reviews active, debug-log supplement pending. Known owned chain closed; 63 unreadable processes remain a disclosed global-fd visibility boundary, not a FREE claim.
 - S6: restoration COMPLETEb8b35c8b; two-consumer adaptation6b2be238 frozen but known exclusion residual remains. Sole builder now maps minimal outer-holder scope, no final audit of knowingly unsafe candidate/no runtime; exact primitive/classifier unchanged.
 - S1/S2/S3: fresh S2 environment still valid; PREP2 materialized at worktrees/s3-prep2 with staged treea584 and HEADd5cd, no fabricated merge. Frozen9a7a4039; schema/generator unchanged and reserved. No real DB/integration proof/hook/commit.
 
@@ -26,7 +26,7 @@ Product heads: S156fb0d22, S2d5cd9b8b, S35c7b42b3, S491990ae9, S5143d451e, S6d51
 
 ## Immediate next action
 
-Observe and preserve the one ACTIVE S4 native proof, including three distinct receipts and any retained owner. S2 exact placement continuation, S5 V3 dual review and S6 exclusion scope proceed independently; S5 fake11 is explicitly QUEUED for a separate slot. V10B remains blocked, not awaited or bypassed. No repeat of passed S4 Stage1 or S5 V10.1 diagnostic.
+Close independent S4 result review and debug-log supplement without rerun, then run the separately activated V2 fake diagnostic. S2 V61 final review, S5 V3.1 closure and S6 exclusion base wait proceed in parallel. V10B remains blocked, not awaited or bypassed. No repeat of passed S4 Stage1 or V101 diagnostic.
 
 Containment/governed delivery → stagedG2 → C1/server lifecycle/forward2.x → native writers/relationships/reconciliation → real integrated two-platform proof → measured pilot → importer acceptance → retainedV1.
 
