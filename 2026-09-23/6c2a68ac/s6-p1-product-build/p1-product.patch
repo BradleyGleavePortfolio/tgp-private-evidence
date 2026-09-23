@@ -1,0 +1,1562 @@
+diff --git a/App.tsx b/App.tsx
+index bac96bb..55bf758 100644
+--- a/App.tsx
++++ b/App.tsx
+@@ -1,7 +1,7 @@
+ import React, { useEffect, useState } from 'react';
+ import { StatusBar } from 'expo-status-bar';
+ import { SafeAreaProvider } from 'react-native-safe-area-context';
+-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
++import { QueryClientProvider } from '@tanstack/react-query';
+ import { PostHogProvider } from 'posthog-react-native';
+ import {
+   useFonts,
+@@ -28,11 +28,7 @@ import { usersApi } from './src/services/api';
+ import { authEvents } from './src/utils/authEvents';
+ import { secureStorage } from './src/services/secureStorage';
+ import { initDatabase } from './src/db/database';
+-import {
+-  queryClient,
+-  asyncStoragePersister,
+-  QUERY_CACHE_MAX_AGE,
+-} from './src/services/queryClient';
++import { queryClient } from './src/services/queryClient';
+ import { initSentry, wrap as sentryWrap, captureError } from './src/services/sentry';
+ // Phase 11: typed analytics service replaces the raw lib/analytics track call
+ // for app_opened so the typed AnalyticsEvents constant is used.
+@@ -220,40 +216,25 @@ function App() {
+       */}
+       <AnalyticsProvider>
+         {/*
+-          PersistQueryClientProvider wraps the whole app so any screen migrated
+-          to API-first (Fix #2) can use useQuery/useMutation. We use the
+-          persisting variant so the React Query cache is hydrated from
+-          AsyncStorage on cold start — a user opening the app sees last-known
+-          data immediately while a fresh fetch runs in the background, instead
+-          of staring at a spinner. The provider is intentionally INSIDE
+-          ErrorBoundary so a thrown query error from a single screen doesn't
+-          take down the rest of the app — the boundary will catch it, and
+-          React Query will retry on the next mount.
++          QueryClientProvider wraps the whole app so any screen migrated to
++          API-first (Fix #2) can use useQuery/useMutation. The provider is
++          intentionally INSIDE ErrorBoundary so a thrown query error from a
++          single screen doesn't take down the rest of the app — the boundary
++          will catch it, and React Query will retry on the next mount.
++
++          S6-P1: this is the plain provider. Persistence of the cache to
++          AsyncStorage is identity-bound and owned by PersistedQueryCacheGate,
++          mounted in RootNavigator once the bootstrap identity is committed —
++          see src/services/PersistedQueryCacheGate.tsx and
++          src/services/queryClient.ts (createIdentityPersistence).
+         */}
+-        <PersistQueryClientProvider
+-          client={queryClient}
+-          persistOptions={{
+-            persister: asyncStoragePersister,
+-            maxAge: QUERY_CACHE_MAX_AGE,
+-            // Bump this string whenever the wire shape of any cached query
+-            // changes incompatibly. Cache entries with a different buster are
+-            // discarded on hydration instead of being deserialized into
+-            // mismatched TypeScript types.
+-            buster: 'tgp-rq-v2-samples',
+-            dehydrateOptions: {
+-              // Don't persist transient or per-session-only queries. Anything
+-              // tagged with the meta { persist: false } (none today, but future
+-              // mutations-in-progress proxies will be) gets evicted before write.
+-              shouldDehydrateQuery: (q) => q.meta?.persist !== false,
+-            },
+-          }}
+-        >
++        <QueryClientProvider client={queryClient}>
+           {/* Wave 2: dark status-bar icons on the bone background. SDK 56
+               edge-to-edge: the bone band itself is painted by <StatusBarBand>
+               above; expo-status-bar only controls icon contrast now. */}
+           <StatusBar style="dark" />
+           {/* ThemeProvider: Premium Visual System — UX Psych Report #5.
+-              Must be inside PersistQueryClientProvider so useFoundingNumber()
++              Must be inside QueryClientProvider so useFoundingNumber()
+               (which calls useQuery) works correctly. */}
+           <ThemeProvider>
+             {/* BiometricUnlockGate is a no-op when the user hasn't opted in.
+@@ -263,7 +244,7 @@ function App() {
+               <RootNavigator />
+             </BiometricUnlockGate>
+           </ThemeProvider>
+-        </PersistQueryClientProvider>
++        </QueryClientProvider>
+       </AnalyticsProvider>
+       </ErrorBoundary>
+       {/* SDK 56 edge-to-edge: paint the bone band behind the Android status
+diff --git a/src/navigation/RootNavigator.tsx b/src/navigation/RootNavigator.tsx
+index 3b5217d..b028ba5 100644
+--- a/src/navigation/RootNavigator.tsx
++++ b/src/navigation/RootNavigator.tsx
+@@ -38,6 +38,10 @@ import Day1WinScreen from '../screens/client/Day1WinScreen';
+ import PackageSelectionSheet from '../components/PackageSelectionSheet';
+ import { prefsStorage } from '../storage/mmkv';
+ import { signOut } from '../services/authActions';
++// S6-P1: identity boundary for the persisted React Query cache. Mounted
++// inside NavigationContainer around the per-auth-state navigator so the
++// container, its ref and the deep-link replay behaviour are untouched.
++import { PersistedQueryCacheGate } from '../services/PersistedQueryCacheGate';
+ import api from '../services/api';
+ // Phase 11 Track 9 — Support Inbox: init Crisp and sync identity on login
+ import { initCrisp, syncCrispIdentity } from '../services/support/crisp.service';
+@@ -286,6 +290,12 @@ export function extractAcceptInviteToken(url: string): string | null {
+ 
+ export default function RootNavigator() {
+   const [authState, setAuthState] = useState<AuthState>('loading');
++  // S6-P1: the COMMITTED bootstrap identity that authorizes restoring a
++  // user's persisted query cache — token present AND cached user readable AND
++  // no pending role selection. `undefined` = bootstrap outcome unknown (gate
++  // holds, touches nothing); `null` = committed logged-out; string = user id.
++  // Set on every bootstrap outcome, including the failure paths.
++  const [sessionUserId, setSessionUserId] = useState<string | null | undefined>(undefined);
+   const pendingDay1Target = useRef<WinType | null>(null);
+   // Deep-link replay state for the public accept-invite path. When a
+   // signed-in user clicks an accept-invite URL we sign them out and then
+@@ -581,12 +591,14 @@ export default function RootNavigator() {
+       const needsRoleSelection = await AsyncStorage.getItem('needs_role_selection');
+ 
+       if (!token || !parsedUser) {
++        setSessionUserId(null);
+         setAuthState('unauthenticated');
+         return;
+       }
+ 
+       // Role selection not done yet — stay in auth flow
+       if (needsRoleSelection === 'true') {
++        setSessionUserId(null);
+         setAuthState('unauthenticated');
+         return;
+       }
+@@ -597,9 +609,13 @@ export default function RootNavigator() {
+       } catch (err) {
+         logger.warn('RootNavigator', 'non-fatal', err);
+         await clearUserCache();
++        setSessionUserId(null);
+         setAuthState('unauthenticated');
+         return;
+       }
++      // Committed identity: token + valid cached user + no role selection.
++      // A cached user without a string id cannot own a persisted cache key.
++      setSessionUserId(typeof parsedUser.id === 'string' && parsedUser.id.trim() ? parsedUser.id : null);
+       const role = user?.role;
+ 
+       if (role === 'coach') {
+@@ -730,9 +746,11 @@ export default function RootNavigator() {
+       }
+ 
+       // Token exists but no role yet
++      setSessionUserId(null);
+       setAuthState('unauthenticated');
+     } catch (err) {
+       logger.warn('RootNavigator', 'non-fatal', err);
++      setSessionUserId(null);
+       setAuthState('unauthenticated');
+     }
+   };
+@@ -811,6 +829,19 @@ export default function RootNavigator() {
+       {/* OfflineBanner sits at the top of every auth state so users see the
+           offline indicator regardless of which navigator is mounted. */}
+       <OfflineBanner />
++      {/* S6-P1: every navigator below renders only for the committed identity
++          (or committed logged-out state) whose persisted cache has been
++          restored/purged. The gate never remounts NavigationContainer; while
++          it restores, no navigator is mounted, so navigationRef.isReady()
++          stays false and the replay effects above keep waiting as before. */}
++      <PersistedQueryCacheGate
++        userId={sessionUserId}
++        renderRestoring={() => (
++          <View style={styles.loadingContainer}>
++            <ActivityIndicator size="large" color={Colors.primary} />
++          </View>
++        )}
++      >
+       {authState === 'unauthenticated' ? (
+         <AuthNavigator />
+       ) : authState === 'onboarding' ? (
+@@ -862,6 +893,7 @@ export default function RootNavigator() {
+           <ClientNavigator />
+         </EntitlementProvider>
+       )}
++      </PersistedQueryCacheGate>
+     </NavigationContainer>
+   );
+ }
+diff --git a/src/services/__tests__/queryClient.persister.test.ts b/src/services/__tests__/queryClient.persister.test.ts
+index 8377a44..49477d3 100644
+--- a/src/services/__tests__/queryClient.persister.test.ts
++++ b/src/services/__tests__/queryClient.persister.test.ts
+@@ -17,15 +17,16 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
+   },
+ }));
+ 
+-jest.mock('../../lib/userCache', () => ({
+-  readUserCacheSync: () => null,
+-}));
++// S6-P1: the module no longer reads lib/userCache at import time (the
++// import-time persister singleton is gone), so the userCache mock this suite
++// used to need has been removed.
+ 
+ import {
+   persisterKeyForUser,
+   purgePersistedQueryCacheForAllUsers,
+   QUERY_CACHE_KEY_PREFIX,
+ } from '../queryClient';
++import * as queryClientModule from '../queryClient';
+ 
+ describe('queryClient persister — R15 user-scoping', () => {
+   it('namespaces the key with the authenticated user id', () => {
+@@ -57,6 +58,17 @@ describe('queryClient persister — R15 user-scoping', () => {
+     );
+   });
+ 
++  // S6-P1 public-contract change: persistence is created per committed
++  // identity by createIdentityPersistence() (owned by PersistedQueryCacheGate),
++  // so importing this module must no longer construct a persister or touch
++  // storage for the boot-time (always ':anonymous' on shim builds) identity.
++  it('exports no import-time persister singleton and reads no storage at import', () => {
++    expect((queryClientModule as Record<string, unknown>).asyncStoragePersister).toBeUndefined();
++    expect(typeof queryClientModule.createIdentityPersistence).toBe('function');
++    expect(AsyncStorage.getItem).not.toHaveBeenCalled();
++    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
++  });
++
+   it('purgePersistedQueryCacheForAllUsers no-ops when nothing matches', async () => {
+     const getAllKeys = AsyncStorage.getAllKeys as jest.Mock;
+     const removeMany = AsyncStorage.removeMany as jest.Mock;
+diff --git a/src/services/__tests__/queryClient.signout.test.ts b/src/services/__tests__/queryClient.signout.test.ts
+index 82ee020..7ce8611 100644
+--- a/src/services/__tests__/queryClient.signout.test.ts
++++ b/src/services/__tests__/queryClient.signout.test.ts
+@@ -54,6 +54,7 @@ jest.mock('../../db/fastingDb', () => ({
+   endFast: jest.fn(async () => undefined),
+ }));
+ 
++import { QueryObserver } from '@tanstack/react-query';
+ import { queryClient } from '../queryClient';
+ import { signOut } from '../authActions';
+ 
+@@ -81,4 +82,50 @@ describe('P0-1: in-memory query cache cleared on signOut', () => {
+ 
+     expect(queryClient.getQueryData(USER_A_QUERY_KEY)).toBeUndefined();
+   });
++
++  // S6-P1 ordering defect (observed, not hypothetical): signOut runs while the
++  // signed-in screens are still mounted, so a bare queryClient.clear() removed
++  // and destroyed every Query while its QueryObserver stayed attached. The
++  // observer's later removeObserver() — on unmount after the 'logout' event, or
++  // on its next render — then hit an orphan Query whose observer list went
++  // empty, calling scheduleGc() and arming a gcTime timer on an object no
++  // longer in the cache, which nothing can ever clear. signOut now settles and
++  // detaches first (settleAndClearQueryCache), which makes those later calls
++  // inert. Privacy assertions above are unchanged.
++  it('detaches live observers before clearing, so a later removeObserver cannot arm an unclearable gc timer', async () => {
++    jest.useFakeTimers();
++    try {
++      const observer = new QueryObserver(queryClient, {
++        queryKey: USER_A_QUERY_KEY,
++        queryFn: () => new Promise<never>(() => {}),
++        staleTime: Infinity,
++      });
++      const unsubscribe = observer.subscribe(() => {});
++      const query = queryClient.getQueryCache().find({ queryKey: USER_A_QUERY_KEY });
++      expect(query).toBeDefined();
++      expect(query!.getObserversCount()).toBe(1);
++
++      await signOut('user-A');
++
++      // The live observer was detached while its query was still cached, so the
++      // query could be destroyed with its gc timer cleared for good.
++      expect(query!.getObserversCount()).toBe(0);
++      expect(queryClient.getQueryCache().find({ queryKey: USER_A_QUERY_KEY })).toBeUndefined();
++      expect(queryClient.getQueryData(USER_A_QUERY_KEY)).toBeUndefined();
++
++      // Flush the notify scheduler's setTimeout(0) hops so only durable timers
++      // remain in the count.
++      jest.advanceTimersByTime(0);
++      const timersBeforeTeardown = jest.getTimerCount();
++
++      // The screen unmounts after the logout event: QueryObserver.destroy()
++      // calls removeObserver() on the already-removed query. No new timer.
++      unsubscribe();
++      observer.destroy();
++      jest.advanceTimersByTime(0);
++      expect(jest.getTimerCount()).toBe(timersBeforeTeardown);
++    } finally {
++      jest.useRealTimers();
++    }
++  });
+ });
+diff --git a/src/services/authActions.ts b/src/services/authActions.ts
+index 386a780..15cba04 100644
+--- a/src/services/authActions.ts
++++ b/src/services/authActions.ts
+@@ -8,7 +8,7 @@ import { authEvents } from '../utils/authEvents';
+ import { profileApi, usersApi } from './api';
+ import { secureStorage } from './secureStorage';
+ import { setSentryUser } from './sentry';
+-import { purgePersistedQueryCacheForAllUsers, queryClient } from './queryClient';
++import { purgePersistedQueryCacheForAllUsers, settleAndClearQueryCache } from './queryClient';
+ import { reset as analyticsReset } from '../lib/analytics';
+ import { logger } from '../utils/logger';
+ import { clearUserCache, readUserCache, readUserCacheSync } from '../lib/userCache';
+@@ -349,7 +349,15 @@ export async function signOut(userId?: string | null): Promise<void> {
+   // The persisted AsyncStorage copy is wiped above via
+   // purgePersistedQueryCacheForAllUsers(); this call covers the live
+   // singleton that every running screen reads from.
+-  queryClient.clear();
++  //
++  // S6-P1 lifecycle correction: signOut runs while the signed-in screens are
++  // still mounted (they unmount only after the 'logout' event below), so a
++  // bare queryClient.clear() here left every mounted useQuery pointed at a
++  // destroyed, un-cached Query; its later removeObserver() re-armed a gcTime
++  // timer nothing could clear (S6-C6). settleAndClearQueryCache() settles
++  // in-flight fetches and detaches observers first, then clears — the cache is
++  // still empty before 'logout' is emitted. See queryClient.ts for the trace.
++  await settleAndClearQueryCache();
+ 
+   authEvents.emit('logout');
+ }
+diff --git a/src/services/queryClient.ts b/src/services/queryClient.ts
+index 8a3f282..acd80db 100644
+--- a/src/services/queryClient.ts
++++ b/src/services/queryClient.ts
+@@ -24,10 +24,12 @@
+ // can opt in per-query with `refetchOnWindowFocus: true` and shorter
+ // staleTime — see HabitsScreen for an example.
+ 
+-import { QueryClient } from '@tanstack/react-query';
++import { QueryClient, hydrate } from '@tanstack/react-query';
++import type { Query } from '@tanstack/react-query';
+ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
++import { persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
++import type { PersistedClient } from '@tanstack/react-query-persist-client';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+-import { readUserCacheSync } from '../lib/userCache';
+ 
+ function getHttpStatus(err: unknown): number | undefined {
+   return (err as { response?: { status?: number } })?.response?.status;
+@@ -62,76 +64,322 @@ export const queryClient = new QueryClient({
+ });
+ 
+ /**
+- * AsyncStorage-backed persister for the React Query cache.
++ * Persisted React Query cache — identity-bound (S6-P1).
+  *
+  * Why we persist the cache:
+  *   On a cold start the user opens the app and we have to wait for the network
+  *   round-trip before showing anything. With persistence, we hydrate the cache
+- *   from disk synchronously-ish on boot and the first paint shows last-known
+- *   data while a fresh fetch runs in the background. That's the felt-native
+- *   experience the audit asked for and what enterprise apps (Linear, Things,
+- *   Cash App) all do under the hood.
++ *   from disk on boot and the first paint shows last-known data while a fresh
++ *   fetch runs in the background.
+  *
+  * What we DON'T persist:
+  *   Mutations are intentionally not persisted. A pending mutation surviving
+  *   an app restart could double-create rows (e.g. a workout logged twice if
+  *   the user force-quit mid-network). Re-issuing those is the queue's job
+- *   (foodLogQueue.ts), not the query cache's.
++ *   (foodLogQueue.ts), not the query cache's. Queries tagged with
++ *   `meta: { persist: false }` are evicted before write.
+  *
+  * Cache TTL:
+  *   24h max age. Anything older is treated as cold and refetched on first
+  *   subscribe. This bounds the staleness window for users who open the app
+  *   once a week without ever connecting.
+  *
+- * R15: the persister key is namespaced by authenticated user id so a shared
+- * device cannot hydrate user A's cache into user B's session. The id is read
+- * synchronously from MMKV on module load; an anonymous (logged-out) cold
+- * start uses ':anonymous', which is wiped on the next sign-in.
++ * R15 / S6-P1: the persister key is namespaced by authenticated user id so a
++ * shared device cannot hydrate user A's cache into user B's session. Before
++ * S6-P1 the key was resolved ONCE at module load (always ':anonymous' on
++ * AsyncStorage-shim builds, because lib/userCache has not hydrated yet) and
++ * could never be swapped, so isolation rested on purge-on-sign-in/out plus
++ * queryClient.clear(). S6-P1 removes the import-time singleton: persistence is
++ * created per committed identity by `createIdentityPersistence()` and owned by
++ * `PersistedQueryCacheGate` (RootNavigator supplies the committed bootstrap
++ * identity). There is no persistence at all for the logged-out state.
+  */
+ export const QUERY_CACHE_KEY_PREFIX = 'TGP_RQ_CACHE_V1';
+ 
++// Bump this string whenever the wire shape of any cached query changes
++// incompatibly. Cache entries with a different buster are discarded on
++// restore instead of being deserialized into mismatched TypeScript types.
++export const QUERY_CACHE_BUSTER = 'tgp-rq-v2-samples';
++
++export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
++
++// Throttle disk writes so heavy cache churn doesn't hammer AsyncStorage.
++const QUERY_CACHE_THROTTLE_MS = 1000;
++
+ export function persisterKeyForUser(userId: string | null | undefined): string {
+   const suffix = userId && userId.trim() ? userId : 'anonymous';
+   return `${QUERY_CACHE_KEY_PREFIX}:${suffix}`;
+ }
+ 
+-function resolveBootUserId(): string | null {
+-  try {
+-    return readUserCacheSync()?.id ?? null;
+-  } catch {
+-    return null;
+-  }
++// Persistence opt-out: anything tagged `meta: { persist: false }` is never
++// written to disk (unchanged semantics from the PersistQueryClientProvider
++// composition this replaces).
++function shouldDehydrateQuery(query: Query): boolean {
++  return query.meta?.persist !== false;
+ }
+ 
+-// S6 R3 assessment (identity mirror): readUserCacheSync() is now a truthful
+-// in-process mirror that is null until lib/userCache has hydrated. This module
+-// is evaluated at import time, BEFORE any hydration, so on every AsyncStorage-
+-// shim build resolveBootUserId() is null and the persister key is always
+-// ':anonymous' for the whole process lifetime (identical to the pre-R3
+-// observable behaviour, where the shim's synchronous read was always
+-// undefined). The per-user namespacing therefore does not protect anything on
+-// shim builds; isolation rests entirely on purgePersistedQueryCacheForAllUsers()
+-// (every sign-in and sign-out) plus queryClient.clear() on sign-out. Fixing
+-// that requires re-creating the persister after hydration / on identity
+-// change (App.tsx PersistQueryClientProvider composition), which is outside
+-// the R3 identity/cache/pairing boundary and is reported for re-scope rather
+-// than widened here.
+-//
+-// NOTE (P1-1): the persister key is resolved ONCE at module load time
+-// (via resolveBootUserId()) and cannot be swapped after construction.
+-// This means that after an in-session account switch the persister
+-// continues writing under the boot-time user's key, not the newly
+-// signed-in user's key. To compensate, every sign-in path calls
+-// purgePersistedQueryCacheForAllUsers() immediately after setUserCache()
+-// so any orphan blob at a stale key is removed before the first
+-// persistence pass for the new user. See src/screens/auth/LoginScreen.tsx,
+-// CreateAccountScreen.tsx, and RoleSelectionScreen.tsx.
+-export const asyncStoragePersister = createAsyncStoragePersister({
+-  storage: AsyncStorage,
+-  key: persisterKeyForUser(resolveBootUserId()),
+-  // Throttle disk writes so heavy cache churn doesn't hammer AsyncStorage.
+-  throttleTime: 1000,
+-});
++export type RestoreOutcome = 'restored' | 'empty' | 'timeout' | 'retired' | 'failed';
++export type DrainOutcome = 'drained' | 'timeout';
++
++export interface IdentityPersistence {
++  readonly userId: string;
++  readonly key: string;
++  /**
++   * Read this identity's blob and hydrate it into `queryClient`, then subscribe
++   * cache changes to disk. Resolves:
++   *   'restored' — a valid blob was hydrated;
++   *   'empty'    — nothing on disk (or a busted/expired blob, which is removed);
++   *   'timeout'  — `timeoutMs` elapsed first: nothing is hydrated, persistence
++   *                is subscribed for new writes, and the late read is discarded
++   *                at the restore→hydrate boundary when it finally completes;
++   *   'retired'  — `retire()` was called before the read settled: nothing is
++   *                hydrated and nothing is subscribed;
++   *   'failed'   — the read/deserialize threw: the blob is removed, persistence
++   *                is subscribed for new writes.
++   */
++  restore(options?: { timeoutMs?: number }): Promise<RestoreOutcome>;
++  /**
++   * Fence this identity: unsubscribe from cache changes and refuse every
++   * storage write from now on — including queued/throttled writes the library
++   * has already accepted, which are dropped at the actual `setItem`. Idempotent.
++   */
++  retire(): void;
++  /**
++   * Wait for storage writes that were already in flight at `retire()`.
++   * Resolves 'drained' once they have completed, or 'timeout' after
++   * `timeoutMs`. After a 'timeout' the persistence fails closed: any write
++   * that lands later removes its own key again.
++   */
++  drain(options?: { timeoutMs?: number }): Promise<DrainOutcome>;
++  isRetired(): boolean;
++}
++
++/**
++ * Create the persistence for one committed identity.
++ *
++ * Fences (all checked at the moment of the actual storage operation, not at
++ * `persistClient` entry, because the async-storage persister throttles and
++ * serializes before it reaches storage):
++ *   - write fence:   `setItem` is a no-op once retired;
++ *   - restore fence: a read that completes after `retire()` or after the
++ *                    bounded restore window hydrates nothing;
++ *   - fail-closed:   a write that was in flight at retirement and outlives the
++ *                    bounded drain removes its own key when it lands.
++ */
++export function createIdentityPersistence(
++  userId: string,
++  options: { client?: QueryClient } = {},
++): IdentityPersistence {
++  const client = options.client ?? queryClient;
++  const key = persisterKeyForUser(userId);
++  let retired = false;
++  let drainTimedOut = false;
++  let unsubscribe: (() => void) | null = null;
++  const inflightWrites = new Set<Promise<void>>();
++
++  const fencedStorage = {
++    getItem: (k: string) => AsyncStorage.getItem(k),
++    removeItem: (k: string) => AsyncStorage.removeItem(k),
++    setItem: async (k: string, value: string): Promise<void> => {
++      if (retired) return; // write fence: dropped at the actual write
++      const write = (async () => {
++        try {
++          await AsyncStorage.setItem(k, value);
++        } finally {
++          if (retired && drainTimedOut) {
++            // Fail-closed: this write outlived the bounded drain (and any purge
++            // the transition performed), so it must not resurrect the blob.
++            try {
++              await AsyncStorage.removeItem(k);
++            } catch {
++              // Non-fatal: purgePersistedQueryCacheForAllUsers() on the next
++              // sign-in/out is the backstop.
++            }
++          }
++        }
++      })();
++      const tracked = write.catch(() => undefined);
++      inflightWrites.add(tracked);
++      try {
++        await write;
++      } finally {
++        inflightWrites.delete(tracked);
++      }
++    },
++  };
++
++  const persister = createAsyncStoragePersister({
++    storage: fencedStorage,
++    key,
++    throttleTime: QUERY_CACHE_THROTTLE_MS,
++  });
++
++  const subscribe = () => {
++    if (retired || unsubscribe) return;
++    unsubscribe = persistQueryClientSubscribe({
++      queryClient: client,
++      persister,
++      buster: QUERY_CACHE_BUSTER,
++      dehydrateOptions: { shouldDehydrateQuery },
++    });
++  };
++
++  const removeBlob = async () => {
++    try {
++      await persister.removeClient();
++    } catch {
++      // Non-fatal: see purgePersistedQueryCacheForAllUsers().
++    }
++  };
++
++  type ReadResult =
++    | { kind: 'read'; client: PersistedClient | undefined }
++    | { kind: 'error' }
++    | { kind: 'timeout' };
++
++  return {
++    userId,
++    key,
++    isRetired: () => retired,
++    retire: () => {
++      retired = true;
++      if (unsubscribe) {
++        unsubscribe();
++        unsubscribe = null;
++      }
++    },
++    async restore({ timeoutMs }: { timeoutMs?: number } = {}): Promise<RestoreOutcome> {
++      if (retired) return 'retired';
++      const read: Promise<ReadResult> = Promise.resolve()
++        .then(() => persister.restoreClient())
++        .then(
++          (persisted) => ({ kind: 'read', client: persisted ?? undefined }),
++          () => ({ kind: 'error' }),
++        );
++      let timer: ReturnType<typeof setTimeout> | undefined;
++      let result: ReadResult;
++      try {
++        if (timeoutMs === undefined) {
++          result = await read;
++        } else {
++          const timeout = new Promise<ReadResult>((resolve) => {
++            timer = setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs);
++          });
++          result = await Promise.race([read, timeout]);
++        }
++      } finally {
++        if (timer !== undefined) clearTimeout(timer);
++      }
++      // Restore fence: a retirement that raced the read wins — nothing is
++      // hydrated and nothing is subscribed.
++      if (retired) return 'retired';
++      if (result.kind === 'timeout') {
++        // The read continues in the background; its result is unreachable
++        // (the race already settled), so it can never hydrate.
++        subscribe();
++        return 'timeout';
++      }
++      if (result.kind === 'error') {
++        await removeBlob();
++        if (retired) return 'retired';
++        subscribe();
++        return 'failed';
++      }
++      const persisted = result.client;
++      if (!persisted) {
++        subscribe();
++        return 'empty';
++      }
++      const expired = !persisted.timestamp || Date.now() - persisted.timestamp > QUERY_CACHE_MAX_AGE;
++      const busted = persisted.buster !== QUERY_CACHE_BUSTER;
++      if (expired || busted) {
++        await removeBlob();
++        if (retired) return 'retired';
++        subscribe();
++        return 'empty';
++      }
++      hydrate(client, persisted.clientState);
++      subscribe();
++      return 'restored';
++    },
++    async drain({ timeoutMs }: { timeoutMs?: number } = {}): Promise<DrainOutcome> {
++      const pending = Array.from(inflightWrites);
++      if (pending.length === 0) return 'drained';
++      const all = Promise.all(pending).then((): DrainOutcome => 'drained');
++      if (timeoutMs === undefined) return all;
++      let timer: ReturnType<typeof setTimeout> | undefined;
++      try {
++        const timeout = new Promise<DrainOutcome>((resolve) => {
++          timer = setTimeout(() => resolve('timeout'), timeoutMs);
++        });
++        const outcome = await Promise.race([all, timeout]);
++        if (outcome === 'timeout') drainTimedOut = true;
++        return outcome;
++      } finally {
++        if (timer !== undefined) clearTimeout(timer);
++      }
++    },
++  };
++}
++
++/**
++ * Settle and clear the in-memory query cache at an identity boundary
++ * (sign-out, identity replacement, committed logout).
++ *
++ * Why not a bare `queryClient.clear()` (traced in the pinned
++ * @tanstack/query-core 5.100.14 sources; observed in S6-C6 as two 600 000 ms
++ * timers created via `Query.removeObserver → scheduleGc` that survived
++ * `cancelQueries()` + `clear()`):
++ *
++ *   1. `QueryCache.clear()` → `remove(query)` → `query.destroy()` clears the
++ *      gc timer, silently cancels the retryer and deletes the map entry — but
++ *      it does NOT detach observers. Every still-mounted `useQuery` keeps its
++ *      `QueryObserver` pointed at the now-orphaned Query object.
++ *   2. Later, `Query.removeObserver()` runs on that orphan — from
++ *      `QueryObserver.destroy()` when the screen unmounts, or from
++ *      `QueryObserver.#updateQuery()` on the observer's next render — and,
++ *      because the observer list becomes empty, calls `scheduleGc()`: a
++ *      gcTime (600 000 ms) timer on an object no longer in the cache, which
++ *      nothing can clear. `removeObserver()` is a no-op for an observer that
++ *      is not in `query.observers`, so detaching observers while the query is
++ *      still cached makes every later call inert.
++ *   3. `Query.#fetch`'s `finally { scheduleGc() }` runs when the retryer
++ *      settles. `destroy()`'s silent cancel settles it AFTER `clearGcTimeout`,
++ *      i.e. it re-arms on the orphan as well. `cancelQueries()` settles the
++ *      fetch while the query is still cached (its `finally` runs before the
++ *      cancel promise resolves), so the re-armed timer is then cleared by
++ *      `destroy()`.
++ *
++ * Privacy is not weakened: the cache is still emptied synchronously at the
++ * end of this call; the extra steps only ensure the emptied objects are truly
++ * released instead of leaving observed orphans behind. Nothing here shortens
++ * gcTime or masks timers. The detached observers re-attach to fresh Query
++ * objects on their next render (or are destroyed on unmount) exactly as after
++ * a plain `clear()`.
++ */
++export async function settleAndClearQueryCache(
++  client: QueryClient = queryClient,
++  options: { shouldContinue?: () => boolean } = {},
++): Promise<boolean> {
++  // 1. Settle in-flight fetches while their queries are still cached, so the
++  //    `finally { scheduleGc() }` in Query.#fetch re-arms a timer that step 3
++  //    can still clear.
++  await client.cancelQueries();
++  // A caller whose transition was superseded while cancelling must not clear
++  // the cache the superseding transition has already rebuilt.
++  if (options.shouldContinue && !options.shouldContinue()) return false;
++  // 2. Detach observers while their queries are still cached, so the observers'
++  //    later removeObserver() calls (on unmount, or on their next render) are
++  //    no-ops instead of arming gc on an orphan.
++  for (const query of client.getQueryCache().getAll()) {
++    for (const observer of [...query.observers]) {
++      query.removeObserver(observer);
++    }
++  }
++  // 3. Empty the cache. destroy() clears each query's gc timeout for good.
++  client.clear();
++  return true;
++}
+ 
+ /**
+  * Remove every persisted React Query cache key from AsyncStorage. Used on
+@@ -151,5 +399,3 @@ export async function purgePersistedQueryCacheForAllUsers(): Promise<void> {
+   }
+ }
+ 
+-export const QUERY_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+-
+diff --git a/src/services/PersistedQueryCacheGate.tsx b/src/services/PersistedQueryCacheGate.tsx
+new file mode 100644
+index 0000000..f732a69
+--- /dev/null
++++ b/src/services/PersistedQueryCacheGate.tsx
+@@ -0,0 +1,152 @@
++// PersistedQueryCacheGate — identity boundary for the persisted React Query
++// cache (S6-P1).
++//
++// Replaces the import-time PersistQueryClientProvider composition, whose
++// persister key was fixed at module load (always ':anonymous' on
++// AsyncStorage-shim builds) and could not follow the signed-in identity.
++//
++// Contract:
++//   `userId` is the COMMITTED bootstrap identity supplied by RootNavigator:
++//     undefined — bootstrap outcome unknown yet: nothing is read, written,
++//                 cleared or purged; children stay unmounted;
++//     null      — committed logged-out: memory is cleared and every persisted
++//                 cache key is purged before unauthenticated children mount;
++//                 nothing is persisted while logged out;
++//     string    — committed user: that user's own key is restored (bounded)
++//                 before that user's children mount, then kept in sync.
++//
++//   Children are rendered only while `committed === userId`. Any identity
++//   change therefore unmounts the previous identity's children in the same
++//   React commit that schedules the transition effect — structurally, no
++//   replacement child can ever observe the previous identity's memory, and the
++//   previous children's observers have detached before the cache is cleared.
++//
++//   Transition order (explicit, same for A→B, A→null, null→A, interrupted):
++//     1. retire the previous persistence (unsubscribe + write fence)
++//     2. drain its in-flight storage writes (bounded)
++//     3. settleAndClearQueryCache() — cancel fetches, detach observers, clear
++//     4. null: purge every persisted cache key;  user: restore own key (bounded)
++//     5. commit → children mount
++//   A transition that is superseded mid-flight stops at its next checkpoint
++//   and never commits; the superseding transition retires whatever the
++//   superseded one had created. Late completions of a retired persistence are
++//   fenced inside createIdentityPersistence (restore→hydrate boundary, actual
++//   setItem, fail-closed removal after an expired drain).
++import React, { useEffect, useRef, useState } from 'react';
++import { ActivityIndicator, StyleSheet, View } from 'react-native';
++import {
++  createIdentityPersistence,
++  purgePersistedQueryCacheForAllUsers,
++  settleAndClearQueryCache,
++} from './queryClient';
++import type { IdentityPersistence } from './queryClient';
++
++/** Upper bound on the restoring phase for one identity (hung storage read). */
++export const PERSISTED_CACHE_RESTORE_TIMEOUT_MS = 4000;
++/** Upper bound on waiting for the previous identity's in-flight writes. */
++export const PERSISTED_CACHE_DRAIN_TIMEOUT_MS = 1000;
++
++export interface PersistedQueryCacheGateProps {
++  userId: string | null | undefined;
++  children: React.ReactNode;
++  /** Optional placeholder while restoring; defaults to a centered spinner. */
++  renderRestoring?: () => React.ReactElement | null;
++}
++
++export function PersistedQueryCacheGate({ userId, children, renderRestoring }: PersistedQueryCacheGateProps) {
++  // undefined = nothing committed yet (never equal to a real identity because
++  // the render guard below also requires userId !== undefined).
++  const [committed, setCommitted] = useState<string | null | undefined>(undefined);
++  const activeRef = useRef<IdentityPersistence | null>(null);
++  // Persistences that have been retired but whose in-flight writes have not
++  // been drained yet. A transition that is superseded mid-drain leaves its
++  // entries here so the superseding transition drains them instead of losing
++  // them (interrupted A→B→A / A→B→null paths).
++  const retiredRef = useRef<Set<IdentityPersistence>>(new Set());
++  // True once an identity-bound restore could have put private data into the
++  // shared client. Until then (cold boot before the first commit) there is no
++  // previous identity memory to clear, and clearing would needlessly cancel
++  // queries owned by providers mounted ABOVE this gate.
++  const memoryDirtyRef = useRef(false);
++  const transitionRef = useRef(0);
++
++  useEffect(() => {
++    if (userId === undefined) {
++      // Bootstrap unknown: hold. Whatever was active stays retired by the
++      // cleanup below; no storage or cache side effects until a real outcome.
++      return undefined;
++    }
++    const transition = ++transitionRef.current;
++    const isCurrent = () => transitionRef.current === transition;
++    const retired = retiredRef.current;
++    if (activeRef.current) retired.add(activeRef.current);
++    activeRef.current = null;
++    // Step 1 (idempotent — the cleanup of the previous effect already fenced it).
++    retired.forEach((persistence) => persistence.retire());
++
++    (async () => {
++      // Step 2.
++      if (retired.size) {
++        const draining = Array.from(retired);
++        await Promise.all(
++          draining.map((persistence) => persistence.drain({ timeoutMs: PERSISTED_CACHE_DRAIN_TIMEOUT_MS })),
++        );
++        if (!isCurrent()) return;
++        // Drained or fenced fail-closed: no longer this gate's concern.
++        draining.forEach((persistence) => retired.delete(persistence));
++      }
++      // Step 3. The previous identity's children were unmounted in the commit
++      // that scheduled this effect (their passive cleanups ran first), so the
++      // clear runs after their observers detached.
++      if (memoryDirtyRef.current) {
++        const cleared = await settleAndClearQueryCache(undefined, { shouldContinue: isCurrent });
++        if (!cleared || !isCurrent()) return;
++        memoryDirtyRef.current = false;
++      }
++      // Step 4.
++      if (userId === null) {
++        await purgePersistedQueryCacheForAllUsers();
++        if (!isCurrent()) return;
++        setCommitted(null);
++        return;
++      }
++      const next = createIdentityPersistence(userId);
++      activeRef.current = next;
++      // From here a restore may hydrate this identity's private data.
++      memoryDirtyRef.current = true;
++      await next.restore({ timeoutMs: PERSISTED_CACHE_RESTORE_TIMEOUT_MS });
++      // A later transition retired `next` and took over; it never commits.
++      if (!isCurrent() || next.isRetired()) return;
++      // Step 5.
++      setCommitted(userId);
++    })();
++
++    return () => {
++      // Fence the persistence this transition owns (or created) as soon as the
++      // identity changes or the gate unmounts. Draining/clearing belongs to the
++      // next transition, which picks it up via activeRef / retiredRef.
++      activeRef.current?.retire();
++    };
++  }, [userId]);
++
++  const isCommitted = userId !== undefined && committed === userId;
++  if (!isCommitted) {
++    if (renderRestoring) return renderRestoring();
++    return (
++      <View style={styles.restoring}>
++        <ActivityIndicator testID="persisted-cache-restoring" />
++      </View>
++    );
++  }
++  return <>{children}</>;
++}
++
++export default PersistedQueryCacheGate;
++
++const styles = StyleSheet.create({
++  restoring: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++});
+diff --git a/src/services/__tests__/persistedQueryCache.identityGate.test.tsx b/src/services/__tests__/persistedQueryCache.identityGate.test.tsx
+new file mode 100644
+index 0000000..250f642
+--- /dev/null
++++ b/src/services/__tests__/persistedQueryCache.identityGate.test.tsx
+@@ -0,0 +1,486 @@
++/**
++ * S6-P1 — identity-bound persisted query cache: REQUIRED post-fix suite.
++ *
++ * Real composition: real `queryClient`, real `createIdentityPersistence`
++ * (pinned @tanstack persist primitives over the AsyncStorage jest mock), real
++ * `PersistedQueryCacheGate`. Nothing in the persistence path is mocked.
++ *
++ * Exit criteria pinned here (parent S6-P1 decisions):
++ *   - no anonymous shared-key restore or write for authenticated state,
++ *   - A→B replacement WITHOUT a normal signOut: no frame renders A's private
++ *     data under B; A's deferred restore cannot land after replacement,
++ *   - a queued/throttled OLD storage write is fenced at the actual write, not
++ *     merely at persistClient entry,
++ *   - clearing happens before new private children can observe old memory,
++ *   - normal same-user restore works, normal logout leaves nothing behind,
++ *   - the restoring phase is bounded (no deadlock on a hung storage read).
++ */
++import React from 'react';
++import { act, render, cleanup } from '@testing-library/react-native';
++import { Text } from 'react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { QueryClient, QueryClientProvider, dehydrate, useQuery } from '@tanstack/react-query';
++
++import {
++  queryClient,
++  persisterKeyForUser,
++  createIdentityPersistence,
++  QUERY_CACHE_BUSTER,
++  QUERY_CACHE_KEY_PREFIX,
++} from '../queryClient';
++import {
++  PersistedQueryCacheGate,
++  PERSISTED_CACHE_RESTORE_TIMEOUT_MS,
++  PERSISTED_CACHE_DRAIN_TIMEOUT_MS,
++} from '../PersistedQueryCacheGate';
++
++const ME = ['me'] as const;
++const A = { id: 'user-A', email: 'a@example.com', secret: 'A-private' };
++const B = { id: 'user-B', email: 'b@example.com', secret: 'B-private' };
++const KEY_A = persisterKeyForUser('user-A');
++const KEY_B = persisterKeyForUser('user-B');
++const ANON_KEY = `${QUERY_CACHE_KEY_PREFIX}:anonymous`;
++
++function blobWith(key: readonly unknown[], data: unknown, extra: Record<string, unknown> = {}): string {
++  const tmp = new QueryClient();
++  tmp.setQueryData(key, data);
++  for (const [k, v] of Object.entries(extra)) tmp.setQueryData([k], v);
++  return JSON.stringify({ buster: QUERY_CACHE_BUSTER, timestamp: Date.now(), clientState: dehydrate(tmp) });
++}
++async function blobQueries(storageKey: string): Promise<Array<{ queryKey: unknown; data: unknown }>> {
++  const raw = await AsyncStorage.getItem(storageKey);
++  if (!raw) return [];
++  const parsed = JSON.parse(raw) as { clientState: { queries: Array<{ queryKey: unknown; state: { data: unknown } }> } };
++  return parsed.clientState.queries.map((q) => ({ queryKey: q.queryKey, data: q.state.data }));
++}
++
++/** Records, per render, which identity the child is rendered for and what it can see. */
++const frames: Array<{ session: string; me: unknown }> = [];
++function PrivateProbe({ session }: { session: string }) {
++  const { data } = useQuery({ queryKey: ME, queryFn: () => new Promise<never>(() => {}), staleTime: Infinity });
++  frames.push({ session, me: data ?? queryClient.getQueryData(ME) });
++  return <Text testID={`private-${session}`}>{data ? JSON.stringify(data) : 'none'}</Text>;
++}
++function Harness({ userId }: { userId: string | null }) {
++  return (
++    <QueryClientProvider client={queryClient}>
++      <PersistedQueryCacheGate userId={userId}>
++        <PrivateProbe session={userId ?? 'anon'} />
++      </PersistedQueryCacheGate>
++    </QueryClientProvider>
++  );
++}
++
++let getItemSpy: jest.SpyInstance;
++let setItemSpy: jest.SpyInstance;
++
++beforeEach(async () => {
++  jest.useFakeTimers();
++  await AsyncStorage.clear();
++  queryClient.clear();
++  frames.length = 0;
++  getItemSpy = jest.spyOn(AsyncStorage, 'getItem');
++  setItemSpy = jest.spyOn(AsyncStorage, 'setItem');
++});
++afterEach(async () => {
++  // Global exit criterion: the shared anonymous key is never read or written.
++  const touched = [...getItemSpy.mock.calls, ...setItemSpy.mock.calls].map((c) => String(c[0]));
++  expect(touched.filter((k) => k === ANON_KEY || k === QUERY_CACHE_KEY_PREFIX)).toEqual([]);
++  await cleanup();
++  jest.clearAllTimers();
++  jest.useRealTimers();
++  jest.restoreAllMocks();
++});
++
++const settle = async (ms = 0) => {
++  await act(async () => {
++    await jest.advanceTimersByTimeAsync(ms);
++  });
++};
++
++describe('normal same-user restore', () => {
++  it('restores A from A\'s own key, renders children only after restore, persists back to A\'s key, restores again on cold remount', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    expect(r.queryByTestId('private-user-A')).toBeNull(); // restoring phase, no private frame yet
++    await settle();
++    expect(r.getByTestId('private-user-A').props.children).toContain('A-private');
++    expect(frames.every((f) => f.session !== 'user-A' || f.me === undefined || (f.me as typeof A).id === 'user-A')).toBe(true);
++
++    await act(async () => {
++      queryClient.setQueryData(['extra'], { n: 1 });
++    });
++    await settle(1100);
++    expect(await blobQueries(KEY_A)).toEqual(
++      expect.arrayContaining([expect.objectContaining({ data: A }), expect.objectContaining({ data: { n: 1 } })]),
++    );
++    r.unmount();
++    queryClient.clear();
++    const again = await render(<Harness userId="user-A" />);
++    await settle();
++    expect(again.getByTestId('private-user-A').props.children).toContain('A-private');
++  });
++});
++
++describe('A → B replacement without a normal signOut', () => {
++  it('never renders A\'s private data under B, clears before B\'s children mount, and B restores from B\'s key only', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    await AsyncStorage.setItem(KEY_B, blobWith(ME, B));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    expect(queryClient.getQueryData(ME)).toEqual(A);
++
++    r.rerender(<Harness userId="user-B" />);
++    // Synchronously after the identity change: A's children are gone and no B child exists yet.
++    expect(r.queryByTestId('private-user-A')).toBeNull();
++    expect(r.queryByTestId('private-user-B')).toBeNull();
++    await settle();
++    expect(r.getByTestId('private-user-B').props.children).toContain('B-private');
++    expect(queryClient.getQueryData(ME)).toEqual(B);
++    const bFrames = frames.filter((f) => f.session === 'user-B');
++    expect(bFrames.length).toBeGreaterThan(0);
++    expect(bFrames.some((f) => JSON.stringify(f.me ?? '').includes('A-private'))).toBe(false);
++    // Nothing of A was written to B's key, and A's key still holds A only.
++    await settle(1100);
++    expect(JSON.stringify(await blobQueries(KEY_B))).not.toContain('A-private');
++    expect(JSON.stringify(await blobQueries(KEY_A))).not.toContain('B-private');
++  });
++
++  it('a deferred OLD restore resolving after replacement hydrates nothing', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    await AsyncStorage.setItem(KEY_B, blobWith(ME, B));
++    let releaseA: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    getItemSpy.mockImplementation(async (k: string) => {
++      if (k === KEY_A && !releaseA) {
++        await new Promise<void>((res) => {
++          releaseA = res;
++        });
++      }
++      return realGet(k);
++    });
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    expect(r.queryByTestId('private-user-A')).toBeNull(); // still restoring A (read held)
++
++    r.rerender(<Harness userId="user-B" />); // replacement lands first
++    await settle();
++    expect(r.getByTestId('private-user-B').props.children).toContain('B-private');
++
++    (releaseA as unknown as () => void)(); // A's read finally resolves
++    await settle(50);
++    expect(queryClient.getQueryData(ME)).toEqual(B);
++    expect(JSON.stringify(queryClient.getQueryCache().getAll().map((q) => q.state.data))).not.toContain('A-private');
++    await settle(1100);
++    expect(JSON.stringify(await blobQueries(KEY_B))).not.toContain('A-private');
++  });
++
++  it('a queued/throttled OLD storage write is dropped at the actual write after retirement (not just at persistClient entry)', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    // First event → immediate write (throttle idle). Second → queued ~1 s.
++    await act(async () => {
++      queryClient.setQueryData(['warm'], 1);
++    });
++    await settle(5);
++    const writesToAAfterWarm = setItemSpy.mock.calls.filter((c) => c[0] === KEY_A).length;
++    await act(async () => {
++      queryClient.setQueryData(['queued-under-A'], 'should-never-persist');
++    });
++    // Retire A (replacement) before the queued write fires.
++    r.rerender(<Harness userId="user-B" />);
++    await settle();
++    await settle(1500); // the library's throttled op fires now — into the fenced storage
++    const writesToAAfter = setItemSpy.mock.calls.filter((c) => c[0] === KEY_A).length;
++    expect(writesToAAfter).toBe(writesToAAfterWarm);
++    expect(JSON.stringify(await blobQueries(KEY_A))).not.toContain('should-never-persist');
++    expect(JSON.stringify(await blobQueries(KEY_B))).not.toContain('should-never-persist');
++  });
++
++  it('an in-flight OLD storage write is drained before the replacement identity is committed', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    let releaseWrite: (() => void) | null = null;
++    const realSet = AsyncStorage.setItem.bind(AsyncStorage);
++    setItemSpy.mockImplementation(async (k: string, v: string) => {
++      if (k === KEY_A && !releaseWrite) {
++        await new Promise<void>((res) => {
++          releaseWrite = res;
++        });
++      }
++      return realSet(k, v);
++    });
++    await act(async () => {
++      queryClient.setQueryData(['slow-write'], 1); // immediate write, now hanging inside storage
++    });
++    await settle(5);
++    expect(releaseWrite).not.toBeNull();
++    r.rerender(<Harness userId="user-B" />);
++    await settle(50);
++    // The write is genuinely outstanding, so B is not yet committed: no B frame may exist.
++    expect(r.queryByTestId('private-user-B')).toBeNull();
++    (releaseWrite as unknown as () => void)();
++    await settle(50);
++    expect(r.getByTestId('private-user-B')).toBeTruthy();
++  });
++});
++
++describe('A → logged out (null) with delayed OLD operations', () => {
++  it('a deferred OLD restore resolving after logout hydrates nothing into the unauthenticated session', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    let releaseA: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    getItemSpy.mockImplementation(async (k: string) => {
++      if (k === KEY_A && !releaseA) {
++        await new Promise<void>((res) => {
++          releaseA = res;
++        });
++      }
++      return realGet(k);
++    });
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    r.rerender(<Harness userId={null} />);
++    await settle(50);
++    expect(r.getByTestId('private-anon').props.children).toBe('none');
++    (releaseA as unknown as () => void)();
++    await settle(50);
++    expect(queryClient.getQueryData(ME)).toBeUndefined();
++    expect(frames.filter((f) => f.session === 'anon').every((f) => f.me === undefined)).toBe(true);
++    expect(setItemSpy.mock.calls.filter((c) => String(c[0]).startsWith(QUERY_CACHE_KEY_PREFIX))).toEqual([]);
++  });
++
++  it('a queued/throttled OLD write is dropped after logout and the retired identity\'s key is purged', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    await act(async () => {
++      queryClient.setQueryData(['warm'], 1);
++    });
++    await settle(5);
++    await act(async () => {
++      queryClient.setQueryData(['queued-under-A'], 'should-never-persist');
++    });
++    r.rerender(<Harness userId={null} />);
++    await settle(50);
++    const writesAfterLogout = setItemSpy.mock.calls.length;
++    await settle(1500); // throttled op fires into the fenced storage
++    expect(setItemSpy.mock.calls.length).toBe(writesAfterLogout);
++    // Explicit logout lifecycle: retired identity's key is gone (drain → purge), nothing to resurrect.
++    expect(await AsyncStorage.getItem(KEY_A)).toBeNull();
++  });
++
++  it('an OLD write still in flight when the bounded drain expires cannot recreate the blob after logout purge (fail-closed)', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    let releaseWrite: (() => void) | null = null;
++    const realSet = AsyncStorage.setItem.bind(AsyncStorage);
++    setItemSpy.mockImplementation(async (k: string, v: string) => {
++      if (k === KEY_A && !releaseWrite) {
++        await new Promise<void>((res) => {
++          releaseWrite = res;
++        });
++      }
++      return realSet(k, v); // the bytes DO land — the write was never stopped
++    });
++    const removeItemSpy = jest.spyOn(AsyncStorage, 'removeItem');
++    await act(async () => {
++      queryClient.setQueryData(['slow-write'], 'A-slow');
++    });
++    await settle(5);
++    expect(releaseWrite).not.toBeNull();
++    r.rerender(<Harness userId={null} />);
++    await settle(PERSISTED_CACHE_DRAIN_TIMEOUT_MS + 50);
++    // Drain expired: unauthenticated children render with the purge done, write still outstanding.
++    expect(r.getByTestId('private-anon').props.children).toBe('none');
++    expect(await AsyncStorage.getItem(KEY_A)).toBeNull();
++    (releaseWrite as unknown as () => void)(); // old completion lands AFTER the purge
++    await settle(50);
++    // Fail-closed: the retired identity's fenced storage removes what it just wrote.
++    expect(removeItemSpy.mock.calls.some((c) => c[0] === KEY_A)).toBe(true);
++    expect(await AsyncStorage.getItem(KEY_A)).toBeNull();
++    expect(setItemSpy.mock.calls.filter((c) => String(c[0]).startsWith(QUERY_CACHE_KEY_PREFIX) && c[0] !== KEY_A)).toEqual([]);
++  });
++});
++
++describe('logout and unauthenticated state', () => {
++  it('A → null clears memory before unauthenticated children render and persists nothing afterwards', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId="user-A" />);
++    await settle();
++    expect(queryClient.getQueryData(ME)).toEqual(A);
++    r.rerender(<Harness userId={null} />);
++    await settle();
++    expect(r.getByTestId('private-anon').props.children).toBe('none');
++    expect(frames.filter((f) => f.session === 'anon').some((f) => f.me !== undefined)).toBe(false);
++    const before = setItemSpy.mock.calls.length;
++    await act(async () => {
++      queryClient.setQueryData(['anon-thing'], 1);
++    });
++    await settle(1500);
++    expect(setItemSpy.mock.calls.length).toBe(before); // logged-out state is never persisted
++  });
++
++  it('unauthenticated from cold start never reads any persisted cache key', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const r = await render(<Harness userId={null} />);
++    await settle();
++    expect(r.getByTestId('private-anon')).toBeTruthy();
++    expect(getItemSpy.mock.calls.filter((c) => String(c[0]).startsWith(QUERY_CACHE_KEY_PREFIX))).toEqual([]);
++  });
++});
++
++describe('bounded restoring phase', () => {
++  it('renders children with an empty cache after PERSISTED_CACHE_RESTORE_TIMEOUT_MS when storage hangs (no deadlock)', async () => {
++    getItemSpy.mockImplementation(() => new Promise<never>(() => {}));
++    const r = await render(<Harness userId="user-A" />);
++    await settle(PERSISTED_CACHE_RESTORE_TIMEOUT_MS - 1);
++    expect(r.queryByTestId('private-user-A')).toBeNull();
++    await settle(2);
++    expect(r.getByTestId('private-user-A').props.children).toBe('none');
++  });
++
++  it('a restore completing AFTER the timeout is discarded (explicit: no stale hydrate over the live session) while new writes persist', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, { ...A, stale: true }));
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    getItemSpy.mockImplementation(async (k: string) => {
++      if (k === KEY_A && !release) {
++        await new Promise<void>((res) => {
++          release = res;
++        });
++      }
++      return realGet(k);
++    });
++    const r = await render(<Harness userId="user-A" />);
++    await settle(PERSISTED_CACHE_RESTORE_TIMEOUT_MS + 1);
++    expect(r.getByTestId('private-user-A').props.children).toBe('none');
++    await act(async () => {
++      queryClient.setQueryData(['fresh'], 'fresh-A'); // live session data
++    });
++    (release as unknown as () => void)(); // stale read completes late
++    await settle(50);
++    expect(queryClient.getQueryData(ME)).toBeUndefined(); // fenced at the restore→hydrate boundary
++    expect(queryClient.getQueryData(['fresh'])).toBe('fresh-A');
++    await settle(1500);
++    const persisted = JSON.stringify(await blobQueries(KEY_A));
++    expect(persisted).toContain('fresh-A');
++    expect(persisted).not.toContain('"stale":true');
++  });
++
++  it('the timeout never commits an identity other than the requested one', async () => {
++    getItemSpy.mockImplementation(() => new Promise<never>(() => {}));
++    const r = await render(<Harness userId="user-A" />);
++    await settle(PERSISTED_CACHE_RESTORE_TIMEOUT_MS / 2);
++    r.rerender(<Harness userId="user-B" />); // replaced mid-wait
++    await settle(PERSISTED_CACHE_RESTORE_TIMEOUT_MS / 2 + 5); // A's timer would have fired here
++    expect(r.queryByTestId('private-user-A')).toBeNull();
++    expect(r.queryByTestId('private-user-B')).toBeNull(); // B's own bounded wait still running
++    await settle(PERSISTED_CACHE_RESTORE_TIMEOUT_MS / 2 + 5);
++    expect(r.getByTestId('private-user-B').props.children).toBe('none');
++  });
++});
++
++describe('createIdentityPersistence (unit, real primitives)', () => {
++  it('retire() before the read resolves reports retired and hydrates nothing; retire is idempotent', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    getItemSpy.mockImplementation(async (k: string) => {
++      if (k === KEY_A) await new Promise<void>((res) => { release = res; });
++      return realGet(k);
++    });
++    const p = createIdentityPersistence('user-A');
++    const restoring = p.restore();
++    p.retire();
++    p.retire();
++    (release as unknown as () => void)();
++    expect(await restoring).toBe('retired');
++    expect(queryClient.getQueryData(ME)).toBeUndefined();
++    expect(p.isRetired()).toBe(true);
++  });
++
++  it('restore() reports restored/empty and only subscribes when not retired', async () => {
++    const empty = createIdentityPersistence('user-B');
++    expect(await empty.restore()).toBe('empty');
++    empty.retire();
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    const p = createIdentityPersistence('user-A');
++    expect(await p.restore()).toBe('restored');
++    expect(queryClient.getQueryData(ME)).toEqual(A);
++    p.retire();
++    queryClient.setQueryData(['after-retire'], 1);
++    await settle(1500);
++    expect(setItemSpy.mock.calls.filter((c) => c[0] === KEY_A)).toEqual([]);
++  });
++
++  it('restore({ timeoutMs }) reports timeout, subscribes, and discards the late completion at the hydrate boundary', async () => {
++    await AsyncStorage.setItem(KEY_A, blobWith(ME, A));
++    let release: (() => void) | null = null;
++    const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++    getItemSpy.mockImplementation(async (k: string) => {
++      if (k === KEY_A) await new Promise<void>((res) => { release = res; });
++      return realGet(k);
++    });
++    const p = createIdentityPersistence('user-A');
++    const restoring = p.restore({ timeoutMs: 100 });
++    await settle(101);
++    expect(await restoring).toBe('timeout');
++    (release as unknown as () => void)();
++    await settle(10);
++    expect(queryClient.getQueryData(ME)).toBeUndefined();
++    queryClient.setQueryData(['live'], 1);
++    await settle(1500);
++    expect(setItemSpy.mock.calls.filter((c) => c[0] === KEY_A).length).toBeGreaterThan(0);
++    p.retire();
++  });
++
++  it('drain() resolves only after the in-flight storage write has actually completed', async () => {
++    const p = createIdentityPersistence('user-A');
++    expect(await p.restore()).toBe('empty');
++    let release: (() => void) | null = null;
++    const realSet = AsyncStorage.setItem.bind(AsyncStorage);
++    setItemSpy.mockImplementation(async (k: string, v: string) => {
++      if (k === KEY_A && !release) await new Promise<void>((res) => { release = res; });
++      return realSet(k, v);
++    });
++    queryClient.setQueryData(['x'], 1);
++    await settle(5);
++    p.retire();
++    let drained = false;
++    const draining = p.drain().then((outcome) => {
++      expect(outcome).toBe('drained');
++      drained = true;
++    });
++    await settle(50);
++    expect(drained).toBe(false);
++    (release as unknown as () => void)();
++    await draining;
++    expect(drained).toBe(true);
++  });
++
++  it('drain({ timeoutMs }) reports timeout (never a silent success) and a write completing after retirement is removed again', async () => {
++    const p = createIdentityPersistence('user-A');
++    expect(await p.restore()).toBe('empty');
++    let release: (() => void) | null = null;
++    const realSet = AsyncStorage.setItem.bind(AsyncStorage);
++    setItemSpy.mockImplementation(async (k: string, v: string) => {
++      if (k === KEY_A && !release) await new Promise<void>((res) => { release = res; });
++      return realSet(k, v);
++    });
++    const removeItemSpy = jest.spyOn(AsyncStorage, 'removeItem');
++    queryClient.setQueryData(['x'], 1);
++    await settle(5);
++    p.retire();
++    const draining = p.drain({ timeoutMs: 100 });
++    await settle(101);
++    expect(await draining).toBe('timeout');
++    (release as unknown as () => void)();
++    await settle(10);
++    expect(removeItemSpy.mock.calls.some((c) => c[0] === KEY_A)).toBe(true);
++    expect(await AsyncStorage.getItem(KEY_A)).toBeNull();
++  });
++});
+diff --git a/src/__tests__/rootNavigatorPersistedCacheGate.test.tsx b/src/__tests__/rootNavigatorPersistedCacheGate.test.tsx
+new file mode 100644
+index 0000000..536f57d
+--- /dev/null
++++ b/src/__tests__/rootNavigatorPersistedCacheGate.test.tsx
+@@ -0,0 +1,192 @@
++/**
++ * S6-P1 — RootNavigator is the identity authority for the persisted query
++ * cache (REQUIRED post-fix suite).
++ *
++ * Renders the REAL RootNavigator with the real `lib/userCache` (AsyncStorage
++ * shim), real `queryClient`, real `PersistedQueryCacheGate`; collaborators
++ * that touch network/native are mocked exactly as in
++ * rootNavigatorAcceptLink.test.tsx.
++ *
++ * Pins parent decision (b): the committed bootstrap result — token present AND
++ * user readable — is the only thing that may authorize restoring a user's
++ * persisted queries. A cached user whose token is missing must NOT have their
++ * cache read, and the auth stack must render with an empty cache.
++ */
++const mockSecure: Record<string, string | null> = {};
++jest.mock('../services/secureStorage', () => ({
++  secureStorage: {
++    getItem: jest.fn(async (k: string) => mockSecure[k] ?? null),
++    setItem: jest.fn(async (k: string, v: string) => {
++      mockSecure[k] = v;
++    }),
++    removeItem: jest.fn(async (k: string) => {
++      delete mockSecure[k];
++    }),
++  },
++}));
++jest.mock('../services/authActions', () => ({ signOut: jest.fn(async () => {}) }));
++jest.mock('../services/api', () => ({
++  __esModule: true,
++  default: {
++    get: jest.fn(async () => ({ data: { is_complete: true } })),
++    post: jest.fn(async () => ({ data: {} })),
++  },
++}));
++jest.mock('react-native/Libraries/Linking/Linking', () => ({
++  __esModule: true,
++  default: {
++    getInitialURL: jest.fn(async () => null),
++    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
++    openURL: jest.fn(async () => true),
++  },
++}));
++jest.mock('@react-navigation/native', () => {
++  const React = jest.requireActual('react');
++  const actual = jest.requireActual('@react-navigation/native');
++  return {
++    ...actual,
++    NavigationContainer: ({ children }: { children: React.ReactNode }) =>
++      React.createElement(React.Fragment, null, children),
++    createNavigationContainerRef: () => ({
++      isReady: () => true,
++      navigate: jest.fn(),
++      resetRoot: jest.fn(),
++      current: null,
++    }),
++  };
++});
++jest.mock('../navigation/AuthNavigator', () => {
++  const React = jest.requireActual('react');
++  const { Text } = jest.requireActual('react-native');
++  return () => React.createElement(Text, { testID: 'nav-auth' }, 'auth');
++});
++jest.mock('../navigation/CoachNavigator', () => {
++  const React = jest.requireActual('react');
++  const { Text } = jest.requireActual('react-native');
++  const { queryClient } = jest.requireActual('../services/queryClient');
++  // The private surface reports what it can see from the cache at mount.
++  return () => {
++    const me = queryClient.getQueryData(['me']);
++    return React.createElement(Text, { testID: 'nav-coach' }, me ? JSON.stringify(me) : 'none');
++  };
++});
++jest.mock('../navigation/ClientNavigator', () => () => null);
++jest.mock('../navigation/OnboardingNavigator', () => () => null);
++jest.mock('../navigation/LeanOnboardingNavigator', () => () => null);
++jest.mock('../navigation/CoachWizardNavigator', () => () => null);
++jest.mock('../navigation/Day1OnboardingNavigator', () => () => null);
++jest.mock('../components/OfflineBanner', () => () => null);
++jest.mock('../components/PackageSelectionSheet', () => () => null);
++jest.mock('../screens/client/Day1WinScreen', () => () => null);
++jest.mock('../services/support/crisp.service', () => ({ initCrisp: jest.fn(), syncCrispIdentity: jest.fn() }));
++jest.mock('../hooks/useLeanOnboardingReconcile', () => ({ useLeanOnboardingReconcile: jest.fn() }));
++jest.mock('../services/firstWinApi', () => ({
++  firstWinApi: { getStatus: jest.fn().mockResolvedValue({ data: { completed: true } }) },
++  WinType: {},
++}));
++jest.mock('../services/foodLogQueue', () => ({ flush: jest.fn().mockResolvedValue(undefined) }));
++jest.mock('../hooks/useNetworkStatus', () => ({
++  useNetworkStatus: () => ({ isOnline: true, isInternetReachable: true }),
++  isEffectivelyOnline: () => true,
++}));
++jest.mock('../utils/authEvents', () => ({
++  authEvents: { onAuthChange: jest.fn(() => () => {}), on: jest.fn(() => () => {}), emit: jest.fn() },
++}));
++jest.mock('../screenshots', () => ({ isScreenshotMode: () => false }));
++jest.mock('../offline', () => ({ triggerSync: jest.fn(async () => undefined) }));
++jest.mock('../entitlements/EntitlementProvider', () => ({
++  EntitlementProvider: ({ children }: { children: unknown }) => children,
++}));
++
++import React from 'react';
++import { render, act, waitFor, cleanup } from '@testing-library/react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { QueryClient, QueryClientProvider, dehydrate } from '@tanstack/react-query';
++import RootNavigator from '../navigation/RootNavigator';
++import { queryClient, persisterKeyForUser, QUERY_CACHE_BUSTER, QUERY_CACHE_KEY_PREFIX } from '../services/queryClient';
++import { PERSISTED_CACHE_RESTORE_TIMEOUT_MS } from '../services/PersistedQueryCacheGate';
++
++const COACH_B = { id: 'user-B', email: 'b@example.com', role: 'coach', name: 'Bea' };
++const KEY_B = persisterKeyForUser('user-B');
++
++function blob(data: unknown): string {
++  const tmp = new QueryClient();
++  tmp.setQueryData(['me'], data);
++  return JSON.stringify({ buster: QUERY_CACHE_BUSTER, timestamp: Date.now(), clientState: dehydrate(tmp) });
++}
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  queryClient.clear();
++  for (const k of Object.keys(mockSecure)) delete mockSecure[k];
++  jest.restoreAllMocks();
++});
++afterEach(async () => {
++  await cleanup();
++});
++
++const mount = () =>
++  render(
++    <QueryClientProvider client={queryClient}>
++      <RootNavigator />
++    </QueryClientProvider>,
++  );
++
++describe('RootNavigator × persisted cache identity', () => {
++  it('cached user B with a MISSING token: auth stack renders, B\'s persisted cache is never read, memory stays empty', async () => {
++    await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(COACH_B));
++    await AsyncStorage.setItem(KEY_B, blob({ ...COACH_B, secret: 'B-private' }));
++    const getItem = jest.spyOn(AsyncStorage, 'getItem');
++    const { findByTestId } = await mount();
++    await findByTestId('nav-auth');
++    expect(getItem.mock.calls.filter((c) => String(c[0]).startsWith(QUERY_CACHE_KEY_PREFIX))).toEqual([]);
++    expect(queryClient.getQueryData(['me'])).toBeUndefined();
++  });
++
++  it('cached user B WITH a token: the coach surface mounts only after B\'s own cache is restored and sees it', async () => {
++    mockSecure['supabase_token'] = 'jwt-B';
++    await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(COACH_B));
++    await AsyncStorage.setItem(KEY_B, blob({ ...COACH_B, secret: 'B-private' }));
++    const getItem = jest.spyOn(AsyncStorage, 'getItem');
++    const { findByTestId } = await mount();
++    const coach = await findByTestId('nav-coach');
++    expect(coach.props.children).toContain('B-private'); // visible at first private mount, not after
++    expect(getItem.mock.calls.some((c) => c[0] === KEY_B)).toBe(true);
++    expect(getItem.mock.calls.filter((c) => String(c[0]).includes(':anonymous'))).toEqual([]);
++  });
++
++  it('a hung persisted-cache read does not deadlock bootstrap: coach surface renders within the bounded window', async () => {
++    jest.useFakeTimers();
++    try {
++      mockSecure['supabase_token'] = 'jwt-B';
++      await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(COACH_B));
++      const realGet = AsyncStorage.getItem.bind(AsyncStorage);
++      jest.spyOn(AsyncStorage, 'getItem').mockImplementation((k: string) =>
++        k === KEY_B ? new Promise<never>(() => {}) : realGet(k),
++      );
++      const r = await mount();
++      await act(async () => {
++        await jest.advanceTimersByTimeAsync(50);
++      });
++      expect(r.queryByTestId('nav-coach')).toBeNull(); // restoring, bounded
++      await act(async () => {
++        await jest.advanceTimersByTimeAsync(PERSISTED_CACHE_RESTORE_TIMEOUT_MS + 50);
++      });
++      expect(r.getByTestId('nav-coach').props.children).toBe('none');
++    } finally {
++      jest.useRealTimers();
++    }
++  });
++
++  it('cached user B whose bootstrap fails validation (needs_role_selection) is treated as unauthenticated: no cache read', async () => {
++    mockSecure['supabase_token'] = 'jwt-B';
++    await AsyncStorage.setItem('prefs:auth.user_data', JSON.stringify(COACH_B));
++    await AsyncStorage.setItem('needs_role_selection', 'true');
++    await AsyncStorage.setItem(KEY_B, blob({ secret: 'B-private' }));
++    const getItem = jest.spyOn(AsyncStorage, 'getItem');
++    const { findByTestId } = await mount();
++    await findByTestId('nav-auth');
++    await waitFor(() => expect(queryClient.getQueryData(['me'])).toBeUndefined());
++    expect(getItem.mock.calls.filter((c) => c[0] === KEY_B)).toEqual([]);
++  });
++});

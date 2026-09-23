@@ -1,0 +1,261 @@
+import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { PostHogProvider } from 'posthog-react-native';
+import {
+  useFonts,
+  CormorantGaramond_400Regular,
+  CormorantGaramond_500Medium,
+} from '@expo-google-fonts/cormorant-garamond';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
+import * as SplashScreen from 'expo-splash-screen';
+import RootNavigator from './src/navigation/RootNavigator';
+import AppSplash from './src/components/AppSplash';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { StatusBarBand } from './src/components/StatusBarBand';
+// Phase 11: push-channel taxonomy — register Android channels + iOS categories
+import { registerPushChannels } from './src/notifications/push-channels';
+import {
+  registerForPushNotifications,
+  installForegroundHandler,
+} from './src/services/pushNotifications';
+import { usersApi } from './src/services/api';
+import { authEvents } from './src/utils/authEvents';
+import { secureStorage } from './src/services/secureStorage';
+import { initDatabase } from './src/db/database';
+import { queryClient } from './src/services/queryClient';
+import { initSentry, wrap as sentryWrap, captureError } from './src/services/sentry';
+// Phase 11: typed analytics service replaces the raw lib/analytics track call
+// for app_opened so the typed AnalyticsEvents constant is used.
+import { track } from './src/lib/analytics';
+import { AnalyticsEvents } from './src/analytics/events';
+import { ThemeProvider } from './src/theme/ThemeProvider';
+import BiometricUnlockGate from './src/components/BiometricUnlockGate';
+
+// Screenshots module — static import so Metro's resolver alias works correctly.
+// In production EAS builds, metro.config.js resolveRequest hook redirects this
+// import to src/screenshots/index.stub.ts (empty no-ops), so no fixture data
+// or mock adapters ever reach the production bundle.
+// In development and screenshot capture runs, the real module is used.
+// Do NOT use a dynamic require() guarded by __DEV__ here — __DEV__ is a
+// runtime constant and Metro cannot tree-shake dynamic requires at bundle time.
+import { installAxiosMockAdapter, isScreenshotMode, seedDemoUser } from './src/screenshots';
+
+// Initialise Sentry as early as possible so even import-time failures get
+// captured. The function no-ops when EXPO_PUBLIC_SENTRY_DSN is unset, so this
+// line is safe to commit without secrets.
+initSentry();
+
+// Screenshot mode: replace the axios network adapter with a fixture-backed one
+// before any screen module imports `services/api`. No-op when the env flag is
+// off, so production builds are unaffected.
+installAxiosMockAdapter();
+
+// Prevent the native splash from auto-hiding before fonts are ready.
+// We hide it manually once fonts + app init are both complete.
+SplashScreen.preventAutoHideAsync();
+
+// PostHog credentials — loaded from Expo public env vars.
+// EXPO_PUBLIC_POSTHOG_API_KEY is the canonical Phase 11 var name.
+// EXPO_PUBLIC_POSTHOG_KEY is the legacy alias; both are accepted so existing
+// dev setups without the rename continue to work.
+// When both are absent (CI, local dev without secrets) the SDK no-ops.
+const POSTHOG_KEY =
+  process.env.EXPO_PUBLIC_POSTHOG_API_KEY ??
+  process.env.EXPO_PUBLIC_POSTHOG_KEY ??
+  '';
+const POSTHOG_HOST =
+  process.env.EXPO_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com';
+
+// In screenshot mode the PostHog provider is bypassed: posthog-react-native's
+// web shim throws on construct in some envs, and analytics has no place in a
+// capture run anyway. Production path is unchanged.
+const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+  isScreenshotMode() ? (
+    <>{children}</>
+  ) : (
+    <PostHogProvider
+      apiKey={POSTHOG_KEY}
+      options={{ host: POSTHOG_HOST }}
+      autocapture
+    >
+      {children}
+    </PostHogProvider>
+  );
+
+function App() {
+  const [ready, setReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Wave 2: Load Cormorant Garamond (display serif) + Inter (neutral sans).
+  // Open-source fallback pair for GT Sectra + Söhne (commercial).
+  const [fontsLoaded] = useFonts({
+    CormorantGaramond_400Regular,
+    CormorantGaramond_500Medium,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+  });
+
+  // Hide native splash once fonts AND initApp are ready. Hiding on fontsLoaded
+  // alone exposed a blank-screen window between native-splash dismiss and
+  // AppSplash mount when ready was still false. (Hunt P2-splash)
+  useEffect(() => {
+    if (fontsLoaded && ready) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, ready]);
+
+  useEffect(() => {
+    initApp();
+  }, []);
+
+  // Register the Expo push token with the backend whenever the user signs in.
+  // authEvents fires after every successful auth state change (login, token
+  // refresh, etc.). We gate on a valid supabase_token so we don't fire on
+  // the unauthenticated path. Best-effort: push registration failure must
+  // never block the app boot.
+  useEffect(() => {
+    const tryRegisterPushToken = async () => {
+      try {
+        const token = await secureStorage.getItem('supabase_token');
+        if (!token) return; // not authenticated
+        const result = await registerForPushNotifications();
+        if (result.token) {
+          await usersApi.updatePushToken(result.token);
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('Failed to register push token', e);
+      }
+    };
+
+    // Run once on mount in case the user is already logged in (warm start).
+    tryRegisterPushToken();
+
+    // Also run on every auth change so newly signed-in users register immediately.
+    const unsubscribe = authEvents.onAuthChange(tryRegisterPushToken);
+    return unsubscribe;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const initApp = async () => {
+    try {
+      // Single source of truth for foreground push behaviour. Wired here
+      // (after initSentry at module load) and before any other notification
+      // setup so the in-app banner store owns the foreground surface.
+      // (Hunt P0-4)
+      installForegroundHandler();
+
+      if (isScreenshotMode()) {
+        // Skip analytics in screenshot mode — it can throw modal UI on top of
+        // the screen we are trying to capture. Seed AsyncStorage so
+        // RootNavigator routes the demo user straight into ClientNavigator.
+        // The local SQLite database is also skipped: none of the
+        // marketing-target screens (Home / Log / Plan / Recipes / Progress /
+        // Fast) read from it, and the web build of expo-sqlite needs
+        // cross-origin-isolation that the dev server does not set, which
+        // would hang the boot.
+        await seedDemoUser();
+      } else {
+        // Initialize SQLite database: create tables, seed exercises (152),
+        // recipes, foods, lessons, community data, etc.
+        // NOTE: seedCoachIfNeeded() was removed along with the dead SQLite auth path.
+        // Auth lives exclusively on the backend now; the local `users` table is no longer used.
+        await initDatabase();
+        // Phase 11: register push channels (Android + iOS categories) at boot
+        // so the four-tier taxonomy is in place before any notification
+        // arrives. The user-facing permission prompt itself is gated to the
+        // Day-1 onboarding "Notifications" step (R29 — ask at the value
+        // moment, not at cold start).
+        await registerPushChannels();
+        // Phase 11: use typed AnalyticsEvents constant for app_opened.
+        track(AnalyticsEvents.APP_OPENED, { cold_start: true });
+      }
+    } catch (err) {
+      // initSentry has already run at module load, so we can capture in any
+      // build profile — previously this was gated to __DEV__ and silently
+      // swallowed in production while setReady(true) still flipped the UI.
+      // (Hunt P1-init)
+      captureError(err, { phase: 'initApp' });
+      if (__DEV__) console.error('App init error:', err);
+    } finally {
+      setReady(true);
+    }
+  };
+
+  // Block render until fonts are loaded — prevents flash of unstyled text.
+  // The native splash screen remains visible during this window (preventAutoHideAsync above).
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  if (!ready || (showSplash && !isScreenshotMode())) {
+    // Screenshot mode bypasses the AppSplash animation so captures land on
+    // real content immediately rather than the bone splash card.
+    return (
+      <>
+        <AppSplash onFinish={() => setShowSplash(false)} />
+        <StatusBar style="dark" />
+      </>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <ErrorBoundary>
+      {/*
+        PostHogProvider wraps the whole app so the SDK can auto-capture
+        screen views and session recording (when enabled). autocapture is
+        enabled so screen transitions are tracked automatically. It no-ops
+        when POSTHOG_KEY is an empty string, so no secrets are needed in dev.
+      */}
+      <AnalyticsProvider>
+        {/*
+          QueryClientProvider wraps the whole app so any screen migrated to
+          API-first (Fix #2) can use useQuery/useMutation. The provider is
+          intentionally INSIDE ErrorBoundary so a thrown query error from a
+          single screen doesn't take down the rest of the app — the boundary
+          will catch it, and React Query will retry on the next mount.
+
+          S6-P1: this is the plain provider. Persistence of the cache to
+          AsyncStorage is identity-bound and owned by PersistedQueryCacheGate,
+          mounted in RootNavigator once the bootstrap identity is committed —
+          see src/services/PersistedQueryCacheGate.tsx and
+          src/services/queryClient.ts (createIdentityPersistence).
+        */}
+        <QueryClientProvider client={queryClient}>
+          {/* Wave 2: dark status-bar icons on the bone background. SDK 56
+              edge-to-edge: the bone band itself is painted by <StatusBarBand>
+              above; expo-status-bar only controls icon contrast now. */}
+          <StatusBar style="dark" />
+          {/* ThemeProvider: Premium Visual System — UX Psych Report #5.
+              Must be inside QueryClientProvider so useFoundingNumber()
+              (which calls useQuery) works correctly. */}
+          <ThemeProvider>
+            {/* BiometricUnlockGate is a no-op when the user hasn't opted in.
+                It sits inside ThemeProvider so the locked-state UI uses the
+                same theme as the rest of the app. */}
+            <BiometricUnlockGate>
+              <RootNavigator />
+            </BiometricUnlockGate>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </AnalyticsProvider>
+      </ErrorBoundary>
+      {/* SDK 56 edge-to-edge: paint the bone band behind the Android status
+          bar via an absolutely-positioned overlay. Rendered AFTER the app tree
+          so it stacks on top via position:absolute + zIndex, without consuming
+          layout space (no double safe-area inset). */}
+      <StatusBarBand />
+    </SafeAreaProvider>
+  );
+}
+
+// Sentry.wrap() injects an automatic error boundary + touch tracking. When
+// the SDK isn't initialised (no DSN) it returns the component unchanged.
+export default sentryWrap(App);

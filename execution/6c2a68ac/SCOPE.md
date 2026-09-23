@@ -239,6 +239,10 @@ S3 composed result2d4615e7/118 is frozen: runner/final/cleanup0, guard72/composi
 
 `S5_HOOKED_CANDIDATE_PREPARATION_GRANT.md` independently assigns `restore_s5_source_mue9wsph` a fresh source-only packet, T4 individual/cumulative, to prepare the exact true-hooked two-file continuation and identify the retained fresh51 boundary. No worktree/Git metadata/node/runtime/lock/DB/private writes. This removes planning latency only; actual commit still waits for setup and T0 disposition.
 
+## S6 frozen P1 candidate review and preparation
+
+Product build is COMPLETE698cf631/15, patch20c6594c across nine authorized paths. `S6_P1_EXACT_CANDIDATE_REVIEW_SCOPE.md` assigns existing nonbuilder A/B separate read-only exact-source reviews in s6-p1-product-a/b. They later close actual results in these same reviews; no duplicate source audit. `S6_P1_VALIDATION_PREPARATION_GRANT.md` assigns the original builder only fresh s6-p1-validation-prep source files for exact bounded runtime/hook request, not candidate mutation or execution. S5 owns sole runtime. No S6 product write, node/test/parse/install/lock/commit or private-checkout write.
+
 ## Baseline pins
 
 Latest S5 transition: original hooked activation STOPPED06 at formatter raw1, result492f7104/16;00–05 succeeded and stagedtree3d30/client/hooks/tool remain in place, no commit, runtime returned18:16Z. `S5_FORMATTER_DISPOSITION_AND_CONTINUATION.md` now authorizes `restore_s5_source_mue9wsph` the sole S5 runtime: one spec-only mechanical format pinned338defe8, then original07–10 with mechanically updated expectations. Frozen original failures/prep/patch remain unchanged; no repeated install/generate/T0, hook bypass, realPG or remote action. Required dual exact-head/runner reviews and fresh51 remain downstream. T0 result0b50d653/31 remains accepted only as bounded diagnostic evidence.

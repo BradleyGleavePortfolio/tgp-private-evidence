@@ -1,6 +1,6 @@
 # S6 C6 disposition and P1 product build
 
-Parent EXEC-6c2a68ac, 2026-09-23. C6 is CONSUMED, runtime returned. P1 source-only product implementation is ACTIVE for `restore_s6_substrate_mue9osen`, requested Claude Fable 5 / High. No runtime is granted by this document.
+Parent EXEC-6c2a68ac, 2026-09-23. C6 is CONSUMED, runtime returned. P1 source-only product implementation is COMPLETE/FROZEN698cf631/15, patch20c6594c/nine paths, by `restore_s6_substrate_mue9osen`, requested Claude Fable 5 / High. Source mutation authority is consumed; exact independent review is now governed by `S6_P1_EXACT_CANDIDATE_REVIEW_SCOPE.md`. No runtime is granted by this document.
 
 ## Evidence and decision
 

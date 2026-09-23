@@ -1,0 +1,20 @@
+# S6 P1 validation and local-commit preparation
+
+Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE source-only for existing builder `restore_s6_substrate_mue9osen`, requested Claude Fable5/High, T4 individual/cumulative. This independent preparation may run while both nonbuilder source reviews inspect the frozen product. No execution or product mutation is granted.
+
+## Purpose and immutable inputs
+
+Prepare the smallest exact executable request for frozen candidate698cf631/15, patch20c6594c, using existing installed S6 substrate and the test selection in its VALIDATION_REQUEST.md. Include the true-hooked local-commit and exact identity/bundle boundary. Preparation removes avoidable sequencing latency; it must not introduce new controls, observers, supervisors, frameworks or a duplicate audit.
+
+Sole writes: fresh `execution/6c2a68ac/s6-p1-validation-prep/**`. Product worktree, candidate packet, index/config/hooks/HEAD, dependency tree, earlier results, lock paths, /tmp and private checkout are all read-only. Use GIT_OPTIONAL_LOCKS=0 and object/file reads only. No npm/node/bash execution of command files, parse check, formatter, tests, installs, generation, network, locks, probes or signals. Do not read either reviewer's current findings or change product bytes while the reviews run.
+
+## Requested preparation
+
+- **Exact commands:** preserve the frozen validation selection and hazard inputs, define finite per-step/aggregate bounds and actual raw/postcheck separation. Use in-worktree tools with offline resolution, CHECKPOINT_DISABLE=1 where applicable, and existing resource limits. No install or Node upgrade. Identify any concrete missing prerequisite; do not silently supply or fetch it.
+- **Ownership:** reuse the already accepted S6 exclusion/ownership mechanisms and existing step patterns where applicable, with the smallest necessary constant/command bindings. No new ownership primitive or last-owner timeout. Make exact proposed changes visible as diffs; carry direct caller wait receipts distinct from runner raw and launcher published status. If the existing compositions cannot cover the finite command list without a substantive mechanism change, report that precise incompatibility and minimum execution choice rather than building a new framework.
+- **Hazard proof:** place only the two frozen controls at the exact absent paths for the authorized run, hash-guard their removal, and preserve actual assertion-level T-WIRING/T0/T4 pass versus T1/T2/T3 intended failure. Generic raw1 is insufficient; import failure/hang/timeout/skip is not a flip. No forceExit, timer masking, instrumentation or repeated C6 baseline.
+- **True hooks:** inspect the actual repository's hook configuration and installed tools without executing them. Prepare normal hook installation/staging/verified Bradley author+committer/commit with a factual exact message, detached head and unchanged refs. No bypass or commit-tree. Do not assume hook commands or formatter availability from S3/S5; bind what exists. If a hook would write source, expose that consequential scope and require later disposition rather than quietly expanding source bytes under review.
+- **Exact head proof:** derive the candidate tree without touching the index, retain the nine authorized paths and patch binding, and prepare tree/parent/message/no-trailer/cleanliness/refs/bundle checks with quoted shell expressions. Record original candidate separately from any future authorized mechanical change.
+- **Stop rules:** first unexpected nonzero/unknown/mutation or failed prerequisite stops and preserves state; expected hazard failures remain explicitly separate. No retries, repairs, cleanup of unrelated scratch, baseline reruns or recursive diagnostics.
+
+Use concise REQUEST, exact command/helper files if mechanically derivable, INPUT hashes/diffs and a non-self-including manifest. Freeze and return. This is preparation, not grantability or product acceptance. Both existing independent reviews remain the review authority and later close actual results in the same reviews; parent separately activates runtime after source closure and slot availability.
