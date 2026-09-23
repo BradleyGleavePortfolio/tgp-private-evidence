@@ -1,0 +1,113 @@
+--- v10/ctl-t0-only.v10.sh
++++ v10.1/controls-v101-t0/ctl-t0-only.v101.sh
+@@ -1,4 +1,9 @@
+ #!/usr/bin/env bash
++# OP88-S5-V10.1 T0-ONLY driver successor (of V10 2797a72a; NOT EXECUTED; V10 frozen). Corrects owned-launch-v10-a OWN-V10-A02 in this consumer ONLY:
++#  the post-wait session census is a TYPED result sess=empty|live|foreign|unknown (own_group_current rc1/0/2/3, re-read after any escalation); census-error (rc3)
++#  is no longer an empty string: it fails <id>.owned, blocks own_retire (so the EXIT trap still reaps/censuses that session => CENSUS_ERROR => FINAL 90) and is
++#  written to the EXIT record and log as session=unknown. Session authority is removed only on sess=empty AND observed in-shell wait (own_retire re-checks).
++#  Embedded OWN-BLOCK is v10.1 (byte-identical to own-block-v101.sh; verify-embedded-block.sh). Jest argv/env, gates, pins, assertions, bounds, traps, records: v10 bytes. V10 header follows.
+ # OP88-S5-V10 T0-ONLY driver successor (of V9 38f8ec01; NOT EXECUTED; V9 + closure immutable). Corrects owned-launch-v9-a A-01..A-04 in this consumer:
+ #  A-01 wait is performed in this (child-owning) shell via own_finish variables OWN_FIN/OWN_FIN_RC — never through $(...); a subshell call is a named mechanism error.
+ #  A-02 `trap on_exit EXIT` and TERM/INT/HUP are registered BEFORE the control root and before any spawn (the V9 derivation had dropped them).
+@@ -65,7 +70,13 @@
+ PIN_HEAD=143d451ead6ccdbebd92ca3031ba7a89867d6cfc
+ PIN_DIRTY_FINGERPRINT=6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0   # v6 (T2-2, optional attribution gate)
+ RUN_BUDGET=90; RUN_GRACE=10; AGG_BOUND=120; RUN_RESERVE=10; T0=$(date +%s)
+-# >>> OWN-BLOCK v10 (successor of v9 9d713d2c per audits/owned-launch-v9-a A-01..A-05; v8 cc8346cd per checkpoint-2 rows 1-3 and parent ruling: bounded child-side adoption gate; byte-identical
++# >>> OWN-BLOCK v10.1 (successor of v10 df200b52 per audits/owned-launch-v10-a OWN-V10-A02 ONLY: leader collection is separated from session authority.
++# own_finish collects the leader at the actual `wait` (pid leaves OWN_PIDS, enters OWN_RETIRED evidence; a pid is never waited twice, so no fabricated
++# non-child 127 can appear as a COLLECTED rc); SESSION authority (the confirmed pgid in OWN_PGIDS) is removed by own_retire ONLY on a positively
++# observed-empty (own_group_current rc1) or positively foreign (rc2) session — live (rc0) or census-error (rc3) keep it (own_retire rc2, OWN_LAST_SESSION),
++# never merely because the leader is gone. own_collect therefore collects exited leaders and reports SESSION_RETIRED / SESSION_KEPT per typed census.
++# Nothing else changes: byte-identical to v10 below this header except own_finish, own_collect, own_retire and the OWN_LAST_SESSION initialiser. v10 header follows.)
++# [v10 header, retained] OWN-BLOCK v10 (successor of v9 9d713d2c per audits/owned-launch-v9-a A-01..A-05; v8 cc8346cd per checkpoint-2 rows 1-3 and parent ruling: bounded child-side adoption gate; byte-identical
+ # in ctl-t0-only.v9.sh and run-s5-setup-npm-ci.v9.sh; controls source this file). Consumer MUST set OWN_ROOT (private evidence dir) first.
+ # Contract: workload execs only after (a) current-attempt identity confirmed pgid==sid==pid, direct child, not self group and (b) adoption
+ # published to a FRESH private attempt path and verified by the child (content == "<child pid> <attempt token>"); no ack / expired / parent
+@@ -84,7 +95,7 @@
+ # background child is a group leader, `setsid` forks and $! names an exited intermediate; v9 also fail-closes there because the gate child's
+ # $$ never matches the published pid), and zombie members are excluded from group liveness (no false SURVIVOR before `wait`).
+ OWN_SELF_PGID=$(ps -o pgid= -p $$ | tr -d ' '); OWN_SELF_SID=$(ps -o sid= -p $$ | tr -d ' ')
+-OWN_PIDS=""; OWN_PGIDS=""; OWN_RETIRED=""; OWN_LAST_DECOY=""; OWN_PHASE=idle
++OWN_PIDS=""; OWN_PGIDS=""; OWN_RETIRED=""; OWN_LAST_DECOY=""; OWN_PHASE=idle; OWN_LAST_SESSION=none
+ # child-side gate: bash -c "$OWN_GATE" own-gate <attempt-dir> <parent-pid> <workload...>; polls 0.05 s up to 100x (5 s); 76 if parent gone, 75 if never adopted
+ OWN_GATE='a=$1; p=$2; shift 2; i=0; while :; do kill -0 "$p" 2>/dev/null || exit 76; [ -r "$a/ADOPT" ] && [ "$(cat "$a/ADOPT" 2>/dev/null)" = "$$ ${a##*/}" ] && break; i=$((i+1)); [ "$i" -ge 100 ] && exit 75; sleep 0.05; done; exec "$@"'
+ own_stamp() { echo "monitor=$([[ -o monitor ]] && echo on || echo off) bash=$BASH_VERSION setsid=[$(setsid --version 2>&1 | head -1)] timeout=[$(timeout --version 2>&1 | head -1)] ps=[$(ps --version 2>&1 | head -1)]"; }
+@@ -133,11 +144,18 @@
+     [ "$ok" = 1 ] && [ "$g" != "$OWN_SELF_PGID" ] && { kill "-$2" -- "-$g" 2>/dev/null; n=$((n+1)); }; done; echo "group:$n"; }
+ own_group_wait_empty() { # <sid> <s>: rc0 ONLY on observed-empty (rc1); keeps polling on live/unknown; rc2 foreign
+   local n=$(( $2 * 10 )) i=0 st; while :; do own_group_current "$1"; st=$?; case $st in 1) return 0;; 2) return 2;; esac; [ $i -lt $n ] || return 1; sleep 0.1; i=$((i+1)); done; }
+-own_finish() { # <pid> -> OWN_FIN=observed|unobserved|mechanism-error-subshell, OWN_FIN_RC. Call DIRECTLY in the launching shell; `wait` only after verified absence
++own_finish() { # <pid> -> OWN_FIN=observed|unobserved|not-registered|mechanism-error-subshell, OWN_FIN_RC. Call DIRECTLY in the launching shell; `wait` only after verified absence.
++  # v10.1 (A02): on observed the LEADER is collected here (removed from OWN_PIDS, kept in OWN_RETIRED as evidence) — a pid is waited exactly once (a second `wait` would fabricate 127);
++  # SESSION authority in OWN_PGIDS is untouched: only own_retire removes it, and only after a positively observed-empty/foreign session census.
+   OWN_FIN_RC=""; [ "$BASHPID" = "$$" ] || { OWN_FIN=mechanism-error-subshell; return 2; }
+-  if own_alive "$1"; then OWN_FIN=unobserved; return 1; fi; wait "$1" 2>/dev/null; OWN_FIN_RC=$?; OWN_FIN=observed; return 0; }
+-own_collect() { # [prefix]: in the launching shell (call directly, optionally with `>> file` — never inside $(...) or a pipe): wait+retire every registered pid no longer alive
+-  local p pre=${1:-}; for p in $OWN_PIDS; do own_alive "$p" && continue; own_finish "$p" || { echo "${pre}COLLECT_ERROR pid=$p state=$OWN_FIN"; continue; }; echo "${pre}COLLECTED pid=$p rc=$OWN_FIN_RC"; own_retire "$p"; done; return 0; }
++  if own_alive "$1"; then OWN_FIN=unobserved; return 1; fi; case " $OWN_PIDS " in *" $1 "*) ;; *) OWN_FIN=not-registered; return 3;; esac
++  wait "$1" 2>/dev/null; OWN_FIN_RC=$?; OWN_FIN=observed; own_collect_leader "$1"; return 0; }
++own_collect_leader() { # <pid>: leader authority ends at the actual wait: drop from OWN_PIDS, add once to OWN_RETIRED (evidence). Never touches OWN_PGIDS (session authority).
++  local p n=""; for p in $OWN_PIDS; do [ "$p" = "$1" ] || n="$n $p"; done; OWN_PIDS=$n; case " $OWN_RETIRED " in *" $1 "*) ;; *) OWN_RETIRED="$OWN_RETIRED $1";; esac; }
++own_collect() { # [prefix]: in the launching shell (call directly, optionally with `>> file` — never inside $(...) or a pipe): wait (collect) every registered pid no longer alive;
++  # v10.1 (A02): the exited leader's SESSION authority is retired only when own_retire positively observes it empty/foreign, otherwise it is KEPT for reap/census/recovery
++  local p pre=${1:-}; for p in $OWN_PIDS; do own_alive "$p" && continue; own_finish "$p" || { echo "${pre}COLLECT_ERROR pid=$p state=$OWN_FIN"; continue; }; echo "${pre}COLLECTED pid=$p rc=$OWN_FIN_RC"
++    case " $OWN_PGIDS " in *" $p "*) if own_retire "$p"; then echo "${pre}SESSION_RETIRED sid=$p ($OWN_LAST_SESSION)"; else echo "${pre}SESSION_KEPT sid=$p ($OWN_LAST_SESSION: authority retained, not resolved by leader exit)"; fi;; esac; done; return 0; }
+ own_record() { # <path> <content>: atomic checked publication; rc0 only when the file exists with exactly this content (tmp -> mv -> readback)
+   local tmp="$1.tmp.$$"; printf '%s\n' "$2" > "$tmp" 2>/dev/null || { rm -f "$tmp" 2>/dev/null; return 1; }
+   mv -f "$tmp" "$1" 2>/dev/null || { rm -f "$tmp" 2>/dev/null; return 2; }; [ "$(cat "$1" 2>/dev/null)" = "$2" ] || return 3; }
+@@ -146,9 +164,12 @@
+   for pg in $OWN_PGIDS; do own_group_current "$pg"; st=$?; case $st in 0) echo "LIVE_SESSION sid=$pg members=[$(own_session_members "$pg" | tr '\n' ',')]"; rc=1;; 1) echo "EMPTY_SESSION sid=$pg";; 2) echo "FOREIGN_NUMBER sid=$pg (not owned, not counted)";; *) echo "CENSUS_ERROR sid=$pg (unknown: counted as unresolved)"; rc=1;; esac; done
+   for p in $OWN_RETIRED; do echo "RETIRED id=$p (evidence only)"; done; return $rc; }
+ own_wait_gone() { local pid=$1 n=$(( $2 * 10 )) i=0; while own_alive "$pid" && [ $i -lt $n ]; do sleep 0.1; i=$((i+1)); done; ! own_alive "$pid"; }   # bounded; never `wait`
+-own_retire() { # <pid>: ONLY after actual `wait` or verified absence; removes signal authority (pid and its group), keeps evidence elsewhere. rc1 if still alive
+-  ! own_alive "$1" || return 1; local p n=""; for p in $OWN_PIDS; do [ "$p" = "$1" ] || n="$n $p"; done; OWN_PIDS=$n
+-  n=""; for p in $OWN_PGIDS; do [ "$p" = "$1" ] || n="$n $p"; done; OWN_PGIDS=$n; OWN_RETIRED="$OWN_RETIRED $1"; }
++own_retire() { # <pid>: ONLY after actual `wait` or verified absence. rc1 if still alive (nothing changes). Leader authority: dropped (idempotent with own_collect_leader).
++  # v10.1 (A02): SESSION authority (pid in OWN_PGIDS) is removed ONLY when own_group_current positively reports observed-empty (rc1) or foreign (rc2) => rc0,
++  # OWN_LAST_SESSION=empty|foreign|none; live (rc0) or census-error (rc3) => rc2, OWN_LAST_SESSION=live|unknown, pgid KEPT (still reaped/censused; never signalled by number)
++  ! own_alive "$1" || return 1; own_collect_leader "$1"; case " $OWN_PGIDS " in *" $1 "*) ;; *) OWN_LAST_SESSION=none; return 0;; esac
++  own_group_current "$1"; case $? in 1) OWN_LAST_SESSION=empty;; 2) OWN_LAST_SESSION=foreign;; 0) OWN_LAST_SESSION=live; return 2;; *) OWN_LAST_SESSION=unknown; return 2;; esac
++  local p n=""; for p in $OWN_PGIDS; do [ "$p" = "$1" ] || n="$n $p"; done; OWN_PGIDS=$n; }
+ own_reap_all() { # <grace_s>: registered pids + phase-bound pending fork; TERM -> bounded -> KILL -> 3 s bounded; census confirmed groups; rc1 on survivor
+   local pid rc=0 how pg m; for pid in $OWN_PIDS $(own_pending); do own_alive "$pid" || continue   # leader/pid phase; descendants handled per confirmed group below regardless of leader liveness
+     how=$(own_signal "$pid" TERM); if ! own_wait_gone "$pid" "$1"; then how="$how+KILL:$(own_signal "$pid" KILL)"; own_wait_gone "$pid" 3 || { echo "SURVIVOR pid=$pid how=$how"; rc=1; continue; }; fi
+@@ -157,7 +178,7 @@
+     how=$(own_group_signal "$pg" TERM); own_group_wait_empty "$pg" "$1" || { how="$how+KILL:$(own_group_signal "$pg" KILL)"; own_group_wait_empty "$pg" 3 || { m=$(own_session_members "$pg"); echo "GROUP_SURVIVORS sid=$pg how=$how [${m//$'\n'/,}]"; rc=1; continue; }; }
+     echo "GROUP_REAPED pgid=$pg how=$how"; done; return $rc; }
+ own_budget() { local b=$(( $1 - $3 - $4 )); [ "$b" -gt "$2" ] && b=$2; [ "$b" -lt 0 ] && b=0; echo "$b"; }
+-# <<< OWN-BLOCK v10
++# <<< OWN-BLOCK v10.1
+ log "OWN_STAMP $(own_stamp)"; own_precondition || { log "REFUSE: job-control (set -m) active or setsid/pgrep/ps missing — identity contract unverifiable"; exit 2; }
+ # ---- dependency + input gates (all refusals rc 2, before any child)
+ [ "$(git -C "$W" rev-parse HEAD)" = "$PIN_HEAD" ] || { log "REFUSE: worktree HEAD != $PIN_HEAD"; exit 2; }
+@@ -194,7 +215,7 @@
+ log "GATE_CONTROL_ROOT $CR candidate_spec_sha256=$cand_sha (worktree $wt_sha) predecessor_spec_sha256=$(sha256sum "$CR/test/predecessor.spec.ts" | cut -c1-64) fake_harness_sha256=$PIN_HARNESS config_sha256=$PIN_CONFIG"
+ check I0.inputs "$( [ "$cand_sha" = "$wt_sha" ]; echo $? )" "candidate spec copy is byte-identical to the dirty worktree file"
+ run_gate() { # <id> <spec> <scenario> -> GATE_RC/GATE_RAW; checks <id>.identity <id>.adoption <id>.owned; state: never-released | released | released-then-cancelled
+-  local rec="$OUT/gate-$CTL_TS-$1.jsonl" out="$OUT/gate-$CTL_TS-$1.jest.log" t0 pid w=0 how=exited ident crc m="" att pub=not-attempted state=never-released fin; : > "$rec"
++  local rec="$OUT/gate-$CTL_TS-$1.jsonl" out="$OUT/gate-$CTL_TS-$1.jest.log" t0 pid w=0 how=exited ident crc m="" att pub=not-attempted state=never-released fin gcs sess=unknown; : > "$rec"
+   local left=$((AGG_BOUND - ($(date +%s) - T0))) budget; budget=$(own_budget "$left" "$RUN_BUDGET" "$RUN_GRACE" "$RUN_RESERVE")
+   [ "$budget" -ge 5 ] || { log "AGGREGATE_BOUND_HIT before $1 (left=${left}s admissible=${budget}s: budget+grace+KILL/session confirm+reserve must fit)"; GATE_RC=124; return; }
+   att=$(own_attempt) || { log "$1 ATTEMPT_PATH_FAILED root=$OWN_ROOT"; GATE_RC=70; check "$1.adoption" 1 "fresh private attempt path could be created"; }
+@@ -211,13 +232,14 @@
+   if [ "$state" = released ] && own_alive "$pid"; then how=budget-TERM; own_signal "$pid" TERM >/dev/null; own_wait_gone "$pid" "$RUN_GRACE" || { how=budget-KILL; own_signal "$pid" KILL >/dev/null; own_wait_gone "$pid" 3; }; fi
+   own_finish "$pid"; fin="$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC}"; GATE_RAW=$fin   # A-01: wait in THIS shell; observed only after verified absence
+   case $OWN_FIN in observed) GATE_RC=$OWN_FIN_RC;; unobserved) GATE_RC=137; how=$how-unconfirmed;; *) GATE_RC=70; how=$how-wait-mechanism-error;; esac
+-  own_group_current "$pid"; case $? in 0) own_group_signal "$pid" TERM >/dev/null; own_group_wait_empty "$pid" 2 || { own_group_signal "$pid" KILL >/dev/null; own_group_wait_empty "$pid" 1; }; own_group_current "$pid" && m=$(own_session_members "$pid");; 2) m="foreign-group-not-signalled";; esac
+-  own_record "$att/EXIT" "raw=$fin validation_rc=$GATE_RC how=$how state=$state survivors=[${m//$'\n'/,}]" || { PUB_FAIL=$((PUB_FAIL+1)); log "$1 EXIT_RECORD_PUBLICATION_FAILED $att"; }
+-  [ "$OWN_FIN" = observed ] && [ -z "$m" ] && own_retire "$pid"   # A-02(V8): authority retired only after actual in-shell wait AND verified-empty session
+-  log "$1 EXIT raw=$fin validation_rc=$GATE_RC how=$how identity=$ident adoption=$pub state=$state elapsed=$(( $(date +%s) - t0 ))s record_lines=$(wc -l < "$rec") survivors=[${m//$'\n'/,}] publication_failures=$PUB_FAIL (nonzero jest rc is EXPECTED: beforeAll throws)"
++  own_group_current "$pid"; gcs=$?; if [ "$gcs" = 0 ]; then own_group_signal "$pid" TERM >/dev/null; own_group_wait_empty "$pid" 2 || { own_group_signal "$pid" KILL >/dev/null; own_group_wait_empty "$pid" 1; }; own_group_current "$pid"; gcs=$?; fi
++  case $gcs in 1) sess=empty; m="";; 0) sess=live; m=$(own_session_members "$pid"); [ -n "$m" ] || m="live-members-unlisted";; 2) sess=foreign; m="foreign-group-not-signalled";; *) sess=unknown; m="census-error-session-unresolved";; esac   # A02 (V10.1): typed; unknown is never empty
++  own_record "$att/EXIT" "raw=$fin validation_rc=$GATE_RC how=$how state=$state session=$sess survivors=[${m//$'\n'/,}]" || { PUB_FAIL=$((PUB_FAIL+1)); log "$1 EXIT_RECORD_PUBLICATION_FAILED $att"; }
++  [ "$OWN_FIN" = observed ] && [ "$sess" = empty ] && own_retire "$pid"   # A-02(V8)+A02(V10.1): session authority removed only after actual in-shell wait AND positively observed-empty session (own_retire re-checks)
++  log "$1 EXIT raw=$fin validation_rc=$GATE_RC how=$how identity=$ident adoption=$pub state=$state session=$sess elapsed=$(( $(date +%s) - t0 ))s record_lines=$(wc -l < "$rec") survivors=[${m//$'\n'/,}] publication_failures=$PUB_FAIL (nonzero jest rc is EXPECTED: beforeAll throws)"
+   check "$1.identity" "$( [ "$ident" = confirmed ]; echo $? )" "jest child confirmed as its own session/group leader and direct child (never the caller group) within 2 s"
+   check "$1.adoption" "$( [ "$state" = released ] && [ "$GATE_RC" != 75 ] && [ "$GATE_RC" != 76 ] && [ "$PUB_FAIL" = 0 ] && [ -s "$att/IDENTITY" ] && [ -s "$att/EXIT" ]; echo $? )" "identity published before release, adoption published/verified on fresh path, workload released (rc not 75/76), no publication failure, complete IDENTITY/EXIT records"
+-  check "$1.owned" "$( [ -z "$m" ] && [ "$how" = exited ] && [ "$OWN_FIN" = observed ]; echo $? )" "jest child exit observed by in-shell wait within budget and its session is empty"
++  check "$1.owned" "$( [ "$sess" = empty ] && [ "$how" = exited ] && [ "$OWN_FIN" = observed ]; echo $? )" "jest child exit observed by in-shell wait within budget and its session POSITIVELY observed empty (live/foreign/census-error never count as empty)"
+ }
+ mut() { grep -c '"mutating":true' "$1"; }
+ run_gate T0 predecessor.spec.ts refused-identity; R="$OUT/gate-$CTL_TS-T0.jsonl"

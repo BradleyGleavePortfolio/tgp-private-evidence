@@ -1,0 +1,33 @@
+--- v10/sup-under-test.v10.sh
++++ v10.1/controls-v101-t0/sup-under-test.v101.sh
+@@ -1,4 +1,8 @@
+ #!/usr/bin/env bash
++# OP88-S5-V10.1 control fixture successor of v10 5356387c (NOT EXECUTED; V10 frozen). Corrects owned-launch-v10-a OWN-V10-A01 ONLY: the non-trap exits
++# preserve cycle's PRIMARY status (0 released/finished, 2 refused) when cleanup succeeded and escalate to 91 ONLY on cleanup/census failure (RRC/c2),
++# matching on_term's existing 91 convention; the final line 'fixture-exit primary_rc=<rc> cleanup_rc=<RRC>' separates the two statuses in sup.out.
++# Sources own-block-v10.1 (A02). Scenarios, workloads, seams, waits, checks and every other line are the v10 bytes. v10 header follows.
+ # OP88-S5-V10 control fixture (NOT EXECUTED by the builder): minimal supervisor running the exact OWN-BLOCK v10 consumer sequence
+ # (attempt -> spawn_begin -> setsid gate child -> register -> confirm -> pre-release IDENTITY record -> adopt -> bounded wait -> in-shell finish
+ # -> session escalation -> retire) around a FAKE workload (marker + sleep). All waits are top-level in this shell (A-01/V9B-02).
+@@ -8,7 +12,7 @@
+ #  plain natural-exit no-ack stale-adopt write-fail never-setsid delayed-setsid interrupt-afterfork interrupt-adopting pre-spawn-stale
+ #  leader-first-exit term-ignoring reuse-refusal timeout post-release-fail identity-pub-fail
+ set -u
+-SC=$1; REC=$2; mkdir -p "$REC"; . "$(dirname "${BASH_SOURCE[0]}")/../own-block-v10.sh"
++SC=$1; REC=$2; mkdir -p "$REC"; . "$(dirname "${BASH_SOURCE[0]}")/../own-block-v101.sh"
+ OWN_ROOT="$REC/attempts"; mkdir -p "$OWN_ROOT"; O="$REC/sup.out"; : > "$O"; POST="$REC/post"; mkdir -p "$POST"
+ say() { echo "$*" >> "$O"; }
+ echo "$$ $OWN_SELF_PGID $OWN_SELF_SID" > "$REC/sup.pid_pgid"
+@@ -65,8 +69,9 @@
+   own_census >> "$O"; crc2=$?; RRC=$(( rrc || crc2 )); return 0; }
+ case "$SC" in
+   pre-spawn-stale) cycle; say "phase2 bang=$! retired=$PID"; own_spawn_begin; kill -TERM $$; sleep 1; say "UNREACHABLE"; exit 99 ;;
+-  reuse-refusal)   cycle; own_spawn_begin; ( exec setsid sleep 20 ) & Q=$!; own_register "$Q"; own_confirm "$Q" 2; own_retire "$Q" && RL=NO || RL=yes   # retiring a LIVE child must be refused
++  reuse-refusal)   cycle; rc=$?; own_spawn_begin; ( exec setsid sleep 20 ) & Q=$!; own_register "$Q"; own_confirm "$Q" 2; own_retire "$Q" && RL=NO || RL=yes   # retiring a LIVE child must be refused
+                    own_signal "$Q" KILL >/dev/null; own_wait_gone "$Q" 3; own_finish "$Q"; own_retire "$Q"; own_census >> "$O"; c2=$?
+-                   say "retired-signal=$(own_signal "$PID" TERM) nonchild-signal=$(own_signal 1 TERM) retired-group=$(own_group_signal "$PID" TERM) alive_retired=$(own_alive "$PID" && echo YES || echo no) retire-live-refused=$RL second_raw=$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC} census_rc=$c2"; exit $(( RRC || c2 )) ;;
+-  *) cycle; rc=$?; exit "$RRC" ;;
++                   say "retired-signal=$(own_signal "$PID" TERM) nonchild-signal=$(own_signal 1 TERM) retired-group=$(own_group_signal "$PID" TERM) alive_retired=$(own_alive "$PID" && echo YES || echo no) retire-live-refused=$RL second_raw=$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC} census_rc=$c2"
++                   say "fixture-exit primary_rc=$rc cleanup_rc=$(( RRC || c2 ))"; exit $(( (RRC || c2) ? 91 : rc )) ;;   # A01: primary preserved; 91 only on cleanup/census failure
++  *) cycle; rc=$?; say "fixture-exit primary_rc=$rc cleanup_rc=$RRC"; exit $(( RRC ? 91 : rc )) ;;   # A01: was `exit "$RRC"` (discarded the refusal status 2 => C3-C6 mismatch)
+ esac

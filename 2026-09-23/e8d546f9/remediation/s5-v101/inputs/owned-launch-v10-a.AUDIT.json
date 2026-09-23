@@ -1,0 +1,91 @@
+{
+  "assignment": "OP88-OWNED-LAUNCH-V10-A",
+  "tier": "T4",
+  "reviewer": {
+    "role": "Independent non-builder A; inherited parent identity",
+    "requested_model_and_settings": "No named model/version supplied; High is policy, not observable telemetry",
+    "actual_runtime_model_and_settings": "Unexposed; not asserted",
+    "current_peer_access": false,
+    "candidate_execution_syntax_probes_lock_install_network_source_edits": false,
+    "prior_outputs": "Preserved unchanged"
+  },
+  "scope": "Exact V10 closure of both frozen V9 reports and concrete defects affecting the next proof; no new harness program, generic supervision framework, kernel-immunity requirement, product audit or absent S6 consumer clearance.",
+  "verdicts": {
+    "primitive": "PARTIAL SOURCE CLOSURE: parent-shell wait, pre-release identity publication and observed-gone/error distinction are implemented; current-session retirement remains defective in A02 below. Appropriate for bounded private diagnostic evidence, not blanket consumer acceptance. [Primitive](../../s5-v10-t0/own-block-v10.sh#L28)",
+    "fake_child_controls": "Independent of unsafe setup and SAFE TO GRANT AS A BOUNDED DIAGNOSTIC, after the other independent review and explicit parent grant. Recommend immediate diagnostic execution if the parent wants these frozen bytes observed; do not wait for setup. However the advertised 25-PASS acceptance is statically blocked by A01: if preceding checks pass, this exact driver stops at C3, not at a successful full proof. A03 also limits publication acceptance. [Driver L12-18,L28-44,L63-70](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L12)",
+    "T0_consumer": "HOLD execution/application acceptance: A02 can classify unknown session ownership as empty, and attributable fresh setup plus staged frozen library/harness/config remain separate prerequisites. Restored traps and unchanged T0 assertions are source improvements, not a T0 result. [T0 L180,L207-225](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L180)",
+    "setup": "HOLD independently under the parent's explicit ruling: failed-marker HOLD_BOUND expiry cannot release unknown ownership. Only the separately owned setup-exclusion successor may close that boundary; no V10 fake-child result transfers clearance. [Setup L163-175](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L163) [Setup ruling](../../S5_V10_REVIEW_AND_SETUP_RULING.md)",
+    "S6_and_product": "Excluded: no S6 consumer adaptations in this packet; no installation, product/runtime, native, DB, landing or release conclusion.",
+    "grant_issued_by_this_audit": false
+  },
+  "material_findings": [
+    {
+      "id": "OWN-V10-A01",
+      "severity": "HIGH for successful private-control acceptance; not an install/side-effect blocker",
+      "title": "Fixture discards refusal status and guarantees a C3 mismatch",
+      "counterexample": "In no-ack, the gate exits 75; cycle logs the actual parent-shell wait, performs clean cleanup, sets RRC=0 and returns 2 at fixture L54. The outer case at L71 captures rc=$? but ignores it and exits RRC=0. Driver C3 explicitly requires SUP_RC=2, so the correctly observed fixture exit 0 necessarily fails that predicate. The same mismatch affects C4/C5/C5b/C5c/C6. [Fixture L49-54,L71](../../s5-v10-t0/controls-v10-t0/sup-under-test.v10.sh#L49) [Driver L67-80](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L67)",
+      "consequence": "Healthy earlier checks yield 11 PASS then C3 FAIL/stop, with aggregate 1, rather than the requested 25 PASS; this is static source reasoning, not a reported run. Importantly it is not a recurrence of non-parent wait127: the wait repair works, while the fixture loses its own primary status. [Driver L29,L51-68](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L29) [Fixture L53-54,L71](../../s5-v10-t0/controls-v10-t0/sup-under-test.v10.sh#L53)",
+      "smallest_correction": "Preserve cycle's primary rc when cleanup succeeds, override/escalate only on cleanup failure, and update the fixture pin/manifest. Do not weaken the expected 75 or SUP_RC=2 predicates. No new harness is needed."
+    },
+    {
+      "id": "OWN-V10-A02",
+      "severity": "HIGH",
+      "lineage": "V9B-05 and V9 A-05 current/live/unknown census closure",
+      "title": "Unknown/live session authority can still be retired because the leader is gone",
+      "counterexamples": [
+        "T0 L214 handles own_group_current returns 0 and 2 but not the newly defined census-error 3. With an exited Jest leader and an unresolved same-session descendant, return 3 leaves m empty; L216 retires the PID AND session, and L220 accepts .owned. The EXIT census then has no session to inspect, so the supported unknown result can become a successful empty-ownership result. [T0 L212-220](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L212) [Primitive L56-60,L82-84](../../s5-v10-t0/own-block-v10.sh#L56)",
+        "New own_collect L73 waits for an exited registered leader and calls own_retire without testing that leader's session. If own_reap_all returns GROUP_CENSUS_ERROR with a live/unknown descendant after leader exit, collect erases the session before own_census; the earlier reap rc may still force nonzero, but the final census/recovery owner has lost its active session and can falsely report it resolved. Both consumer cleanup paths use collect before census. [Primitive L72-84,L89](../../s5-v10-t0/own-block-v10.sh#L72) [T0 L172-179](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L172) [Setup L158,L174,L177](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L158)"
+      ],
+      "smallest_correction": "Propagate census-error explicitly in T0; separate collecting a leader's exit from retiring its session. Remove session authority only after positively observed-empty session (or positively foreign identity), never merely absent leader. This is a typed-result/state-machine correction, not hypothetical kernel hardening.",
+      "private_control_qualification": "Does not require waiting for unsafe canonical setup before a limited diagnostic of the ordinary frozen C1-C3 prefix; it does prevent transferring that prefix's result into complete primitive/T0 recovery acceptance."
+    },
+    {
+      "id": "OWN-V10-A03",
+      "severity": "MEDIUM, evidence outcome",
+      "lineage": "V9 A-04 checked publication",
+      "title": "Driver ignores a failed required enclosure EXIT record",
+      "counterexample": "Driver L43 calls checked own_record but handles failure only by a successful log call. A failed EXIT-record write/readback after the child is reaped leaves PASS/FAIL and the primary exit untouched; its case can still PASS and finish_ctl has no publication latch. Thus the helper's checked atomic write does not by itself make the driver evidence fail closed. [Driver L22-29,L39-44](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L22) [Primitive L74-76](../../s5-v10-t0/own-block-v10.sh#L74)",
+      "smallest_correction": "Latch that required publication failure into a nonzero result while preserving raw child/primary and cleanup statuses. This does not make private fake-child side effects unsafe; it limits acceptance of their evidence."
+    }
+  ],
+  "closure_ledger": [
+    {
+      "prior": "V9 A-01 / B-02 parent-shell wait",
+      "status": "SOURCE-CLOSED for the named command-substitution defect: own_finish returns OWN_FIN/OWN_FIN_RC; actual workload waits occur directly in each launching shell, and the deliberate subshell probe is explicitly rejected. A01 above is a separate fixture-primary-exit loss. [Primitive L69-73](../../s5-v10-t0/own-block-v10.sh#L69) [Driver L39,L53](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L39) [Fixture L53,L61,L63,L69](../../s5-v10-t0/controls-v10-t0/sup-under-test.v10.sh#L53)"
+    },
+    {
+      "prior": "V9 A-02 / B-01 actual T0 traps",
+      "status": "SOURCE-CLOSED: EXIT and TERM/INT/HUP registrations precede CR creation and the sole launch. Setup's actual signal/EXIT wiring is present, not inferred from its fixture. [T0 L172-204](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L172) [Setup L172-176,L211](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L172)"
+    },
+    {
+      "prior": "V9 A-03 / B-04 identity-before-release and fatal append",
+      "status": "SOURCE-CLOSED for the exact reported branches: checked IDENTITY precedes own_adopt; setup's post-release identity-log failure calls die, which reaps/collects/censuses; T0 latches required publication failure and cancels under its restored traps. Checked recovery after these paths remains qualified by A02 and the separately held setup exclusion. [T0 L206-219](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L206) [Setup L177-178,L213-219](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L177)"
+    },
+    {
+      "prior": "V9 A-04 record/quarantine outcomes",
+      "status": "PARTIAL: own_record uses tmp/rename/content readback; T0 latches incomplete EXIT failure and requires successful publication; setup now distinguishes written/fallback/failed. Parent-rejected failed-marker release stays HELD, and A03 identifies the driver's remaining unchecked outcome. [Primitive L74-76](../../s5-v10-t0/own-block-v10.sh#L74) [T0 L215-219](../../s5-v10-t0/controls-v10-t0/ctl-t0-only.v10.sh#L215) [Setup L163-171](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L163)"
+    },
+    {
+      "prior": "V9 A-05 / B-05 current census",
+      "status": "PARTIAL: legacy OWNED_PGIDS is now history only; gone between samples is skipped, existing-but-unreadable process is unknown, zombies are not live members, and reaper unknown returns failure. A02 prevents full end-to-end closure because callers discard authority on unknown/leader-only absence. [Primitive L28-35,L54-68,L77-90](../../s5-v10-t0/own-block-v10.sh#L28) [Setup L158](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L158)"
+    },
+    {
+      "prior": "V9 B-03 stamp truncation",
+      "status": "SOURCE-CLOSED: START now creates the record before OWN_STAMP appends. [Setup L181-182](../../s5-v10-t0/controls-v10-t0/run-s5-setup-npm-ci.v10.sh#L181)"
+    },
+    {
+      "prior": "V9 A control adequacy / inherited V8 A-06",
+      "status": "Material improvements retained: C7 holds until decoy observation; TERM-ignore/leader-first-exit markers acknowledge readiness; C8 publishes the pending PID for the gone join; C10 joins bang to the retired child; GRAND distinguishes live/zombie/unknown. Actual outer-driver cancellation is still not directly exercised and GRAND is populated only after run_sup completes: this limits cancellation evidence, not a new hypothetical blocker on the bounded ordinary diagnostic prefix. No additional harness demand. [Fixture L15-17,L22-23,L29,L43](../../s5-v10-t0/controls-v10-t0/sup-under-test.v10.sh#L15) [Driver L21-28,L42,L82-94](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L21)"
+    }
+  ],
+  "private_diagnostic_recommendation": {
+    "separation": "The fake driver sources only own-block, launches the fake supervisor, and merely hashes/greps T0/setup bytes. It neither sources nor executes setup/T0, opens the canonical lock, installs dependencies, nor reaches HOLD_BOUND/quarantine. The known unsafe setup branch therefore does not block this independent diagnostic. [Driver L13-18,L34,L50,L54-62](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L13)",
+    "exact_frozen_invocation_when_parent_grants": "cd /home/user/workspace/execution/op88/s5-v10-t0 && S5_CTL_GRANT=granted-by-parent timeout --foreground -k 10 230 bash controls-v10-t0/ctl-own-launch.v10.sh",
+    "caller_rule": "Capture the command's actual status immediately, report it, and return that same status; do not end with an unconditional successful echo or retry.",
+    "acceptance_for_this_diagnostic_only": "Preserve actual 0/75 child records and the expected C3 assertion failure; do not relabel it 25 PASS, successful R6, or T0/setup clearance. Earlier unexpected failures still stop immediately. Later C4-C14 evidence remains absent, including actual 143 and escalation evidence. [Driver L29,L63-97](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L29)",
+    "bounds": "230+10 seconds is the frozen nominal external allowance; driver admission reserves cleanup and refuses another case when it cannot fit. No worst-case completion or runtime pass is asserted. [Driver L6-9,L31](../../s5-v10-t0/controls-v10-t0/ctl-own-launch.v10.sh#L6)"
+  },
+  "smallest_next_action": "Do not wait for setup: parent may grant the exact bounded diagnostic after both reviews, honestly expecting C3 failure. For a successful full fake-child proof, the sole builder should fix only A01/A03, refresh exact fixture/driver pins and obtain focused readback; A02 remains the primitive/T0 applicability correction. Keep setup-exclusion work separate. No new broad review or harness program.",
+  "source_binding": "20/20 packet hashes verified; both embedded blocks byte-identical; all five submitted diff bodies independently match their input/output pairs; copied V9 inputs match original frozen V9 source. Full exact hashes and comparison digests are in INPUTS.json.",
+  "truth": "Static findings only. No scripts, controls, syntax checks, clients, installation or lock/process probes executed. No current V10 peer report accessed. FREEZE.json supplies actual UTC sealing time."
+}
