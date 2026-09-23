@@ -39,14 +39,14 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V61 `ed241342…` dual source-cleared with k=120. Restoration `0a07e1e2…` accepted; one five-set continuation activated. |
 | S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Exact staged tree `a584a1b95423f95dae8daabf673ef3776604acbb` being restored source-only; runtime integration gated on S1/S2. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
-| S5/V10.1 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 remains FAILED and recovered. V31 A found material stale START binding defect S5-V31-A-01; B still reviewing. Controls held; narrow successor required. |
+| S5/V10.1 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 failure/recovery dual review closed with qualifications. V31 A exact-binding and B P1-acknowledgement findings routed to one active V32 successor; runtime held. |
 | S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Fresh exact source/C6 packet restored, receipt `b5e8b500…`; unsafe intermediate `6b2be238…` remains held for S5 closure and narrow correction. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-Six useful disjoint lanes: S2 owns the sole runtime slot; S5 V31 B and V2 result B review; S5 V32 repairs the concrete binding defect; S5 and S3 restore exact source. S2/S6 restoration and S5 V31-A/V2-result-A are complete. No competing runtime. S6 implementation remains held.
+S2 owns the sole runtime slot; S5 V32 repairs concrete findings; S5 and S3 restore exact source. Both V31 reviewers and both historical V2 result reviewers are complete. Their independent capacity is available immediately for new frozen S2 results and V32 final bytes, not redundant reviews. No competing runtime. S6 implementation remains held.
 
 ## DAG
 

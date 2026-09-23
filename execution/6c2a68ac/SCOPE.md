@@ -79,8 +79,6 @@ Read/hash/diff only, no runtime or recovery. Use only the archived s5-setup-v2-c
 
 Follow only the archived 2026-09-23/e8d546f9/s6-source-restore/REPORT.md and named packet. Fresh pinned public mobile clone/fetch is allowed, remote writes are not. No product edit, primitive adaptation, setup, test, browser, canonical lock operation, process signal, hook or commit. S6 implementation and runtime remain HELD; this anticipatory restoration does not activate them.
 
-## Baseline
-
 ## Active successor assignments
 
 ### S5-V32 narrow repair
@@ -94,7 +92,9 @@ Follow only the archived 2026-09-23/e8d546f9/s6-source-restore/REPORT.md and nam
 - Acceptance: close S5-V31-A-01 with exact current-attempt binding in the earliest checked publication; stale equal/future timestamp records cannot supply current runner facts; retain early-death liveness, raw-status truth, no-handoff/last-owner behavior and unchanged OWN-BLOCK v10.1 bytes. Preserve all prior assertions and add only the negative cases required by the finding. Freeze diffs, hashes, source/control requests and non-self-including manifest for two independent changed-candidate reviews.
 - Stop triggers: new material ambiguity, primitive change, authority expansion, collision or additional unscoped behavior.
 
-The smallest needed real-runner START publication change is explicitly allowed inside this fresh packet; preserving its prior whole-file hash is not an acceptance criterion when the finding requires that change. Primitive bytes and unrelated behavior remain frozen. `bash -n` on owned candidate shell files is allowed as nonexecuting syntax validation, not tests. No candidate/control runtime, lock, process census, signals, install, product worktree edit or private publication. Do not wait for cosmetic changes. The outstanding V31-B audit remains independent on its frozen inputs; parent routes any additional concrete findings after it freezes.
+The smallest needed real-runner START publication change is explicitly allowed inside this fresh packet; preserving its prior whole-file hash is not an acceptance criterion when the finding requires that change. Primitive bytes and unrelated behavior remain frozen. `bash -n` on owned candidate shell files is allowed as nonexecuting syntax validation, not tests. No candidate/control runtime, lock, process census, signals, install, product worktree edit or private publication. Do not wait for cosmetic changes.
+
+V31-B is now frozen: add the smallest bounded P1 HEARTBEAT acknowledgement for material V31-B-01, not a rerun allowance. Historical V2 result B's O-B-01 permits narrow per-operand diagnostic logging for failed conjunctions; keep all predicate semantics and P2's existing token-bound wait. One combined final successor goes to dual independent exact review. See `S5_V31_AND_V2_RESULT_DISPOSITION.md` for qualifications, including actual uutils timeout rather than an unverified GNU prerequisite.
 
 ### S5-SOURCE-RESTORE
 

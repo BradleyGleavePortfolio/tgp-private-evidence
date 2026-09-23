@@ -1,0 +1,114 @@
+{
+ "audit": "OP88-S5-SETUP-EXCLUSION v3.1 source + controls-v2 independent review B",
+ "child": "S5-V31-B",
+ "parent": "EXEC-6c2a68ac",
+ "tier": "T4",
+ "reviewer": {
+  "role": "independent nonbuilder B (passive; did not implement)",
+  "requested_model_policy": "Claude Fable 5 / High requested; runtime identity not observable, not asserted",
+  "method": "read / sha256sum / diff / cmp / grep / wc only; nothing executed (no candidate, control, fake, bash -n, patch, probe, process, lock, signal, install, network)",
+  "peer_current_audit_read": false,
+  "live_summaries_or_takeover_read": false,
+  "prior_v3_reports_read_as": "previous-round findings supplied for closure, not current-round conclusions",
+  "sole_writes": "/home/user/workspace/execution/6c2a68ac/audits/s5-v31-b"
+ },
+ "status": "REVIEW COMPLETE - not a grant",
+ "exact_inputs": {
+  "source_packet": "tgp-private-evidence/2026-09-23/e8d546f9/remediation/s5-setup-exclusion-v31",
+  "source_manifest_sha256": "fab2b49e6f990795d980f973d58edcdeb6fbff27dcfe2a77036265bf4b7738e9",
+  "source_manifest_verified": "14/14 OK; equals SCOPE acceptance hash",
+  "controls_packet": "tgp-private-evidence/2026-09-23/e8d546f9/remediation/s5-setup-v31-controls-v2",
+  "controls_manifest_sha256": "7d4a150dd05f4af5847bf810f9f37ccc8f443454e8f35a684d3abfc52ecd6e26",
+  "controls_manifest_verified": "9/9 OK; equals SCOPE acceptance hash",
+  "launcher_v31_sha256": "d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630",
+  "launcher_v3_sha256": "a10c615fedbac7c24bb1f6c4a4d18172342a1ba612727eef280c5fd70f451a17",
+  "launcher_v2_sha256": "b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09",
+  "runner_v101x_sha256": "81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a (unchanged vs v3/v2; PIN_RUNNER unchanged)",
+  "own_block_v101_sha256": "4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 (sed-extracted from launcher and runner: identical)",
+  "ctl_v31_v2_sha256": "f34769c3d35d853c741a50eecad9da95581067ab59c00f0f6e1c793f187ac62e",
+  "ctl_v31_frozen_sha256": "e87b0a2e6c4d9c0602eb3ba1dbba356fdde3daa0108dbde4153b2d8354619417",
+  "fake_runner_v31_sha256": "4e7858a240e9b70409b82cf474ced52cb32437d9a2d7c80d56ee2161cc07704e (cmp-identical to frozen s5-setup-v3-controls copy)",
+  "prior_manifests_verified": {
+   "s5-setup-exclusion-v3": "8b128b4dbef5f26ca11a26480bc07bdaf6bcc40c9c381c7da0c47e34109841c9 (0 non-OK)",
+   "s5-setup-v3-controls": "19529fa7ef7247dc72fa3a447c16ad3557b111d71c21b70ebae924d025976e73 (0 non-OK)",
+   "audits/s5-setup-v3-a": "d9104403fa899235f2f3ca8e7a32ac341155eae4297cd9901533b41e2fc4741c (0 non-OK)",
+   "audits/s5-setup-v3-b": "3bb45135f2ea906e4f09cc9c7d8e889bace398876f22513913444377e7056145 (0 non-OK)"
+  }
+ },
+ "delta_verification": {
+  "launcher_v3_to_v31": {"recomputed_diff_equals_shipped": true, "added": 14, "removed": 3, "lines": "236 -> 247", "touched_v31_lines": "2-6, 165, 180-185, 189, 227"},
+  "launcher_v2_to_v31_cumulative": {"recomputed_diff_equals_shipped": true},
+  "ctl_v31_to_v2": {"recomputed_diff_equals_shipped": true, "added": 5, "removed": 0, "executable_lines_added": "L85 TOK extraction, L86 bounded wait_text on this attempt's SELF_HOLD record", "ten_check_lines_identical": true},
+  "occurrence_counts_launcher_v3_v31": {"kill ": "3/3", "trap ": "2/2", "rm -f": "3/3", "flock": "1/1", "own_signal": "3/3", "own_group_signal": "2/2", "own_reap_all": "2/2", "exit ": "15/15", "OWN_PGIDS=": "3/3", "rm ": "5/6 (word 'form' in L180 comment)", "date ": "2/3 (L227 SPAWN_TS)"},
+  "occurrence_counts_driver_frozen_v2": {"kill ": "8/8 (all kill -0)", "rm ": "4/4", "rmdir": "3/3", "chmod": "4/4", "mkfifo": "1/1", "timeout ": "3/4 (comment word L4)"}
+ },
+ "assessments": {
+  "exact_attempt_binding": {"result": "HOLDS", "lines": "launcher v3.1 L183-185, L227, L230; runner L206", "basis": "token line OR first START line with pgid=$SESSION (trailing-space anchored, numeric) and normalised stamp not before SPAWN_TS; SESSION and SPAWN_TS required non-empty; ASCII compare of fixed-width UTC stamps; SPAWN_TS taken immediately before spawn"},
+  "stale_import": {"result": "NONE NEW", "residual": "same UTC second + exact new session number, or clock step-back (disclosed); unreachable while a prior runner holds inherited fd 9 (runner L209/L213 vs launcher L152); record truncated at runner L206 so post-START content is this runner's"},
+  "early_adopted_death": {"result": "SOURCE_CLOSED_UNEXECUTED", "window": "runner L206-L212 (STAMP_WRITE_FAILED 74, precondition 2, lease checks 75)", "trace": "bound via (b) -> released=0 final=<none|2|75> unpreserved=0 cleanup_failures=<0|none> -> L197/L198 add no unknown -> census over $SESSION empty -> L243 release normal <raw rc>, cleanup=verified-empty, no SELF_HOLD", "residual_R1": "adopted gate whose runner never writes START (exec-chain failure before runner L206) remains a fail-closed unknown hold; outside V3-B-01; safe direction"},
+  "assertion_non_weakening": {"result": "HOLDS", "basis": "(b) only converts not-this-attempt->unknown into typed facts from this attempt's own record; EXIT_RECORD facts can only add unknown (L197-198), never empty; IDENTITY-bound inner census untouched; session_state/release/self_hold/exceptional byte-identical to v3"},
+  "p2_acknowledgement_wait": {"result": "CORRECT_NON_WEAKENING", "lines": "ctl-v31.v2.sh L85-86 vs launcher L208-212", "basis": "waits <=10 s for the exact record L87 reads (^token=<this attempt> .*reason=[release publication failed (normal); TOK from LEASE_HOLDER.at-running; on timeout logs and evaluates the byte-identical predicate which fails on its own terms"},
+  "complete_writes_signals_bounds": {"launcher": "no new write/signal/trap/rm; one variable", "driver_writes": "only under $S5X_OUT/<ts>/; repair removes exactly <name>.tmp.$LPID then rmdir; refuses unexpected contents", "driver_signals": "kill -0 only; timeout N cat bounds the driver's own cat", "bounds": "passing-path static ~70 s < timeout --foreground -k 10 180; failing paths STOP at first failed check"},
+  "primitive_runner_applicability": {"result": "EXPLICIT_POSITIVE_FOR_V31", "basis": "no new primitive call, none in a new context; own_spawn_begin still immediately before the & line; runner 81ff20b0 and primitive 4aebf96f byte-identical; established for this composition, not inherited"}
+ },
+ "closure": {
+  "V3-B-01": {"status": "SOURCE_CLOSED_UNEXECUTED", "lines": "launcher v3.1 L165, L180-185, L189, L227", "qualification": "closed for the defined L206-L212 window; R1 pre-START class remains fail-closed (not V3-B-01)"},
+  "V3-B-02": {"status": "HONOURED", "basis": "v2 fake/driver not repinned; new fake writes START and (except early-death) the binding line in every scenario; PIN_L refuses non-v3.1 bytes"},
+  "V3-A_smallest_next_proof_P1_P2_P3": {"status": "IMPLEMENTED_AS_P1_P2_P3a_plus_P3b", "notes": "A's ordering correction (fault after acknowledged census) honoured at L67-68 in intent; see V31-B-01 for the acknowledgement gap on the heartbeat conjunct"},
+  "S5SV2-A-01_A-02_V2-B-01_V2-B-02": {"status": "UNCHANGED_BY_V31", "basis": "corresponding v3 lines byte-identical"}
+ },
+ "findings": [
+  {
+   "id": "V31-B-01",
+   "severity": "Medium (proof determinism; false-FAIL only; never false PASS)",
+   "component": "controls-v2 driver",
+   "lines": "ctl-v31.v2.sh L64 (acknowledgements: LEASE_HOLDER state=SELF-HOLD, SELF_HOLD reason=) and L67 (conjunct XR HEARTBEAT state=SELF-HOLD census=live detail=[P:empty SP:live]); launcher L212 (SELF_HOLD published) vs L216 (first HEARTBEAT appended after latch_raw/own_collect/session_state)",
+   "statement": "P1.inner_live_hold conjoins the first HEARTBEAT line without any acknowledgement wait for it; both acknowledged points precede that line by a full session_state (~15-20 forks incl. pgrep and two ps -eo). The driver reaches the conjunct after a 0.1 s poll plus check 1 (~10-15 forks). The windows overlap, so a FAIL/STOP at check 2 of 10 is possible on a passing launcher. Same acknowledgement-race class as the parent-confirmed V2 X6 race that the v2 delta fixes for P2.",
+   "consequence": "NOT-LANDED run and a spent single grant; no false PASS; launcher left in SELF-HOLD with no fixture fault applied self-releases after the 16 s inner sleep (release self-hold-then-empty 90), private lock freed; not a launcher defect",
+   "smallest_fix": "one bounded wait_text on launcher.EXIT_RECORD for the exact HEARTBEAT string before L67 (+1 line; same shape as the v2 delta at L86 and the existing L69/L72 waits); new hash; two exact +1-line reviews",
+   "binding": "binding for grantability of these exact bytes as a 'deterministic' control; resolvable by the +1 successor or by explicit parent acceptance of a possible false FAIL with one pre-authorised re-run within the same single grant"
+  },
+  {
+   "id": "V31-B-02",
+   "severity": "Low (record truth / provenance labelling)",
+   "component": "controls-v2 request and driver header",
+   "lines": "ctl-v31.v2.sh L2; REQUEST_V31_CONTROLS_V2.md first paragraph; diffs/ctl-v31-to-v2.diff header hunk",
+   "statement": "Predecessor driver cited as 'ctl-v31.sh 18a743e4...'; no file in the archive hashes to 18a743e4; the frozen predecessor ctl-v31.sh is e87b0a2e6c4d... (INPUTS.json states it correctly). Request also says 102/27 lines; wc -l gives 101/26.",
+   "consequence": "traceability by prose is wrong; machine pins (PIN_L, manifests, INPUTS.json) are correct and the exact delta was independently reproduced against e87b0a2e",
+   "disposition": "record the correction in the grant/disposition; no byte change required for the proof"
+  },
+  {
+   "id": "V31-B-03",
+   "severity": "Low (unstated prerequisites)",
+   "component": "controls-v2 request section 3-4",
+   "statement": "The harness relies on: non-root executor (chmod a-rwx and the launcher's -r/-x tests are void as root); non-interactive invocation with job control off so util-linux setsid does not fork and LPID == launcher $$ (FIFO path $EX/LEASE_HOLDER.tmp.$LPID); util-linux setsid, GNU coreutils timeout, procps ps/pgrep (pgid=SESSION assumption). None is stated as a grant prerequisite.",
+   "consequence": "each violation presents as a deterministic FAIL (e.g. P2.first_receipt_published_ok, P1 check 3) or as the disclosed P3b UNRESOLVED; no false PASS",
+   "disposition": "state in the grant record"
+  },
+  {
+   "id": "V31-B-04",
+   "severity": "Low (fidelity note)",
+   "component": "fake-runner.v31.sh early-death-75 vs runner die/finish paths",
+   "lines": "fake L12; runner L194-203, L201 EXIT trap",
+   "statement": "The fake omits final_accounting output; the real runner's die and exit-74 paths append CLEANUP_FAILURES=0 so canonical would yield cleanup_failures=0 rather than 'none' as the request's P3b prose states.",
+   "consequence": "none for binding (START-only) or for check 10 (correct for the fake); expectation prose slightly inaccurate for canonical",
+   "disposition": "note only"
+  }
+ ],
+ "residuals_not_findings": [
+  "R1: adopted gate whose runner never writes START (exec-chain failure between ADOPT and runner L206, or ps failure leaving pgid= empty) remains a fail-closed unknown SELF-HOLD; outside V3-B-01's defined window; safe direction; parent-recoverable",
+  "R2: stale START in the same UTC second carrying the exact new session number, or clock step-back between attempts; disclosed by builder; practically unreachable under the inherited-fd lock; even then released=1 needs IDENTITY and census decides",
+  "Prior V3-B R1-R4 and the ms NO_HOLDER_RECORD window unchanged by v3.1"
+ ],
+ "separated_determinations": {
+  "source_closure_v31": "SOURCE-CLOSED, UNEXECUTED for V3-B-01 within runner L206-L212; no introduced material source finding; two Low residuals; B requests no launcher change",
+  "private_control_grantability": "NOT AS-IS on determinism grounds (V31-B-01). GRANTABLE under exactly one of: (i) ctl-v31.v3 successor with one bounded wait_text before L67 (two exact +1-line reviews), or (ii) explicit parent acceptance of a possible NOT-LANDED false FAIL at P1.inner_live_hold with one pre-authorised re-run inside the same single grant. Prerequisites of V31-B-03 to be stated. Pins/refusals/writes/signal set otherwise meet the request; v2 delta correct and non-weakening; independent of the S2 restoration slot; one runtime slot only",
+  "canonical_setup_T0": "NOT CLEARED; not requested; held pending dual source closure, observed private control result (P3b answers the pgid assumption), fresh prerequisites and a separate grant; no shim in canonical invocation; V10.1 T0/primitive verdicts not re-opened; existing V2 X6 failure stays failed, its result data not read by B",
+  "product_clearance": "NONE; no product code, PR, merge, deploy, flag, hosted setting, customer data, spending or source-account action involved or cleared"
+ },
+ "truth": [
+  "Nothing executed by B; builder bash -n / patch claims unverified by execution; diff bodies independently reproduced by pure diff",
+  "Current peer audit, live summaries and TAKEOVER not read",
+  "No grant, implementation authority or runtime issued; concrete findings bind on their own terms; no majority reading implied"
+ ]
+}

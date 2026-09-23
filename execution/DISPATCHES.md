@@ -7,11 +7,11 @@ Updated 2026-09-23 for EXEC-6c2a68ac. Current contract: `execution/6c2a68ac/SCOP
 | S2 exact substrate restore | `restore_s2_substrate_mue9eidh` | Claude Fable 5 / High | restoration paths in SCOPE | COMPLETE; exact receipt accepted, ownership released |
 | S2 V61 controls | `restore_s2_substrate_mue9eidh` | Claude Fable 5 / High | enumerated grant runtime paths and `execution/6c2a68ac/s2-v61-result` | ACTIVE upon parent message; one five-set block, stop first failure; exclusive runtime slot |
 | S5 V31 independent A | `audit_s5_v31_lens_a_mue9eid4` | Parent inheritance | `execution/6c2a68ac/audits/s5-v31-a` | COMPLETE; material S5-V31-A-01 exact-binding defect, source closure denied |
-| S5 V31 independent B | `audit_s5_v31_lens_b_mue9eidl` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v31-b` | ACTIVE; read/hash/diff only, no peer |
+| S5 V31 independent B | `audit_s5_v31_lens_b_mue9eidl` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v31-b` | COMPLETE; material P1 acknowledgement race V31-B-01 routed to V32 |
 | S5 V2 failed-result/recovery A | `audit_s5_failure_lens_a_mue9osec` | Parent inheritance | `execution/6c2a68ac/audits/s5-v2-result-a` | COMPLETE; accepts attributable failure/historical exact-holder closure with qualifications only; B pending |
-| S5 V2 failed-result/recovery B | `audit_s5_failure_lens_b_mue9oser` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v2-result-b` | ACTIVE; read/hash/diff only, no peer |
+| S5 V2 failed-result/recovery B | `audit_s5_failure_lens_b_mue9oser` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v2-result-b` | COMPLETE; A/B reconciled; historical failure and exact-holder closure accepted with qualifications only |
 | S6 exact substrate restore | `restore_s6_substrate_mue9osen` | Claude Fable 5 / High | restored paths in SCOPE | COMPLETE; d51a/tree62bf67b8, packet19/19/subset11/11; no runtime |
-| S5 V32 narrow binding repair | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | `execution/6c2a68ac/s5-v32-builder` | ACTIVE; source/control successor only for material S5-V31-A-01 |
+| S5 V32 narrow binding repair | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | `execution/6c2a68ac/s5-v32-builder` | ACTIVE; exact binding A-01, P1 wait B-01, narrow failed-operand diagnostics |
 | S5 product substrate restore | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | `worktrees/s5-r4`, `execution/6c2a68ac/s5-source-restore` | ACTIVE; exact frozen source only, no runtime |
 | S3 PREP2 substrate restore | `restore_s3_candidate_mue9wspd` | Claude Fable 5 / High | `worktrees/s3-prep2`, `execution/6c2a68ac/s3-restore` | ACTIVE; exact staged tree only, no integration/test/commit |
 
