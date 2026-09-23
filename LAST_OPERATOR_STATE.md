@@ -38,7 +38,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 | Lane | Individual / cumulative tier | Exact product candidate | Current transition |
 |---|---|---|---|
 | S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Preserved; real dynamic discriminator after S2 controls. |
-| S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V61 `ed241342…` executed once; five raw0, result `d0a1e406…`/621 entries frozen. Independent result A/B active; setup/proof held. |
+| S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Five raw0 result `d0a1e406…`/621 entries dual-accepted, no A/B blocker. Fresh setup activated; real proof follows separately. |
 | S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Exact staged tree `a584a1b95423f95dae8daabf673ef3776604acbb` restored from both parents, receiptbd9e6cd8; uncommitted, runtime integration gated on S1/S2. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V10.1 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 failure/recovery dual review closed with qualifications. V31 A exact-binding and B P1-acknowledgement findings routed to one active V32 successor; runtime held. |
@@ -48,7 +48,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S2 controls completed and slot returned with scoped empty ownership accounting; two independent result reviews are active. S5 V32 repairs concrete findings. S3 source restoration is accepted under receiptbd9e6cd8, with both-parent tree reproduction, all86 preservation rows, six formatting blobs and exact48-line staged status; no merge commit. S5 source restoration is accepted under receipt64611811 at head143d + patchc36258b3 and exact dirty fingerprint6850b32e, with core.abbrev8. V31 A/B and historical V2 result A/B are complete. No runtime currently active; fresh S2 setup remains conditional. S6 implementation remains held.
+S2 five-set controls are dual-accepted with C qualifications only; sole executor now owns fresh setup S10/S20/S30 runtime. S5 V32 repairs concrete findings in parallel. S3/S5/S6 exact restorations are complete and accepted; no repeat. S3 remains uncommitted and untested. S6 implementation awaits the corrected shared base. Completed reviewers are available for V32 final bytes.
 
 ## DAG
 
@@ -62,7 +62,7 @@ Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R 
 
 Proven at exact scope: current mains/PR identities and grades; six candidate identities; S1 ancestry in S2; prior S2 setup receipt; S4 Stage1 and exact native/package/browser proof; S5 V10.1 private primitive diagnostic; S5 V2 failed-result preservation and accountable slot recovery. S4 result included launcher0/observer0/SUCCESS, full 1742/1742 and focused 105/105 including 19 target cases, with recorded hook/log/visibility qualifications.
 
-Unproven: independent acceptance of the observed S2 V61 five-set result; S1 discriminator and real composition; S3 runtime integration; corrected S5 controls; safe S6 C6; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
+Unproven: fresh S2 setup and S1 discriminator/real composition; S3 runtime integration; corrected S5 controls; safe S6 C6; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
 
 Material blockers: S2 V61 result pending; S5 V31-A-01 exact-binding defect; S6 unsafe intermediate; C1/G2 generated-contract collision; incomplete native-family destinations and relationship accounting; no universal-importer proof beyond current TrueCoach/Chrome-heavy evidence; unsafe landing boundary due unprotected mains and backend auto-deploy.
 
@@ -72,12 +72,12 @@ Original failures and all qualifications remain immutable under the intake commi
 
 ## Next executable slices
 
-1. T4 two independent exact S2 result attestations, active on resultd0a1e406.
-2. T4 fresh unchanged S2 setup after result closure, grant prepared but inactive.
+1. T4 fresh unchanged S2 setup, activated after dual control-result closure.
+2. T4 one real S1/S2 composition/discriminator proof after setup success.
 3. T4 S5 narrow exact-attempt-binding correction, then dual changed-candidate review.
 4. T4 one corrected S5 private control execution if both reviews clear it.
 5. T4 narrow S6 two-consumer correction and dual final-head review after S5 closure.
 6. T4 S1/S2 real composition/discriminator proof after S2 result closure.
 7. T4 S3 integration/setup after S1/S2 proof.
 
-Bradley decision required: NO. Exact next action: close dual S2 result review and activate fresh setup if accepted; in parallel freeze S5 V32 then dispatch its two independent final-byte reviewers.
+Bradley decision required: NO. Exact next action: execute fresh setup once, evaluate its receipt directly, then activate real composition proof; in parallel freeze S5 V32 and dispatch two independent final-byte reviewers.
