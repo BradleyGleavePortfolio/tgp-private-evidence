@@ -197,6 +197,10 @@ In parallel `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` assigns source-only T4 buil
 
 S6 and S5 remain runtime queued. The two required final-head attestations start their source/applicability portions in parallel under `S3_FINAL_HEAD_REVIEW_SCOPE.md`: independent nonbuilders `audit_s5_failure_lens_a_mue9osec` and `audit_s5_failure_lens_b_mue9oser`, each T4, sole respective `audits/s3-final-head-a/**` or `-b/**`, read/hash/diff only. Same review incorporates the frozen runtime results later; no premature final clearance or extra audit layer. Parent retains sole private publication authority; no Bradley decision required.
 
+## S3 composed-proof changed-binding review
+
+Source-only preparation COMPLETE, sealbe31c041/14 entries. Exact runnere876f48c derived from acceptedefa273c7; fixture9763698b derived from accepted9fcc3696; no runtime. `S3_COMPOSED_PROOF_DUAL_REVIEW_SCOPE.md` activates two independent changed-binding reviews by the existing final-head nonbuilders A/B, sole separate review paths. Frozen review asks source closure and one-shot grantability for exact be0ba827/treea584/lockb7fed/deepmerge8 with S3 receipt binding; unchanged v5.7 mechanics transfer without re-audit. `env -u S2_RUNNER_STUBS` is fixed; fresh output roots required; fixture handles port collision; no new control layer. Runtime HELD pending both reviews, returned slot and explicit grant.
+
 ## S3 targeted result and S6 setup transition
 
 S3 original09–14 COMPLETE: six actualraw0,31 suites/825 tests PASS, exactbe0ba827/treea584/lockb7fed preserved, result1513911d/27 entries and bundled204a582. Executor returned canonical runtime. Both already-active final-head reviewers receive this frozen result for the same review; composed proof remains pending, source preparation active.

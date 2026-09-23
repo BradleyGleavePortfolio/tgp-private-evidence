@@ -1,0 +1,23 @@
+--- baseline/s2-fixture-r53.sh	2026-09-23 15:27:36.000000000 +0000
++++ candidates/infra/s3-fixture-be0b.sh	2026-09-23 17:06:15.105062518 +0000
+@@ -1,4 +1,9 @@
+ #!/usr/bin/env bash
++# S3-COMPOSED-PROOF fixture (2026-09-23, EXEC-6c2a68ac source-only preparation) — byte-derived from the ACCEPTED S2 fixture
++# infra/s2-fixture-r53.sh sha256 9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881 (real proof result seal bbde4b0b…).
++# ONLY changes (lane pins, no logic): NS=s3comp-be0b (was s2comp-r53) and PORT=54354 (was 54353). The stopped s2comp-r53 cluster under
++# /home/user/pg17/clusters/ is never touched, adopted, reused or destroyed by this file (D1/D3 refusals apply unchanged to the new DATA).
++# Original header follows.
+ # S2-RUNNER-53 disposable PostgreSQL 17.6 fixture — REIMPLEMENTATION (2026-09-22, S2-SETUP-FIXTURE-PREP) derived from the latest
+ # preserved fixture s2-fixture.sh sha256 08987e4cd566e0ee7ee8ef76ac4c39bc327ffd92fb85dfaf52fac8058d8df44c (setup-and-runner-readiness/infra).
+ # The namespaced fixture 6062f4ce… named by frozen request 03 is NOT preserved; this file does not claim, contain or imitate its bytes.
+@@ -18,8 +23,8 @@
+ set -euo pipefail
+ PG17_HOME=/home/user/pg17; PGHOME=$PG17_HOME/dist
+ pgbin(){ local b=$1; shift; LD_LIBRARY_PATH="$PGHOME/lib" "$PGHOME/bin/$b" "$@" 9>&-; }   # never leak the lock fd to children
+-PORT=54353; SUPER=s1_super; PASS=s1_local_synthetic
+-NS=s2comp-r53
++PORT=54354; SUPER=s1_super; PASS=s1_local_synthetic
++NS=s3comp-be0b
+ DATA=$PG17_HOME/clusters/$NS; LOG=$PG17_HOME/clusters/$NS.log; SOCK=$PG17_HOME/run
+ MARKER=s1-disposable-pg17   # the frozen S1 guard requires exactly this marker
+ cmd=${1:?init|start|stop|status|destroy|url|lockcheck}

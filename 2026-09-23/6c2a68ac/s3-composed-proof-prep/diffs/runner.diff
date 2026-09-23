@@ -1,0 +1,107 @@
+--- baseline/run-composition-r57-v5.7-when-granted.sh	2026-09-23 15:27:36.000000000 +0000
++++ candidates/run-composition-s3-v5.8-when-granted.sh	2026-09-23 17:09:33.709062518 +0000
+@@ -1,4 +1,21 @@
+ #!/usr/bin/env bash
++# S3 composed-lock release proof runner v5.8-s3 — EXEC-6c2a68ac S3-COMPOSED-PROOF-PREP (source-only, 2026-09-23). Derived from the ACCEPTED
++# S2 v5.7 runner sha256 efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c (real proof: runner 0, 68/68, 48/48, seal bbde4b0b…).
++# MINIMUM ADDITIVE BINDING SUCCESSOR: pins and lane paths only; every execution/refusal/assertion/cleanup/ownership/timeout/publication mechanism
++# is byte-identical to v5.7. v5.8-s3 delta (see ../diffs/runner.diff and ../REPORT.md):
++#   S3-1 target: WT=worktrees/s3-prep2, EXPECT_HEAD=be0ba827… (hooked two-parent commit), EXPECT_TREE=a584a1b9… (NEW check), EXPECT_LOCK_SHA=b7fed5ed…;
++#        CLOSURE_REF=be0ba827… (the S3 install was made from the staged tree a584a1b9 that this commit carries, so the closure-identity check is
++#        retained against the exact head rather than an ancestor).
++#   S3-2 install binding: S3's node_modules was installed by the S3 lane (execution/6c2a68ac/s3-integration-result steps 02/03: `npm ci` from lock
++#        b7fed5ed… raw 0, guarded `prisma generate` raw 0, v6.19.3) and legitimately has NO .s2-composition-install-stamp. The v5.7 stamp refusal
++#        is REPLACED by an equivalent-strength binding to the actual installed graph: sha256 of node_modules/.package-lock.json must equal
++#        EXPECT_INSTALLED_LOCK_SHA (observed 05bc530a…, mtime 16:44:09Z = the receipted npm ci end) AND the generated client must exist.
++#        Nothing is fabricated; the S2-style stamp is neither written nor imitated. The conditional install_stamp echo is left in place (no-op).
++#   S3-3 lane: fixture candidates/infra/s3-fixture-be0b.sh (NS=s3comp-be0b, PORT=54354, DB=s1_rls_s3comp_be0b); output lane
++#        execution/6c2a68ac/s3-composed-proof (composition-s3/<utc>, runtime/); the stopped s2comp-r53 cluster is never touched.
++#   S3-4 label: S1_R4_LOCK_HOLDER names this runner. Unchanged: EXPECT_PRISMA_CLI_SHA (S3's installed CLI bytes are the same c2a77456…),
++#        steps 10–45, LEADER/adopt/halt/cleanup/receipt/publication code, stub seams (unused), relative-$0 self-stamp (invoke by ABSOLUTE path).
++# ---- v5.7 header retained below for provenance ----
+ # S2 composition proof runner v5.7 — OP88-S2-V57. Derived (2026-09-22) from FROZEN v5.6 sha256 8980bca0936a34b25950f90bc97731d073c7d1dab95178ee80db8edb0d0e1de1
+ # (execution/op88/s2-v56, immutable). Execution-only successor closing the frozen V5.6 audits A (S2-V56-A01..A07) and B (D-01..D-05, R-1..R-3, P-01..P-03)
+ # where they touch this runner; no product/fixture/lockfile/stub change, no supervisor rewrite. v5.7 delta (FINDINGS_MAP_V57.md):
+@@ -92,17 +109,19 @@
+ # offline string layer (exit 64 before any psql/connection). Never for proof.
+ set -u
+ ROOT=/home/user/workspace
+-WT=$ROOT/worktrees/s2-runner53
+-LANE=$ROOT/execution/s2-setup-prep   # setup/fixture lane (grant05 install, fixture 9fcc3696); pin unchanged — must be restored before any execution
+-R57=$ROOT/execution/op88/s2-v57       # this runner's lane (sole writer OP88-S2-V57); every identity/output path must resolve under it (F01)
+-EXPECT_HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c   # FROZEN successor r3; no override
+-EXPECT_LOCK_SHA=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
++WT=$ROOT/worktrees/s3-prep2   # S3-1: integrated S3 candidate worktree (S3 executor-owned; read/executed here, never written by this runner)
++LANE=$ROOT/execution/6c2a68ac/s3-composed-proof-prep/candidates   # S3-3: frozen prep packet holding infra/s3-fixture-be0b.sh (hash-pinned below)
++R57=$ROOT/execution/6c2a68ac/s3-composed-proof   # S3-3: this runner's output lane (variable name kept to leave F01 guard code untouched); every identity/output path must resolve under it
++EXPECT_HEAD=be0ba8274e486dee77f15d18fe367a13ff08ecf5   # S3-1: hooked two-parent commit (parents d5cd9b8b + 5c7b42b3); no override
++EXPECT_TREE=a584a1b95423f95dae8daabf673ef3776604acbb   # S3-1 (NEW): tree the S3 install/generate receipts were bound to (write-tree before/after every S3 step)
++EXPECT_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55   # S3-1: integrated lock (deepmerge-ts 8.0.0; S2 was 62b05b90…/7.1.5)
++EXPECT_INSTALLED_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44   # S3-2 (NEW): node_modules/.package-lock.json written by the receipted S3 `npm ci` (s3-integration-result step 02, 16:44:09Z)
+ EXPECT_PRISMA_CLI_SHA=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0   # P1: installed prisma/build/index.js (6.19.3) recorded by grant05 setup-30; the checkpoint analysis (audits/s2-r54/a) is bound to these bytes
+-EXPECT_FIXTURE_SHA=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881   # infra/s2-fixture-r53.sh (REIMPLEMENTATION from 08987e4c; request-03's 6062f4ce is unpreserved); refuse if absent/different
+-CLOSURE_REF=9742037b153221de565e651ad8ba3b721bc0fb31   # A2 dependency closure was installed at this ancestor
+-DB=s1_rls_s2comp_r53
+-NS=s2comp-r53   # must equal the fixture's pinned NS (fixture is hash-pinned above)
+-PORT=54353      # must equal the fixture's pinned PORT; lane-unique (historical S2 lanes 54321, S5 54325)
++EXPECT_FIXTURE_SHA=9763698b9231af15648c1179df8c99d2e848f6738469cf4ebee8bff1259de21c   # S3-3: candidates/infra/s3-fixture-be0b.sh (accepted 9fcc3696 fixture with NS/PORT re-pinned only); refuse if absent/different
++CLOSURE_REF=be0ba8274e486dee77f15d18fe367a13ff08ecf5   # S3-1: the S3 dependency closure was installed from this head's tree (a584a1b9); check retained against the exact head
++DB=s1_rls_s3comp_be0b   # S3-3: within the S1 guard namespace ^s1_rls_[a-z0-9_]{1,40}$
++NS=s3comp-be0b   # must equal the fixture's pinned NS (fixture is hash-pinned above)
++PORT=54354      # must equal the fixture's pinned PORT; lane-unique (S2 lanes 54321/54353, S5 54325)
+ unset S2_KEEP_FIXTURE
+ export CHECKPOINT_DISABLE=1   # P1: inherited by every step (setsid/timeout/bash/env/npx/node pass the environment; consumers use no env -i/-u)
+ # ---- cleanup budget (seconds). Outer launch is `timeout --foreground -k 60 2100`: TERM at 2100 s, KILL 60 s later.
+@@ -117,8 +136,8 @@
+   REFUSAL_HARNESS="bash $WT/test/release/s1s2-composition.sh"   # real offline refusal path is cheap and DB-free
+   OWNED_PAT="^bash $STUBS/|^s2r53-stub-escapee|^bash $WT/test/release/s1s2-composition.sh|^bash -c : s2r57-step-leader;"   # A03: an unreaped step/cleanup leader is visible to the scan
+ else
+-  LOCK=$ROOT/execution/test-validation.lock; OUT=$R57/composition-r57/$STAMP
+-  GUARD_SPEC="bash test/db/s1-harness-guard.spec.sh"; FIXTURE="bash $LANE/infra/s2-fixture-r53.sh"
++  LOCK=$ROOT/execution/test-validation.lock; OUT=$R57/composition-s3/$STAMP
++  GUARD_SPEC="bash test/db/s1-harness-guard.spec.sh"; FIXTURE="bash $LANE/infra/s3-fixture-be0b.sh"
+   HARNESS="bash test/release/s1s2-composition.sh"; DISC="bash test/db/s1-r4-truncate-discriminator.sh"; REFUSAL_HARNESS=$HARNESS
+   OWNED_PAT="^bash test/db/s1-harness-guard.spec.sh|^bash test/release/s1s2-composition.sh|^bash test/db/s1-r4-truncate-discriminator.sh|^psql .*(127\.0\.0\.1:$PORT|-p $PORT)|^node .*prisma/build/index.js"
+ fi
+@@ -394,6 +413,7 @@
+ stamp "toolchain: timeout=$(timeout --version 2>&1 | head -1) flock=$(flock --version 2>&1 | head -1) setsid=$(setsid --version 2>&1 | head -1) pgrep=$(pgrep --version 2>&1 | head -1) bash=$BASH_VERSION lane_identity: NS=$NS DB=$DB PORT=$PORT"
+ stamp "nproc=$(nproc) mem_free_mb=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo) disk_free=$(df -h /home/user | awk 'NR==2{print $4}')"
+ [ "$HEAD" = "$EXPECT_HEAD" ] || { stamp "REFUSED: head $HEAD != expected $EXPECT_HEAD"; finish 70; }
++[ "$TREE" = "$EXPECT_TREE" ] || { stamp "REFUSED: tree $TREE != expected $EXPECT_TREE"; finish 70; }   # S3-1 (NEW)
+ [ "$DIRTY" = 0 ] || { stamp "REFUSED: worktree dirty ($DIRTY lines)"; git status --porcelain --untracked-files=all 9>&- | tee "$OUT/dirty.txt"; finish 70; }
+ [ "$(sha256sum package-lock.json | cut -c1-64)" = "$EXPECT_LOCK_SHA" ] || { stamp "REFUSED: lockfile hash mismatch"; finish 70; }
+ # dependency-closure admissibility: package-lock.json, package.json, prisma/schema.prisma must be byte-identical to the closure's install head
+@@ -404,16 +424,20 @@
+   # F06 (A-06): installed CLI existence + exact byte pin are checked BEFORE the first CLI execution (--version below); unbound client bytes never run
+   [ -f node_modules/prisma/build/index.js ] || { stamp "REFUSED: node_modules/prisma missing (setup-30 not done in this sandbox)"; finish 70; }
+   [ "$(sha256sum node_modules/prisma/build/index.js | cut -c1-64)" = "$EXPECT_PRISMA_CLI_SHA" ] || { stamp "REFUSED: installed prisma CLI bytes != $EXPECT_PRISMA_CLI_SHA (checkpoint analysis not bound; CLI NOT executed)"; finish 70; }   # P1/F06
+-  stamp "prisma_cli_sha256=$(sha256sum node_modules/prisma/build/index.js 2>/dev/null | cut -c1-64) (pinned, verified before first execution) fixture_sha256=$(sha256sum "$LANE/infra/s2-fixture-r53.sh" 2>/dev/null | cut -c1-64) expect_fixture=$EXPECT_FIXTURE_SHA"
++  stamp "prisma_cli_sha256=$(sha256sum node_modules/prisma/build/index.js 2>/dev/null | cut -c1-64) (pinned, verified before first execution) fixture_sha256=$(sha256sum "$LANE/infra/s3-fixture-be0b.sh" 2>/dev/null | cut -c1-64) expect_fixture=$EXPECT_FIXTURE_SHA"
+   stamp "prisma=$(node node_modules/prisma/build/index.js --version 2>/dev/null 9>&- | tr -s ' ' | tr '\n' ';')"   # first CLI execution: after the pin
+   [ -f node_modules/.s2-composition-install-stamp ] && sed 's/^/install_stamp: /' node_modules/.s2-composition-install-stamp | tee -a "$S"
+   NM_TARGET=$(readlink -f node_modules); stamp "node_modules -> $NM_TARGET"
+-  grep -q "^lock=$EXPECT_LOCK_SHA$" node_modules/.s2-composition-install-stamp 2>/dev/null || { stamp "REFUSED: install stamp lock hash != expected"; finish 70; }
++  # S3-2: install binding to the receipted S3 installation (replaces the v5.7 .s2-composition-install-stamp refusal; S3 legitimately has no such stamp)
++  INSTALLED_LOCK_SHA=$(sha256sum node_modules/.package-lock.json 2>/dev/null | cut -c1-64); stamp "installed_graph: node_modules/.package-lock.json sha256=${INSTALLED_LOCK_SHA:-absent} expect=$EXPECT_INSTALLED_LOCK_SHA receipts=execution/6c2a68ac/s3-integration-result(steps 02 npm ci raw0, 03 prisma generate raw0)"
++  [ "$INSTALLED_LOCK_SHA" = "$EXPECT_INSTALLED_LOCK_SHA" ] || { stamp "REFUSED: installed graph node_modules/.package-lock.json != receipted S3 install $EXPECT_INSTALLED_LOCK_SHA"; finish 70; }
++  [ -f node_modules/.prisma/client/index.js ] && [ -d node_modules/@prisma/client ] || { stamp "REFUSED: generated Prisma client missing (S3 step 03 generate not present in this node_modules)"; finish 70; }
++  stamp "installed_versions: prisma=$(node -p "require('./node_modules/prisma/package.json').version" 2>/dev/null 9>&-) client=$(node -p "require('./node_modules/@prisma/client/package.json').version" 2>/dev/null 9>&-) deepmerge_ts=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/deepmerge-ts/package.json','utf8')).version" 2>/dev/null 9>&-) (S2 accepted run: 6.19.3 / 6.19.3 / 7.1.5)"
+   stamp "client_boundary: CHECKPOINT_DISABLE=${CHECKPOINT_DISABLE-unset} exported before all steps (env -i steps carry it explicitly); prisma CLI bytes bound; scoped claim: optional Prisma checkpoint worker (detached fork) excluded — arbitrary future setsid escapes are OUTSIDE this claim"
+   command -v psql >/dev/null || { stamp "REFUSED: psql missing (setup-10 not done)"; finish 70; }
+   [ -x /home/user/pg17/dist/bin/postgres ] || { stamp "REFUSED: PG17 dist missing (setup-20 not done)"; finish 70; }
+-  [ "$(sha256sum "$LANE/infra/s2-fixture-r53.sh" 2>/dev/null | cut -c1-64)" = "$EXPECT_FIXTURE_SHA" ] || { stamp "REFUSED: fixture $LANE/infra/s2-fixture-r53.sh absent or != pinned $EXPECT_FIXTURE_SHA"; finish 70; }
+-  grep -q "^PORT=$PORT;" "$LANE/infra/s2-fixture-r53.sh" && grep -q "^NS=$NS$" "$LANE/infra/s2-fixture-r53.sh" || { stamp "REFUSED: fixture PORT/NS literals do not match runner PORT=$PORT NS=$NS"; finish 70; }
++  [ "$(sha256sum "$LANE/infra/s3-fixture-be0b.sh" 2>/dev/null | cut -c1-64)" = "$EXPECT_FIXTURE_SHA" ] || { stamp "REFUSED: fixture $LANE/infra/s3-fixture-be0b.sh absent or != pinned $EXPECT_FIXTURE_SHA"; finish 70; }
++  grep -q "^PORT=$PORT;" "$LANE/infra/s3-fixture-be0b.sh" && grep -q "^NS=$NS$" "$LANE/infra/s3-fixture-be0b.sh" || { stamp "REFUSED: fixture PORT/NS literals do not match runner PORT=$PORT NS=$NS"; finish 70; }
+ else
+   stamp "STUB MODE: toolchain/node_modules/PG17/fixture-hash prechecks SKIPPED (not evidence); head/dirty/lockfile/closure checks above were REAL"
+   stamp "client_boundary: CHECKPOINT_DISABLE=${CHECKPOINT_DISABLE-unset} exported (stubs echo what they inherit)"
+@@ -461,7 +485,7 @@
+ 
+ # ---- 5) S1 R4 discriminator (S1-owned, frozen) on the PROTECTED database the harness leaves behind, under the same hold.
+ mkdir -p "$OUT/s1-r4"
+-export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-r57-v5.7 pid=$$ fd9=$LOCK"
++export S1_PRISMA_CLI="$WT/node_modules/prisma/build/index.js" S1_PROOF_LOG="$OUT/s1-r4/s1-r4-discriminator.detail.log" S1_R4_LOCK_HOLDER="run-composition-s3-v5.8 pid=$$ fd9=$LOCK"
+ run_step 45-s1-r4-discriminator 300 "$OUT/s1-r4/s1-r4-discriminator.log" -- $DISC "$DB"; RC_DISC=$?
+ stamp "45 s1-r4-discriminator exit=$RC_DISC $(grep -E 'passed|FAIL' "$OUT/s1-r4/s1-r4-discriminator.log" | tail -1)"
+ stamp "lock still held by runner after discriminator: $(lock_probe)"
