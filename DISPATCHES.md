@@ -1,6 +1,6 @@
 # Active TGP execution register
 
-Updated2026-09-23 01:26UTC. Parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1 (EXEC-e8d546f9). Authoritative register; root DISPATCHES.md is its identical compatibility mirror.
+Updated2026-09-23 01:33UTC. Parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1 (EXEC-e8d546f9). Authoritative register; root DISPATCHES.md is its identical compatibility mirror.
 
 Full current dispatch contract: execution/e8d546f9/SCOPE.md and subsequent exact parent grants. Every named child below is individually T4 because it changes or attests consequential ownership, provenance, recovery or validation evidence; product PR grades remain separate. Canonical builder Claude Fable5, High requested policy not observed runtime. Independent A inherits parent, B explicitly requests Fable. All previous-session IDs/slots/installations/PIDs are historical, not carried forward. Original op88 register preserved in Git at96ee6117.
 
@@ -26,12 +26,17 @@ Full current dispatch contract: execution/e8d546f9/SCOPE.md and subsequent exact
 | S2V5.9 independentB | s2_v5_7_audit_b_muddwjaj | Claude Fable5 | frozen execution/e8d546f9/audits/s2-v59-b | COMPLETE1a325a4c; independently same closure, controls grantable |
 | S5V10.1 independentA | s4_v6_1_delta_audit_a_mudeb4mr | Parent inheritance | frozen execution/e8d546f9/audits/s5-v101-a | COMPLETEa05b466f; three source findings closed, private diagnostic grantable |
 | S5V10.1 independentB | s4_v6_1_delta_audit_b_mudeb4nm | Claude Fable5 | frozen execution/e8d546f9/audits/s5-v101-b | COMPLETEf7965a77; independently same closure; no provider/tool issue |
-| S5V10.1 private diagnostic executor | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | execution/e8d546f9/s5-v101-control-result | SINGLE GRANT prepared; activation after publication; no source/audit/T0/setup action |
-| S4 native-caller-v1 independentA | s4_v6_1_delta_audit_a_mudeb4mr | Parent inheritance | execution/e8d546f9/audits/s4-native-caller-v1-a | DISPATCHED exactf5e621b1, no currentpeer/execution |
+| S5V10.1 private diagnostic executor | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | frozen execution/e8d546f9/s5-v101-control-result | COMPLETE/PASS8e16701b176/176;25 checks/raw0/23s; clean slot closed |
+| S2V5.9 control executor | s2_v5_8_concrete_repair_mude34f9 | Claude Fable5 | execution/e8d546f9/s2-v59-control-result plus exact frozen request runtime outputs | NEXT GRANT, activate after publication; eight sets only, ENV01 new1 dir; no real DB |
+| S4 native-caller-v1 independentA | s4_v6_1_delta_audit_a_mudeb4mr | Parent inheritance | frozen execution/e8d546f9/audits/s4-native-caller-v1-a | COMPLETE6c730911; one material receipt-write aggregation defect |
 | S4 native-caller-v1 independentB | s4_v6_1_delta_audit_b_mudeb4nm | Claude Fable5 | execution/e8d546f9/audits/s4-native-caller-v1-b | DISPATCHED exactf5e621b1 independently, no currentpeer/execution |
-| S5 setup-exclusion-v2 builder | s5_v10_1_narrow_repair_muddwjam | Claude Fable5 | execution/e8d546f9/s5-setup-exclusion-v2 | DISPATCHED source-only L1-L6/C1-C8/observer and exact primitive embed; no optional L7/handoff negative; no runtime |
+| S4 native-caller-v2 builder | s4_v6_1_narrow_repair_muddwjaa | Claude Fable5 | execution/e8d546f9/s4-native-caller-v2 | DISPATCHED only V1A01 checked receipt writes; V61/Stage1 unchanged; B only after freeze |
+| S5 setup-exclusion-v2 builder | s5_v10_1_narrow_repair_muddwjam | Claude Fable5 | frozen execution/e8d546f9/s5-setup-exclusion-v2 | COMPLETEb96dc73233/33; no runtime |
+| S5 setup-exclusion-v2 independentA | setup_exclusion_audit_a_mude0dvj | Parent inheritance | execution/e8d546f9/audits/s5-setup-v2-a | DISPATCHED exactb96dc732 and new-consumer applicability; no currentpeer/execution |
+| S5 setup-exclusion-v2 independentB | setup_exclusion_audit_b_mude0dw5 | Claude Fable5 | execution/e8d546f9/audits/s5-setup-v2-b | DISPATCHED exactb96dc732 independently; no currentpeer/execution |
 | S4 native source restoration | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | frozen restored source and execution/e8d546f9/s4-native-restore; additive s4-native-unshallow | COMPLETE6aca52bd; parent targeted unshallow01:18:51UTC, worker additive readback only; no native runtime |
-| S5 pinned source restoration | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | absent worktrees/s5-r4; execution/e8d546f9/s5-source-restore | DISPATCHED exact143d451e plus already-approved two-test-file patch; fingerprint6850b32e authoritative, no invented patch/runtime/install/network |
+| S5 pinned source restoration | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | restored worktrees/s5-r4; frozen s5-source-restore and s5-source-fingerprint | COMPLETEab886821; local core.abbrev8 reproduces approved6850b32e, source/lock unchanged; no runtime |
+| S6 source restoration | restore_upstream_proof_inputs_muddwjad | Claude Fable5 | absent worktrees/s6-diagnostic; exact execution/op88/s6-c6-prep copy; execution/e8d546f9/s6-source-restore | DISPATCHED productd51a1910/frozen19files only; no adaptations/install/runtime |
 
 V10B worker `shared_launch_v10_audit_b_muddwjag` is BLOCKED by provider safety classifier on passive review; follow-up clarification also blocked. No verdict, independence or approval inferred. Stopped affected task; no substitute model/tool used to bypass provider restriction. Original status artifact retained.
 
@@ -41,7 +46,7 @@ Parent alone writes canonical telemetry/private publication and owns remote oper
 
 Fresh conditional S2SETUP grant is recorded in execution/e8d546f9/S2_SETUP_GRANT.md: sole executor restore_upstream_proof_inputs_muddwjad, after exact restoration/hash/capacity checks. Existing setup05 bytes only; client/PG-binary/locked dependency installation, no server/DB/control/test/product changes. Other workers remain read/source/syntax-only as assigned. No other process/control/install/runtime/browser/canonical-lock/hook/commit/product/hosted/release/customer grant.
 
-S2SETUP CLOSED: S10/S20/S30 raw0, receipt9c11436327/27, final no survivors/lockfree01:04:17UTC. S4_STAGE1 CLOSED/PASS at01:15:33UTC, result9c84eab2. S5_V101_CONTROL_GRANT is next sole runtime grant after publication/activation; then S2V59 controls on a separate grant after clean closure. Source/restoration and S4 caller review remain parallel.
+S2SETUP CLOSED9c114363; S4_STAGE1 CLOSED/PASS9c84eab2; S5_V101_CONTROL CLOSED/PASS8e16701b at01:29:55UTC, all with attributable clean accounting. S2_V59_CONTROL_GRANT is next sole runtime grant after publication/activation. Source/restoration and reviews remain parallel; no competing runtime grant.
 
 Canonical nonblocking lock /home/user/workspace/execution/test-validation.lock was absent00:44UTC; absence grants nothing. Later exact execution grants require frozen commands/inputs, expected raw statuses, owned signals/writes, bounds and cleanup evidence. Source/review stays parallel; heavy resources serialized.
 

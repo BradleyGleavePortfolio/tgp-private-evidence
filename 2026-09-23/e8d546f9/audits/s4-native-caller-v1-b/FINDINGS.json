@@ -1,0 +1,73 @@
+{
+  "audit": "OP88-S4-NATIVE-CALLER-V1-B",
+  "tier": "T4",
+  "role": "independent non-builder reviewer B (exact source review of the narrow native caller correction); requested policy Claude Fable 5 / High; observable runtime model and settings not exposed, not asserted",
+  "frozen_at_utc": "2026-09-23T01:29:21Z",
+  "mode": "read / sha256 / diff / read-only grep only. Nothing executed: no bash -n by this reviewer (SYNTAX_CHECKS.txt is builder-claimed), no probe, process, lock, network, install, browser, source write. Sole writes: execution/e8d546f9/audits/s4-native-caller-v1-b",
+  "not_read": ["execution/e8d546f9/audits/s4-native-caller-v1-a (current peer)", "state/takeover narratives", "s4-native-unshallow worker material (inputs restoration is out of this slice)", "worktrees, execution/s4-r6, product source"],
+  "candidate": {
+    "root": "/home/user/workspace/execution/e8d546f9/s4-native-caller-v1",
+    "manifest_sha256": "f5e621b1007ad2cfbf30201dfcc347dd0be83b15e8414f0a39a9e0d2188dbea4",
+    "manifest_check": "sha256sum -c from the packet root: 6/6 OK; non-self-including; FREEZE.json outside as declared",
+    "caller_script_sha256": "6d6a193f0968520b852f7059764ff7b6ff153106ee3ac412adab41761f7bf8b9",
+    "caller_cmd_sha256": "ab2d55ffd3778e7feb5ca3ad01fe7fc64db76a72fec0042c3de9fd61d0888bad",
+    "v61_staged_unchanged": "execution/s4-r6-validation/v6 sha256sum -c --quiet 12/12 OK; SHA256SUMS sha256 671d08c3…; driver 817a0dc8…, launcher 85e1bafd… equal INPUTS.json",
+    "declared_inputs_hashes_confirmed": ["SLOT_REQUEST_V6.md c0fe3556…", "SLOT_REQUEST_V61.md 15a1d6df…", "SHA256SUMS.stage1 9c84eab2…", "S4_STAGE1_GRANT.md 102683cb…", "S4_V6_RECOVERY_RULING.md f05993ec… (current; read in full)", "AGENT_RULES.md edd63115… (unchanged since my S4 V6.1 review; read in full there)"],
+    "caller_line_diff": "reproduces: only SLOT_REQUEST_V6 §5 bash -c line -> `bash /home/user/workspace/execution/s4-r6-validation/native-caller-v1/s4-r6-native-caller-v1.sh`; no diff exists for the 12 frozen files (unchanged, out of scope)",
+    "restoration_state_observed": "execution/s4-r6-validation/ contains only v6/; native-caller-v1/, runs/ and caller-receipts/ do not yet exist (copy is post-review per request §5); execution/test-validation.lock exists, 0 bytes, owner user; no symlink in the path (readlink -f identical)"
+  },
+  "reuse_faithfulness": {
+    "status": "FAITHFUL",
+    "detail": "Compared line-by-line against the accepted driver (controls/run-controls-v6.sh 817a0dc8…): now/proc_start L68/72 identical; resolve_active_run L83-90 identical except RECEIPTS/CONTROL-V6 glob -> RUNS/VALIDATION-V6 glob and LAST_RUN_DIR dropped (single run); cancel_active L91-115 identical except log->note, ACTIVE_GRACE->GRACE_S, PRIVATE_LEASE->LEASE_PATH, and the separate DRIVER-UNRESOLVED receipt file replaced by the UNRESOLVED= line plus §6 rule text in the single caller receipt; census L117-126 (V6.1 A-01 form) identical; holder_identity L129-137 (V6.1 A-02 form) identical; holder_alive L139-143 identical with LEASE_PATH; manifest pin = driver L77 shape (timeout --foreground 20 sha256sum -c --quiet from the packet root); spawn/poll/wait = run_bounded L211-221 shape including the guarded wait; deadline formula outer+grace+LAUNCHER_POST_S equals the driver's run_bounded argument at L249; 97/94/90/91 meanings as finish L184-201. Deliberately NOT reused (correctly, on the canonical path): flock -n probe, session_state reap, recover_holder."
+  },
+  "boundary_verdicts": {
+    "three_facts_separate_on_every_path": {
+      "status": "YES (source-closed, unrun)",
+      "paths": {
+        "launcher_exits_before_bound": "loop exits on kill -0 failure -> UNRESOLVED empty -> wait -> LAUNCHER_RC = real status -> stdout `launcher exit=N` byte-identical to the accepted line -> observer N (0 subject to the contradiction check; 5/11 passed through as the launcher's own retained-holder codes; 12 only as a real exit, flagged)",
+        "observer_bound_3422s_or_caller_TERM_INT": "cancel_active once: one kill -TERM to the own child, one absolute deadline 45+77+5=127 s, no second allowance, no KILL; if the launcher exits inside the deadline -> real status via wait; if alive at the deadline -> UNRESOLVED recorded (pid, current vs spawn starttime, readlink fd/9 vs canonical path, run identity) -> no wait -> observer 97, stdout `launcher exit=none observer=97 …`",
+        "self_hold": "launcher L299/L220: exec -a s4r6-quarantine-holder-<RUN_ID>-SELF in the SAME pid (starttime preserved, fd 9 retained, TERM/INT/HUP ignored). Caller L137: alive && cmdline contains `s4r6-quarantine-holder-*-SELF` && readlink fd/9 == canonical lease && starttime == spawn starttime -> classification SELF_HOLD_RETAINED(identity verified), observer 97, never 12; receipt lists console SELF-HOLD line, record lease.* and the §6 rule",
+        "exit_0_contradicted": "L140: observer 94 when no run dir, no OWNED_SID, owned-session census != EMPTY (UNKNOWN never counts, V6.1 A-01 form) or a live identity-checked holder; stdout still `launcher exit=0`; never upgrades nonzero to 0",
+        "receipt_failure": "L155: only an observer 0 is downgraded to 90; stderr line; the actual exit stays in the stdout line"
+      }
+    },
+    "no_unbounded_wait_no_kill_no_lock_no_foreign_cleanup_no_fake_12_0": {
+      "status": "YES",
+      "greps_mirrored": "kill -KILL/-9: 0; executable flock/exec 9>/pkill: 0 (LEASE_PATH only compared against readlink of the launcher's fd 9); signals: kill -0 probes and exactly one kill -TERM $ACTIVE_PID (own child) inside cancel_active; wait: one executable occurrence (L120) guarded by -z UNRESOLVED; every timeout uses --foreground; census is pgrep -s read-only; no session/pgid signalling; 12 and 0 only ever come from `wait` on the own child"
+    },
+    "topology_pid_start_token_lease_facts": {
+      "status": "CORRECT",
+      "detail": "set +m (redundant for a non-interactive script but explicit) => `bash $LAUNCHER &` is a plain child with pgid == caller pgid != launcher pid, so launcher L227 (73) cannot fire whether run directly or under the Stage 1 transport (wrapper W session leader -> bash native-caller-v1.cmd -> caller -> launcher pgid W); the launcher's own `setsid bash $RUNNER &` then execs in place as in Stage 1. Identity = pid + /proc starttime (field 20 after the comm) captured at spawn and re-read at cancel deadline and at classification; token from cmdline; lease from readlink fd/9 compared to the canonical path string (no symlink in the path, verified). Caller reads S4R6_OUTER_S/S4R6_GRACE_S only to compute its bound and passes the environment through untouched."
+    },
+    "bound_arithmetic": {
+      "status": "CORRECT for OBSERVE_S and the cancel allowance; tail understated (nonmaterial)",
+      "detail": "OBSERVE_S = 3300 + 45 + 77 = 3422 = launcher bounds.worst_case_s: outer+grace+confirm 10+post 8+publish 5+WORST_EXTRA_S (2*5 + 2*5 + 16*2 + 2 = 54) — 10+8+5+54 = 77 = LAUNCHER_POST_S (launcher L87-94, driver L60-64). Cancel allowance 45+77+5 = 127 s. Tail after the loop: up to four 5 s `timeout --foreground` reads (record python, holder_identity python for qh_id, holder_identity again inside holder_alive, census pgrep) plus file-local ls/grep/cat/readlink/sha256sum => bounded ≈ 20 s, not the '~10 s' stated; observer worst ≈ 3422 + 127 + ~20 + poll granularity ≈ 3570 s. The caller correctly claims to bound the observer only, not the launcher."
+    }
+  },
+  "introduced_defects": {"material": [], "statement": "No concrete material defect introduced by the caller correction."},
+  "nonmaterial_notes": [
+    {"id": "S4-NC-V1-B-N1", "where": "L34-36, request §3", "note": "Tail allowance understated (~10 s stated; up to ~20 s of bounded reads). Bound remains finite and the 3422/127 figures are right."},
+    {"id": "S4-NC-V1-B-N2", "where": "L72-78, L124, L134", "note": "If the launcher exits in the instant after the cancel-deadline liveness check, the caller reports observer 97 with UNRESOLVED text 'still alive at its cancel deadline' while the receipt shows alive_now=false / launcher_start_now=<gone>; its real exit is then only in SUPERVISOR_RECORD.json (never reaped by the caller). Truthful 'unresolved', not a fake exit; the receipt exposes the state."},
+    {"id": "S4-NC-V1-B-N3", "where": "L155, L159", "note": "When the receipt write fails the stdout line still prints `caller receipt=<path>`; the failure is on stderr only (same log under the transport, 2>&1). Cosmetic."},
+    {"id": "S4-NC-V1-B-N4", "where": "L18-23 exit map", "note": "Exit-code overlap: the launcher can itself exit 70/90/91 (runner 90/91 passed through as RUNNER_NONZERO) and the caller uses 70/90/91 for its own pre-spawn/receipt conditions; disambiguation is by the stdout line (`launcher exit=N` present only for a real exit) and the receipt, not by exit code alone. Same class as the driver's finish codes. Readers/grant text should key on the stdout line + receipt."},
+    {"id": "S4-NC-V1-B-N5", "where": "L55 (driver L85 semantics)", "note": "Run binding uses the oldest lexical match of `VALIDATION-V6-*-<pid>-*`; a stale run directory from an earlier run with the same pid number could misbind (V6B-04 lineage). runs/ does not exist yet, so the first native run cannot misbind; the receipt records the bound path."},
+    {"id": "S4-NC-V1-B-N6", "where": "L104", "note": "HUP is not trapped by the caller (nor by the launcher outside SELF-HOLD — unchanged V6.1, out of scope). Under `setsid -f` there is no controlling terminal; a caller death by HUP/KILL leaves the launcher under its own bounds with no caller receipt, and the transport receipt records the caller's signal death — three artefacts still not conflated. Precondition: transport as Stage 1, never the raw bash tool."},
+    {"id": "S4-NC-V1-B-N7", "where": "L37", "note": "If S4R6_OUTER_S/S4R6_GRACE_S are set in the environment the caller's bound follows them, consistent with the launcher; the grant should state the environment (defaults) explicitly."},
+    {"id": "carried", "note": "Request §6 items stand: SELF-HOLD branch source-reviewed only (Stage 1 did not exercise SELF-HOLD/standby loss); canonical-lease recovery is a parent decision; Stage 2 inputs not verified by the caller; §6.4 decision point (97 vs would-be 12) — B agrees with V1's choice: 12 must only ever mean an actual exit."}
+  ],
+  "grantability": {
+    "status": "EXACT_NATIVE_PROOF_GRANTABLE_ON_B_SIDE_WITH_REMAINING_RUNTIME_PRECONDITIONS",
+    "what_this_review_establishes": "The narrow caller correction the ruling required (three facts separate; no unbounded wait; no KILL of the last owner; no faked 12/success) is source-closed on the exact bytes 6d6a193f…; nothing in the frozen 12 files changed (12/12 re-verified); the caller adds no fault seam, control, lock touch or recovery.",
+    "preconditions_not_established_here": [
+      "the other independent exact review closes clean (not read)",
+      "restoration worker copies native/s4-r6-native-caller-v1.sh to execution/s4-r6-validation/native-caller-v1/ (outside frozen v6) and the grant pins its sha256 6d6a193f… and the .cmd sha256 ab2d55ff… before launch (as Stage 1 pinned stage1-caller.cmd)",
+      "Stage 2 inputs green per SLOT_REQUEST_V6 §5 / V61 §3: restored 91990 worktree/predecessor/probes attributable, node_modules/dist absence handled by the runner's install under that grant — not this caller's concern and not verified here",
+      "separate canonical-lock grant (execution/test-validation.lock) — the caller only reads fd 9 of its child; the launcher takes flock",
+      "transport exactly as Stage 1 (setsid -f wrapper, T2 polling ≤ 840 s slices, T3 collection; caller receipt + transport exit receipt + SUPERVISOR_RECORD.json are the three artefacts); run as the same unprivileged user; setsid/pgrep/ps/timeout/python3 present",
+      "S4R6_OUTER_S/S4R6_GRACE_S unset or stated; runs/ and caller-receipts/ under execution/s4-r6-validation (created by launcher/caller)"
+    ],
+    "what_a_run_would_and_would_not_prove": "The observer's stdout line, exit and receipt classify one native execution truthfully; a 97 with SELF_HOLD_RETAINED or UNRESOLVED is a recorded recovery boundary for the parent under the ruling's Recovery section, not a result; a 0 with census EMPTY, no live holder and lease released is the only success shape. Nothing here proves the launcher completes within 3422 s."
+  },
+  "not_proven": "No execution by this reviewer; bash semantics relied on (non-interactive script has job control off; background child status retained for `wait`; exec preserves pid/starttime and inherited fd 9; `exec -a` sets argv[0] visible in /proc/pid/cmdline) are documented behaviour, not measured here; SYNTAX_CHECKS.txt unverified; TRANSPORT.md not present locally (Stage 1 RESULT.md describes T1/T2/T3 and its wrapper pid/pgid/sid facts were read for topology only, Stage 1 not repeated).",
+  "smallest_next_proof": "After the other independent review closes clean: restoration worker copies the caller (hash 6d6a193f…) to execution/s4-r6-validation/native-caller-v1/, parent confirms Stage 2 inputs green and issues the single canonical-lock native grant quoting native-caller-v1.cmd (ab2d55ff…) under the Stage 1 transport with defaults; collect the caller receipt, transport exit receipt and SUPERVISOR_RECORD.json as three separate facts; any 97/94/90 or nonzero stops for parent reading — no retry, no signal to any pid without the identity triple and an EMPTY census."
+}

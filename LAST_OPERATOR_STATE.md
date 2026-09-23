@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated 2026-09-23 01:26 UTC. Executive parent session `e8d546f9-bc43-4fd2-8bae-b6038a849bc1` (EXEC-e8d546f9). Recon CLOSED; execution continuing. This private root is the current operational index, not public-context telemetry.
+Updated 2026-09-23 01:33 UTC. Executive parent session `e8d546f9-bc43-4fd2-8bae-b6038a849bc1` (EXEC-e8d546f9). Recon CLOSED; execution continuing. This private root is the current operational index, not public-context telemetry.
 
 ## Mission and authority
 
@@ -33,11 +33,11 @@ All64 open PR head/base/name records re-queried; zero mismatches with `execution
 | Lane | Grade | Exact product head | Current next transition |
 |---|---|---|---|
 | S1 R4 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Source preserved, independent source reviews frozen; TRUNCATE/membership dynamic proof after S2 controls/setup. |
-| S2 V5.9 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Frozen4341ce30 16/16; independent A abbf2c34/B1a325a4c close N6 gap, no material delta finding. Runner/product/stubs unchanged. Eight-set controls now eligible, queued after S5 diagnostic slot; no new revision/reinstall. |
+| S2 V5.9 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Frozen4341ce30 16/16; independent A abbf2c34/B1a325a4c close N6. S5 slot closed; eight-set control grant next for explicit activation after publication. No new revision/reinstall. |
 | S3 PREP2 | T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source bundle940ce711 restored; prepared composition treea584a1b95423f95dae8daabf673ef3776604acbb retained. Upstream proof, hook/composed-lock/final reviews pending. |
-| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Stage1 PASS9c84eab2; no rerun. Native inputs restored/nonshallow718b9757. Native-caller-v1 f5e621b1 6/6 frozen, independent A/B review active; unchanged V61/product, native execution held. |
-| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10.1 manifest45accac9 24/24; independent A a05b466f/Bf7965a77 source closure, no material delta defect. Single private diagnostic grant ready for activation after publication. Separate setup-v2 source and pinned worktree restoration parallel, no setup/T0 grant. Old V10B remains blocked/no verdict. |
-| S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 manifest04d761f019/19, narrow B5196e231 preserved. Shared launch exact consumer adaptation/setup pending; no repeat C5 A/B/D. |
+| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Stage1 PASS9c84eab2, no rerun; native inputs ready718b9757. Caller-v1 A6c730911 identifies unchecked intermediate receipt writes; narrow caller-v2 correction only, B independent. Underlying V61/product unchanged, native held. |
+| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | Private diagnostic PASS8e16701b 176/176:25 checks/raw0/23s/clean ownership, slot closed. Setup-v2 b96dc732 33/33 frozen under dual review; pinned worktree restored, local core.abbrev8 reproduces approved6850b32e fingerprint (ab886821). No setup/T0 grant; oldV10B still no verdict. |
+| S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Frozen04d761f0 19/19/narrow B5196e231 preserved. Source-only restoration active. Exact primitive now source-reviewed/private-tested: bounded S6 consumer adaptation may proceed under new assignment; no runtime or C5 A/B/D repetition. |
 
 Actual source objects/tree identities restored from prerequisite-verified bundles. S1 `56fb` is an actual ancestor of S2 `d5cd` (fresh Git check), not merely matching content. S4 current bundle is `af2c8207…b0dd` for91990, not the older R5 bundlef8de3d63. Source restoration and manifest checks are not new product tests/audits.
 
@@ -45,7 +45,7 @@ Actual source objects/tree identities restored from prerequisite-verified bundle
 
 Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCHES.md` and root mirror. Initial six assignments plus S2V58 and two separate setup reviewers; V10B blocked. No old op88 worker ID, PID, installation or grant is inherited as live. Parent is sole telemetry/private publisher. S1 schema/generator remains reserved, no mutation assigned. Auditors do not read their current peer conclusions, implement source, run duplicate heavy tests or self-clear.
 
-Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; about9GB after fresh setup. S2SETUP and S4_STAGE1 closed cleanly. S5_V101_CONTROL_GRANT is next sole runtime slot after publication/activation; S2V59 controls queued next, not concurrently authorized. Source/review parallel; old fixtures not inherited.
+Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; about9GB after fresh setup. S2SETUP, S4_STAGE1 and S5_V101_CONTROL closed cleanly. S2_V59_CONTROL_GRANT is next sole runtime slot after publication/activation. Source/review parallel; old fixtures not inherited.
 
 Fresh restoration complete: exact clean d5cd and37-file predecessor, V57 frozen runtime-path copy; S3 PREP2 tree reproduced from BOTH parents using preserved patches, not a merge/runtime attestation. Upstream report preserved with additive DISCLOSURE_ADDENDUM naming the version/getconf/process-census observations; original report not rewritten.
 
@@ -53,11 +53,11 @@ S2 setup COMPLETE: setup10raw0 at00:56:29UTC; setup20raw0 at00:57:04UTC; setup30
 
 ## Proven, unproven and current material findings
 
-Verified this session: live mains/64 PR refs; candidate bundle prerequisites/actual trees; S1-in-S2; current packet manifest counts above; dispatch mirrors identical; fresh S2 setup; S4 exact private Stage1 PASS and clean slot closure. Preserved valid S5 R1 and earlier source/test evidence retain original applicability only.
+Verified this session: live mains/64 PR refs; candidate bundle prerequisites/actual trees; S1-in-S2; current packet manifests; dispatch mirrors identical; fresh S2 setup; S4 exact Stage1 PASS and S5 V10.1 private diagnostic PASS with clean slot closure. Preserved valid S5 R1 and earlier source/test evidence retain original applicability only.
 
 Unproven: current real-PG composition, S1 dynamic discriminator, S3 runtime integration, final S4 package/browser proof, S5 fresh bootstrap/full control/T0, S6 C6 causal outcome, native lifecycle/writers/relationships/reconciliation, real-platform/pilot acceptance. No overall audited/merged/deployed/enabled/customer-accepted/production-proven claim.
 
-- S4-V6-A01/A02/B01/B02 all source-closed by independent V6.1 attestations, exact Stage1 now PASSED. No Stage1 rerun requested. Only known native-caller distinction remains under source correction; native source/probes ready and pinned-base ancestry fetched without candidate changes.
+- S4-V6-A01/A02/B01/B02 source-closed and Stage1 PASSED. Caller-v1 A identifies one material new receipt-group defect: earlier required printf failure can be masked by a successful final write. V2 corrects only publication aggregation; no Stage1 rerun/new fault suite. Native allowance tail is qualified additively (3569 post-spawn/3589 incl manifest plus unenclosed operations), not a hard last-owner KILL bound.
 - OWN-V10-A01/A02/A03: fixture loses primary refusal rc; unknown session authority retired when leader gone; failed required control EXIT record ignored. Frozen private diagnostic may be safe independently of setup, but B must independently freeze before grant. Expected C3 failure is not25PASS.
 - Setup exclusion: unknown/live ownership may not lose final exclusion; separately frozen9-file successor requires independent scope review. No automatic transfer to S6 or T0.
 - Setup-exclusion A/B frozen: outer census omits inner npm session; unknown tracking can be retired on leader collection; normal publication failure does not retain holder; unproved live handoff; stale observer release/raw/publication truth; wrong X1 IDENTITY path; X4 mv-into-directory prevents rmdir recovery; fake descendant assertions do not prove actual nested-session boundary. Parent chooses NO live/unknown transfer capability. Separate setup-v2 source-only grant now active: exact V10.1 primitive embedding with new-consumer applicability review, L1-L6/C1-C8/observer only; optional L7 and optional handoff negative declined. No generic framework, no inherited primitive clearance or setup execution.
@@ -85,14 +85,14 @@ Acceptance unchanged: ≥one authorized real nonempty native/reconciled complete
 
 ## Next six slices and exact next action
 
-1. Single S5V10.1 private diagnostic now, then separately grant dual-cleared S2V59 eight-set controls.
-2. Complete narrow S4 native-caller-v1 dual review; verified native inputs plus separate slot then actual native validation. Stage1 preserved, not rerun.
+1. Activate dual-cleared S2V59 eight-set controls; freeze results, two independent evidence reviews then real composition.
+2. Close narrow S4 native-caller-v2 publication delta and independent exact reviews; verified inputs plus separate slot then native validation. Stage1 preserved, not rerun.
 3. V10B unavailable due provider block; no unchanged diagnostic grant. Preserve this incomplete review separately from source defects; advance legitimate changed V10.1 repair without inherited approval.
-4. Finish S5 setup-v2 concrete correction and dual new-consumer applicability review before setup/T0; pinned source restoration parallel, no R1 rerun.
+4. Finish S5 setup-v2 dual applicability review, exact private controls then separate setup/T0; source/approved dirty fingerprint ready, no R1 rerun.
 5. Upstream paths and fresh setup complete; unchangedd5cd/S1 real composition/TRUNCATE after controls and accurate real-proof bound disposition, then dual evidence follow-up; S3 integration afterwards.
-6. Shared primitive closure → exact S6 consumer adaptation/applicability → fresh setup → C6 only.
+6. Exact accepted primitive → bounded S6 consumer adaptation and dual applicability → fresh setup → C6 only; restoration parallel.
 
-Bradley decision required: NO for current local execution. Exact next action: activate published S5_V101_CONTROL_GRANT, then S2 controls on their own grant after attributable slot closure; S4 caller review and S5 setup-source/restoration parallel. Reserved owner decisions remain downstream.
+Bradley decision required: NO for current local execution. Exact next action: activate S2_V59_CONTROL_GRANT after publication; S4 narrow caller correction, S5 setup reviews and S6 source continuation stay parallel. Reserved owner decisions remain downstream.
 
 ## Entry points
 

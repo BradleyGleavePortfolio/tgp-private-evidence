@@ -1,0 +1,84 @@
+{
+  "slice": "OP88-S5-SETUP-EXCLUSION",
+  "reviewer": "B (independent passive nonbuilder; read-only; nothing executed)",
+  "reviewed_at_utc": "2026-09-23T00:56Z",
+  "input_manifest_sha256": "0a69011150799ecdb31f46452ff92cede7075190906b851e39d6b5ebcb0758a7",
+  "input_files": 9,
+  "input_verification": "sha256sum -c all OK; diff(v10,v10x) body == shipped diff; OWN-BLOCK v10 in launcher and v10x byte-identical to inputs/own-block-v10.sh",
+  "severity_rule": "High = requested policy (ruling acceptance / request text) not met on a statically traceable path; not observed runtime",
+  "verdicts": {
+    "private_control_run_X1_X4": "NOT GRANTABLE AS WRITTEN (B-02); X1-X3 bounded and safe; grantable after harness fix, but PASS would not evidence canonical A-04 closure (B-01, B-06)",
+    "canonical_install_setup_applicability": "NOT GRANTABLE (B-01)",
+    "primitive_applicability": "unchanged bytes reused; no new primitive review needed for this packet"
+  },
+  "findings": [
+    {
+      "id": "SEB-B-01",
+      "severity": "High",
+      "title": "Launcher release census excludes the install session created by the primitive's setsid; V10 A-04 outcome reproduced and recorded as verified-empty",
+      "evidence": [
+        "run-s5-setup-npm-ci.v10x.sh:221 setsid bash -c \"$OWN_GATE\" ... npm ci ... 9>&- &",
+        "launch-s5-setup-exclusion.v1.sh:161 SESSION=$PID; :172-174 release on own_group_current $SESSION == empty",
+        "OWN-BLOCK lines 78-84 own_session_members/own_group_current filter sid/pgid == $1 only",
+        "launcher has no reference to setup.EXIT_RECORD, FINAL, CLEANUP_FAILURES, EXCLUSION_UNPRESERVED, or setup-v1/attempts/*/IDENTITY"
+      ],
+      "consequence": "Runner FINAL 90 (exclusion=unpreserved) or inner-timeout KILL leaves npm-session survivors invisible to the launcher; launcher releases with how=normal cleanup=verified-empty; lock free with live unresolved ownership. Ruling acceptance 'no free exclusion with live or unknown ownership' not met.",
+      "scope": "canonical launcher + v10x runner; not the primitive; not the private controls (fake runner has no sub-session)",
+      "blocks": ["canonical setup use"],
+      "owner": "builder s5_selective_v7_fixer_mud58q6n (launcher scope)"
+    },
+    {
+      "id": "SEB-B-02",
+      "severity": "High (for the control grant)",
+      "title": "X4 handoff step cannot complete: own_record mv into directory leaves it non-empty, rmdir fails, launcher loops forever, orphan private-lock holder survives outer timeout",
+      "evidence": [
+        "ctl-exclusion.v1.sh:28 mkdir -p LEASE_RELEASE SELF_HOLD dirs; :34 rmdir \"$EXD/LEASE_RELEASE\"",
+        "OWN-BLOCK line 100 mv -f \"$tmp\" \"$1\" (GNU mv moves into existing directory, rc 0) then readback rc 3",
+        "launcher:138 release returns 1 on record failure; :143-147 self_hold loop never exits while LEASE_RELEASE is a directory",
+        "ctl:16 setsid launcher not bounded by ctl's outer timeout; ctl:19 finish trap only logs UNRESOLVED"
+      ],
+      "consequence": "Static expectation '6 PASS' unattainable (max 5 PASS + UNRESOLVED); guaranteed orphan process with 2 s heartbeat writing indefinitely; a valid handoff alone cannot free it.",
+      "fix_scope": "harness only: rm -rf instead of rmdir; launcher behaviour here is fail-closed and correct",
+      "blocks": ["private control grant as written"]
+    },
+    {
+      "id": "SEB-B-03",
+      "severity": "Medium",
+      "title": "Normal-path RELEASE publication failure frees the lock while logging 'entering SELF-HOLD'",
+      "evidence": [
+        "launcher:138 release() returns 1 after RELEASE_RECORD_FAILED message",
+        "launcher:174 release \"normal\" is the final statement; no self_hold fall-through; script ends, fd 9 closes",
+        "launcher:156-157 release \"nothing-launched\" 74 failure continues to launch (Low)"
+      ],
+      "consequence": "Request item 6 not met on this path; LEASE_HOLDER left at state=RUNNING, no RELEASE, no SELF_HOLD; observer reports HOLDER_GONE_NO_RELEASE (truthful). Exposure is status truth plus B-01.",
+      "blocks": ["canonical setup use (with B-01)"]
+    },
+    {
+      "id": "SEB-B-06",
+      "severity": "Medium",
+      "title": "Fake children do not model the primitive's setsid sub-session or runner exit 90; PASS would not evidence A-04 closure; two vacuous assertions",
+      "evidence": [
+        "fake-runner.sh descendant case: ( ... ) 9>&- & same session; no setsid; no exit 90 path",
+        "ctl:24 ! pgrep -f \"$EXD/DESC_READY\" and ctl:36 pkill -f DESC_READY match nothing (cmdline is 'sleep 60')"
+      ],
+      "consequence": "Control results cannot be read as canonical exclusion proof (G09).",
+      "blocks": []
+    }
+  ],
+  "retention_notes": [
+    "Exclusion retained only while launcher process lives; any exit frees it; no EXIT trap => unexpected exits leave no record",
+    "LEASE_HOLDER is latest-state only (overwritten); history only in launcher.EXIT_RECORD",
+    "LEASE_RELEASE lacks runner FINAL/CLEANUP_FAILURES truth",
+    "SELF_HOLD may be overwritten by 'retry' line (launcher:146) losing entry reason in $EX",
+    "RECOVERY_ACCEPT retained untouched; exact token/pid/start_time match required"
+  ],
+  "smallest_next_proof": {
+    "zero_execution": "runner:221 setsid vs launcher:161,172-174 + OWN-BLOCK:78-84 suffices to deny canonical grant",
+    "optional_private_control": "X5 subsession-90: fake runner ( setsid sleep 60 ) 9>&- & ; exit 90. Expected vs current launcher: LEASE_RELEASE how=normal raw=observed 90 cleanup=verified-empty, private lock free, sleep live in its own sid. ~15 s, private paths only, not run by B.",
+    "preconditions_for_any_grant": [
+      "ctl:34 rmdir -> rm -rf (B-02)",
+      "launcher release gate includes runner-published child sid(s) from $EX/logs/setup-v1/attempts/*/IDENTITY and treats runner FINAL 90 / EXCLUSION_UNPRESERVED as unresolved (B-01) => new launcher hash, new dual exact review",
+      "normal-path release failure falls through to self_hold (B-03)"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+# OP88-S4-NATIVE-CALLER-V1-B — independent exact review of the narrow native caller correction (auditor B, frozen)
+
+**Verdict: the V1 caller keeps actual launcher exit, bounded observer return and identity-bound retained owner separate on every traced path including SELF-HOLD; it contains no unbounded wait, no KILL, no lock touch, no cleanup of a non-owned process and no faked 12/0; every reused block is faithful to the accepted V6.1 driver; the 3422 s observer bound and the 127 s single cancel allowance are arithmetically right (tail understated by ~10 s, nonmaterial). No material defect is introduced. On B's side the exact native proof is grantable once the remaining runtime preconditions (other review, restored caller pinned, Stage 2 inputs green, separate canonical-lock grant, Stage 1 transport) are met by the parent.** Detail: [FINDINGS.json](FINDINGS.json).
+
+Scope: packet `/home/user/workspace/execution/e8d546f9/s4-native-caller-v1`, manifest sha256 `f5e621b1007ad2cfbf30201dfcc347dd0be83b15e8414f0a39a9e0d2188dbea4`, 6/6 OK from the packet root, non-self-including, `FREEZE.json` outside. Caller `native/s4-r6-native-caller-v1.sh` `6d6a193f…`, `native-caller-v1.cmd` `ab2d55ff…`. Authority: current `S4_V6_RECOVERY_RULING.md` (`f05993ec…`, read in full), live `AGENT_RULES.md` (`edd63115…`, unchanged since my V6.1 review). Frozen V6.1 staged at `execution/s4-r6-validation/v6` re-verified 12/12 (`671d08c3…`); driver `817a0dc8…` and launcher `85e1bafd…` read for the reuse and SELF-HOLD checks only; the 12 files are unchanged and not re-audited. Stage 1 result (`9c84eab2…`) read only for transport/topology facts, not repeated. Declared input hashes in the packet `INPUTS.json` all confirmed.
+
+Mode: read / sha256 / diff / read-only grep only. Nothing executed (`SYNTAX_CHECKS.txt` is builder-claimed), no probe, process, lock, network, install, browser or source write. Sole writes: this directory. **Not read:** current peer `s4-native-caller-v1-a`, any state/takeover narrative, the `s4-native-unshallow` worker material. Reviewer runtime model/settings not exposed, not asserted.
+
+## (a) Three facts separate on every path
+
+| path | caller behaviour (line) | fact reported |
+|---|---|---|
+| launcher exits before the bound | `kill -0` fails → `wait` (120) → `LAUNCHER_RC` real status → stdout `launcher exit=N` byte-identical to the accepted line (158) → observer N | actual exit; 5/11 pass through as the launcher's own retained-holder codes; 12 only as a real exit, flagged (141) |
+| observer bound 3422 s or caller TERM/INT | `cancel_active` once (60–79): one `kill -TERM` to the own child, one absolute deadline 127 s, no second allowance, no KILL; exits inside → `wait` real status; alive at deadline → `UNRESOLVED` (pid, spawn vs current starttime, `readlink fd/9` vs canonical path, run identity), **no wait** → observer 97, stdout `launcher exit=none observer=97 …` | bounded observer return |
+| SELF-HOLD | launcher L299/L220 `exec -a s4r6-quarantine-holder-<RUN_ID>-SELF` in the same pid (starttime preserved, fd 9 retained, TERM/INT/HUP ignored); caller 137 requires alive ∧ cmdline token `…-SELF` ∧ `fd/9 == canonical lease` ∧ starttime unchanged → `SELF_HOLD_RETAINED(identity verified)`, observer 97, never 12; receipt carries console `SELF-HOLD:` line, record `lease.*`, holder triple + live check, census, §6 rule | identity-bound retained owner, recorded, untouched |
+| exit 0 contradicted | 140: no run dir / no `OWNED_SID` / census ≠ EMPTY (UNKNOWN never counts, V6.1 A-01 form) / live identity-checked holder → observer 94, stdout still `launcher exit=0` | never upgrades nonzero to 0 |
+| receipt write fails | 155: only an observer 0 downgrades to 90; stderr line | actual exit remains in stdout |
+
+## (b) Prohibited behaviours — none
+
+Mirrored greps on the caller: `kill -KILL`/`-9` 0; executable `flock`/`exec 9>`/`pkill` 0 (`LEASE_PATH` is only compared to `readlink /proc/<pid>/fd/9`); signals are `kill -0` probes plus exactly one `kill -TERM "$ACTIVE_PID"` inside `cancel_active`; one executable `wait` (120) guarded by `-z $UNRESOLVED`; all `timeout` calls `--foreground`; census is read-only `pgrep -s`; no pgid/session signalling; 12 and 0 can only originate from `wait` on the own child. The driver's `flock -n` probe, `session_state` reap and `recover_holder` are correctly not reused on the canonical path.
+
+## (c) Reuse faithfulness
+
+Compared line-by-line with the driver: `now`/`proc_start` (L68/72) identical; `resolve_active_run` (L83–90) identical except the `RUNS/VALIDATION-V6-*-<pid>-*` glob and dropped `LAST_RUN_DIR`; `cancel_active` (L91–115) identical except `log→note`, `ACTIVE_GRACE→GRACE_S`, `PRIVATE_LEASE→LEASE_PATH`, and the separate `DRIVER-UNRESOLVED` file replaced by the `UNRESOLVED=` line plus the §6 text in the single caller receipt; `census` (L117–126), `holder_identity` (L129–137), `holder_alive` (L139–143) identical with the canonical path; manifest pin = L77 shape; spawn/poll/guarded-wait = `run_bounded` L211–221; the observer deadline `outer+grace+LAUNCHER_POST_S` equals the driver's own `run_bounded` argument (L249); codes 97/94/90/91 as `finish`.
+
+## (d) Bound arithmetic and topology
+
+`OBSERVE_S = 3300 + 45 + 77 = 3422` = launcher `bounds.worst_case_s` (confirm 10 + post 8 + publish 5 + `WORST_EXTRA_S` 2·5 + 2·5 + 16·2 + 2 = 54 → 77 = `LAUNCHER_POST_S`; launcher L87–94, driver L60–64). Cancel allowance 45 + 77 + 5 = 127 s. Tail after the loop: up to four 5 s `timeout --foreground` reads (record python, `holder_identity` twice, census) plus file-local ops ≈ 20 s, not "~10 s" → observer worst ≈ 3570 s, still finite; the caller correctly bounds only itself, not the launcher. Topology: `set +m` (explicit; already off in a script) → `bash "$LAUNCHER" &` is a plain child with `pgid == caller pgid ≠ launcher pid`, so the launcher's 73 refusal cannot fire either directly or under the Stage 1 transport chain (wrapper W → `bash native-caller-v1.cmd` → caller → launcher, pgid W); the launcher's `setsid bash "$RUNNER" &` then execs in place as in Stage 1. Identity facts: pid + `/proc` starttime captured at spawn, re-read at the cancel deadline and at classification; token from cmdline; lease via `readlink fd/9` against the canonical path (no symlink in the path; `execution/test-validation.lock` exists, 0 bytes, same user). `S4R6_OUTER_S/GRACE_S` are only read, passed through untouched.
+
+## Introduced defects
+
+**None material.** Nonmaterial: **N1** tail understated (~20 s bounded, not ~10). **N2** if the launcher exits in the instant after the deadline liveness check, observer 97 is reported with "still alive" text while the receipt shows `alive_now=false`; the real exit is then only in `SUPERVISOR_RECORD.json` — truthful "unresolved", not a fake. **N3** `caller receipt=<path>` is printed on stdout even when the write failed (stderr says so). **N4** exit-code overlap 70/90/91 between launcher pass-through and the caller's own conditions — disambiguate by the stdout line and receipt, never the code alone. **N5** oldest-match run-dir glob could misbind on pid-number reuse (V6B-04 lineage); `runs/` does not exist yet, so the first native run cannot. **N6** HUP untrapped (also in the launcher outside SELF-HOLD, unchanged/out of scope); under `setsid -f` no tty; a caller death leaves the launcher under its own bounds with the transport receipt recording the caller's death — three artefacts still not conflated. **N7** environment knobs follow the launcher; the grant should state defaults. Request §6 items stand; B agrees with §6.4's choice that 12 must only ever mean an actual exit.
+
+## Grantability
+
+The narrow caller correction the ruling required is source-closed on `6d6a193f…`; nothing in the frozen 12 files changed. Remaining preconditions, not established here: the other independent review closes clean; the restoration worker copies the caller to `execution/s4-r6-validation/native-caller-v1/` and the grant pins `6d6a193f…`/`ab2d55ff…` before launch; Stage 2 inputs green (restored 91990 worktree/predecessor/probes attributable; runner-side install under that grant — not this caller's concern); the separate canonical-lock grant; transport exactly as Stage 1 with the caller receipt, transport exit receipt and `SUPERVISOR_RECORD.json` kept as three separate facts; same unprivileged user; `setsid/pgrep/ps/timeout/python3` present; defaults for `S4R6_*`. A run proves one native execution's truthful classification; 97 (`SELF_HOLD_RETAINED`/`UNRESOLVED`) is a recorded recovery boundary for the parent, not a result; nothing proves the launcher completes within 3422 s.
+
+## What this review does not prove
+
+No execution; bash semantics relied on (job control off in scripts; background status retained for `wait`; `exec` preserves pid/starttime/fd 9; `exec -a` sets argv[0] in `/proc/pid/cmdline`) are documented, not measured here; `TRANSPORT.md` not present locally (Stage 1 RESULT.md read for T1/T2/T3 facts only).
+
+## Smallest next proof
+
+After the other review closes clean: copy + pin the caller, confirm Stage 2 inputs green, issue the single canonical-lock native grant quoting `native-caller-v1.cmd` under the Stage 1 transport with defaults; collect the three artefacts; any 97/94/90 or nonzero stops for parent reading — no retry, no signal to any pid without the identity triple and an EMPTY census. This report is one of two required attestations, not a grant; no approval is invented. S5 setup is not a dependency; Stage 1 is not rerun.
+
+Freeze clock: `2026-09-23T01:29:21Z`.

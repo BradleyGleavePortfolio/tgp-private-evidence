@@ -1,0 +1,26 @@
+--- a/run-s5-setup-npm-ci.v101.sh
++++ b/run-s5-setup-npm-ci.v101x.sh
+@@ -1,4 +1,9 @@
+ #!/usr/bin/env bash
++# OP88-S5-SETUP-EXCLUSION runner variant v101x of frozen V10.1 setup 5f94783b (V10.1 immutable; NOT LAUNCHED). Same ONLY delta as v10x 3a7b57d1 over V10 (setup-v10-to-v10x.diff): the canonical
++# lease may be INHERITED from the explicitly owned outer launcher (launch-s5-setup-exclusion.v2.sh) instead of acquired here. When S5_LEASE_INHERITED=<token> is set the runner verifies
++# that fd 9 is already open on $LOCK (readlink /proc/$$/fd/9), that $EX/LEASE_HOLDER names the same token and a live holder, and does NOT call flock (the outer open-file-description keeps
++# the lease after this runner exits; the child still gets 9>&-). Without S5_LEASE_INHERITED the V10.1 behaviour (own flock) is unchanged. Everything else is the V10.1 bytes (embedded
++# OWN-BLOCK v10.1 4aebf96f; no new runner logic, pins or product change). V10.1 header follows.
+ # OP88-S5-V10.1 ADDITIVE SETUP SUCCESSOR of V10 8fa80828 (v1/V8/V9/V10 preserved; NOT LAUNCHED). ONLY change: the embedded OWN-BLOCK is v10.1 (owned-launch-v10-a A02:
+ # leader collection separated from session authority; own_collect/own_retire retire a session only on positively observed-empty/foreign census, never on leader exit alone),
+ # byte-identical to own-block-v101.sh. NOTHING else changed: npm ci argv/env/pins/lock fd, provenance gates, die/quarantine/final_accounting and the HOLD_BOUND
+@@ -200,7 +205,12 @@
+ mkdir -p "$LOGS/npm-logs"
+ echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"
+ echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"
+-exec 9>"$LOCK"; flock -n 9 || die lock-busy 75; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"
++if [ -n "${S5_LEASE_INHERITED:-}" ]; then   # v10x: lease owned by the outer launcher; verify, never re-acquire, never release here
++  [ "$(readlink /proc/$$/fd/9 2>/dev/null)" = "$LOCK" ] || die lease-fd-not-inherited 75 "S5_LEASE_INHERITED set but fd 9 is not open on $LOCK"
++  grep -q "^token=$S5_LEASE_INHERITED " "$EX/LEASE_HOLDER" 2>/dev/null || die lease-holder-record-mismatch 75 "$EX/LEASE_HOLDER does not name token=$S5_LEASE_INHERITED"
++  HP=$(sed -n "s/^token=[^ ]* holder_pid=\([0-9]*\) .*/\1/p" "$EX/LEASE_HOLDER" 2>/dev/null); [ -n "$HP" ] && [ -d "/proc/$HP" ] || die lease-holder-gone 75 "holder pid=[$HP] not present"
++  echo "$(ts) lease INHERITED fd=9 path=$LOCK token=$S5_LEASE_INHERITED holder_pid=$HP (outer launcher retains exclusion after this runner exits)" >> "$EXIT_RECORD"
++else exec 9>"$LOCK"; flock -n 9 || die lock-busy 75; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"; fi
+ cd "$WT" || die cd 1
+ [ "$PWD" = "$WT" ] || die cwd 1
+ 

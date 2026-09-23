@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated2026-09-23 01:26UTC. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
+Updated2026-09-23 01:33UTC. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
 
 ## Current handoff point
 
@@ -13,8 +13,9 @@ Current continuation is op88 next-proof, NOT awaiting EXECUTE/S0. Prior worker �
 - S2V59: frozen4341ce30 16/16; independent A abbf2c34/B1a325a4c close N6, no material delta defect. Eight-set controls eligible after S5 slot, no new revision/reinstall; standalonewdcancel3 accepted.
 - S4V6.1: Stage1 PASS9c84eab2,158/158; raw0/all12controls/363predicates/87s, no retained owner, slot closed. Native source/probes restored; parent completed pinned-base unshallow with candidate/tree/lock clean and unchanged. Only known native-caller correction now assigned, no repeated Stage1 or native execution.
 - S5V10: independent B provider-blocked twice despite passive-review clarification, no verdict/approval; unchanged diagnostic remains held. Existing A preserved, expectedC3 source counterexample not a run. No provider-safeguard bypass.
-- S5V10.1: frozen45accac9 24/24; independent A a05b466f/Bf7965a77 clear exact private diagnostic. Single-run grant prepared, activate after publication; old V10B absence not clearance. Setup-v2 source and pinned worktree restoration parallel, no setup/T0 grant.
-- S4 native caller: f5e621b1 6/6 frozen, independent A/B review active; exact unchanged V61 and passed controls not re-audited/rerun. Readback718b9757 confirms nonshallow clean native source/probes.
+- S5V10.1: private diagnostic PASS8e16701b176/176,25 checks/raw0/23s, clean slot closed. Setup-v2 b96dc732 under independent review; exact source/dirty fingerprint ready via local core.abbrev8, no setup/T0 grant.
+- S4 native caller: V1A6c730911 finds one required receipt-write propagation defect; V2 narrowly fixes it while B stays independent. V61/Stage1 unchanged and not rerun; native inputs ready718b9757.
+- S6: source-only exact product/C6 restoration active; accepted private primitive now permits a bounded consumer-adaptation assignment, never inherited runtime clearance.
 - S1/S2/S3: exactd5cd/predecessor37files restored, PREP2 reproduced from both parents; fresh S2 environment setup now complete. No controls/real DB proof/product change/hook/commit.
 - S6C6: frozen19-file discriminator and narrowB preserved. Shared launch consumer/setup dependency held; no repeat valid C5A/B/D.
 
@@ -26,7 +27,7 @@ Product heads: S156fb0d22, S2d5cd9b8b, S35c7b42b3, S491990ae9, S5143d451e, S6d51
 
 ## Immediate next action
 
-Activate S5_V101_CONTROL_GRANT after publication; then S2V59 eight-set controls on a separate grant after attributable closure. S4 native-caller reviews and S5 setup-v2 source/restoration proceed in parallel. V10B remains blocked, not awaited or bypassed. S2 real composition follows reviewed controls with corrected cap rationale; S6 waits only on shared-launch/setup dependencies. Do not rerun passed S4 Stage1.
+Activate S2_V59_CONTROL_GRANT after publication, then freeze/dual-review its evidence before real composition. S4 narrow caller correction, S5 setup-v2 review and S6 source continuation proceed independently. V10B remains blocked, not awaited or bypassed. No repeat of passed S4 Stage1 or S5 V10.1 diagnostic.
 
 Containment/governed delivery → stagedG2 → C1/server lifecycle/forward2.x → native writers/relationships/reconciliation → real integrated two-platform proof → measured pilot → importer acceptance → retainedV1.
 

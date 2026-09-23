@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# OP88-S5-SETUP-EXCLUSION deterministic PRIVATE fault controls v2 (successor of v1 2de9500f; NOT EXECUTED by the builder; separate grant). Runs the exact launcher v2 bytes with
+# S5X_PRIVATE=1 against a private lock/EX tree and fake-runner.v2.sh. Cases: X1 normal release after verified-empty; X2 same-session TERM-ignoring descendant -> one escalation
+# -> release; X3 inner timeout ends an overrunning runner -> release; X4 unpublishable RELEASE/SELF_HOLD markers with unresolved ownership -> observable SELF-HOLD retaining
+# the lock, persisting across heartbeats with NO handoff path, released only after the exact fixture obstacle is repaired and the census is empty; X5 (S5X-A-01/SEB-B-01
+# material boundary) runner-created setsid sub-session outliving a runner that exits 90 with EXCLUSION_UNPRESERVED -> hold until that inner sid is positively empty;
+# X6 (S5X-A-03/SEB-B-03) normal-path RELEASE publication failure -> SELF-HOLD, not exit; X7 (S5X-A-07) TERM during RUNNING -> raw status latched, escalation, release.
+# v2 harness closes S5X-A-06 (X1 IDENTITY path = launcher OWN_ROOT) and SEB-B-02 (obstacle repair removes ONLY the launcher's own <name>.tmp.<launcher pid> deposited inside
+# the directory obstacle, then rmdir; no recursive delete) and drops every pattern-based pgrep/pkill (typed /proc state of a published pid; a survivor is reported, never killed).
+# Bounds: driver <= ~150 s (S5X_INNER_BOUND=5, NORMAL_BOUND 12, HEARTBEAT 2); request: timeout --foreground -k 10 230. The launcher is detached (own session, unbounded as in canonical
+# use): an unresolved holder is REPORTED (pid/token) to the parent, never killed to satisfy the bound. No network/install/canonical lock. STOP on first failure.
+set -uo pipefail; HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; PKT="$(cd "$HERE/.." && pwd)"
+[ "${S5_CTL_GRANT:-}" = "granted-by-parent" ] || { echo "REFUSE: S5_CTL_GRANT=granted-by-parent not set"; exit 2; }
+PIN_L=b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09; [ "$(sha256sum "$PKT/launch-s5-setup-exclusion.v2.sh" | cut -c1-64)" = "$PIN_L" ] || { echo "REFUSE launcher hash"; exit 2; }
+OUT="${S5X_OUT:-$PKT/control-results}/$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$OUT" || exit 74; LOG="$OUT/ctl.log"; PASS=0; FAIL=0; LPID=""; EXD=""
+log() { echo "$(date -u +%FT%TZ) $*" | tee -a "$LOG"; }
+log "CTL_START driver_sha256=$(sha256sum "$0" | cut -c1-64) launcher_sha256=$PIN_L fake_sha256=$(sha256sum "$HERE/fake-runner.v2.sh" | cut -c1-64) out=$OUT"
+check() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); log "PASS $1 $3"; else FAIL=$((FAIL+1)); log "FAIL $1 $3"; log "STOP_ON_FIRST_FAILURE $1"; exit 1; fi; }
+lock_free() { ( exec 8>"$1"; flock -n 8 ) 2>/dev/null; }   # PRIVATE lock only: probe by acquiring in a subshell that exits immediately
+launch() { # <case> <scenario> -> EXD LPID; launcher runs detached in its own session, unbounded (as in canonical use)
+  EXD="$OUT/$1"; mkdir -p "$EXD"; export S5X_PRIVATE=1 S5X_LOCK="$EXD/private.lock" S5X_EX="$EXD" S5X_RUNNER="$HERE/fake-runner.v2.sh" S5X_SCENARIO=$2 S5X_INNER_BOUND=5 S5X_INNER_KILL=2 S5X_NORMAL_BOUND=12 S5X_HEARTBEAT=2 S5_SETUP_GRANT=granted-by-parent
+  setsid bash "$PKT/launch-s5-setup-exclusion.v2.sh" > "$EXD/launcher.out" 2>&1 < /dev/null & LPID=$!; log "LAUNCH $1 scenario=$2 lpid=$LPID"; }
+wait_launcher() { local i=0; while kill -0 "$LPID" 2>/dev/null && [ $i -lt $(( $1 * 10 )) ]; do sleep 0.1; i=$((i+1)); done; ! kill -0 "$LPID" 2>/dev/null; }
+wait_state() { # <state> <s>: acknowledged point = LEASE_HOLDER shows state=<state>; rc1 if the launcher exits first or the bound passes
+  local i=0; until grep -q "state=$1 " "$EXD/LEASE_HOLDER" 2>/dev/null; do kill -0 "$LPID" 2>/dev/null || return 1; [ $i -ge $(( $2 * 10 )) ] && return 1; sleep 0.1; i=$((i+1)); done; }
+wait_text() { # <file> <regex> <s>
+  local i=0; until grep -Eq "$2" "$1" 2>/dev/null; do [ $i -ge $(( $3 * 10 )) ] && return 1; sleep 0.1; i=$((i+1)); done; }
+rel() { grep -q "how=$2 " "$EXD/LEASE_RELEASE" 2>/dev/null; }
+REL() { grep -Eq "$1" "$EXD/LEASE_RELEASE" 2>/dev/null; }
+pid_gone() { # <pid>: typed, rc0 only when /proc/<pid> is absent or the process is a zombie; never pattern-matches, never signals
+  [ -n "$1" ] || return 1; [ -d "/proc/$1" ] || return 0; [ "$(awk '{print $3}' "/proc/$1/stat" 2>/dev/null)" = Z ]; }
+repair_marker_dir() { # <dir> <name>: the launcher's own_record deposits exactly <name>.tmp.<launcher pid> inside a directory obstacle (mv into dir); remove that ONE known file, then rmdir. Never recursive.
+  local d=$1 n=$2 t="$1/$2.tmp.$LPID" k=0; [ -d "$d" ] || { log "REPAIR_SKIP not-a-directory $d"; return 0; }
+  while :; do [ -e "$t" ] && { rm -f "$t" || { log "REPAIR_FAILED rm $t"; return 1; }; }
+    rmdir "$d" 2>/dev/null && { log "REPAIRED $d (removed only $n.tmp.$LPID)"; return 0; }
+    k=$((k+1)); [ $k -ge 5 ] && { log "REPAIR_FAILED rmdir $d contents=[$(ls -A "$d" 2>/dev/null | tr '\n' ',')] (unexpected contents: not deleted)"; return 1; }; sleep 0.3; done; }
+finish() { [ -n "$LPID" ] && kill -0 "$LPID" 2>/dev/null && log "UNRESOLVED launcher pid=$LPID ex=$EXD still holding (not killed: parent boundary; token in $EXD/LEASE_HOLDER)"; log "SUMMARY pass=$PASS fail=$FAIL"; }
+trap finish EXIT
+# ---- X1 normal
+launch X1 normal; wait_launcher 30; wait "$LPID"; RC=$?
+check X1.normal_release "$( [ "$RC" = 0 ] && rel X1 normal && REL 'raw=observed 0 ' && REL 'cleanup=verified-empty' && REL 'inner=\[none\]' && lock_free "$EXD/private.lock" && grep -q 'state=RELEASED' "$EXD/LEASE_HOLDER" && [ -s "$EXD/logs/setup-exclusion/attempts"/*/IDENTITY ]; echo $? )" "holder published before launch, IDENTITY (launcher OWN_ROOT) before ADOPT, raw 0 observed, outer session verified empty, no inner session, RELEASE published, lock free, exit 0"
+# ---- X2 same-session TERM-ignoring descendant -> one escalation -> release
+launch X2 descendant; wait_launcher 60; wait "$LPID"; RC=$?; DP=$(cat "$EXD/DESC_READY" 2>/dev/null)
+check X2.descendant_escalated "$( [ "$RC" = 90 ] && rel X2 session-live-after-runner-then-empty && REL 'raw=observed 0 ' && REL 'cleanup=escalated\(rc=0\)' && grep -q 'GROUP_REAPED\|KILL' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && lock_free "$EXD/private.lock" && pid_gone "$DP"; echo $? )" "descendant pid=$DP escalated once inside the owned outer session, raw 0 kept separate, verified empty, released rc 90, descendant gone (typed /proc state)"
+# ---- X3 inner timeout ends an overrunning runner
+launch X3 overrun; wait_launcher 40; wait "$LPID"; RC=$?
+check X3.inner_timeout "$( rel X3 normal && REL 'raw=observed (124|137|143) ' && REL "final_rc=$RC\$" && [[ "$RC" =~ ^(124|137|143)$ ]] && lock_free "$EXD/private.lock"; echo $? )" "overrunning runner ended by the inner timeout; recorded raw status equals the actual launcher exit (rc=$RC); released after verified empty"
+# ---- X4 unpublishable markers with unresolved ownership -> SELF-HOLD retained (no handoff) -> exact obstacle repair -> release only when empty AND publishable
+launch X4 descendant; wait_state RUNNING 15 || log "X4 note: state=RUNNING not observed before fixture"
+mkdir -p "$EXD/LEASE_RELEASE" "$EXD/SELF_HOLD" "$EXD/logs/setup-exclusion/SELF_HOLD"   # installed at the acknowledged RUNNING point: RELEASE/SELF_HOLD records cannot be published (paths are directories)
+wait_text "$EXD/launcher.out" 'SELF_HOLD PUBLICATION FAILED' 60 || log "X4 note: SELF_HOLD PUBLICATION FAILED not seen within 60 s"
+check X4.self_hold_observable "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'SELF_HOLD PUBLICATION FAILED' "$EXD/launcher.out" && grep -q 'state=SELF-HOLD' "$EXD/LEASE_HOLDER" && grep -q 'RELEASE_RECORD_FAILED' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD"; echo $? )" "with RELEASE/SELF_HOLD markers unpublishable the launcher retains the lock alive (state=SELF-HOLD, busy lock, stderr, RELEASE_RECORD_FAILED reason), no forced exit"
+sleep 5
+check X4.hold_persists_no_handoff "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'HEARTBEAT state=SELF-HOLD' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && ! grep -Eq 'RECOVERY_HANDOFF|how=handoff' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && ! grep -v '^#' "$PKT/launch-s5-setup-exclusion.v2.sh" | grep -q 'RECOVERY_ACCEPT'; echo $? )" "hold persists across heartbeats; no handoff path exists or is logged"
+repair_marker_dir "$EXD/SELF_HOLD" SELF_HOLD && repair_marker_dir "$EXD/logs/setup-exclusion/SELF_HOLD" SELF_HOLD && repair_marker_dir "$EXD/LEASE_RELEASE" LEASE_RELEASE; RR=$?
+wait_launcher 15; wait "$LPID"; RC=$?
+check X4.release_after_exact_repair "$( [ "$RR" = 0 ] && [ "$RC" = 90 ] && rel X4 self-hold-then-empty && REL 'release-record-failed' && REL 'SELF_HOLD-failed' && REL 'recovery=none' && grep -q '^retry token=' "$EXD/SELF_HOLD" && lock_free "$EXD/private.lock"; echo $? )" "after removing ONLY the launcher's own tmp deposits + empty directories, the holder republishes SELF_HOLD, releases self-hold-then-empty with accumulated publication truth (release-record-failed+SELF_HOLD-failed), recovery=none, rc 90, lock free"
+# ---- X5 runner-created setsid sub-session outlives runner exit 90 (canonical shape) -> hold until inner sid positively empty
+launch X5 subsession-90; wait_state SELF-HOLD 20; SH=$?; wait_text "$EXD/SELF_HOLD" 'reason=' 5; SP=$(cat "$EXD/SUB_READY" 2>/dev/null)
+check X5.inner_session_holds "$( [ "$SH" = 0 ] && kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && [ -n "$SP" ] && [ -d "/proc/$SP" ] && grep -q "inner=\[$SP\]" "$EXD/SELF_HOLD" && grep -q "$SP:live" "$EXD/SELF_HOLD" && grep -q 'reason=\[session-live-after-runner: census=live' "$EXD/SELF_HOLD" && grep -q 'released=1 final=90 unpreserved=1' "$EXD/SELF_HOLD"; echo $? )" "runner exited 90 with EXCLUSION_UNPRESERVED; its own IDENTITY bound the inner sid=$SP; holder in SELF-HOLD with busy lock while that session lives (census live, runner truth recorded)"
+wait_launcher 40; wait "$LPID"; RC=$?
+check X5.release_only_after_inner_empty "$( [ "$RC" = 90 ] && rel X5 self-hold-then-empty && REL 'raw=observed 90 ' && REL "inner=\[$SP\]" && REL "$SP:empty" && REL 'released=1 final=90 unpreserved=1' && ! REL 'cleanup=verified-empty' && grep -q 'HEARTBEAT state=SELF-HOLD census=live' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && pid_gone "$SP" && lock_free "$EXD/private.lock"; echo $? )" "release happened only after the inner sid was positively observed empty (raw 90 separate; no verified-empty claim); lock free; sub-session gone"
+# ---- X6 normal-path RELEASE publication failure -> SELF-HOLD (not exit) -> exact repair -> release
+launch X6 normal-slow; wait_state RUNNING 15 || log "X6 note: state=RUNNING not observed"; mkdir -p "$EXD/LEASE_RELEASE"
+wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" 'RELEASE_RECORD_FAILED' 30 || log "X6 note: RELEASE_RECORD_FAILED not seen within 30 s"
+check X6.normal_release_failure_holds "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'state=SELF-HOLD' "$EXD/LEASE_HOLDER" && grep -q 'reason=\[release publication failed (normal' "$EXD/SELF_HOLD"; echo $? )" "normal completion with unpublishable RELEASE: holder stays alive in recorded SELF-HOLD with busy lock (v1 exited here)"
+repair_marker_dir "$EXD/LEASE_RELEASE" LEASE_RELEASE; RR=$?; wait_launcher 15; wait "$LPID"; RC=$?
+check X6.release_after_exact_repair "$( [ "$RR" = 0 ] && [ "$RC" = 90 ] && rel X6 self-hold-then-empty && REL 'raw=observed 0 ' && REL 'publication=release-record-failed' && lock_free "$EXD/private.lock"; echo $? )" "after removing only the launcher's own tmp deposit + empty directory: released self-hold-then-empty, raw 0 and the publication failure both retained, rc 90, lock free"
+# ---- X7 TERM during RUNNING -> raw latched in the owning shell, one escalation, release
+launch X7 overrun; wait_state RUNNING 15 || log "X7 note: state=RUNNING not observed"; kill -TERM "$LPID"; wait_launcher 45; wait "$LPID"; RC=$?
+check X7.signal_raw_latched "$( [ "$RC" = 90 ] && rel X7 signal-then-empty && REL 'raw=observed (124|137|143) ' && REL 'cleanup=escalated\(rc=0\)' && grep -q 'LAUNCHER_SIGNAL state=RUNNING' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && grep -q 'RUNNER_RAW_LATCHED' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" && lock_free "$EXD/private.lock"; echo $? )" "TERM at RUNNING: lease retained, owned outer session escalated once, raw runner status latched (not none), released signal-then-empty rc 90, lock free"
+LPID=""; log "ALL_CASES_DONE pass=$PASS fail=$FAIL (static expectation 11 checks; not evidence until executed under grant)"
