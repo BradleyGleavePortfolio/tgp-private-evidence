@@ -217,6 +217,12 @@ S6 setup result695558f8/20 verified: npm/runner0,20/20, unchanged source/ancesto
 
 S3 composed proof ACTIVATE once at `S3_COMPOSED_PROOF_ACTIVATION.md` after S6 explicit runtime release. Sole executor `restore_s2_substrate_mue9eidh`, exact runnere876f48c/fixture9763698b, dual A16f71ac2/B8dce0cd6 accepted. `S3_COMPOSED_PROOF_RUNTIME_GRANT.md` fixes command/env/fresh roots/scratch/bounds/stops. S3 final-head reviewers await actual result; S5 and S6 runtime not active in parallel.
 
+## Current preflight collision and C6 activation
+
+S3 composed preflight STOP e04842cc/5 before the exact block: five fixed release/tmpfiles present, untouched; no runner/fixture/DB and one shot UNUSED. Runtime returned. `S3_SCRATCH_PRESERVATION_GRANT.md` gives original S3 validation owner file-only reversible relocation of those exact ordinary closed files to a fresh preservation root, not deletion or speculative attribution. No source/runtime/audit change.
+
+`S6_C6_ACTIVATION.md` assigns sole runtime to `restore_s6_substrate_mue9osen` for exact frozen C6 once, qualified setup substrate and actual launcher wait capture, no other changes. After both C6 closure and scratch receipt, parent may reactivate unchanged S3 proof with fresh result root `s3-composed-proof-result-02`; old stop packet immutable.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

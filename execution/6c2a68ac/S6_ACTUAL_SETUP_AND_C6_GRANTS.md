@@ -1,6 +1,6 @@
 # S6 actual setup and C6-only: separate conditional grants
 
-Parent EXEC-6c2a68ac, 2026-09-23. S6-SETUP CONSUMED: npm/runner0 and20/20, but launcher recorded exceptional final_rc90 after owned escalation, not the required normal0 and not directly waited. Runtime returned after empty-session/fd closure at17:25:13Z. `S6_SETUP_DISPOSITION.md` accepts the installed substrate and closure for the next bounded diagnostic, not all-criteria setup success; no repeat. C6 remains NOT ACTIVE pending a free runtime slot and separate activation. Dual source closure Ad9a9d4c5/Bb64eb282 remains applicable. No new private-control layer.
+Parent EXEC-6c2a68ac, 2026-09-23. S6-SETUP CONSUMED: npm/runner0 and20/20, but launcher recorded exceptional final_rc90 after owned escalation, not the required normal0 and not directly waited. `S6_SETUP_DISPOSITION.md` accepts installed substrate/closure only. C6 is now ACTIVE under `S6_C6_ACTIVATION.md` after S3 returned the runtime unused on preflight collision. Dual source closure Ad9a9d4c5/Bb64eb282 remains applicable. No setup repeat or new private-control layer.
 
 ## Scope, identity and ownership
 
