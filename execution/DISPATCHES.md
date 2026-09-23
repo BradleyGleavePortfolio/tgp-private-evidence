@@ -4,7 +4,10 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 
 | Slice | Worker | Requested route | Sole owned writes | Current state |
 |---|---|---|---|---|
-| S5 exact recovery and hooked continuation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `worktrees/s5-r4/**`, `execution/e7d2385c/s5-continuation/**` | ACTIVE; only heavy runtime owner, minimum fresh setup and true hooks; no realPG yet |
+| S5 exact recovery and hooked continuation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Frozen `execution/e7d2385c/s5-continuation/**`, product head98d39610 | COMPLETE4007b242; true hooks/identity/bundle, runtime released19:54:57Z; no realPG |
+| S5 exact runner and PG17.6 prerequisite recovery | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `execution/e7d2385c/s5-proof-preparation/**`, required `execution/s5-r4/**`, `/home/user/pg17/**` | ACTIVE minimum tooling recovery; only heavy slot; no DB init/start/proof |
+| S5 independent exact-head/runner A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s5-a/**` | ACTIVE independent source/hooked-head grantability; no runtime/peer conclusions |
+| S5 independent exact-head/runner B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | `execution/e7d2385c/audits/s5-b/**` | ACTIVE independent source/hooked-head grantability; no runtime/peer conclusions |
 | S6 frozen recovery/preparation then P2 correction | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Recovery outputs sealed; new `worktrees/s6-p2/**`, `execution/e7d2385c/s6-p2/**` | P1 restored exactly; minimum A01/A02/B03 source correction ACTIVE; P1 immutable, no runtime |
 | S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | SOURCE COMPLETE0266ff53, NOT GRANTABLE two A/one B; preserved, awaits scoped changed-byte follow-up |
 | S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | ACTIVE static complete-source review; no peer conclusions/product edits/runtime |

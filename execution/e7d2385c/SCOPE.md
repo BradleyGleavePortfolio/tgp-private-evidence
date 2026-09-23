@@ -27,6 +27,9 @@ One heavy runtime slot exists in this sandbox. Initially it is reserved to the S
 | S6 review A | T4 | Identity/privacy independent assurance; parent-model inheritance; bounded T1 NO | Independent complete source verdict, concrete A/B or source closure, final actual-result attestation later in the same review |
 | S6 review B | T4 | Lifecycle/integration independent assurance; Claude Fable 5 / High; bounded T1 NO | Independent complete source verdict, concrete A/B or source closure, final actual-result attestation later in the same review |
 | S7 canonical continuation map | T4 | Source-only lifecycle/identity/generated-contract decomposition; Claude Fable 5 / High; bounded T1 NO | Reuse PR526/528/529, locate actual contract collision and next 1–3 bounded product slices; no implementation, audit or runtime |
+| S5 exact-head/runner review A | T4 | Independent nonbuilder, parent inheritance; bounded T1 NO | Exact hooked98d39610, original correction and narrow alias/format delta, one fresh51 grantability; later same-review actual result |
+| S5 exact-head/runner review B | T4 | Independent nonbuilder, Claude Fable 5 / High; bounded T1 NO | Independent complete candidate/database-proof judgment; no current peer conclusions; later same-review actual result |
+| S5 proof prerequisite recovery | T4 | Existing runner/PG17.6 recovery; Claude Fable 5 / High; bounded T1 NO | Restore exact prior runner/fixture/launcher; minimum absent PG tooling only; no DB proof until dual source closure |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
