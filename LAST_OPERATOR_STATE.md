@@ -10,7 +10,7 @@ TrueCoach and another real platform are conformance targets, not the product bou
 
 EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
 
-Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. Current runtime is S5 canonical setup. S3 composed proof is complete and its two existing final reviews are finishing. S6 C6 is consumed and has unlocked P1 product source correction. No repeat restoration, baseline diagnostic, V2 rerun, setup audit or recursive validator.
+Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. Current runtime is S5 canonical setup. S3 exact local integration is ACCEPTED with both final reviews closed. S6 C6 is consumed and has unlocked P1 product source correction. No repeat restoration, baseline diagnostic, V2 rerun, setup audit or recursive validator.
 
 ## Verified GitHub baseline
 
@@ -39,7 +39,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 |---|---|---|---|
 | S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Actual discriminator48/48 at composed d5cd, guard72/72; dual final applicability accepted, membership path remains unobserved. |
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
-| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | Targeted31 suites/825 tests PASS. Composed result2d4615e7/118: runner0, guard72/composition68/discriminator48, ten normalized release cases match S2. Runtime returned; two existing final-head reviews finishing. |
+| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration; targeted31/825 and composed0/72/68/48. Final A6bb8ab6c/B49e9a3e4 closed, no A/B. No remote landing or customer claim. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus frozen patchc36258b3 | Dual source CLOSED; actual private raw0/11PASS accepted, resulta21622ee/66. Canonical setup ACTIVE sole runtime; T0 remains separate/inactive. V2 stays failed. |
 | S6 P1 | T4 / T4 | baseline `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 complete64a99289/31: six hazard assertions pass, two residual600000ms timers, C/runner143, launcher waited90, runtime closed. P1 identity-cache/lifecycle product source build ACTIVE; no runtime. |
@@ -48,11 +48,11 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S5 executor `repair_s5_binding_mue9vjso` owns sole runtime under `S5_CANONICAL_SETUP_ACTIVATION.md`. Its source owner independently prepares only the post-setup/T0 true-hooked continuation packet; no worktree/runtime writes. S3 composed result2d4615e7/118 is frozen and supplied to existing final-head A/B, who finish those same reviews; source and targeted portions are not repeated. S3 closure re-confirmed17:47:20Z, no runtime retained for packaging. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant. Scratch preservation and C6 result are archived unchanged.
+S5 executor `repair_s5_binding_mue9vjso` owns sole runtime under `S5_CANONICAL_SETUP_ACTIVATION.md`. Its source owner independently prepares only the post-setup/T0 true-hooked continuation packet; no worktree/runtime writes. S3 final A/B are COMPLETE and exact local integration is accepted at `S3_FINAL_INTEGRATION_ACCEPTANCE.md`; no repeated work. Frozen closure is17:44:37–38Z; later17:47:20Z reconfirmation is executor mail, not an extra receipted read in the packet. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant. Scratch preservation and C6 result are archived unchanged.
 
 ## DAG
 
-S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [allraw0,31 suites/825 tests PASS] → composed-lock release proof [COMPLETE raw0/72/68/48] → dual final-head attestations [same reviews finishing].
+S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [allraw0,31 suites/825 tests PASS] → composed-lock release proof [COMPLETE raw0/72/68/48] → dual final-head attestations [CLOSED] → exact local integration ACCEPTED.
 
 In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 exclusion successor/dual review [all CLOSED/ACCEPTED] → actual S6 setup [qualified substrate only] → C6-only [outcome i, CONSUMED] → P1 product correction [source ACTIVE] → exact review/validation/hooked head. S5 canonical setup/T0 remain queued without blocking S3 or S6 source work.
 
@@ -64,9 +64,9 @@ Proven at exact scope: current mains/PR identities and grades; six candidate ide
 
 New accepted evidence: S1/S2 actual real run at d5cd, guard72/72, composition68/68, discriminator48/48, raw0 and scoped cleanup/publication, with both final applicability attestations. Empty runner self-hash is compensated by immediate manifest/preflight identity; direct/PUBLIC TRUNCATE observed, inherited-membership unobserved. S5 private V32 actual11/11PASS/raw0 includes stale-token rejection and current-platform pgid/status propagation; no canonical setup/product claim.
 
-Unproven: broader S1 membership applicability beyond the actual fixture; S3 final all-evidence acceptance; S5 canonical setup/T0; corrected S6 privacy/lifecycle behavior; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
+Unproven: broader S1 membership applicability beyond the actual fixture; S5 canonical setup/T0; corrected S6 privacy/lifecycle behavior; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
 
-Material blockers: S3 final-head attestations completing; S6 P1 privacy hazards reproduced and product correction now required, with query-lifecycle hang qualification; S5 canonical execution outstanding; C1/G2 generated-contract collision; incomplete native-family destinations and relationship accounting; no universal-importer proof beyond current TrueCoach/Chrome-heavy evidence; unsafe landing boundary due unprotected mains and backend auto-deploy.
+Material blockers: S6 P1 privacy hazards reproduced and product correction now required, with query-lifecycle hang qualification; S5 canonical execution outstanding; C1/G2 generated-contract collision; incomplete native-family destinations and relationship accounting; no universal-importer proof beyond current TrueCoach/Chrome-heavy evidence; unsafe landing boundary due unprotected mains and backend auto-deploy. S3 is no longer a local integration blocker.
 
 ## Failed evidence preserved
 
@@ -76,7 +76,7 @@ Original failures and all qualifications remain immutable under the intake commi
 
 1. T4 finish active S5 canonical setup, then exact T0 after substrate disposition.
 2. Preserve S3 composed real result and ten-case release comparison without another run.
-3. T4 finish the two existing S3 final-head reviews using the frozen composed result; do not repeat source/targeted audits.
+3. Preserve accepted S3 as the exact local backend foundation for later explicitly scoped integration; no new S3 audit or proof.
 4. T4 build and freeze bounded S6 P1 product correction, then two independent exact-source reviews and actual validation/true-hooked head.
 
 Bradley decision required: NO. C6 is not rerun or relabelled; actual launcher90 and unknown transient member are retained independently of its causal evidence. Targeted Jest had14 Nest WARN and2 ERROR messages in passing negative-path cases, so it is not described as warning-free. See the active reactivation02 and P1 source-build grant for current execution scope.

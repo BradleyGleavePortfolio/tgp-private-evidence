@@ -241,6 +241,8 @@ S3 composed result2d4615e7/118 is frozen: runner/final/cleanup0, guard72/composi
 
 ## Baseline pins
 
+S3 final transition: both final reviews COMPLETE, A6bb8ab6c and B49e9a3e4, scoped acceptance/no A/B. `S3_FINAL_INTEGRATION_ACCEPTANCE.md` accepts exact local be0ba827/treea584/parentsd5cd+5c7b and preserves all source, true-hook, targeted31/825 and composed72/68/48 evidence. No further S3 review/run, no public or deployment authority. S5 and S6 continue independently.
+
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.
 
 Bradley decision required: NO for this bounded local scope. Downstream external/production/customer boundaries remain reserved.
