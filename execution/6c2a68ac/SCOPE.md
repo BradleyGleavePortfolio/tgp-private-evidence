@@ -12,6 +12,8 @@ Live G01–G22 at context 1ebbed76188e33c970fc17c1e7b252f535d040d0 governs. T4 b
 
 All prior worker IDs, installations, PIDs, slots and grants are historical, not active authority here. Prior approvals remain applicable only to their exact inputs. No original V10 provider-blocked review is re-routed or represented as complete. Source/review may run concurrently; one explicit runtime slot only. No product push/merge, deployment, flags, hosted settings, customer data access, new spending, or source-account action is granted.
 
+Current owner amendment at 2026-09-23 08:56 PDT: `OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`. A blocks only its affected consequential product path; B blocks only its invalidated proof; C is recorded/qualified and never creates another cycle. No moving acceptance, duplicate evidence purchase or recursive validator. Current constraint is S2 result disposition → fresh required setup → real S1/S2 proof → S3 integration. S5's independent correction/proof path cannot freeze S2.
+
 Private archive is read-only to workers. Parent alone writes the private checkout and publishes. Workers write only their assigned fresh local output paths. Never overwrite frozen evidence or modify candidate bytes without explicit material-finding scope. Manual code edits use apply_patch. No optional framework redesign, broad archaeology or search for unavailable Agent83 artifacts.
 
 ## Current independently graded children
@@ -108,7 +110,9 @@ Read/hash/diff only. No rerun, test, probe, process action, lock open, signal, s
 
 The smallest needed real-runner START publication change is explicitly allowed inside this fresh packet; preserving its prior whole-file hash is not an acceptance criterion when the finding requires that change. Primitive bytes and unrelated behavior remain frozen. `bash -n` on owned candidate shell files is allowed as nonexecuting syntax validation, not tests. No candidate/control runtime, lock, process census, signals, install, product worktree edit or private publication. Do not wait for cosmetic changes.
 
-V31-B is now frozen: add the smallest bounded P1 HEARTBEAT acknowledgement for material V31-B-01, not a rerun allowance. Historical V2 result B's O-B-01 permits narrow per-operand diagnostic logging for failed conjunctions; keep all predicate semantics and P2's existing token-bound wait. One combined final successor goes to dual independent exact review. See `S5_V31_AND_V2_RESULT_DISPOSITION.md` for qualifications, including actual uutils timeout rather than an unverified GNU prerequisite.
+V31-B is now frozen: add the smallest bounded P1 HEARTBEAT acknowledgement for material V31-B-01, not a rerun allowance. Historical V2 result B's O-B-01 permits narrow per-operand diagnostic logging for failed conjunctions; keep all predicate semantics and P2's existing token-bound wait. Under the current owner amendment, extra diagnostic logging is nonblocking unless needed to interpret the next decision; it must not delay freeze or create a separate cycle. One combined final successor goes to dual independent exact review. See `S5_V31_AND_V2_RESULT_DISPOSITION.md` for qualifications, including actual uutils timeout rather than an unverified GNU prerequisite.
+
+Convergence statement for the existing S5 chain: **A/B DEFECT:** B, wrong-attempt record attribution and unacknowledged P1 heartbeat can invalidate the private proof. **WHY IT BLOCKS:** current records cannot reliably support the intended per-attempt proof decision; this does not block independent product lanes. **MINIMUM FIX:** earliest exact attempt binding plus one bounded acknowledgement wait, unchanged primitive/invariant predicates. **EXECUTION UNLOCKED:** one private proof immediately after dual changed-byte closure; then setup/T0 and S6 composition. No new framework, hypothetical fault family, V2 rerun or C-only fixer.
 
 ### S5-SOURCE-RESTORE
 

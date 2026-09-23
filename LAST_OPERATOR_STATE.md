@@ -10,6 +10,8 @@ TrueCoach and another real platform are conformance targets, not the product bou
 
 EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
 
+Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. Current bottleneck: S2 result disposition → fresh setup → real S1/S2 proof → S3 integration. No repeat restoration, V2 rerun, setup audit or recursive validator. S5 repair/proof is a separate critical path; C-only observations cannot delay either lane.
+
 ## Verified GitHub baseline
 
 Observed 2026-09-23 15:27 UTC.

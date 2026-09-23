@@ -2,6 +2,8 @@
 
 Updated 2026-09-23 for EXEC-6c2a68ac. Current contract: `execution/6c2a68ac/SCOPE.md`. All listed children are individually T4; cumulative S2/S5/S6 integrations are T4. Canonical T4 builder is Claude Fable 5 / High. Parent alone publishes private state and performs evidence disposition.
 
+Owner Safety ROI amendment at 08:56 PDT applies: A/B/C classification, C never blocks or creates cycles, no recursive validation or duplicate evidence. Bottleneck: existing dual S2 result disposition → fresh setup → real proof. Parallel S5 fixes must converge to one private execution; no unrelated task is blocked by S5.
+
 | Slice | Worker ID | Requested model | Sole writes | State |
 |---|---|---|---|---|
 | S2 exact substrate restore | `restore_s2_substrate_mue9eidh` | Claude Fable 5 / High | restoration paths in SCOPE | COMPLETE; exact receipt accepted, ownership released |
