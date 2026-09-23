@@ -1,18 +1,18 @@
 # LAST OPERATOR STATE
 
-Updated 2026-09-23 at approximately 02:16 UTC after dual S4 native result acceptance, S2 V61 source/budget closure and the S5 V2 diagnostic stop. Executive parent session `e8d546f9-bc43-4fd2-8bae-b6038a849bc1` (EXEC-e8d546f9). Recon CLOSED; execution continuing. This private root is the current operational index, not public-context telemetry.
+Updated 2026-09-23 after fresh executive takeover and targeted GitHub verification. Parent session `6c2a68ac-77b8-4d08-86d5-680d240e58f3` (EXEC-6c2a68ac). Recon CLOSED at 15:27 UTC; execution active.
 
 ## Mission and authority
 
-Finish native, reconciled, usable importer acceptance, then retained TGP V1. EXECUTE active. Parent orchestrates, grades, assigns, disposes findings and publishes private evidence; builders implement; independent auditors attest. No product landing, deployment, flags, hosted settings, production/customer action or new spending is granted by this local wave.
+Build TGP's AI-assisted, autonomous, site-agnostic, browser-agnostic, self-learning migration engine. An authorized source, including a previously unseen platform, must flow observe → understand → induce/revalidate a reusable data-only `PlatformBlueprint` → acquire accessible data → normalize → reconstruct native TGP entities and relationships → reconcile → truthful terminal result. Permanent test: `NEW SOURCE → CORE DIFF = 0`.
 
-Read completely this session: all five supplied DOCX attachments (grading/routing, EXECUTE, proposed Agent Rules, rule inventory, governance refactor), tables/appendices/headers/footers included; both current private root handoffs; full live G01–G22; full Op81 continuation/Roman plan; current dispatch/grade registers and applicable op88 scope/rulings. Stale “execution takeover brief” was NOT read or used. Current owner instruction selects T4 Claude Fable 5 / High, not attached Fable5.1. Requested settings are not runtime telemetry. Effective live G01–G22 supersedes proposed attachment status and old generic process.
+TrueCoach and another real platform are conformance targets, not the product boundary. Completion also requires unseen-site autonomous induction, no executable per-brand core diff, at least three distinct sites, at least two browser/driver hosts using the same kernel, completeness accounting, deterministic replay, native relationships and honest adverse terminals.
 
-Owner rule: new repair/audit cycles only for a concrete material defect, attributable failed execution, changed exact candidate or true uncovered consequential boundary. Execute the smallest safe proof immediately on material closure; no generalized framework refinement or rerun of valid evidence.
+EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
 
-## Verified baseline
+## Verified GitHub baseline
 
-Live GitHub observation 2026-09-23 00:43–00:48UTC. Remote private intake `96ee6117f5432bca6d7f9bccfdeac2e7005a5c3f`; this publication succeeds it, not a claim that intake SHA remains latest forever.
+Observed 2026-09-23 15:27 UTC.
 
 | Repository | Exact main |
 |---|---|
@@ -20,82 +20,60 @@ Live GitHub observation 2026-09-23 00:43–00:48UTC. Remote private intake `96ee
 | Mobile | `a5933fd6de5616493de75f0db907098b149b955c` |
 | Extension | `0111be661922234d670bbf23e23d270eec1b4a4e` |
 | Context | `1ebbed76188e33c970fc17c1e7b252f535d040d0` |
+| Private intake | `41aa9ddd03525f987231472a7b18edaa4dcc93da` |
 
-All64 open PR head/base/name records re-queried; zero mismatches with `execution/pr-grades/PUBLIC_PR_GRADES.json`. Grades are per-PR, not only lane-level. Exact relevant PR matrix is in `execution/e8d546f9/TAKEOVER.md`; generated live readback in `execution/e8d546f9/live-prs.json`.
+All 64 open PR head/base/name records match `execution/pr-grades/PUBLIC_PR_GRADES.json`; every open PR has an explicit individual T0–T4 grade. Relevant preserved stacks are unchanged:
 
-- Backend #524→#525 retained; #526 C1 and #528→#529 G2 depend on #525; #527 policy donor preserved; #522 overlapping identity patch blocked. Each T4; cumulative integration T4.
-- Mobile #289–#292 each T4, cumulative T4. #290 reported base4be69b90 is not final#28922354984; preserve final hardening, no blind stacking. Roman #293 T1 and #294 T2 remain inactive presentation-only work.
-- Extension #21→#23→#24→#25 each T4, cumulative T4. #26 T4 policy content incorporated, do not reapply or mistake content-equivalence for ancestry. #20 T4 provisional inactive; #19 T4 acceptance amendment retained.
-- Context #31/#33/#34 T4 provisional preserved historical/planning work, not current telemetry or new dispatches. Other retained PR grades unchanged; no unrelated activation.
+- Backend #524→#525; #526 C1 and #528→#529 G2 depend on #525; #527 policy donor; #522 overlapping identity patch blocked. Each T4; cumulative T4.
+- Mobile #289–#292 each T4, cumulative T4. #290 reported base is not final #289 head. Roman #293 T1 and #294 T2 remain inactive presentation work.
+- Extension #21→#23→#24→#25 each T4, cumulative T4. #26 content incorporated, not ancestry. #20 provisional T4 inactive; #19 T4 acceptance amendment retained.
+- Context #31/#33/#34 provisional T4 historical/planning artifacts, not current telemetry.
 
-## Current lanes and exact candidates
+Backend, mobile, context and private main are unprotected; extension main is protected. Backend main push still triggers Fly deployment. A product landing is therefore not implied by local proof.
 
-| Lane | Grade | Exact product head | Current next transition |
+## Active slices and exact candidates
+
+| Lane | Individual / cumulative tier | Exact product candidate | Current transition |
 |---|---|---|---|
-| S1 R4 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Source preserved, independent source reviews frozen; TRUNCATE/membership dynamic proof after S2 controls/setup. |
-| S2 V6.1 controls | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V59 STOPd749a4b1 preserved. V61 ed24134220/20 dual clear A4f90e206/B3e2b7744; caller k=120 accepted in additive A18b7b9de/Bf565c458. Five-set grant67780508 QUEUED pending S5 slot closure. P1/W1/C1 retained; no real proof grant. V60 edit/revert disclosed, no continuous-immutability claim. |
-| S3 PREP2 | T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | worktrees/s3-prep2 materialized: HEADd5cd, staged treea584a1b95423f95dae8daabf673ef3776604acbb, 48 staged paths, no merge commit/state fabricated. Frozen9a7a4039; upstream proof, setup/generator ruling and integration remain pending. |
-| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof ACCEPTED: result02df9f60111/111, A9d8d4493/B1480090d, parent12430d88. Actual0/observer0/SUCCESS, full1742/1742, focused105/105 including19targetcases; package/browser joins. Local hook-creation wording ruling, debug-log gap and no global FREE qualification preserved. No rerun/release/customer clearance. |
-| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 fake11 FAILED raw1/8PASS1FAIL at X6; checks10/11 NOTRUN. Exact private fixture recovery completed02:16:21; holder gone, sessions empty, manifest01252159. Slot closure accepted, failure unchanged. V31 fab2b49e and final controls7d4a150d frozen; dual source/control review active. Canonical setup/T0 held. |
-| S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Scope57bcbf08 plus released-attempt accounting addendum0f5d7280 frozen; builder stopped before implementation. Two-consumer adaptation6b2be238 remains an unsafe intermediate, not runtime-ready. Wait for corrected S5 base dual closure then explicit composition activation; no C5 A/B/D repetition. |
+| S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Preserved; real dynamic discriminator after S2 controls. |
+| S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V61 `ed241342…` dual source-cleared with k=120. Fresh session substrate restoration active; one five-set execution follows. |
+| S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Preserved staged tree `a584a1b95423f95dae8daabf673ef3776604acbb`; runtime integration gated on S1/S2. |
+| S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
+| S5/V10.1 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 remains FAILED and recovered. V31 `fab2b49e…` + controls `7d4a150d…` under two independent current reviews. |
+| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Unsafe intermediate `6b2be238…`; held for S5 closure and explicit narrow correction. |
 
-Actual source objects/tree identities restored from prerequisite-verified bundles. S1 `56fb` is an actual ancestor of S2 `d5cd` (fresh Git check), not merely matching content. S4 current bundle is `af2c8207…b0dd` for91990, not the older R5 bundlef8de3d63. Source restoration and manifest checks are not new product tests/audits.
+## Current ownership
 
-## Ownership and resources
+Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCHES.md` and root mirror. Initial six assignments plus S2V58 and two separate setup reviewers; V10B blocked. No old op88 worker ID, PID, installation or grant is inherited as live. Parent is sole telemetry/private publisher. S1 schema/generator remains reserved, no mutation assigned. Auditors do not read their current peer conclusions, implement source, run duplicate heavy tests or self-clear.
+## DAG
 
-Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; about9GB after fresh setup. S2SETUP, S4_STAGE1 and S5_V101_CONTROL closed cleanly. S2_V59_CONTROL stopped01:37:09, failed evidence preserved. S4_NATIVE_V2 closed01:56:02 and its exact technical proof is independently accepted. S5_SETUP_V2_CONTROL failed at X6; its private holder released naturally after the exact fixture repair at02:16:21, manifest01252159, slot closure accepted with qualified fd visibility. S2 awaits publication and explicit activation. Source/review parallel.
+S2 substrate restore → one V61 k/new1/new2/neg/neg2 execution → dual result review → S1/S2 real PostgreSQL composition and discriminator proof → S3 integration/setup.
 
-Fresh restoration complete: exact clean d5cd and37-file predecessor, V57 frozen runtime-path copy; S3 PREP2 tree reproduced from BOTH parents using preserved patches, not a merge/runtime attestation. Upstream report preserved with additive DISCLOSURE_ADDENDUM naming the version/getconf/process-census observations; original report not rewritten.
+In parallel: S5 V31 dual source/control review → one private control if cleared → shared primitive closure → S6 two-consumer correction → dual final-head review → S6 setup/C6 proof.
 
-S2 setup COMPLETE: setup10raw0 at00:56:29UTC; setup20raw0 at00:57:04UTC; setup30 npm_ci0/prisma_generate0 at01:03:38UTC. Exact CLI/stamp/lock pins verified, outside-root inventory209→209 unchanged, d5cd clean. No server/DB initialized. Frozen result9c114363 27/27 verified; final no survivors/lock FREE01:04:17UTC. S2V57B's mid-install missing-CLI observation remains historical, superseded by this final receipt, not an installation failure.
+Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R → N/Q1 → C → C1/lifecycle/forward-2.x → compatible mobile/extension/native writers → relationships/reconciliation → integrated host/device → real platforms and unseen-site induction → measured pilot → universal importer acceptance → retained TGP V1.
 
-## Proven, unproven and current material findings
+## Proven, unproven and blockers
 
-Verified this session: live mains/64 PR refs; candidate bundle prerequisites/actual trees; S1-in-S2; current packet manifests; dispatch mirrors identical; fresh S2 setup; S4 exact Stage1 PASS and S5 V10.1 private diagnostic PASS with clean slot closure. Preserved valid S5 R1 and earlier source/test evidence retain original applicability only.
+Proven at exact scope: current mains/PR identities and grades; six candidate identities; S1 ancestry in S2; prior S2 setup receipt; S4 Stage1 and exact native/package/browser proof; S5 V10.1 private primitive diagnostic; S5 V2 failed-result preservation and accountable slot recovery. S4 result included launcher0/observer0/SUCCESS, full 1742/1742 and focused 105/105 including 19 target cases, with recorded hook/log/visibility qualifications.
 
-Unproven: current real-PG composition, S1 dynamic discriminator, S3 runtime integration, S5 fresh bootstrap/remaining controls/T0, S6 C6 causal outcome, native lifecycle/writers/relationships/reconciliation, real-platform/pilot acceptance. S4's exact local native/package/browser proof is accepted, not a substitute for these missing outcomes. No overall audited/merged/deployed/enabled/customer-accepted/production-proven claim.
+Unproven: S2 V61 result; S1 discriminator and real composition; S3 runtime integration; S5 V31 controls; safe S6 C6; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
 
-- S4-V6-A01/A02/B01/B02 source-closed and Stage1 PASSED. Caller-v1 A identifies one material new receipt-group defect: earlier required printf failure can be masked by a successful final write. V2 corrects only publication aggregation; no Stage1 rerun/new fault suite. Native allowance tail is qualified additively (3569 post-spawn/3589 incl manifest plus unenclosed operations), not a hard last-owner KILL bound.
-- OWN-V10-A01/A02/A03 closed for V10.1 by independent exact reviews and the granted private diagnostic25PASS/raw0. This supersedes the former C3 source expectation only for V101, not the original V10 no-verdict boundary or canonical setup/T0.
-- SetupV2 dual reviews permit only the exact fake11 proof. Canonical residuals remain binding: A01 unavailable inner evidence cannot become no work; A02 failed final receipt correction cannot leave stale success; B01 shared runner record must bind current token; B02 prior holder/fallback identity records must be preserved. Sole source-only V3 correction assigned, no generic framework or optional harness expansion.
-- Setup-exclusion A/B frozen: outer census omits inner npm session; unknown tracking can be retired on leader collection; normal publication failure does not retain holder; unproved live handoff; stale observer release/raw/publication truth; wrong X1 IDENTITY path; X4 mv-into-directory prevents rmdir recovery; fake descendant assertions do not prove actual nested-session boundary. Parent chooses NO live/unknown transfer capability. Separate setup-v2 source-only grant now active: exact V10.1 primitive embedding with new-consumer applicability review, L1-L6/C1-C8/observer only; optional L7 and optional handoff negative declined. No generic framework, no inherited primitive clearance or setup execution.
-- S2: V57 reviews both frozen; expected standalonewdcancel3 explicitly handled by V58 caller. ENV01 needs only additive predecessor output directory under control grant. Fresh setup/installstamp now receipted. Parent accepts two-lane paths to preserve unchanged runner; no new harness requested.
-- S2-V57-A01..05 concrete material blockers: BASHPID evaluated inside command substitution disables watchdog/finish parent guards; N1 old bare-PID record incompatible with new consumer; predecessor stub-lock outside grant/handoff; historical PID import can adopt a replacement sleep; N4 pre-registration delay loses decoy on cancellation. V58 limited driver/request and narrowly necessary original synthetic identity provenance; no product change. B not shared before freeze.
-- S2-V58-A01 pre-session controller gap now source-closed by both exact V59 reviews. B58's earlier grantability view did not override A's valid finding; source correction, not voting, closes it. V59 carried low qualifications unchanged, no optional revision. Additive B disposition1c265fcd and V59 request correct proof arithmetic (2480>2100, explicit cap not sum) and caller index-cache boundary; no new control gate.
-- V10B provider blocked passive review twice including clarification; no approval/incomplete-review masquerade and no routing around provider safeguard. Unchanged V10 diagnostic remains held. S4/S2/setup-source work continues independently.
-- Integration: C1/G2 collision in `docs/contracts/importer-openapi.json` and `scripts/importer-contract.ts` prevents consumer freeze. Actual replay164 parent migrations+candidate165 required, not ledger-only.
+Material blockers: S2 V61 unrun; S5 V31 dual attestations absent; S6 unsafe intermediate; C1/G2 generated-contract collision; incomplete native-family destinations and relationship accounting; no universal-importer proof beyond current TrueCoach/Chrome-heavy evidence; unsafe landing boundary due unprotected mains and backend auto-deploy.
 
 ## Failed evidence preserved
 
-Full prior failed-evidence index and original op88 checkpoint remain immutable at intake96ee6117 `LAST_OPERATOR_STATE.md`; packets stay under2026-09-20/,2026-09-21/,2026-09-22/. This concise index does not erase their applicability.
+Original failures and all qualifications remain immutable under the intake commit and frozen packets: S2 B1/B2 and V59 K3 placement failure; S4 earlier browser aborts and incomplete negative evidence; S5 B2 compile/install failure, non-fresh B3, and V2 raw1/8PASS1FAIL at X6; S6 C1 corruption, C2–C4 hangs/timeout and C5 causal limits. The V2 initial inventory is point-in-time with disclosed heartbeat/recovery drift, not a false immutable snapshot. Recovery never turns a failure into a pass. Original V10 provider-blocked B review remains no-verdict and is not bypassed.
 
-Key retained failures: S2 B1 63pass/4fail; B2 66pass/2fail, actual-runner/grant mismatch and qualified self-hash; current V59 K3 placement miss and all NOTRUN evidence (d749a4b1); S4 browser abort/no negative and pre-ack reporting distinction; S5 B2 compile/auto-install failure with unrecovered original npm logs, B3 not fresh bootstrap; current V2 fake11 raw1/8PASS1FAIL at X6 (point-in-time inventory3c3fc4e, immutable pre-recovery copies, live heartbeat drift disclosed); S6 C1 corruption/C2-C4 hangs and C4 timeout124 without handle stacks, C5 actual timers not retrospective cause. Original negative controls, missing proofs, audits and additive corrections remain unchanged. Recovery does not convert a failed diagnostic into a pass.
+## Next executable slices
 
-## DAG and release boundaries
+1. T4 exact S2 substrate restoration, active.
+2. T4 one S2 V61 five-set control execution, then two independent result attestations.
+3. T4 S5 V31 exact source/control dual review, active.
+4. T4 one S5 V31 private control execution if both reviews clear it.
+5. T4 narrow S6 two-consumer correction and dual final-head review after S5 closure.
+6. T4 S1/S2 real composition/discriminator proof after S2 result closure.
+7. T4 S3 integration/setup after S1/S2 proof.
 
-Source repair → exact review → bounded controls → environment/setup → real execution → integration → landing → deployment → enablement → customer acceptance. S2 controls/setup unlock S1/S2 real composition then S3. S4 independent; shared S5 launch/setup unlocks S6. Blocked lane does not freeze disjoint source/review.
-
-S1+S2+S3 → governed containment/landing/runtime → G2 E→T/Q0→B/drain→R→N/Q1→C → C1/server lifecycle/forward2.x freeze → compatible mobile/Roman/extension/native writers → relationships/reconciliation → integrated browser/device → authorized nonempty TrueCoach and structurally different platform → measured pilot → importer acceptance → retained V1.
-
-Live branch flags: backend/mobile/context/private main unprotected, extension protected. Public rulesets empty; private rulesets API403 is plan restriction (“Upgrade to GitHub Pro or make repository public”), not absent-permission proof or a reason to expose private data. Backend current main Fly deploy still triggers on main push without strict readiness dependency. No hosted settings changed. Serving role/image/flags/recovery unknown; local proofs do not authorize production.
-
-Acceptance unchanged: ≥one authorized real nonempty native/reconciled complete run on TrueCoach and structurally different source; zero routine actions after accepted Start; every five-minute claim≤300s native reconciliation; no falseComplete/cross-tenant/wrong-account/replay duplicate/revoked-authority mutation or unintended historical live effects. Pilot≥10distinct coaches,≥90% FIRST accepted in-envelope runs≤300s, failures/partials/blocks/cancellations/timeouts retained; usability≥9/10 unfamiliar coaches unprompted.
-
-## Next six slices and exact next action
-
-1. Preserve and independently review the failed V2 diagnostic plus completed recovery01252159. No signal/rerun/check resumption; recorded final90 is not a reaped90.
-2. S5 known slot closure is accepted; after publication activate S2 V61 k/new1/new2/neg/neg2 once using grant67780508 and k=120; retain P1/W1/C1. Freeze raw exits and independently review results before real-proof discussion.
-3. Finish V31 early-adopted-record source review and final private-control7d4a150d review; the P2 acknowledgement correction is additive, not an old V2 edit. Canonical setup/T0 remains separate.
-4. S4 local technical proof accepted under S4_NATIVE_ACCEPTANCE.md; preserve hook-scope ambiguity disposition and retention/visibility qualifications. No repeat of Stage1/native.
-5. Unchanged d5cd/S1 real composition/TRUNCATE after controls and a separate accurate real-proof grant, then S3 integration/setup with schema/generator ownership respected.
-6. S6 implementation remains stopped until corrected S5 base dual closure and explicit activation of the scoped two-consumer composition, including released-attempt-to-IDENTITY binding. Fresh setup/C6 only thereafter.
-
-Bradley decision required: NO for current local execution. Recovery and exact proof continuation are authorized parent work, with material findings binding and no product/release authority inferred. Reserved owner decisions remain downstream.
-
-## Entry points
-
-Current session contract: `execution/e8d546f9/SCOPE.md`; concise takeover: `execution/e8d546f9/TAKEOVER.md`; fresh ownership: `execution/DISPATCHES.md`.
-Inherited bounded contracts: `execution/OP88_WAVE1.md`, `execution/op88/OWNED_LAUNCH_SCOPE.md`, `execution/op88/S4_V6_RECOVERY_RULING.md`, `execution/op88/S5_V10_REVIEW_AND_SETUP_RULING.md`.
-Full product acceptance: context main `handoffs/op81/CONTINUATION_AND_ROMAN_IMPORT_PLAN.md`. Live G01–G22 controls procedural precedence.
+Bradley decision required: NO. Exact next action: finish S2 restoration, verify frozen pins, then activate the already dual-cleared five-set continuation once.
