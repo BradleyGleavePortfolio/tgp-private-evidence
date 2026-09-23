@@ -195,7 +195,7 @@ Latest transition supersedes the historical active03R/04–14 description above.
 
 In parallel `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` assigns source-only T4 builder `restore_s2_substrate_mue9eidh` sole fresh `s3-composed-proof-prep/**`. Minimum accepted-v5.7 runner/fixture binding successor for be0ba827/lockb7fed/deepmerge8, fresh fixture namespace, explicit provenance applicability, no product/WT/runtime writes. Two independent changed-binding reviews precede one separately activated real composed proof. Existing primitive/control proof transfers, no new framework or recursive test layer.
 
-S6 and S5 remain runtime queued. Parent retains sole private publication authority; no Bradley decision required.
+S6 and S5 remain runtime queued. The two required final-head attestations start their source/applicability portions in parallel under `S3_FINAL_HEAD_REVIEW_SCOPE.md`: independent nonbuilders `audit_s5_failure_lens_a_mue9osec` and `audit_s5_failure_lens_b_mue9oser`, each T4, sole respective `audits/s3-final-head-a/**` or `-b/**`, read/hash/diff only. Same review incorporates the frozen runtime results later; no premature final clearance or extra audit layer. Parent retains sole private publication authority; no Bradley decision required.
 
 ## Baseline pins
 
