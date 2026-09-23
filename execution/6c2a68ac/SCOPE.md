@@ -187,6 +187,16 @@ S6 independent nonbuilder A `audit_s5_v31_lens_a_mue9eid4` (inheritance) and B `
 
 Both exact S6 reviews COMPLETE: Ad9a9d4c54df862e8a551e48935ea7d4c5c7908d434aad7d1ae7fad061f469709 and Bb64eb2824fa19a26d2ab8f0539a772fb007f9e9cc1b25ab5acba990a9544dce5 source-close both compositions without A/B. Parent accepts at `S6_DUAL_CLOSURE_AND_RUNTIME_QUEUE.md`; all C notes and B's empty-stray-file incident retained, no code/review cycle. `S6_ACTUAL_SETUP_AND_C6_GRANTS.md` prepares separate actual stages, NOT ACTIVE. S3 retains sole runtime.
 
+## S3 hooked head and remaining validation transition
+
+Latest transition supersedes the historical active03R/04–14 description above. Frozen continuationca604a0d/23 records03R/04–07raw0 and exact hooked local commit `be0ba8274e486dee77f15d18fe367a13ff08ecf5`, treea584, parentsd5cd/5c7b. Step08raw127 arose from an added observation quoting defect; already-recorded08D satisfies every original step08 identity condition. Parent accepts that existing evidence with C qualifications and preserves both failure and corrected raw-message comparison; no new audit, retry, hook or commit.
+
+`S3_STEP08_DISPOSITION_AND_VALIDATION_ACTIVATION.md` assigns sole runtime to original builder `restore_s3_candidate_mue9wspd`, original09–14 only, fresh `s3-integration-validation/**`, existing T4 commands/bounds/environment/stop rules. No product source mutation, reinstall, regeneration or remote action.
+
+In parallel `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` assigns source-only T4 builder `restore_s2_substrate_mue9eidh` sole fresh `s3-composed-proof-prep/**`. Minimum accepted-v5.7 runner/fixture binding successor for be0ba827/lockb7fed/deepmerge8, fresh fixture namespace, explicit provenance applicability, no product/WT/runtime writes. Two independent changed-binding reviews precede one separately activated real composed proof. Existing primitive/control proof transfers, no new framework or recursive test layer.
+
+S6 and S5 remain runtime queued. Parent retains sole private publication authority; no Bradley decision required.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

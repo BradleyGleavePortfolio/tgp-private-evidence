@@ -1,6 +1,6 @@
 # S3 step03 recording correction and conditional continuation
 
-Parent EXEC-6c2a68ac, 2026-09-23. **ACTIVE** after independent narrow review seal `25f049dde99f0d9fa1f33f5435b8bbf4215911eb4cb315213c1e91a6aec60053` closed the recording defect. Explicit parent activation assigned the returned runtime slot to `restore_s3_candidate_mue9wspd`. Original integration grant remains applicable except the single observation correction and fresh continuation-output path below.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED: 03R and04–07 raw0, local hooked commitbe0ba827 created; wave stopped at extra step08 observation raw127. Existing08D satisfies the original identity criteria; continuation is now governed by `S3_STEP08_DISPOSITION_AND_VALIDATION_ACTIVATION.md`. Original activation followed independent narrow review seal `25f049dde99f0d9fa1f33f5435b8bbf4215911eb4cb315213c1e91a6aec60053`. Historical instructions below are retained, not authority to repeat them.
 
 ## Concrete stop and minimum correction
 

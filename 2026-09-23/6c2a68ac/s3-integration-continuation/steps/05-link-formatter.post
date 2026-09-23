@@ -1,0 +1,5 @@
+source $O/steps/chk.sh; cd $W
+eq "link target" "$TOOL/node_modules/prettier/bin/prettier.cjs" "$(readlink node_modules/.bin/prettier)"
+eq "write-tree unchanged" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"
+eq "link untracked/ignored (porcelain --untracked-files=all lines beyond staged)" 0 "$(git status --porcelain --untracked-files=all | grep -v -E '^[MAD]  ' | wc -l)"
+exit $FAIL

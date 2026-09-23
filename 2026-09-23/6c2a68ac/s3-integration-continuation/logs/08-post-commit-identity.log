@@ -1,0 +1,41 @@
+label=post-commit-identity head=be0ba8274e486dee77f15d18fe367a13ff08ecf5 merge_head= write_tree=a584a1b95423f95dae8daabf673ef3776604acbb node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='true' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' cwd=/home/user/workspace/worktrees/s3-prep2 T=30 loadavg='0.49 0.76 1.14 1/111 29673' mem_avail_mb=7713 utc=2026-09-23T16:55:34Z
+cmd: source $O/steps/chk.sh
+git log -1 --format='%H%n%T%n%P%n%an <%ae>%n%cn <%ce>%n%B' | tee $O/identity.txt
+eq "%T tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git log -1 --format=%T)"
+eq "%P parents" "d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06" "$(git log -1 --format=%P)"
+eq "author" "Bradley Gleave <bradley@bradleytgpcoaching.com>" "$(git log -1 --format='%an <%ae>')"
+eq "committer" "Bradley Gleave <bradley@bradleytgpcoaching.com>" "$(git log -1 --format='%cn <%ce>')"
+eq "trailers" "" "$(git log -1 --format=%(trailers))"
+eq "message sha256 == authored message file" "$(sha256sum $O/steps/07-commit-message.txt | cut -d' ' -f1)" "$(git log -1 --format=%B | sha256sum | cut -d' ' -f1)"
+chk "tree-identical (diff --quiet a584a1b9 HEAD^{tree})" git diff --quiet a584a1b95423f95dae8daabf673ef3776604acbb HEAD^{tree}
+chk "MERGE_HEAD absent" test ! -e .git/MERGE_HEAD
+eq "porcelain lines" 0 "$(git status --porcelain | wc -l)"
+eq "banned-token grep count in commit object" 0 "$(git cat-file -p HEAD | grep -c -iE 'co-authored|generated|claude|anthropic|openai|perplexity')"
+eq "detached HEAD" detached "$(git symbolic-ref -q HEAD >/dev/null && echo branch || echo detached)"
+eq "HEAD^1" d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c "$(git rev-parse HEAD^1)"; eq "HEAD^2" 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 "$(git rev-parse HEAD^2)"
+echo "HEAD=$(git rev-parse HEAD) commit_object_sha256=$(git cat-file -p HEAD | sha256sum | cut -d' ' -f1) gpgsig=$(git cat-file -p HEAD | grep -c '^gpgsig')"
+exit $FAIL
+be0ba8274e486dee77f15d18fe367a13ff08ecf5
+a584a1b95423f95dae8daabf673ef3776604acbb
+d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+Bradley Gleave <bradley@bradleytgpcoaching.com>
+Bradley Gleave <bradley@bradleytgpcoaching.com>
+merge(s3): compose preserved S3 reliability candidate 5c7b42b3 into S1+S2 successor d5cd9b8b
+
+R100 gate: keep the committed R75 checker job from S3 and the S2 retirement of
+the loc-budget/test-density jobs; scope prose now points at .github/r75-policy.json.
+test/ci/r100-pathspec.spec.ts asserts checker delegation and policy scope instead
+of inline workflow pathspecs; test/ci/r75-gate.spec.ts drops the retired-jobs check.
+Six inherited S3 files reformatted with the repository prettier config (no code changes):
+src/filters/throttler-exception.filter.ts, src/observability/README.md,
+src/observability/logging.interceptor.ts, src/prisma.service.ts,
+src/scout/scout.service.ts, test/health-readiness-bounded.spec.ts.
+
+postcheck: %T tree rc=0 | a584a1b95423f95dae8daabf673ef3776604acbb
+postcheck: %P parents rc=0 | d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+postcheck: author rc=0 | Bradley Gleave <bradley@bradleytgpcoaching.com>
+postcheck: committer rc=0 | Bradley Gleave <bradley@bradleytgpcoaching.com>
+bash: -c: line 7: syntax error near unexpected token `(' while looking for matching `)'
+bash: -c: line 7: `eq "trailers" "" "$(git log -1 --format=%(trailers))"'
+exit=127 (124=timeout,137=killed) utc=2026-09-23T16:55:34Z write_tree_after=a584a1b95423f95dae8daabf673ef3776604acbb
+step_status=127 utc=2026-09-23T16:55:34Z

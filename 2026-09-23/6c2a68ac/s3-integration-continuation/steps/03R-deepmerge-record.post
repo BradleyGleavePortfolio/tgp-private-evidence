@@ -1,0 +1,11 @@
+source $O/steps/chk.sh; cd $W
+V=$(grep -A0 -E '^8\.0\.0$' $O/logs/03R-deepmerge-record.log | head -1)
+eq "printed value exactly 8.0.0" 8.0.0 "$V"
+eq "deepmerge-ts package.json sha256" 9db1260031eec1939456f01305b401e2c7f8c0b4cb7707aa0220741eefc71931 "$(sha256sum node_modules/deepmerge-ts/package.json | cut -d' ' -f1)"
+eq "lock entry version" 8.0.0 "$(node -p "JSON.parse(require('fs').readFileSync('package-lock.json','utf8')).packages['node_modules/deepmerge-ts'].version")"
+eq "package-lock.json sha256" b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55 "$(sha256sum package-lock.json | cut -d' ' -f1)"
+eq "write-tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"
+eq "non-staged porcelain lines" 0 "$(git status --porcelain | grep -v -E '^[MAD]  ' | wc -l)"
+chk "no nested deepmerge-ts under @prisma/config" test ! -e node_modules/@prisma/config/node_modules/deepmerge-ts
+echo "note: original step 03 log (s3-integration-result/logs/03) keeps step_status=1; this 03R is a separate post-record observation superseding only that post-condition per parent disposition"
+exit $FAIL

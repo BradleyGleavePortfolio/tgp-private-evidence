@@ -1,0 +1,12 @@
+source $O/steps/chk.sh; cd $W
+chk "pre-commit hook present" test -f .git/hooks/pre-commit
+chk "commit-msg hook present" test -f .git/hooks/commit-msg
+chk "pre-commit names lefthook" grep -qi lefthook .git/hooks/pre-commit
+chk "commit-msg names lefthook" grep -qi lefthook .git/hooks/commit-msg
+eq "core.hooksPath unset" unset "$(git config --get core.hooksPath || echo unset)"
+chk "no lefthook-local.yml" test ! -e lefthook-local.yml
+chk "no .lefthook-local.yml" test ! -e .lefthook-local.yml
+echo "hooks installed (non-sample): $(ls .git/hooks | grep -v '\.sample$' | tr '\n' ' ')"; echo "-- head -3 pre-commit:"; head -3 .git/hooks/pre-commit
+eq "write-tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"
+eq "non-staged porcelain lines" 0 "$(git status --porcelain | grep -v -E '^[MAD]  ' | wc -l)"
+exit $FAIL
