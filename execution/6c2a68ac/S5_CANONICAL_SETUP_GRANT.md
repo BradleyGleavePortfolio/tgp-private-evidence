@@ -1,6 +1,6 @@
 # S5 canonical setup: conditional single-execution grant
 
-Parent EXEC-6c2a68ac, 2026-09-23. NOT ACTIVE until a separate parent message assigns the returned canonical runtime slot. This is the actual setup unlocked by accepted V32 source and private proof, not another control or audit.
+Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE exactly once under `S5_CANONICAL_SETUP_ACTIVATION.md`, after S3 returned runtime and re-confirmed closure17:47:20Z. This is the actual setup unlocked by accepted V32 source and private proof, not another control or audit. The activation clarifies the already-permitted simple detached caller/direct launcher wait receipt without changing frozen source or deadlines.
 
 ## Scope and ownership
 

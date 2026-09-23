@@ -1,6 +1,6 @@
 # S6 C6-only activation
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVATE S6-C6-ONLY once, sole canonical runtime assigned to `restore_s6_substrate_mue9osen`. S3 returned runtime unused after its preflight scratch collision; no composed runner/fixture/DB was started. Its one shot remains unused and inactive.
+Parent EXEC-6c2a68ac, 2026-09-23. COMPLETE. S6-C6-ONLY ran once and returned runtime. Result64a99289/31: launcher wait90, published90; runner143 after C budget TERM; six assertions PASS, two persistent 600000ms Query.removeObserver timers, classification `i-TWO-RESIDUAL-removeObserver-HANG`; cleanup/publication/ownership closed. Historical activation below is consumed, not a rerun authority.
 
 Apply exact C6 stage in `S6_ACTUAL_SETUP_AND_C6_GRANTS.md` and qualified installed-substrate disposition `S6_SETUP_DISPOSITION.md`. Frozen launcherad8130e9 and runner692f8db7/source001b840f are dual-closed Ad9a9d4c5/Bb64eb282. Setup20/20 is accepted as substrate only; published setup90, missing direct wait, unknown transient process and Node20 engine qualification are preserved.
 

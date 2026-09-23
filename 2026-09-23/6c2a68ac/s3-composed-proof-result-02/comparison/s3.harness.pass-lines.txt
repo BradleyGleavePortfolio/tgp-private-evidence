@@ -1,0 +1,69 @@
+PASS  C0 tree: candidate-HEAD export minus S1-owned paths (prisma/migrations/2026122400000
+PASS  C0 tree: S2-only tree has NO S1 verifier (and no prisma/migrations/20261224000000_rl
+PASS  C0: S2-only release.sh exits 1
+PASS  C0: refuses with 'REQUIRED catalog verifier missing'
+PASS  C0: prisma CLI present in that tree (refusal is not 'prisma missing'; banner shows t
+PASS  C0: no 'step 1:' reached (no migrate status)
+PASS  C0: no connection attempt (no P1001 / Can't reach)
+PASS  C0: /tmp/prisma_migrate.log never created
+PASS  C0: no success banner
+PASS  C0b: integrated tree minus verify.sql exits 1
+PASS  C0b: names the missing required verifier
+PASS  C0b: no 'step 1:' reached, no DB contact
+PASS  P1 (s1_rls_s3comp_be0b): REAL prisma migrate deploy of the parent chain as non-super
+PASS  P1 (s1_rls_s3comp_be0b): parent chain applied count == parent directories (164)
+PASS  P1 (s1_rls_s3comp_be0b): _prisma_migrations holds exactly 164 finished rows (genuine
+PASS  P1 (s1_rls_s3comp_be0b): out-of-band rls_fitness_backend.sql applied (production pre
+PASS  P1 (s1_rls_s3comp_be0b): verify.sql FAILS on the pre-state via psql (exposure presen
+PASS  P1 (s1_rls_s3comp_be0b): candidate row absent from ledger before release
+PASS  P2 (s1_rls_s3comp_be0b_lock): REAL prisma migrate deploy of the parent chain as non-
+PASS  P2 (s1_rls_s3comp_be0b_lock): parent chain applied count == parent directories (164)
+PASS  P2 (s1_rls_s3comp_be0b_lock): _prisma_migrations holds exactly 164 finished rows (ge
+PASS  P2 (s1_rls_s3comp_be0b_lock): out-of-band rls_fitness_backend.sql applied (productio
+PASS  P2 (s1_rls_s3comp_be0b_lock): verify.sql FAILS on the pre-state via psql (exposure p
+PASS  P2 (s1_rls_s3comp_be0b_lock): candidate row absent from ledger before release
+PASS  C1: release.sh exits 0
+PASS  C1: step 0 accepted the contract: verifiers_required = 1 (all present)
+PASS  C1: step 1 saw exactly the candidate pending (pending_before=1)
+PASS  C1: step 2 ran real migrate deploy and applied the candidate
+PASS  C1: step 4 invoked the discovered verifier
+PASS  C1: verifiers_passed=1 verifiers_required=1
+PASS  C1: ALL_APPLIED == parent chain + candidate
+PASS  C1v: ledger row for the candidate is finished (deploy was real)
+PASS  C1v: ledger total == parent chain + candidate
+PASS  C1v: same verify.sql via psql stop-on-error exits 0 on the released state
+PASS  C1v: psql route prints S1's OK line (18 relations, 4 partitions)
+PASS  C2: release.sh exits 0 again
+PASS  C2: nothing pending (pending_before=0)
+PASS  C2: verifier still invoked
+PASS  C2: verifiers_passed=1
+PASS  C3 setup: S1 down.sql applied out of band (--single-transaction)
+PASS  C3: release.sh exits 1 (verifier failure propagates)
+PASS  C3: step 3 still reported 'up to date' (ledger untouched by out-of-band reversal)
+PASS  C3: step 4 banner 'catalog verifier FAILED' names the S1 verifier
+PASS  C3: Prisma's real error text (S1 EXPOSURE class) appears in the release log tail
+PASS  C3: no success banner
+PASS  C4 setup: direct re-apply of migration.sql (psql --single-transaction) exits 0
+PASS  C4: release.sh exits 0 after recovery
+PASS  C4: verifiers_passed=1
+PASS  C5: release.sh exits 1 on allowed-path drift
+PASS  C5: ALLOWED-PATH class reported (0 exposure; 1 allowed-path)
+PASS  C5: names the lost privilege
+PASS  C5r: release.sh exits 0 after restoring the grant
+PASS  C7 setup: blocker holds a lock on community_messages_2027_01
+PASS  C7: release.sh exits non-zero while the late-stage lock is held
+PASS  C7: failure banner from the ERR trap with Prisma's own output tail
+PASS  C7: Prisma's real failure text (P3018 / lock timeout 55P03) is in the release log
+PASS  C7: the failing migration named is the candidate
+PASS  C7: no step 4 / no success banner
+PASS  C7: failed deploy recorded in ledger (finished_at null, rolled_back_at null)
+psql:prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql:236: ERROR:  S1
+PASS  C7: whole-file rollback — verify.sql still fails via psql (pre-state intact)
+PASS  C7: blocker released
+PASS  C8 setup: prisma migrate resolve --rolled-back succeeds on the REAL failed row
+PASS  C8: release.sh exits 0 after failed-row recovery
+PASS  C8: step 2 really re-applied the candidate after the rolled-back row (Applying migra
+PASS  C8: ALL_APPLIED == parent chain + candidate (rolled-back row excluded, read through 
+PASS  C8: verifiers_passed=1
+PASS  C8: ledger total == parent chain + candidate (rolled-back row excluded)
+PASS  post-run: worktree still clean (release.sh/contract/S1 files untouched)

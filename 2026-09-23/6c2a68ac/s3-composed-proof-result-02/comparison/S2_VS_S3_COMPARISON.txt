@@ -1,0 +1,167 @@
+# S2 (accepted, seal bbde4b0b, run 20260923T162230Z) vs S3 (this run, 20260923T174228Z) — raw lines first, then normalized diffs
+
+## A. exit-codes.txt (raw)
+S2: final=0 first_exit=0 cleanup_exit=0 signal=none reap=ok cleanup_seconds=0.56 deadline_exceeded=no guard_spec=0 refusal_hosted=64 refusal_noconfirm=64 fixture=0 composition=0 s1_r4_discriminator=0 fixture_stop=0 survivors=none
+S3: final=0 first_exit=0 cleanup_exit=0 signal=none reap=ok cleanup_seconds=0.54 deadline_exceeded=no guard_spec=0 refusal_hosted=64 refusal_noconfirm=64 fixture=0 composition=0 s1_r4_discriminator=0 fixture_stop=0 survivors=none
+normalized_diff: DIFFER
+
+## B. per-step raw exits and pass counts (stamp.txt)
+--- execution/6c2a68ac/s2-real-composition-result/runner-output
+10 guard-spec exit=0 == 72 passed, 0 failed (guard spec, offline, head d5cd9b8)
+20 refusal-hosted exit=64 (expect 64) S1-GUARD REFUSED URL_HOST: S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no hostnames, localhost, IPv6, sockets, remote endpoints)
+21 refusal-noconfirm exit=64 (expect 64) S1-GUARD REFUSED CONFIRM: S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases 's1_rls_s2comp_r53' and 's1_rls_s2comp_r53_lock' on 127.0.0.1:54353 a
+30 precheck: clusters/s2comp-r53 absent, no 54353 listener, no fixture postgres
+30 precheck: no pre-existing release.sh /tmp scratch files
+30 fixture-init exit=0 lock: /home/user/workspace/execution/test-validation.lock inherited fd9 from caller pid=13172
+31 fixture-start exit=0 PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit | cluster=s1-disposable-pg17 | datadir=/home/user/pg17/clusters/s2comp-r53 |
+32 fixture-status: pg_ctl: server is running (PID: 13230)
+40 composition exit=0 end_utc=2026-09-23T16:23:58Z == 68 passed, 0 failed (server 17.6, head d5cd9b8, end_utc=2026-09-23T16:23:56Z)
+45 s1-r4-discriminator exit=0 == 48 passed, 0 failed (server 17.6, head d5cd9b8 scoped_status=clean)
+50 fixture-stop exit=0 (124=stop bound 20s exceeded; nominal 20s) stopped
+--- execution/6c2a68ac/s3-composed-proof-result-02/runner-output
+10 guard-spec exit=0 == 72 passed, 0 failed (guard spec, offline, head be0ba82)
+20 refusal-hosted exit=64 (expect 64) S1-GUARD REFUSED URL_HOST: S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no hostnames, localhost, IPv6, sockets, remote endpoints)
+21 refusal-noconfirm exit=64 (expect 64) S1-GUARD REFUSED CONFIRM: S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases 's1_rls_s3comp_be0b' and 's1_rls_s3comp_be0b_lock' on 127.0.0.1:54354
+30 precheck: clusters/s3comp-be0b absent, no 54354 listener, no fixture postgres
+30 precheck: no pre-existing release.sh /tmp scratch files
+30 fixture-init exit=0 lock: /home/user/workspace/execution/test-validation.lock inherited fd9 from caller pid=28174
+31 fixture-start exit=0 PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit | cluster=s1-disposable-pg17 | datadir=/home/user/pg17/clusters/s3comp-be0b 
+32 fixture-status: pg_ctl: server is running (PID: 28244)
+40 composition exit=0 end_utc=2026-09-23T17:43:59Z == 68 passed, 0 failed (server 17.6, head be0ba82, end_utc=2026-09-23T17:43:58Z)
+45 s1-r4-discriminator exit=0 == 48 passed, 0 failed (server 17.6, head be0ba82 scoped_status=clean)
+50 fixture-stop exit=0 (124=stop bound 20s exceeded; nominal 20s) stopped
+
+## C. harness.log identity/version header (raw, first 20 lines each)
+--- S2
+== S1+S2 composition proof start_utc=2026-09-23T16:22:44Z pid=13278 host=127.0.0.1:54353 db=s1_rls_s2comp_r53 db2=s1_rls_s2comp_r53_lock out=/home/user/workspace/execution/op88/s2-v57/composition-r57/20260923T162230Z/harness
+head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c tree=c0ab87d4dc584b2a7ccad53db16fa551b93fe359 parents=21ea3252de90cab66c591cf907b65a0ee7eef879
+clean=yes
+c0_tree_commit=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c (candidate HEAD export minus S1-owned paths: prisma/migrations/20261224000000_rls_close_public_exposure test/db)
+sha256 8831f8f744d1b42499c8eae7f34e21651c65cf3e831ab82d064434a36482f073  scripts/release.sh  blob=c86b3ab961cb0569369d28e95278be4aa9669d03
+sha256 0922729c5096faf6025ebb093ba7993c218d193c84f9c8c918f195b9331a8fb4  scripts/release-required-verifiers.txt  blob=bfc2c5fe50a4a6ea65e7a04c35fd4e8061f3586d
+sha256 72b0ad5a07cd6ccbcc1e88ef94e311606fb1a85d97f0efa6c38cf87de3cae344  prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql  blob=586ffad41d832bbcbb93379c217d1e8dd5b6b005
+sha256 dd7dd6f33f03fb0738e635530e69299741c1ec4d6e6a848e15ed937a74a7bdeb  prisma/migrations/20261224000000_rls_close_public_exposure/down.sql  blob=b1990b02fb63f00c00fa57d7c8f517b52b1d2dc2
+sha256 266e62e9ed6def7491e886c1f9648ce31dd95d62931c839fb84db2b3140a9448  prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql  blob=11836f0c4ae4361feb75ef3554e0ac504f5fb267
+sha256 6f66e43624fd7ad4337b9b4b67e108fc2192230e8b6e8cc4287b193fe997a8ec  test/db/_support/s1-target-guard.sh  blob=81e305493796a2d8fede288abce1c260afb61020
+sha256 e8c42d2e6f2173f0d4acbf5cf47316c4aefaad23aee023e6e08171a6e536da60  test/db/_support/supabase-like-bootstrap.sql  blob=3bf835115ad540fde27a8ec6c04a7e4262150754
+sha256 719a8d0971bf98c284e6e79915e48a73e23d544703790936958a74b608358014  prisma/migrations/rls_fitness_backend.sql  blob=db4aa89e8b68964d87def6a3a939ccf9583802aa
+sha256 62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390  package-lock.json  blob=a23abae6298ff4312d65320ffb700dee2c8c4f06
+psql=/usr/lib/postgresql/18/bin/psql psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+node=/usr/local/bin/node v20.20.1
+prisma_cli=/home/user/workspace/worktrees/s2-runner53/node_modules/prisma/build/index.js sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+prisma_version: Prisma schema loaded from prisma/schema.prisma;prisma : 6.19.3;@prisma/client : 6.19.3;Computed binaryTarget : debian-openssl-3.0.x;Operating System : linux;Architecture : x64;Node.js : v20.20.1;TypeScript : 5.9.3;Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/
+npx_resolves_to=prisma : 6.19.3
+PATH=/home/user/pg17/dist/bin:/usr/lib/postgresql/18/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+server_version=17.6 cluster=s1-disposable-pg17 datadir=/home/user/pg17/clusters/s2comp-r53
+--- S3
+== S1+S2 composition proof start_utc=2026-09-23T17:42:44Z pid=28292 host=127.0.0.1:54354 db=s1_rls_s3comp_be0b db2=s1_rls_s3comp_be0b_lock out=/home/user/workspace/execution/6c2a68ac/s3-composed-proof/composition-s3/20260923T174228Z/harness
+head=be0ba8274e486dee77f15d18fe367a13ff08ecf5 tree=a584a1b95423f95dae8daabf673ef3776604acbb parents=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+clean=yes
+c0_tree_commit=be0ba8274e486dee77f15d18fe367a13ff08ecf5 (candidate HEAD export minus S1-owned paths: prisma/migrations/20261224000000_rls_close_public_exposure test/db)
+sha256 8831f8f744d1b42499c8eae7f34e21651c65cf3e831ab82d064434a36482f073  scripts/release.sh  blob=c86b3ab961cb0569369d28e95278be4aa9669d03
+sha256 0922729c5096faf6025ebb093ba7993c218d193c84f9c8c918f195b9331a8fb4  scripts/release-required-verifiers.txt  blob=bfc2c5fe50a4a6ea65e7a04c35fd4e8061f3586d
+sha256 72b0ad5a07cd6ccbcc1e88ef94e311606fb1a85d97f0efa6c38cf87de3cae344  prisma/migrations/20261224000000_rls_close_public_exposure/migration.sql  blob=586ffad41d832bbcbb93379c217d1e8dd5b6b005
+sha256 dd7dd6f33f03fb0738e635530e69299741c1ec4d6e6a848e15ed937a74a7bdeb  prisma/migrations/20261224000000_rls_close_public_exposure/down.sql  blob=b1990b02fb63f00c00fa57d7c8f517b52b1d2dc2
+sha256 266e62e9ed6def7491e886c1f9648ce31dd95d62931c839fb84db2b3140a9448  prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql  blob=11836f0c4ae4361feb75ef3554e0ac504f5fb267
+sha256 6f66e43624fd7ad4337b9b4b67e108fc2192230e8b6e8cc4287b193fe997a8ec  test/db/_support/s1-target-guard.sh  blob=81e305493796a2d8fede288abce1c260afb61020
+sha256 e8c42d2e6f2173f0d4acbf5cf47316c4aefaad23aee023e6e08171a6e536da60  test/db/_support/supabase-like-bootstrap.sql  blob=3bf835115ad540fde27a8ec6c04a7e4262150754
+sha256 719a8d0971bf98c284e6e79915e48a73e23d544703790936958a74b608358014  prisma/migrations/rls_fitness_backend.sql  blob=db4aa89e8b68964d87def6a3a939ccf9583802aa
+sha256 b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55  package-lock.json  blob=354de3dae19449970497da6e4d87f0a1225a8f43
+psql=/usr/lib/postgresql/18/bin/psql psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+node=/usr/local/bin/node v20.20.1
+prisma_cli=/home/user/workspace/worktrees/s3-prep2/node_modules/prisma/build/index.js sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+prisma_version: Prisma schema loaded from prisma/schema.prisma;prisma : 6.19.3;@prisma/client : 6.19.3;Computed binaryTarget : debian-openssl-3.0.x;Operating System : linux;Architecture : x64;Node.js : v20.20.1;TypeScript : 5.9.3;Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/
+npx_resolves_to=prisma : 6.19.3
+PATH=/home/user/pg17/dist/bin:/usr/lib/postgresql/18/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+server_version=17.6 cluster=s1-disposable-pg17 datadir=/home/user/pg17/clusters/s3comp-be0b
+
+## D. harness header normalized diff (expected differences: head/tree/parents, package-lock sha+blob, out path, lane db/port; everything else must match)
+2c2
+< head=<HEAD> tree=<TREE> parents=21ea3252de90cab66c591cf907b65a0ee7eef879
+---
+> head=<HEAD> tree=<TREE> parents=<HEAD> 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+13c13
+< sha256 62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390  package-lock.json  blob=a23abae6298ff4312d65320ffb700dee2c8c4f06
+---
+> sha256 b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55  package-lock.json  blob=354de3dae19449970497da6e4d87f0a1225a8f43
+
+## E. harness totals
+== 68 passed, 0 failed (server 17.6, head d5cd9b8, end_utc=2026-09-23T16:23:56Z)
+== 68 passed, 0 failed (server 17.6, head be0ba82, end_utc=2026-09-23T17:43:58Z)
+S2 PASS lines=68 FAIL lines=0; S3 PASS lines=68 FAIL lines=0
+
+## F. release cases: [release] line counts and normalized per-case diffs
+C0   S2_lines=16 S3_lines=16 release_lines S2=16 S3=16 norm_diff=IDENTICAL
+C0b  S2_lines=16 S3_lines=16 release_lines S2=16 S3=16 norm_diff=IDENTICAL
+C1   S2_lines=55 S3_lines=55 release_lines S2=26 S3=26 norm_diff=IDENTICAL
+C2   S2_lines=45 S3_lines=45 release_lines S2=26 S3=26 norm_diff=IDENTICAL
+C3   S2_lines=56 S3_lines=56 release_lines S2=30 S3=30 norm_diff=IDENTICAL
+C4   S2_lines=45 S3_lines=45 release_lines S2=26 S3=26 norm_diff=IDENTICAL
+C5   S2_lines=56 S3_lines=56 release_lines S2=30 S3=30 norm_diff=IDENTICAL
+C5r  S2_lines=45 S3_lines=45 release_lines S2=26 S3=26 norm_diff=IDENTICAL
+C7   S2_lines=70 S3_lines=70 release_lines S2=21 S3=21 norm_diff=IDENTICAL
+C8   S2_lines=52 S3_lines=52 release_lines S2=26 S3=26 norm_diff=IDENTICAL
+
+## G. release case exit codes / rc lines in harness.log
+rc/exit lines IDENTICAL after normalization (11 lines)
+
+## H. full harness.log normalized diff
+DIFFER — lines:
+2c2
+< head=<HEAD> tree=<TREE> parents=21ea3252de90cab66c591cf907b65a0ee7eef879
+---
+> head=<HEAD> tree=<TREE> parents=<HEAD> 5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+13c13
+< sha256 62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390  package-lock.json  blob=a23abae6298ff4312d65320ffb700dee2c8c4f06
+---
+> sha256 b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55  package-lock.json  blob=354de3dae19449970497da6e4d87f0a1225a8f43
+
+## I. discriminator
+== 48 passed, 0 failed (server 17.6, head d5cd9b8 scoped_status=clean)
+== 48 passed, 0 failed (server 17.6, head be0ba82 scoped_status=clean)
+discriminator log DIFFER (comparison/discriminator.normdiff, 4 lines)
+
+## J. guard spec + refusals
+execution/6c2a68ac/s2-real-composition-result/runner-output: == 72 passed, 0 failed (guard spec, offline, head d5cd9b8) | 20: S1-GUARD REFUSED URL_HOST: S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no h | 21: S1-GUARD REFUSED CONFIRM: S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases 's1_rls_s2comp_r53' and 's1_rl
+execution/6c2a68ac/s3-composed-proof-result-02/runner-output: == 72 passed, 0 failed (guard spec, offline, head be0ba82) | 20: S1-GUARD REFUSED URL_HOST: S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no h | 21: S1-GUARD REFUSED CONFIRM: S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases 's1_rls_s3comp_be0b' and 's1_r
+
+## K. versions actually observed (stamp.txt raw)
+--- execution/6c2a68ac/s2-real-composition-result/runner-output
+start_utc=2026-09-23T16:22:31Z runner=run-composition-r57-v5.7-when-granted.sh runner_sha256= head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c tree=c0ab87d4dc584b2a7ccad53db16fa551b93fe359 dirty_lines=0 branch=HEAD
+expect_head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c lock_sha256=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390 expect_lock=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+harness_sha256=c766a8d9d9e3a600be88a5bf2d60a108eabb88aac363fbe5acf85c96a973b867 release_sh_sha256=8831f8f744d1b42499c8eae7f34e21651c65cf3e831ab82d064434a36482f073
+node=v20.20.1 npm=10.8.2 psql=psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) postgres=postgres (PostgreSQL) 17.6
+prisma_cli_sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0 (pinned, verified before first execution) fixture_sha256=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881 expect_fixture=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881
+prisma=Prisma schema loaded from prisma/schema.prisma;prisma : 6.19.3;@prisma/client : 6.19.3;Computed binaryTarget : debian-openssl-3.0.x;Operating System : linux;Architecture : x64;Node.js : v20.20.1;TypeScript : 5.9.3;Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node);PSL : @prisma/pri
+install_stamp: head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c
+install_stamp: lock=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+install_stamp: prisma_cli_sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+install_stamp: installed_by=execution/s2-setup-prep/infra/setup-30-npm-ci.sh
+install_stamp: node=v20.20.1 npm=10.8.2 psql=psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+install_stamp: utc=2026-09-23T16:15:23Z
+install_stamp: log=/home/user/workspace/execution/s2-setup-prep/infra/logs/setup-30-npm-ci-20260923T160944Z.log
+install_stamp: result=success
+--- execution/6c2a68ac/s3-composed-proof-result-02/runner-output
+start_utc=2026-09-23T17:42:28Z runner=/home/user/workspace/execution/6c2a68ac/s3-composed-proof-prep/candidates/run-composition-s3-v5.8-when-granted.sh runner_sha256=e876f48c1519004e0863321888715ad6ec2574ca55ff1f558571c61bf43ecbfd head=be0ba8274e486dee77f15d18fe367a13ff08ecf5 tree=a584a1b95423f95dae8daabf673ef3776604acbb dirty_lines=0 branch=HEAD
+expect_head=be0ba8274e486dee77f15d18fe367a13ff08ecf5 lock_sha256=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55 expect_lock=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
+harness_sha256=c766a8d9d9e3a600be88a5bf2d60a108eabb88aac363fbe5acf85c96a973b867 release_sh_sha256=8831f8f744d1b42499c8eae7f34e21651c65cf3e831ab82d064434a36482f073
+node=v20.20.1 npm=10.8.2 psql=psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1) postgres=postgres (PostgreSQL) 17.6
+prisma_cli_sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0 (pinned, verified before first execution) fixture_sha256=9763698b9231af15648c1179df8c99d2e848f6738469cf4ebee8bff1259de21c expect_fixture=9763698b9231af15648c1179df8c99d2e848f6738469cf4ebee8bff1259de21c
+prisma=Prisma schema loaded from prisma/schema.prisma;prisma : 6.19.3;@prisma/client : 6.19.3;Computed binaryTarget : debian-openssl-3.0.x;Operating System : linux;Architecture : x64;Node.js : v20.20.1;TypeScript : 5.9.3;Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node);PSL : @prisma/pri
+installed_versions: prisma=6.19.3 client=6.19.3 deepmerge_ts=8.0.0 (S2 accepted run: 6.19.3 / 6.19.3 / 7.1.5)
+
+## L. deepmerge-ts import path (static read of installed @prisma/config, both worktrees; describes direct imports, not a dependency chain)
+--- worktrees/s2-runner53: deepmerge-ts=7.1.5 c12=3.1.0 @prisma/config deps: {"c12":"3.1.0","deepmerge-ts":"7.1.5","effect":"3.21.0","empathic":"2.0.0"}
+--- worktrees/s3-prep2: deepmerge-ts=8.0.0 c12=3.1.0 @prisma/config deps: {"c12":"3.1.0","deepmerge-ts":"7.1.5","effect":"3.21.0","empathic":"2.0.0"}
+
+## L2. @prisma/config import evidence (static file reads, no execution)
+worktrees/s3-prep2/node_modules/@prisma/config/dist/index.js lines 893-894:
+  const { loadConfig: loadConfigWithC12 } = await import("c12");
+  const { deepmerge } = await import("deepmerge-ts");
+-> @prisma/config DIRECTLY imports both c12 and deepmerge-ts (dynamic import); c12 3.1.0 does not depend on deepmerge-ts (c12 package.json dependencies: chokidar confbox defu dotenv exsolve giget jiti ohash pathe perfect-debounce pkg-types rc9).
+@prisma/config@6.19.3 package.json declares deepmerge-ts 7.1.5 in BOTH worktrees; the S3 product package.json 'overrides' entry '@prisma/config@6.19.3': {'deepmerge-ts': '8.0.0'} makes the lock (b7fed5ed) pin node_modules/deepmerge-ts 8.0.0 with no nested @prisma/config/node_modules/deepmerge-ts, so Node resolution from @prisma/config reaches 8.0.0 at run time (S2 graph: 7.1.5). Lock entry for node_modules/@prisma/config in S3 still lists the package's own declared range 7.1.5 (lines ~4801-4802) — that is the declaration, not the resolved copy.
+
+## M. note on section A
+normalized exit-codes 'DIFFER' is solely cleanup_seconds=0.56 (S2) vs 0.54 (S3); all thirteen status fields are identical.
+## N. note on section I
+discriminator normalized diff is a single line: the S1_R4_LOCK_HOLDER label 'run-composition-r57-v5.7' -> 'run-composition-s3-v5.8' (runner change S3-4); 48/48 identical otherwise.

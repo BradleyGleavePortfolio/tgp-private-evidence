@@ -1,0 +1,171 @@
+utc=2026-09-23T17:38:23Z POST-CLOSURE read-only census (no signal, no lock open)
+caller 17614=gone launcher 17619=gone session 17681=gone runner 17728=gone selftest 17974=gone jest 18219=gone
+pgrep -s 17614:[] -s 17619:[] -s 17681:[] -s 17974:[] -s 18219:[]
+fd holders on canonical lock: []; lock file: -rw-r--r-- 1 user user 0 Sep 23 17:36 execution/test-validation.lock
+npm/jest/node workloads: none
+--- receipt
+2026-09-23T17:36:08Z CALLER_START caller_pid=17614 caller_sid=17614 cmd=[setsid -w env S6_C6_GRANT=granted-by-parent bash /home/user/workspace/execution/6c2a68ac/s6-exclusion-v1/launch-s6-c6-exclusion.v1.sh]
+2026-09-23T17:37:43Z CALLER_WAIT_OBSERVED launcher_wait_rc=90 (actual wait status of the setsid -w'd launcher process, observed by this caller; separate from the launcher's own published final_rc)
+launcher.out=0B caller.out=0B
+--- launcher.EXIT_RECORD full
+2026-09-23T17:36:08Z LAUNCHER_START pid=17619 stamp=[monitor=off bash=5.3.9(1)-release setsid=[setsid from util-linux 2.41.3] timeout=[timeout (uutils coreutils) 0.8.0] ps=[ps from procps-ng 4.0.4]] launcher_sha256=ad8130e9b5acd5e222817335c26e971ddf0bd69e858cfaa117568b1af8310a78 runner=/home/user/workspace/execution/6c2a68ac/s6-exclusion-v1/run-c6-hazard-v5-conly.v101y.sh runner_sha256=692f8db79a283135d1a609bfcb99b1f
+2026-09-23T17:36:08Z LEASE_HELD token=20260923T173608Z-17619-24178 fd=9 holder published
+2026-09-23T17:36:08Z RUNNER_LAUNCH pid=17681 confirm_rc=0 adoption=published state=released
+2026-09-23T17:37:43Z RUNNER_RAW observed rc=143 (separate from cleanup/publication/recovery)
+2026-09-23T17:37:43Z SESSION_CENSUS census=live detail=[17681:live 17974:empty 18219:empty] inner=[17974,18219] runner=[released=2 final=143 unpreserved=0 cleanup_failures=0]
+2026-09-23T17:37:43Z SESSION_LIVE after runner exit: detail=[17681:live 17974:empty 18219:empty]
+2026-09-23T17:37:43Z escalate GROUP_REAPED pgid=17681 how=group:1
+2026-09-23T17:37:43Z AFTER_ESCALATION census=empty detail=[17681:empty 17974:empty 18219:empty] reap_rc=0 raw=observed 143
+2026-09-23T17:37:43Z LEASE_RELEASED how=session-live-after-runner-then-empty raw=observed 143 cleanup=escalated(rc=0) publication=ok recovery=none inner=[17974,18219] final_rc=90
+--- LEASE_RELEASE
+token=20260923T173608Z-17619-24178 holder_pid=17619 start_time=795539 released_at=2026-09-23T17:37:43Z how=session-live-after-runner-then-empty raw=observed 143 cleanup=escalated(rc=0) publication=ok recovery=none session=17681 inner=[17974,18219] census=[17681:empty 17974:empty 18219:empty] runner=[released=2 final=143 unpreserved=0 cleanup_failures=0] final_rc=90
+--- LEASE_HOLDER
+token=20260923T173608Z-17619-24178 holder_pid=17619 holder_sid=17619 holder_pgid=17619 start_time=795539 state=RELEASED(session-live-after-runner-then-empty) si
+--- launcher attempt
+pid=17681 attempt=attempt-Rcdr2d identity=[17681 17681] holder_pid=17619 token=20260923T173608Z-17619-24178 self_pgid=17619 decoy=none
+ADOPT
+IDENTITY
+runner.out=0B
+--- c6.EXIT_RECORD full
+2026-09-23T17:36:08Z START pid=17728 pgid=17681 ppid=17681 token=20260923T173608Z-17619-24178 runner_sha256=692f8db79a283135d1a609bfcb99b1fd81bf09a527692af332805976f755bc66
+2026-09-23T17:36:08Z OWN_STAMP monitor=off bash=5.3.9(1)-release setsid=[setsid from util-linux 2.41.3] timeout=[timeout (uutils coreutils) 0.8.0] ps=[ps from procps-ng 4.0.4]
+2026-09-23T17:36:08Z lease INHERITED fd=9 path=/home/user/workspace/execution/test-validation.lock token=20260923T173608Z-17619-24178 holder_pid=17619 (outer launcher retains exclusion after this runner exits)
+2026-09-23T17:36:09Z step=provenance rc=0 elapsed=1s 
+2026-09-23T17:36:09Z step=manifest rc=0 elapsed=1s 
+2026-09-23T17:36:09Z step=module-paths rc=0 elapsed=1s 
+2026-09-23T17:36:09Z step=copy-inputs rc=0 elapsed=1s 
+2026-09-23T17:36:09Z step=selftest IDENTITY attempt=attempt-5GYkbl identity_rc=0 adoption=published state=released
+2026-09-23T17:36:09Z step=selftest START child_pid=17974 child_pgid=17974 budget=15s grace=5s cmd=[taskset -c 0,1 node /home/user/workspace/execution/op88/s6-c6-prep/c6/diag/s6diag.selftest.js]
+2026-09-23T17:36:11Z step=selftest first_exit rc=0 how=exited child_pid=17974 raw=observed 0
+2026-09-23T17:36:11Z step=selftest cleanup_exit=0 session=empty group_signal=empty
+2026-09-23T17:36:11Z step=selftest rc=0 elapsed=3s how=exited
+2026-09-23T17:36:11Z step=C IDENTITY attempt=attempt-Z49hu6 identity_rc=0 adoption=published state=released
+2026-09-23T17:36:11Z step=C START child_pid=18219 child_pgid=18219 budget=90s grace=20s cmd=[taskset -c 0,1 node node_modules/jest/bin/jest.js src/services/__tests__/persistedQueryCache.hazardControls.test.tsx --ci --runInBand --verbose --setupFilesAfterEnv=/home/user/workspace/worktrees/s6-diagnostic/jest.setup.js --setupFilesA
+2026-09-23T17:37:42Z step=C BUDGET 90s reached: TERM owned group pid=18219
+2026-09-23T17:37:42Z step=C first_exit rc=143 how=budget-TERM child_pid=18219 raw=observed 143
+2026-09-23T17:37:42Z step=C cleanup_exit=0 session=empty group_signal=empty
+2026-09-23T17:37:42Z step=C summary: step=C timeout_rc=143 jest_pid=18219 exit_event=NONE beforeExit=false snapshots=globalTeardown,tick+1000ms,tick+3000ms,tick+6000ms,tick+10000ms,tick+20000ms,tick+40000ms,tick+70000ms,SIGTERM
+2026-09-23T17:37:42Z step=C-hazard-v5-cancel-before-clear rc=143 elapsed=94s how=budget-TERM
+2026-09-23T17:37:42Z C6-OUTCOME=i-TWO-RESIDUAL-removeObserver-HANG
+FIRST_EXIT C rc=143 how=budget-TERM
+2026-09-23T17:37:42Z C real first exit rc=143 how=budget-TERM (interpret ONLY via the C6-OUTCOME line and raw c6.C.* files; neither 143 nor 0 is acceptance)
+2026-09-23T17:37:42Z ancestor_inventory_before=d0a751542fa5763253e36b4a2c72996e9ef3c266e896eba281889680d7731962 after=d0a751542fa5763253e36b4a2c72996e9ef3c266e896eba281889680d7731962 UNCHANGED
+2026-09-23T17:37:42Z copy persistedQueryCache.hazardControls.test.tsx removed (hash-guarded, equal to frozen source)
+2026-09-23T17:37:42Z copy persistedQueryCache.hazardAdapter.tsx removed (hash-guarded, equal to frozen source)
+2026-09-23T17:37:42Z worktree porcelain after cleanup: 0 line(s) 
+2026-09-23T17:37:42Z historical owned_pgids=[ 17974 18219] (evidence only, not current facts)
+2026-09-23T17:37:42Z final census RETIRED id=17974 (evidence only)
+2026-09-23T17:37:42Z final census RETIRED id=18219 (evidence only)
+2026-09-23T17:37:42Z CLEANUP_FAILURES=0 lock held until exit (fd 9); runner pid=17728 pgid=17681
+FINAL rc=143
+--- runner attempts
+execution/op88/s6-c6-prep/logs/c6/attempts/attempt-5GYkbl/
+pid=17974 step=selftest attempt=attempt-5GYkbl pgid_sid=[17974 17974] self_pgid=17681 self_sid=17681 decoy=none budget=15s grace=5s cmd=[taskset -c 0,1 node /home/user/workspace/execution/op88/s6-c6-prep/c6/diag/s6diag.selftest.js]
+step=selftest raw=observed 0 validation_rc=0 how=exited state=released session=empty survivors=[]
+execution/op88/s6-c6-prep/logs/c6/attempts/attempt-Z49hu6/
+pid=18219 step=C attempt=attempt-Z49hu6 pgid_sid=[18219 18219] self_pgid=17681 self_sid=17681 decoy=none budget=90s grace=20s cmd=[taskset -c 0,1 node node_modules/jest/bin/jest.js src/services/__tests__/persistedQueryCache.hazardControls.test.tsx --ci --runInBand --verbose --setupFilesAfterEnv=/home/user/workspace/worktrees/s6-
+step=C raw=observed 143 validation_rc=143 how=budget-TERM state=released session=empty survivors=[]
+--- inner logs
+  total 108
+  drwxr-xr-x   3 user user  4096 Sep 23 17:37 .
+  drwxr-xr-x   4 user user  4096 Sep 23 17:36 ..
+  drwxr-xr-x   4 user user  4096 Sep 23 17:36 attempts
+  -rw-r--r--   1 user user  2360 Sep 23 17:37 c6.C.checks.txt
+  -rw-r--r--   1 user user 56714 Sep 23 17:37 c6.C.inventory.jsonl
+  -rw-r--r--   1 user user  1553 Sep 23 17:36 c6.C.jest.log
+  -rw-r--r--   1 user user  2852 Sep 23 17:37 c6.C.summary.txt
+  -rw-r--r--   1 user user  3689 Sep 23 17:37 c6.EXIT_RECORD
+  -rw-r--r--   1 user user   394 Sep 23 17:36 c6.fingerprint.txt
+  -rw-r--r--   1 user user     0 Sep 23 17:36 c6.manifest-check.txt
+  -rw-r--r--   1 user user  2404 Sep 23 17:36 c6.module-paths.txt
+  -rw-r--r--   1 user user   487 Sep 23 17:36 c6.provenance.txt
+  -rw-r--r--   1 user user  6608 Sep 23 17:36 c6.selftest.inventory.jsonl
+  -rw-r--r--   1 user user   173 Sep 23 17:36 c6.selftest.out
+--- c6.C.checks.txt
+tests_line: Tests:       6 passed, 6 total
+overlapping_act: 0
+mode_line_present: 1
+did_not_exit_line: 1
+first_exit_rc: 143 how: budget-TERM
+c6_first_exit_rc=143 how=budget-TERM beforeExit=false exit_event=NONE
+c6_tests_line=Tests:       6 passed, 6 total six_of_six=true overlapping_act=0 mode_line_count=1
+c6_snapshots=9 [globalTeardown,tick+1000ms,tick+3000ms,tick+6000ms,tick+10000ms,tick+20000ms,tick+40000ms,tick+70000ms,SIGTERM]
+c6_snapshot label=globalTeardown count600000=2 activeResourcesInfo={"Timeout":3} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.617Z 7893:R:removeObserver:created=2026-09-23T17:36:25.897Z]
+c6_snapshot label=tick+1000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.614Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_snapshot label=tick+3000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.614Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_snapshot label=tick+6000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.614Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_snapshot label=tick+10000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.615Z 7893:R:removeObserver:created=2026-09-23T17:36:25.895Z]
+c6_snapshot label=tick+20000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.614Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_snapshot label=tick+40000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.614Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_snapshot label=tick+70000ms count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.615Z 7893:R:removeObserver:created=2026-09-23T17:36:25.895Z]
+c6_snapshot label=SIGTERM count600000=2 activeResourcesInfo={"Timeout":2} timers=[7343:R:removeObserver:created=2026-09-23T17:36:23.615Z 7893:R:removeObserver:created=2026-09-23T17:36:25.894Z]
+c6_counts_per_snapshot=[2,2,2,2,2,2,2,2,2] distinct=[2] last_paths=[R:removeObserver,R:removeObserver]
+C6-OUTCOME=i-TWO-RESIDUAL-removeObserver-HANG
+--- c6.C.summary.txt
+step=C timeout_rc=143 jest_pid=18219 exit_event=NONE beforeExit=false snapshots=globalTeardown,tick+1000ms,tick+3000ms,tick+6000ms,tick+10000ms,tick+20000ms,tick+40000ms,tick+70000ms,SIGTERM
+tests_line=Tests:       6 passed, 6 total passed=6 failed=0 overlapping_act=0 did_not_exit_line=true
+last_snapshot=SIGTERM liveRefed=2 byOwner={"other":2} byType={"Timeout":2} byDelay={"600000":2} activeResourcesInfo={"Timeout":2} nativeHandles={}
+  live id=7343 type=Timeout owner=other root=other immediate=tanstack delay=600000 repeat=null cb=(anonymous) age=78940ms cats=tanstack|other|preset
+      at Object.setTimeout (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/timeoutManager.ts:44:36)
+      at TimeoutManager.setTimeout (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/timeoutManager.ts:108:27)
+      at Query.scheduleGc (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/removable.ts:18:40)
+      at Query.removeObserver (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/query.ts:377:14)
+      chain: PROMISE#7337† <- PROMISE#7328† <- PROMISE#7313† <- PROMISE#7310† <- PROMISE#7205† <- PROMISE#7204† <- PROMISE#7193† <- PROMISE#7188† <- PROMISE#7178† <- PROMISE#7177† <- PROMISE#7099† <- PROMISE#7094† <- PROMISE#7087† <- PROMISE#7082†
+  live id=7893 type=Timeout owner=other root=other immediate=tanstack delay=600000 repeat=null cb=(anonymous) age=76661ms cats=tanstack|other|preset
+      at Object.setTimeout (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/timeoutManager.ts:44:36)
+      at TimeoutManager.setTimeout (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/timeoutManager.ts:108:27)
+      at Query.scheduleGc (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/removable.ts:18:40)
+      at Query.removeObserver (/home/user/workspace/worktrees/s6-diagnostic/node_modules/@tanstack/query-core/src/query.ts:377:14)
+      chain: PROMISE#7884† <- PROMISE#7875† <- PROMISE#7860† <- PROMISE#7857† <- PROMISE#7766† <- PROMISE#7765† <- PROMISE#7754† <- PROMISE#7749† <- PROMISE#7732† <- PROMISE#7731† <- PROMISE#7659† <- PROMISE#7654† <- PROMISE#7647† <- PROMISE#7642†
+across_snapshots: persistent_signatures=2 same_asyncIds=2 (signature persists but asyncId changes => re-arming chain; same id => single long timer)
+sandbox_afterAll: qcLoaded=true queries=[]
+sandbox_deferred+1500ms: {"queries":[],"mutations":0,"isFetching":0}
+sandbox_deferred+4000ms: {"queries":[],"mutations":0,"isFetching":0}
+sandbox_deferred+8000ms: {"queries":[],"mutations":0,"isFetching":0}
+hints=DELAY_600000=>queryClient(default gcTime 10min) Query alive after teardown
+--- c6.C.jest.log
+  console.info
+    [S6-P1 T0] mode=d51-singleton authenticated write landed on: ["TGP_RQ_CACHE_V1:anonymous"]
+
+      at Object.info (src/services/__tests__/persistedQueryCache.hazardControls.test.tsx:178:13)
+
+PASS src/services/__tests__/persistedQueryCache.hazardControls.test.tsx (14.734 s)
+  S6-P1 hazard controls [mode=d51-singleton]
+    ✓ T-WIRING: the adapter mirrors the shipped composition of this tree (13 ms)
+    ✓ T0 (fingerprint): where does an authenticated write land on this composition? (3900 ms)
+    ✓ T1 (H1): authenticated cold start restores B's queries from the SHARED anonymous key (40 ms)
+    ✓ T2 (H2): after a NON-signOut logout, sign-in as C keeps B in memory and re-persists B for C (2282 ms)
+    ✓ T3 (H3): a cache update landing during signOut survives on disk after the purge (process killed within ~1 s) (2301 ms)
+    ✓ T4 (H6 positive control — must PASS before AND after): normal signOut leaves nothing to restore (3820 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total
+Snapshots:   0 total
+Time:        15.849 s
+Ran all test suites matching /src\/services\/__tests__\/persistedQueryCache.hazardControls.test.tsx/i.
+[s6diag] globalTeardown: liveRefed=4 byOwner={"runner":2,"other":2} byDelay={"100":1,"600000":2,"-1":1} activeResourcesInfo={"Timeout":3}
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+--- c6.selftest.out
+s6diag selftest: hops=11 liveRefed=3 byDelay={"100":1,"1200":1,"300000":1} problems=0 log=/home/user/workspace/execution/op88/s6-c6-prep/logs/c6/c6.selftest.inventory.jsonl
+--- fingerprint
+3796be8fae738993bcc5c30dd7d4cf9b303329b8faa990ca03e31c2460cd35f3  src/services/__tests__/persistedQueryCache.hazardAdapter.tsx
+a91bb732716b500122e291714bf437872cb81930c020812042f84ed87f6a184d  src/services/__tests__/persistedQueryCache.hazardControls.test.tsx
+?? src/services/__tests__/persistedQueryCache.hazardAdapter.tsx
+?? src/services/__tests__/persistedQueryCache.hazardControls.test.tsx
+--- provenance
+HEAD=d51a191098f483cea9abec6cc7e9f3beffd18c06
+TREE=62bf67b88e0f123f1a23ee34a1a75cb43029d9fb
+lock_blob=6c56385d33db5fa703f8dc37a78381b8e2ba89a1
+node=v20.20.1 npm=10.8.2
+node_modules_present=yes
+ancestor_package_json_absent=yes
+ancestor_node_modules=drwxrwxr-x 212 user user 12288 Sep 23 00:04 /home/user/node_modules entries=210 (platform-owned, pre-existing Sep 20; never touched by this runner)
+ancestor_inventory_before=d0a751542fa5763253e36b4a2c72996e9ef3c266e896eba281889680d7731962
+module-paths OK=20 BAD=0
+--- product/source/ancestor truth after
+HEAD=d51a191098f483cea9abec6cc7e9f3beffd18c06 TREE=62bf67b88e0f123f1a23ee34a1a75cb43029d9fb porcelain=0 lock_sha256=840be0b8d5f4ed8272afd20290c8ebf6f6dacc394e6edae4ae5403e9fabe6b69 index_sha256=4b37d9b7e326f0b492822e77c3aa2cf625d8cf938be5b84bc48341bdd205fcb1 node_modules_top=701 copies_left=0 hooks=0
+ancestor entries=210 sha=d0a751542fa5763253e36b4a2c72996e9ef3c266e896eba281889680d7731962; /home/user/package.json=absent
+source packet 001b840f: 28/28; workload packet: 19/19; c6: 11/11; setup-stage records untouched: LEASE_HOLDER LEASE_RELEASE logs 
+utc_end=2026-09-23T17:38:39Z

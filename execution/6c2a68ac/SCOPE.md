@@ -223,6 +223,20 @@ S3 composed preflight STOP e04842cc/5 before the exact block: five fixed release
 
 `S6_C6_ACTIVATION.md` assigns sole runtime to `restore_s6_substrate_mue9osen` for exact frozen C6 once, qualified setup substrate and actual launcher wait capture, no other changes. After both C6 closure and scratch receipt, parent may reactivate unchanged S3 proof with fresh result root `s3-composed-proof-result-02`; old stop packet immutable.
 
+## Current C6 disposition, S3 reactivation and S6 product build
+
+C6 is CONSUMED: result64a99289/31, six hazard assertions passing at d51, two persistent600000ms removeObserver timers, C/runner143, actual launcher wait90. Frozen outcome i supports the in-case orphan hypothesis; no product PASS. Valid scoped cleanup returned runtime17:37:43Z, confirmed17:38:23Z. Unknown transient member remains unknown. No primitive review, retry or new diagnostic layer.
+
+Scratch preservation69a1da31/11 is COMPLETE and reversible; original five fixed paths absent. `S3_COMPOSED_PROOF_REACTIVATION_02.md` assigns sole runtime to `restore_s2_substrate_mue9eidh`, same dual-closed runner/fixture and exact block, fresh result-02. Prior prelaunch stop remains frozen. S5 setup takes the next released runtime without waiting for S3 final review packaging.
+
+`S6_C6_DISPOSITION_AND_P1_BUILD_GRANT.md` activates bounded product source correction by `restore_s6_substrate_mue9osen`, individual/cumulative T4 (identity/privacy/lifecycle, boundedT1 NO), sole enumerated source/test files in s6-diagnostic and fresh s6-p1-product-build packet. Existing P1 identity-gate scope plus minimum actual query-teardown correction; unchanged v5 hazard/adapter for later behavioral discrimination. No runtime/node/install/commit/index/config/lock/private writes. Frozen candidate proceeds to two independent nonbuilder reviews, which continue to exact hooked head/results rather than create additional audit layers.
+
+## S3 actual completion and S5 setup activation
+
+S3 composed result2d4615e7/118 is frozen: runner/final/cleanup0, guard72/composition68/discriminator48, normalized ten release cases match S2, receipt/publicationOK. Runtime returned17:44:37Z and re-confirmed17:47:20Z. Existing final-head A/B now finish the composed-result portion only; B preserves its frozen interim as a prior revision. No new review layer or runtime repeat.
+
+`S5_CANONICAL_SETUP_ACTIVATION.md` activates exactly one frozen V32 canonical setup under the existing grant, sole executor `repair_s5_binding_mue9vjso`, T4 individual/cumulative, exact unchanged source/worktree/preconditions. Simple detached transport includes directly waited launcher return, no additional observer/supervisor/outer timeout. S5 owns sole runtime; S6 remains product source-only. T0 requires later separate disposition/activation.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.
