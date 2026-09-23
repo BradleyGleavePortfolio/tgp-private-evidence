@@ -48,7 +48,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S5 executor `repair_s5_binding_mue9vjso` owns sole runtime under `S5_CANONICAL_SETUP_ACTIVATION.md`. S3 composed result2d4615e7/118 is frozen and supplied to existing final-head A/B, who finish those same reviews; source and targeted portions are not repeated. S3 closure re-confirmed17:47:20Z, no runtime retained for packaging. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant. Scratch preservation and C6 result are archived unchanged.
+S5 executor `repair_s5_binding_mue9vjso` owns sole runtime under `S5_CANONICAL_SETUP_ACTIVATION.md`. Its source owner independently prepares only the post-setup/T0 true-hooked continuation packet; no worktree/runtime writes. S3 composed result2d4615e7/118 is frozen and supplied to existing final-head A/B, who finish those same reviews; source and targeted portions are not repeated. S3 closure re-confirmed17:47:20Z, no runtime retained for packaging. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant. Scratch preservation and C6 result are archived unchanged.
 
 ## DAG
 

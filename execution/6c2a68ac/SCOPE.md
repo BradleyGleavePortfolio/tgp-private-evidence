@@ -237,6 +237,8 @@ S3 composed result2d4615e7/118 is frozen: runner/final/cleanup0, guard72/composi
 
 `S5_CANONICAL_SETUP_ACTIVATION.md` activates exactly one frozen V32 canonical setup under the existing grant, sole executor `repair_s5_binding_mue9vjso`, T4 individual/cumulative, exact unchanged source/worktree/preconditions. Simple detached transport includes directly waited launcher return, no additional observer/supervisor/outer timeout. S5 owns sole runtime; S6 remains product source-only. T0 requires later separate disposition/activation.
 
+`S5_HOOKED_CANDIDATE_PREPARATION_GRANT.md` independently assigns `restore_s5_source_mue9wsph` a fresh source-only packet, T4 individual/cumulative, to prepare the exact true-hooked two-file continuation and identify the retained fresh51 boundary. No worktree/Git metadata/node/runtime/lock/DB/private writes. This removes planning latency only; actual commit still waits for setup and T0 disposition.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.
