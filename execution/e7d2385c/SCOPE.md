@@ -16,7 +16,9 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists, currently S6 for source-granted R2 validation00–09 after S7 released20:58:57Z. S7's first genuine-hook commit refused and remains preserved; its exact formatter-only correction receives two independent source reviews while S6 runs. No competing heavy execution. Two user-requested UX planning workers operate source-only in disjoint owned paths; no code/contracts/dependency/runtime writes. Missing setup wrapper receipt stays C, no reinstall.
+S6 ordinary20–23 is terminal and released21:24:12Z, headbc7b4e96/treeacb41c2b, same-review final attestations pending. S7 foundation5c760b77/tree7800ecb4 is accepted by both reviewers and parent under S7_FOUNDATION_FINAL_ACCEPTANCE.md. The sole heavy owner is now canonical_s7_continuation_map_muei9t11 for necessary existing local generation in the bounded S7-2 C1 implementation only; no test/DB/hook/commit activation yet. That worker is the sole schema/generator mutation owner in new worktrees/s7-c1 and execution/e7d2385c/s7-c1. Accepted worktrees/dependencies remain read-only to it.
+
+S6's strict06/08/20post1 receipts remain preserved with the exact dispositions in S6_R2_VALIDATION_DISPOSITION.md. The requested initial UX planning package is complete and shared, without product or runtime changes. Missing setup wrapper receipt stays C, no reinstall.
 
 ## Individually graded work
 
@@ -37,8 +39,10 @@ One heavy runtime slot exists, currently S6 for source-granted R2 validation00�
 | S6 observed fixture correction | T4 | Required identity proof mechanics; same builder; bounded T1 NO | Preserve intermediate assertions through existing held-read fixture and baseline seeded writes; no product/harness change |
 | S6 baseline copy-test helper type annotation | T1 child, T4 cumulative | Erased isolated test type, no runtime/assertion/policy effect; same stronger Fable5/High builder | One Awaited annotation, targeted review within final applicability, failed typecheck rerun only; no baseline run |
 | S6 throwaway fixture-client cleanup | T1 child, T4 cumulative | Test-owned real GC timer from blob() only; same stronger Fable5/High builder | Preserve dehydrate snapshot, clear tmp through existing API; assertions/defaults/product untouched; required normal-exit4-case proof |
+| S6 mechanical approved-message binding | T1 child, T4 cumulative | One expected hash literal in an alternate commit command; same stronger builder | Approved message06e7 unchanged, oldsealedcommand preserved, no product/test/runner/othercommand change; same-review pin verification |
 | S7-1 clean foundation composition | T4 | Cumulative accepted backend integration; same S5 builder; bounded T1 NO | Source-only preparation now, dualS5acceptance then explicit activation; exact acceptedparents, cleanmerge/no authoredchange, genuinehooks, no repeatPGproof |
 | S7-1 observed formatter correction | T1 mechanical child, T4 cumulative integration | Exactly 13 hook-reported TS paths, pinned formatter and unchanged config; same stronger builder | Frozen formatter AST-neutrality evidence and exact composition applicability; two nonbuilder reviews, normal genuine-hook commit with established4096MB heap; no new PG proof or hook/config weakening |
+| S7-2 C1 composition and generator reconciliation | T4 individual/cumulative | Existing identity/setup schema and generated contract; canonical_s7_continuation_map_muei9t11, Fable5/High, sole schema/generator owner; boundedT1 NO | Reuse exactPR526 on accepted5c760b77, only expected version resolution and one assertion re-pin, existing generator once; freeze candidate for two independent nonbuilders; targeted contract/pairing and one C1-only real-PG proof later, no E/T-Q0 replay |
 | Importer UX job/PR map | T4 planning/cumulative | Authority/PII/terminal-state job decomposition; Fable5/High | User-requested parallel source-only officialUXlabels/titles/grades/dependencies; reusecanonicalPRs, no remotePR creation |
 | Mobile importer journey/state spec | T4 planning/cumulative | Cross-surface authoritative lifecycle and truthful UX; Fable5/High | Source-only journey/state/copy-intent spec mappedS7–S12; no productimplementation, no competingjobnaming, no invented authority |
 
@@ -57,7 +61,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 ## Current next transitions
 
 - S5 is accepted. Preserve its exact proof and both attempts without another run.
-- Finish activated S6 R2 validation00–09, then read actual outcomes before granting20–23. The mobile repo has no configured hooks; do not describe invented hook execution.
-- Complete S7's independent composition/formatter delta reviews. Message67a3df0257e1e221d0d55d67b298131962448951c14ae816726691cce1bf4733 is approved; one prepared genuine-hook commit requires a later explicit heavy-slot transfer. Failed first commit remains failed.
-- Deliver official UX-01–UX-08 job map and canonical mobile journey spec. UX-07 planning starts alongside UX-01; contract-dependent implementation waits for real contracts, and final journey proof converges at S11/S12. PR289–292 already exist in the S6 lineage; no new M5-rebase job.
+- S6 ordinary20–23 completedbc7b4e96; obtain both same-review final exact-head attestations. Mobile has no configured hooks; do not describe invented hook execution.
+- S7 foundation5c760b77 is accepted at its exact boundary; preserve failed first attempt and all C qualifications.
+- S7-2 C1 implementation is activated in isolation under its sole schema/generator owner. Only necessary local generation is granted now; source READY precedes independent review and a separate validation grant. No accepted-substrate reconstruction or repeated E/T-Q0 proof.
+- Initial official UX-01–UX-08 map and canonical mobile journey planning are delivered. UX-07 planning can start alongside UX-01; contract-dependent implementation waits for real contracts, and final journey proof converges at S11/S12. PR289–292 already exist in the S6 lineage; no new M5-rebase job.
 - Accept each lane at its exact boundary and advance the missing C1 delta, then B/drain. Foundation closure is not importer completion.
