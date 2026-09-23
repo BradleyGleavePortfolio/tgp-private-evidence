@@ -6,7 +6,7 @@ Bradley issued EXECUTE on 2026-09-23 at 12:31 PDT in session e7d2385c-108e-44bd-
 
 Parent is orchestration and private publication only, never product implementation or independent audit. Builders own product changes. Independent nonbuilders review exact T4 candidates. Requested model settings are not runtime model telemetry.
 
-S1, S2, S3 and S4 remain ACCEPTED at their frozen proof boundaries. No repeat proof, baseline diagnostic, new harness or audit of unchanged accepted bytes. S5 and S6 remain unfinished. The current wave is foundation, not importer completion. On closure, continue through the existing canonical G2/C1/lifecycle work toward native transformation, relationships/reconciliation, induction, multi-host customer journey and universal importer acceptance. NEW SOURCE → CORE DIFF = 0.
+S1 through S5 are ACCEPTED at their frozen proof boundaries. No repeat proof, baseline diagnostic, new harness or audit of unchanged accepted bytes. S6 remains unfinished. The current wave is foundation, not importer completion. On closure, continue through the existing canonical G2/C1/lifecycle work toward native transformation, relationships/reconciliation, induction, multi-host customer journey and universal importer acceptance. NEW SOURCE → CORE DIFF = 0.
 
 No product remote push/merge, deployment, production/customer enablement, hosted security setting, real source-account access, destructive action, external communication or new spending is granted. Public backend main still auto-deploys. Parent alone may make ordinary private telemetry/evidence commits, preserving Bradley author/committer, no AI trailers, no force push, and a fresh remote-tip comparison. A concurrent private writer must be reconciled rather than overwritten.
 
@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists, currently S7-1 builder for activated clean composition and genuine hooks after dual S5 acceptance. S6 frozen r2gets two independent delta reviews before the next runtime transfer. Two user-requested UX planning workers operate source-only in disjoint owned paths; no code/contracts/dependency/runtime writes. Missing setup wrapper receipt stays C, no reinstall.
+One heavy runtime slot exists, currently S6 for source-granted R2 validation00–09 after S7 released20:58:57Z. S7's first genuine-hook commit refused and remains preserved; its exact formatter-only correction receives two independent source reviews while S6 runs. No competing heavy execution. Two user-requested UX planning workers operate source-only in disjoint owned paths; no code/contracts/dependency/runtime writes. Missing setup wrapper receipt stays C, no reinstall.
 
 ## Individually graded work
 
@@ -38,6 +38,7 @@ One heavy runtime slot exists, currently S7-1 builder for activated clean compos
 | S6 baseline copy-test helper type annotation | T1 child, T4 cumulative | Erased isolated test type, no runtime/assertion/policy effect; same stronger Fable5/High builder | One Awaited annotation, targeted review within final applicability, failed typecheck rerun only; no baseline run |
 | S6 throwaway fixture-client cleanup | T1 child, T4 cumulative | Test-owned real GC timer from blob() only; same stronger Fable5/High builder | Preserve dehydrate snapshot, clear tmp through existing API; assertions/defaults/product untouched; required normal-exit4-case proof |
 | S7-1 clean foundation composition | T4 | Cumulative accepted backend integration; same S5 builder; bounded T1 NO | Source-only preparation now, dualS5acceptance then explicit activation; exact acceptedparents, cleanmerge/no authoredchange, genuinehooks, no repeatPGproof |
+| S7-1 observed formatter correction | T1 mechanical child, T4 cumulative integration | Exactly 13 hook-reported TS paths, pinned formatter and unchanged config; same stronger builder | Frozen formatter AST-neutrality evidence and exact composition applicability; two nonbuilder reviews, normal genuine-hook commit with established4096MB heap; no new PG proof or hook/config weakening |
 | Importer UX job/PR map | T4 planning/cumulative | Authority/PII/terminal-state job decomposition; Fable5/High | User-requested parallel source-only officialUXlabels/titles/grades/dependencies; reusecanonicalPRs, no remotePR creation |
 | Mobile importer journey/state spec | T4 planning/cumulative | Cross-surface authoritative lifecycle and truthful UX; Fable5/High | Source-only journey/state/copy-intent spec mappedS7–S12; no productimplementation, no competingjobnaming, no invented authority |
 
@@ -55,9 +56,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. S5 is accepted; complete the activated clean S7-1 composition with genuine hooks, then exact-head applicability review.
-2. In parallel, close only S6r2's observed three-test delta and prepare its existing validation; no product source reopened.
-3. Transfer runtime for affected S6proof and still-unrun04–09, then normal commit/finalattestations.
-4. Independently deliver officialUXjobmap and canonicalmobilejourneyspec; design planning does not wait on dataflow, but contract-dependent implementation does.
-4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
-5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
+- S5 is accepted. Preserve its exact proof and both attempts without another run.
+- Finish activated S6 R2 validation00–09, then read actual outcomes before granting20–23. The mobile repo has no configured hooks; do not describe invented hook execution.
+- Complete S7's independent composition/formatter delta reviews. Message67a3df0257e1e221d0d55d67b298131962448951c14ae816726691cce1bf4733 is approved; one prepared genuine-hook commit requires a later explicit heavy-slot transfer. Failed first commit remains failed.
+- Deliver official UX-01–UX-08 job map and canonical mobile journey spec. UX-07 planning starts alongside UX-01; contract-dependent implementation waits for real contracts, and final journey proof converges at S11/S12. PR289–292 already exist in the S6 lineage; no new M5-rebase job.
+- Accept each lane at its exact boundary and advance the missing C1 delta, then B/drain. Foundation closure is not importer completion.
