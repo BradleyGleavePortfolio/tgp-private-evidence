@@ -34,6 +34,8 @@ One heavy runtime slot exists in this sandbox. S5's full attempt refused at the 
 | S6 minimum fresh setup | T4 | Install exact unchanged lock for sensitive identity proof; same builder; bounded T1 NO | One bounded npm ci, disclosed prerequisites, no source change/test/typecheck/commit |
 | S6 P3 identity-test correction | T4 | Remaining Class B04 proof defect; same builder; bounded T1 NO | S6_P3_TEST_CORRECTION.md: one test file only, eight P2 files unchanged, independent delta closure then existing validation |
 | S5 observed runner refusal correction | T4 | Concrete proof prerequisite B; same builder; bounded T1 NO | External runner only, preserve actual failure and zero terminal survivors, dual changed-runner closure then existing execution |
+| S6 observed fixture correction | T4 | Required identity proof mechanics; same builder; bounded T1 NO | Preserve intermediate assertions through existing held-read fixture and baseline seeded writes; no product/harness change |
+| S6 baseline copy-test helper type annotation | T1 child, T4 cumulative | Erased isolated test type, no runtime/assertion/policy effect; same stronger Fable5/High builder | One Awaited annotation, targeted review within final applicability, failed typecheck rerun only; no baseline run |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
@@ -49,8 +51,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Complete S6's dual-granted existing00–09 validation; actual results gate ordinary commit20–23.
-2. In parallel, correct only S5's observed proof-runner refusal without product/fixture changes, then obtain the same reviewers' changed-runner grant.
+1. Continue unaffected S6 steps03–09 despite preserved01/02 failures, then prepare only observed fixture/type fixes per S6_OBSERVED_TEST_FIXES.md. Actual success gates ordinary commit.
+2. In parallel, close only S5 runner7.1's owned-group clear-before-drain defect, then obtain the same reviewers' tiny-delta grant.
 3. Transfer runtime explicitly for existing S5 fresh51; preserve the failed prior attempt and no fabricated live result.
 4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
 5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.

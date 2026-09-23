@@ -10,6 +10,8 @@ S5 remains unchanged at98d39610/tree67fc1db5. Its one full attempt20260923T20213
 
 S6 P3 tree93ed7cfc4d0b8095148e0020ca40f901833595f6 / manifest4f993b98 is dual GRANTABLEb90a1c2b/c89cfc6c. Existing validation binding639b5349 is activated for00–09 only under S6_P3_VALIDATION_ACTIVATION.md; S6 owns sole heavy runtime after S5 release. Actual outcomes gate ordinary commit20–23; proposed message4ac2840e is approved. Both remount addenda and setup wrapper provenance are C, no new fix/test/reinstall. P1/P2/verdicts immutable; no final acceptance yet. Mobile has no configured hooks.
 
+Current actual exceptions: S6 step01 raw2 is four errors in one unchanged baseline helper; step02 raw1 is16passed/3fixture-assumption failures. Parent continues independent03–09 on unchanged P3. Afterwards only the one Awaited type annotation and three observed fixture mechanics are authorized under S6_OBSERVED_TEST_FIXES.md; phase assertions must be preserved, not dropped. S5 runner7.1 is frozen but not activated: A identified owned-group bookkeeping cleared before the new drain; B's original grant is preserved. Minimum successor moves that clear after drain/termination, with same reviewers' tiny-delta follow-up, then existing execution.
+
 Previous parent access is denied, so old worker liveness is UNKNOWN, not inferred active or complete. Old process IDs, slots and grants are not inherited. New owners use fresh isolated output paths. Parent alone publishes private telemetry; builders/auditors do not write the private checkout.
 
 ## Product continuation
