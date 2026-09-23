@@ -201,6 +201,10 @@ S6 and S5 remain runtime queued. The two required final-head attestations start 
 
 Source-only preparation COMPLETE, sealbe31c041/14 entries. Exact runnere876f48c derived from acceptedefa273c7; fixture9763698b derived from accepted9fcc3696; no runtime. `S3_COMPOSED_PROOF_DUAL_REVIEW_SCOPE.md` activates two independent changed-binding reviews by the existing final-head nonbuilders A/B, sole separate review paths. Frozen review asks source closure and one-shot grantability for exact be0ba827/treea584/lockb7fed/deepmerge8 with S3 receipt binding; unchanged v5.7 mechanics transfer without re-audit. `env -u S2_RUNNER_STUBS` is fixed; fresh output roots required; fixture handles port collision; no new control layer. Runtime HELD pending both reviews, returned slot and explicit grant.
 
+## S3 composed-proof dual closure
+
+Both changed-binding reviews COMPLETE: A16f71ac2/B8dce0cd6, no A/B, exact source CLOSED and one-shot GRANTABLE. Parent accepts at `S3_COMPOSED_PROOF_DUAL_CLOSURE.md`; C qualifications carried without edits/new cycle. `S3_COMPOSED_PROOF_RUNTIME_GRANT.md` is ready but NOT ACTIVE until S6 returns runtime. Existing final-head A/B source and targeted portions are complete; actual composed result is their only remaining input.
+
 ## S3 targeted result and S6 setup transition
 
 S3 original09–14 COMPLETE: six actualraw0,31 suites/825 tests PASS, exactbe0ba827/treea584/lockb7fed preserved, result1513911d/27 entries and bundled204a582. Executor returned canonical runtime. Both already-active final-head reviewers receive this frozen result for the same review; composed proof remains pending, source preparation active.
