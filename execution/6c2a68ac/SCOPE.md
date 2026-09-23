@@ -81,6 +81,47 @@ Follow only the archived 2026-09-23/e8d546f9/s6-source-restore/REPORT.md and nam
 
 ## Baseline
 
+## Active successor assignments
+
+### S5-V32 narrow repair
+
+- Tier: T4 individual and cumulative.
+- Why: exact-attempt provenance at the shared exclusion/recovery boundary.
+- T4 trigger scan: trusted validation and recovery; T3 trigger scan: process lifecycle and state authority.
+- Bounded T1: NO, recovery/privilege.
+- Sole builder: `repair_s5_binding_mue9vjso`, Claude Fable 5 / High requested. Parent owner: EXEC-6c2a68ac.
+- Sole writes: fresh local `execution/6c2a68ac/s5-v32-builder/**`.
+- Acceptance: close S5-V31-A-01 with exact current-attempt binding in the earliest checked publication; stale equal/future timestamp records cannot supply current runner facts; retain early-death liveness, raw-status truth, no-handoff/last-owner behavior and unchanged OWN-BLOCK v10.1 bytes. Preserve all prior assertions and add only the negative cases required by the finding. Freeze diffs, hashes, source/control requests and non-self-including manifest for two independent changed-candidate reviews.
+- Stop triggers: new material ambiguity, primitive change, authority expansion, collision or additional unscoped behavior.
+
+The smallest needed real-runner START publication change is explicitly allowed inside this fresh packet; preserving its prior whole-file hash is not an acceptance criterion when the finding requires that change. Primitive bytes and unrelated behavior remain frozen. `bash -n` on owned candidate shell files is allowed as nonexecuting syntax validation, not tests. No candidate/control runtime, lock, process census, signals, install, product worktree edit or private publication. Do not wait for cosmetic changes. The outstanding V31-B audit remains independent on its frozen inputs; parent routes any additional concrete findings after it freezes.
+
+### S5-SOURCE-RESTORE
+
+- Tier: T4 individual and cumulative; why: exact consequential source/evidence provenance.
+- T4 trigger scan: recovery/trusted validation; T3 trigger scan: cross-slice lifecycle.
+- Bounded T1: NO, recovery/privacy.
+- Sole builder: `restore_s5_source_mue9wsph`, Claude Fable 5 / High requested. Parent owner: EXEC-6c2a68ac.
+- Sole writes: fresh `worktrees/s5-r4/**`, `execution/6c2a68ac/s5-source-restore/**`.
+- Acceptance: reproduce archived source-restore plus fingerprint-normalization receipts exactly: HEAD `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, tree `d0e122d35022377196908b7d132fc34c1af2fc6b`, frozen two-file patch `c36258b39d0c92f0b760f11982a61427c6e7cce963eecffe2554f447346c5491`, repo-local `core.abbrev=8`, dirty fingerprint `6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0`; no additional changes.
+- Stop triggers: collision, mismatch, missing named input or scope expansion.
+
+Mechanical source restoration only. Existing backend baseline read-only. No network, execution, setup, dependencies, tests, versions, census, locks, signals, hooks, authored product edits or commits. This is disjoint from the S5-V32 packet writer.
+
+### S3-PREP2-RESTORE
+
+- Tier: T4 individual and cumulative; why: consequential composed-source provenance.
+- T4 trigger scan: trusted validation/integration; T3 trigger scan: generated contracts and lifecycle.
+- Bounded T1: NO, trusted validation/integration.
+- Sole builder: `restore_s3_candidate_mue9wspd`, Claude Fable 5 / High requested. Parent owner: EXEC-6c2a68ac.
+- Sole writes: fresh `worktrees/s3-prep2/**`, `execution/6c2a68ac/s3-restore/**`.
+- Acceptance: reproduce existing staged tree `a584a1b95423f95dae8daabf673ef3776604acbb` from exact d5cd and 5c7b parent representations with the named PREP2 patches; state HEAD/index/worktree semantics without fabricating a merge commit; preserve all six formatting blobs and packet25/25.
+- Stop triggers: collision, missing named objects, contradictory semantics or scope expansion.
+
+Read only the archived upstream §2, named PREP2 packet and named bundles. Backend baseline and S2 live worktree read-only; use isolated local object storage. No network, authored code, merge commit, hooks, install, runtime, DB, canonical lock or process actions. S3 integration acceptance still depends on S1/S2 real proof.
+
+## Baseline pins
+
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.
 
 Bradley decision required: NO for this bounded local scope. Downstream external/production/customer boundaries remain reserved.

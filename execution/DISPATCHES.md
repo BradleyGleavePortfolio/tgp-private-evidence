@@ -8,9 +8,12 @@ Updated 2026-09-23 for EXEC-6c2a68ac. Current contract: `execution/6c2a68ac/SCOP
 | S2 V61 controls | `restore_s2_substrate_mue9eidh` | Claude Fable 5 / High | enumerated grant runtime paths and `execution/6c2a68ac/s2-v61-result` | ACTIVE upon parent message; one five-set block, stop first failure; exclusive runtime slot |
 | S5 V31 independent A | `audit_s5_v31_lens_a_mue9eid4` | Parent inheritance | `execution/6c2a68ac/audits/s5-v31-a` | COMPLETE; material S5-V31-A-01 exact-binding defect, source closure denied |
 | S5 V31 independent B | `audit_s5_v31_lens_b_mue9eidl` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v31-b` | ACTIVE; read/hash/diff only, no peer |
-| S5 V2 failed-result/recovery A | `audit_s5_failure_lens_a_mue9osec` | Parent inheritance | `execution/6c2a68ac/audits/s5-v2-result-a` | ACTIVE; read/hash/diff only, no peer |
+| S5 V2 failed-result/recovery A | `audit_s5_failure_lens_a_mue9osec` | Parent inheritance | `execution/6c2a68ac/audits/s5-v2-result-a` | COMPLETE; accepts attributable failure/historical exact-holder closure with qualifications only; B pending |
 | S5 V2 failed-result/recovery B | `audit_s5_failure_lens_b_mue9oser` | Claude Fable 5 / High | `execution/6c2a68ac/audits/s5-v2-result-b` | ACTIVE; read/hash/diff only, no peer |
-| S6 exact substrate restore | `restore_s6_substrate_mue9osen` | Claude Fable 5 / High | fresh `source/mobile`, `worktrees/s6-diagnostic`, `execution/op88/s6-c6-prep`, `execution/6c2a68ac/s6-restore` | ACTIVE; source-only, no implementation/runtime/install |
+| S6 exact substrate restore | `restore_s6_substrate_mue9osen` | Claude Fable 5 / High | restored paths in SCOPE | COMPLETE; d51a/tree62bf67b8, packet19/19/subset11/11; no runtime |
+| S5 V32 narrow binding repair | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | `execution/6c2a68ac/s5-v32-builder` | ACTIVE; source/control successor only for material S5-V31-A-01 |
+| S5 product substrate restore | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | `worktrees/s5-r4`, `execution/6c2a68ac/s5-source-restore` | ACTIVE; exact frozen source only, no runtime |
+| S3 PREP2 substrate restore | `restore_s3_candidate_mue9wspd` | Claude Fable 5 / High | `worktrees/s3-prep2`, `execution/6c2a68ac/s3-restore` | ACTIVE; exact staged tree only, no integration/test/commit |
 
 Prior e8d546f9 dispatches, installations, PIDs, slots and grants are preserved historical evidence only. S4 native proof is accepted and closed. S2 V61 is activated by `execution/6c2a68ac/S2_RESTORATION_ACCEPTANCE_AND_ACTIVATION.md`. S5 runtime is blocked by material exact-binding finding S5-V31-A-01; the second independent review continues. S6 implementation/runtime are held. S1 schema/generator ownership remains reserved and unassigned.
 
