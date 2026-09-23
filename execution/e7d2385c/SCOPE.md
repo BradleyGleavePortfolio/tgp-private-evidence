@@ -1,5 +1,11 @@
 # EXEC-e7d2385c continuation
 
+## Owner pause supersedes execution
+
+**PAUSED BY OWNER on 2026-09-23. All continuation, worker-write and runtime grants are revoked.** The eight session workers are completed or durably checkpointed and stopped. This scope's grading and prior assignments remain historical, not activation authority.
+
+Read `OPERATOR_PAUSE_AND_RESUME.md` before any later continuation. C1 source and both source reviews are complete; the validation binding is frozen and never launched, the intentional 18-path staged merge is preserved, and the PG fixture variant remains unbuilt. A fresh explicit grant is required to resume from that point.
+
 Bradley issued EXECUTE on 2026-09-23 at 12:31 PDT in session e7d2385c-108e-44bd-a9dd-d7aa65c77bde. Intake is private commit cc62002bfd08c3cb677025b651965d36e6a1aaec. Mandatory startup reading and targeted reconciliation are complete. Current explicit owner instructions, live G01–G22, the T0–T4 doctrine, EXECUTE doctrine, and Owner Safety ROI amendment govern.
 
 ## Authority and preserved acceptance
@@ -16,9 +22,9 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-S6 is acceptedbc7b4e96/treeacb41c2b with finalsealsAa8461003/B6d867c8a; release21:24:12Z. S7 foundation5c760b77/tree7800ecb4 is accepted. C1's necessary generation completed and runtime released21:35:18Z; no heavy owner is active and no test/DB/hook/commit is granted. canonical_s7_continuation_map_muei9t11 remains sole schema/generator mutation owner in isolated worktrees/s7-c1 and its assigned s7-c1/s7-c1-formatted/validation-binding output paths. Accepted worktrees/dependencies remain read-only.
+S6 is acceptedbc7b4e96/treeacb41c2b with finalsealsAa8461003/B6d867c8a; release21:24:12Z. S7 foundation5c760b77/tree7800ecb4 is accepted. C1's necessary generation completed and runtime released21:35:18Z. There is no active heavy owner or product writer; canonical_s7_continuation_map_muei9t11's former ownership is retained only as provenance. All worktrees and dependencies are preserved read-only during the pause.
 
-C1 formatted candidate87798e742c7b48f56b05e9b5c30efa877180a9b3 is frozen under manifest8ef86a1b; original128496e2 is preserved. Complete independent C1 source reviews A/B are active, without re-auditing accepted foundations. A separate source-only owner prepares the existing C1-only PG proof under s7-c1-pg-preparation; no runtime, probes or cluster/source mutations are authorized there.
+C1 formatted candidate87798e742c7b48f56b05e9b5c30efa877180a9b3 is frozen under manifest8ef86a1b; original128496e2 is preserved. Independent C1 source reviews A/B are complete and source-grantable, with remaining binding/fixture/actual-result phases explicitly checkpointed. Existing C1-only PG proof preparation is complete under s7-c1-pg-preparation, but no fixture, cluster or proof run exists.
 
 S6's strict06/08/20post1 receipts remain preserved with the exact dispositions in S6_R2_VALIDATION_DISPOSITION.md. The requested initial UX planning package is complete and shared, without product or runtime changes. Missing setup wrapper receipt stays C, no reinstall.
 
@@ -64,11 +70,11 @@ The startup summary's S5 five-binding item is an existing hooked-commit executio
 
 Reviewers may read relevant frozen prior findings and attributable existing test evidence, but not current peer conclusions or parent dispositions as substitutes for their own review. Candidate source is read-only. Each reviewer writes only its fresh owned output directory. No duplicate heavy test run for review independence. Preserve source-phase output; add final-head/result attestations to the same reviews rather than restart unchanged source audits.
 
-## Current next transitions
+## Future transitions, only after fresh authorization
 
 - S5 is accepted. Preserve its exact proof and both attempts without another run.
 - S6 is acceptedbc7b4e96 under S6_FINAL_ACCEPTANCE.md and requires no furthercycle. Mobile has no configured hooks; do not describe invented hook execution.
 - S7 foundation5c760b77 is accepted at its exact boundary; preserve failed first attempt and all C qualifications.
-- S7-2 C1 formatted source is READY87798e74. Complete the two independent source reviews and existing local/PG execution bindings; separate runtime activation is still required. Approved message288048d7b7e908f8803d3d70e57465f52cfc9f102bb4bc4b1dba30143ce7cb83 does not itself authorize execution. No accepted-substrate reconstruction or repeated E/T-Q0 proof.
+- S7-2 C1 formatted source is READY87798e74 and both source reviews are complete. Continue only outstanding execution-binding review, minimum fixture preparation/review and later same-review actual-result attestations. Approved message288048d7b7e908f8803d3d70e57465f52cfc9f102bb4bc4b1dba30143ce7cb83 does not itself authorize execution. No accepted-substrate reconstruction or repeated E/T-Q0 proof.
 - Initial official UX-01–UX-08 map and canonical mobile journey planning are delivered. UX-07 planning can start alongside UX-01; contract-dependent implementation waits for real contracts, and final journey proof converges at S11/S12. PR289–292 already exist in the S6 lineage; no new M5-rebase job.
-- Accept each lane at its exact boundary and advance the missing C1 delta, then B/drain. Foundation closure is not importer completion.
+- After resumption and actual acceptance, advance the missing C1 delta, then B/drain. Foundation closure is not importer completion; the present owner STOP is a mandatory pause.

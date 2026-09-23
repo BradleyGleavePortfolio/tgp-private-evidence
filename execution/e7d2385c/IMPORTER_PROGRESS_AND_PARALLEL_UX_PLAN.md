@@ -1,8 +1,8 @@
 # Importer Progress and Parallel UX Plan
 
-The data/system work continues under S1–S12, while the mobile experience has a separate UX-01–UX-08 planning lane. These are coordinated workstreams, not competing phase numbers, and the UX labels do not authorize rebuilding existing mobile features.
+The project is **safely paused at the owner's request**. All eight session workers are finished or checkpointed, and no task-owned validation process or runtime lock remained at the final check.
 
-This snapshot follows final acceptance of S6 and S7's foundation composition, with C1 integration now underway. It distinguishes accepted results from active changes and future implementation.
+S1–S12 remain the data/system mission, with UX-01–UX-08 as the parallel customer-experience lane. The next operator resumes C1 from its preserved source/review checkpoint, not from a new implementation cycle; the detailed instructions are in `OPERATOR_PAUSE_AND_RESUME.md`.
 
 ## Done
 
@@ -17,11 +17,13 @@ This snapshot follows final acceptance of S6 and S7's foundation composition, wi
 
 The failed first S5 attempt and failed S6 P3 receipts remain recorded as failures. Later corrected evidence does not overwrite them.
 
-## Underway
+## In progress, now paused
 
-| Work | Current activity | What comes next |
+| Work | Preserved stopping point | What comes next after authorization |
 |---|---|---|
-| S7 C1 integration | Reusing the existing durable import-setup work on the accepted foundation, with one schema/generator owner in an isolated worktree | Freeze the exact candidate, obtain independent review, then run the C1-specific validation |
+| S7 C1 integration | Exact 18-path candidate is frozen, both independent source reviews are complete and grantable, and the intentional uncommitted merge is retained | Finish only outstanding execution-binding review, then authorize the existing ordinary-hook commit and targeted validation |
+| C1 validation binding | Launcher and approved commit message are frozen; hooks, commit and targeted tests have never run | A fresh explicit grant is required; existing source reviews are not restarted |
+| C1 real-database proof | Requirements for the existing 22-case proof are documented; the minimum fixture variant is not built | Build and review that bounded prerequisite, then later run the C1-only proof once |
 
 S7's first hook refusal remains recorded; its later corrected commit passed without bypassing hooks. Accepted S3/S5 evidence transfers at its existing boundaries, rather than being repeated.
 
@@ -38,7 +40,7 @@ S6 passed typecheck, identity19/19, navigation4/4, persistence5/5, sign-out4/4 a
 | S11 | Complete customer journey and multi-host integration |
 | S12 | Real acceptance and pilot proof |
 
-The new UX lane is planning-only at this point. No new UX implementation PR, customer-facing prototype or usability session is claimed; the accepted mobile base is now available for future implementation.
+The new UX lane is planning-only at this point. No new UX implementation PR, customer-facing prototype or usability session is claimed; existing mobile PRs remain reuse inputs rather than work to recreate.
 
 ## Official UX jobs and PR naming
 
@@ -61,13 +63,17 @@ Proposed PR titles use the outcome directly, for example `UX-03: Desktop handoff
 - **Presentation inputs:** The Roman views in [PR #293](https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/293) and controlled status views in [PR #294](https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/294) should be compared with the accepted S6 successor before adoption, rather than recreated.
 - **Acceptance distinction:** Existing code, source review, runtime proof and unfamiliar-user usability results remain separate statuses. The 9/10 usability target is a target, not an observed result.
 
-## Useful parallelism
+## Future parallelism, not active assignments
 
-We are using independent planning and source-review work alongside one heavy validation lane. Running more heavy jobs together would compete for the same resources and complicate runtime ownership, so maximum worker count is not the objective.
+All assignments are currently stopped. After a fresh grant, independent planning can accompany one exclusive heavy-validation lane, with one writer for each overlapping product surface.
 
-- **Start now:** Journey planning, UX-07 design-system/accessibility planning, handoff/readiness states, recovery copy, results questions and usability scenarios.
+- **Eligible after resumption:** Outstanding UX-07 design-system/accessibility planning, handoff/readiness states, recovery copy, results questions and usability scenarios. Do not repeat the delivered journey specification.
 - **Wait for real contracts:** Functional Start, Stop, progress, recovery and result bindings must consume defined server states and native destinations. Mock presentation must not imply backend behavior already exists.
 - **Serialize shared files:** One mobile status/result writer and one extension presentation writer avoid conflicting edits within each repository.
 - **Converge later:** UX-07 can begin alongside UX-01. UX-08's actual journey proof converges with S11/S12 rather than declaring the whole product complete early.
 
-No additional owner decision is currently needed for the authorized local continuation. Product publication, production enablement and real customer/source-account actions remain outside the current authorization.
+## Handoff protection
+
+The saved checkpoint identifies completed steps, unfinished review parts, exact hashes, the next action and work that must not be repeated. A portable bundle plus the frozen patch preserves the uncommitted C1 candidate even if a later operator needs a fresh sandbox; restoring missing tooling is distinct from repeating accepted proof.
+
+All prior continuation grants are revoked by the pause. Product publication, production enablement and real customer/source-account actions remain outside the authorization, and no new work should start until explicitly resumed.

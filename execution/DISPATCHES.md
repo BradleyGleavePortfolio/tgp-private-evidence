@@ -1,6 +1,8 @@
-# Active TGP execution register
+# TGP Execution Register
 
-Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXECUTE 2026-09-23 12:31 PDT. Scope: `execution/e7d2385c/SCOPE.md`. Each child and cumulative integration is T4. Requested routing is recorded honestly, not asserted runtime telemetry.
+Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde. **PAUSED BY OWNER: all eight workers ended; all continuation/write/runtime grants revoked.** Scope: `execution/e7d2385c/SCOPE.md`; exact resume cursor: `execution/e7d2385c/OPERATOR_PAUSE_AND_RESUME.md`.
+
+Rows below preserve historical assignments and receipts, not active authorization. Each child/cumulative integration was graded before work, with requested routing recorded honestly rather than asserted as runtime telemetry.
 
 | Slice | Worker | Requested route | Sole owned writes | Current state |
 |---|---|---|---|---|
@@ -21,10 +23,10 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 | S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | COMPLETE finalACCEPTa8461003 atbc7b4e96; all priorseals/qualifications preserved |
 | S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | COMPLETE finalACCEPT6d867c8a atbc7b4e96; no furthercycle |
 | S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | COMPLETE corrected overlap map; reuse S3+S5, missing C1 delta only; no repeat E/T-Q0 proof |
-| S7-2 C1 composition/generator | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | worktrees/s7-c1; s7-c1/**, s7-c1-formatted/** and localvalidationbinding | SOURCE READY87798e74/8ef86a1b; exactformatapplied/message288048d7approved; runtimeRELEASED21:35:18Z; preparesboundedexistingcommands, no execution |
-| S7-2 C1 independent A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | audits/s7-c1-a/** | ACTIVE completeC1identity/setup/contract/integration review onfrozencandidate, no acceptedfoundationaudit |
-| S7-2 C1 independent B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | audits/s7-c1-b/** | ACTIVE independentC1migration/RLS/setup/contract/proof review, no peerconclusions/runtime |
-| S7-2 C1-only PG proof preparation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | s7-c1-pg-preparation/** | ACTIVE source-onlyexistingtest/guard/input/commandbinding; no runtime/probe/newharness/clusterchange |
+| S7-2 C1 composition/generator | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | worktrees/s7-c1; s7-c1/**, s7-c1-formatted/** and localvalidationbinding | PAUSED source87798e74 complete; launcher a57c224c never run; 18-path merge retained; portable bundle a238a7b1 and checkpoint/addendum saved; stop returned completed |
+| S7-2 C1 independent A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | audits/s7-c1-a/** | PAUSED source GRANTABLE4b6eb453, noA/B; checkpoint890b64b4; binding/fixture/actual-result phases unfinished, source review not restarted; stop returned completed |
+| S7-2 C1 independent B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | audits/s7-c1-b/** | PAUSED source GRANTABLE e0aa8103, noA/B; checkpointcef828d5; fixture/actual-commit/PG attestations unfinished; stop returned completed |
+| S7-2 C1-only PG proof preparation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | s7-c1-pg-preparation/** | PAUSED prep COMPLETE63076c47; checkpoint2346baea; fixture variant unbuilt, no cluster/DB/run; stop returned completed |
 | S7-1 foundation composition | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `execution/e7d2385c/s7-foundation/**`; isolated worktree | HOOK REFUSAL preserved; 13 Prettier files and default-heap OOM; no commit; slot RELEASED20:58:57Z |
 | S7-1 formatter-only correction | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `execution/e7d2385c/s7-foundation-format/**` | COMMITTED5c760b77/tree7800ecb4, allrealhooks/raw0; bundle3e81299d; slotRELEASED21:20:28Z |
 | S7 independent composition/format A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s7-a/**` | FINAL exact-boundary ACCEPT51f608d5; previoussource9e9ca7bd preserved |
@@ -32,8 +34,8 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 | Importer UX official job/PR map | `plan_importer_ux_lane_muektoah` | Claude Fable 5 / High | `execution/e7d2385c/ux-planning/` jobmap/DAG/register only | COMPLETE/DELIVERED final7cc0021c; exactUX-01–08; existing289–292 reused; no code/runtime/remote writes |
 | Mobile importer journey/state planning | `specify_mobile_importer_journey_muekv9nz` | Claude Fable 5 / High | `execution/e7d2385c/ux-planning/journey/**` | COMPLETE/DELIVERED9701ab29; spec/matrix/questions, no product/runtime/remote writes |
 
-Parent alone owns private telemetry/evidence publication. S7-2's sole schema/generator mutationowner is canonical_s7_continuation_map_muei9t11 in its isolated assignedpaths. S1–S6 and S7-1 are accepted at their recorded boundaries. No productremote, customer/production/source-account or new spending action is active.
+Parent alone owns the remaining private telemetry/evidence publication. No product mutation owner or heavy-runtime owner is active; former ownership is retained for provenance only. S1–S6 and S7-1 are accepted at their recorded boundaries. No productremote, customer/production/source-account or new spending action is active.
 
 Prior 6c2a68ac worker IDs and grants are historical here; their remote liveness is UNKNOWN. Previous register remains in Git at cc62002bfd08c3cb677025b651965d36e6a1aaec. No prior ACTIVE label is treated as a live execution claim.
 
-Next: completeC1source reviews andexistingexecutionbindings, then explicitboundedlocalvalidation andlateroneC1-onlyPGproof. S6 isclosed; UXplanningisdelivered withacceptedmobilebasebc7b4e96. No duplicateM5 or inventedbackendbehavior. C never independently creates a work item or delay.
+Next only after fresh authorization: finish outstanding C1 execution-binding review, then boundedlocalvalidation and later the minimum reviewed fixture plus oneC1-onlyPGproof. Both full source reviews are already complete. S6 isclosed; UXplanningisdelivered withacceptedmobilebasebc7b4e96. No duplicateM5, source audit or accepted proof.
