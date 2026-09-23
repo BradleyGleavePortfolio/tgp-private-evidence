@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists. S6 P3 validation stopped after03raw124 with4/4 assertions but hang-after-results; released20:37Z. S5 now owns the slot for one existingfull under S5_REV72_ACTIVATION.md, with dual-granted runner16c763f4 and unchanged candidate/fixture/helper. S6 is source-only minimum observed test correction and exact rootnav-handle diagnosis; no speculative fix/runtime/new control. Its commit remains gated. Missing setup wrapper receipt stays C, no reinstall.
+One heavy runtime slot exists, currently S7-1 builder for activated clean composition and genuine hooks after dual S5 acceptance. S6 frozen r2gets two independent delta reviews before the next runtime transfer. Two user-requested UX planning workers operate source-only in disjoint owned paths; no code/contracts/dependency/runtime writes. Missing setup wrapper receipt stays C, no reinstall.
 
 ## Individually graded work
 
@@ -36,6 +36,10 @@ One heavy runtime slot exists. S6 P3 validation stopped after03raw124 with4/4 as
 | S5 observed runner refusal correction | T4 | Concrete proof prerequisite B; same builder; bounded T1 NO | External runner only, preserve actual failure and zero terminal survivors, dual changed-runner closure then existing execution |
 | S6 observed fixture correction | T4 | Required identity proof mechanics; same builder; bounded T1 NO | Preserve intermediate assertions through existing held-read fixture and baseline seeded writes; no product/harness change |
 | S6 baseline copy-test helper type annotation | T1 child, T4 cumulative | Erased isolated test type, no runtime/assertion/policy effect; same stronger Fable5/High builder | One Awaited annotation, targeted review within final applicability, failed typecheck rerun only; no baseline run |
+| S6 throwaway fixture-client cleanup | T1 child, T4 cumulative | Test-owned real GC timer from blob() only; same stronger Fable5/High builder | Preserve dehydrate snapshot, clear tmp through existing API; assertions/defaults/product untouched; required normal-exit4-case proof |
+| S7-1 clean foundation composition | T4 | Cumulative accepted backend integration; same S5 builder; bounded T1 NO | Source-only preparation now, dualS5acceptance then explicit activation; exact acceptedparents, cleanmerge/no authoredchange, genuinehooks, no repeatPGproof |
+| Importer UX job/PR map | T4 planning/cumulative | Authority/PII/terminal-state job decomposition; Fable5/High | User-requested parallel source-only officialUXlabels/titles/grades/dependencies; reusecanonicalPRs, no remotePR creation |
+| Mobile importer journey/state spec | T4 planning/cumulative | Cross-surface authoritative lifecycle and truthful UX; Fable5/High | Source-only journey/state/copy-intent spec mappedS7–S12; no productimplementation, no competingjobnaming, no invented authority |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
@@ -51,8 +55,9 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Complete the one activated S5 full attempt with rev7.2; preserve actual result, then same-review final attestation.
-2. In parallel, prepare only S6's observed fixture/type fixes and identify the actual rootnav handle from source if possible. Do not combine an unknown-cause speculative fix.
-3. After narrow delta closure and runtime transfer, prove affected S6 boundaries and execute still-unrun04–09. No passed applicable evidence is automatically repurchased.
+1. S5 is accepted; complete the activated clean S7-1 composition with genuine hooks, then exact-head applicability review.
+2. In parallel, close only S6r2's observed three-test delta and prepare its existing validation; no product source reopened.
+3. Transfer runtime for affected S6proof and still-unrun04–09, then normal commit/finalattestations.
+4. Independently deliver officialUXjobmap and canonicalmobilejourneyspec; design planning does not wait on dataflow, but contract-dependent implementation does.
 4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
 5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
