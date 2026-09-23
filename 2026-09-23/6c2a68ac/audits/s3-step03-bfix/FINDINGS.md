@@ -1,0 +1,12 @@
+# S3-STEP03-BFIX-REVIEW — Findings
+
+| ID | Class | Finding | Evidence | Disposition |
+|---|---|---|---|---|
+| BF-01 | B (this integration proof only) | Request-03 step 03 recording instruction `node -p "require('deepmerge-ts/package.json').version"` cannot succeed against the locked graph: root override `@prisma/config@6.19.3 → deepmerge-ts 8.0.0`; installed `node_modules/deepmerge-ts/package.json` (9db12600…) version 8.0.0 with `exports` keys `types,import,require` only → `ERR_PACKAGE_PATH_NOT_EXPORTED` under node v20.20.1. Consequential generate exited 0; tree a584a1b9 unchanged. | `logs/03-prisma-generate-guarded.log`; `logs/03D-stop-diagnostic-readonly.txt`; `package.json` overrides; lock entry; file read | Closed exactly by the proposed fs-read observation (expected `8.0.0`, confirmed by independent file read). No retry/reinstall/regenerate. GRANTABLE with REPORT §4 conditions. |
+| BF-02 | C | The replacement observation must be recorded as a separate post-record observation (03R) under the lock/attribution pattern, not by editing the frozen 03 log or re-running the generate. | grant "no retry"; stopped result frozen (`a-w`, manifest bf7800bd…) | Condition 1. |
+| BF-03 | C | Bind the observation to bytes: `node_modules/deepmerge-ts/package.json` sha256 9db12600…, lock b7fed5ed… (version/resolved/integrity), tree a584a1b9…, absence of a nested `@prisma/config/node_modules/deepmerge-ts` (lock and filesystem agree: none). | lock JSON; `find node_modules -name deepmerge-ts` → one dir | Condition 2. |
+| BF-04 | C | Substrate suitability for resuming 04–14 without reinstall: node_modules present from exact lock (1117 packages), generated client v6.19.3 present, engines present (fetch disclosed), tooling CLI 6e922134… present, `.bin/prettier` absent (step 05 creates it), hooks 0, `core.hooksPath` unset, identity unset (step 07/08 handle), HEAD d5cd / MERGE_HEAD 5c7b / unmerged 0 / non-staged 0. | read-only inspection now | Condition 3. |
+| BF-05 | C | Output directory differs from request-03's literal `execution/s3-composition-prep/slot-03/<UTC>`; grant directs `execution/6c2a68ac/s3-integration-result`. | grant vs request-03 §0 | Record; grant supersedes. |
+| BF-06 | C | Engine binaries fetched from binaries.prisma.sh during guarded generate (mtimes 16:44:25Z; `PRISMA_ENGINES_MIRROR` unset) — permitted and disclosed by the grant. | `03D`; stat now | Record; carry into resumed report. |
+
+No A-class finding. No other B-class finding in T00–03.
