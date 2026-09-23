@@ -1,0 +1,61 @@
+S2-V59 controls set=k start 2026-09-23T01:36:57Z budget=60s results=/home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623 pid=9623 pgid=8901 timeout_impl=timeout (uutils coreutils) 0.8.0 runner_sha256=efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c pre_runner_sha256=fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 stubs=535dc494cb47b09d 5560c9f74979b886 6dc98ce0d2539daf bc9704e639da7691 
+pre-snapshot pattern matches (never signalled): []
+
+== K1-predecessor-mechanism (declared max 8 s, remaining 59s) [t=0.03s]
+  enclosure k1 (group 9669) still has members after exit rc=124: [9684 timeout --foreground 1500 bash /home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/stubs/harness.sh k1db;9685 bash /home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/stubs/harness.sh k1db;9691 sleep 20;] → retained as owned survivors (authority kept until cleaned)
+  K1 enclosure group=9669 (exclusive; predecessor internals unchanged)
+  K1 outer exit=124; stamp:
+    K1 start pid=9680 2026-09-23T01:36:57Z
+    50 fixture-stop exit=0 (v5.1 shape: stop runs whether or not step 40's child tree is alive)
+    end composition=notrun
+  K1 recorded-owned processes alive after runner exit: [9684 9685 9691 ]
+  PASS: outer timeout fired (124)
+  PASS(counterexample): fixture stop ran under a live step-40 child
+  PASS(counterexample): step-40 child tree survived the runner
+  owned cleanup: TERM recorded pids [9684 9685 9691 ]  9684  9669 timeout --foreground 1500 bash /home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/stubs/harness.sh k1db; 9685  9669 bash /home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/stubs/harness.sh k1db; 9691  9669 sleep 20;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K2-stub-success (declared max 15 s, remaining 57s) [t=2.87s]
+  enclosure k2 (group 9844) still has members after exit rc=0: [10289 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;10290 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k2 runner exit=0 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013700Z/ enclosure_group=9844
+  PASS: k2 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k2 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k2 outer+inner manifests re-verify (immutable publication)
+  PASS: k2 inner manifest lists no manifest/temporary entry (A02)
+  PASS: K2 result registers
+  PASS: K2 all steps reached, refusals 64/64, stop 0, deadline kept
+  PASS: K2 stub banner
+  PASS: K2 real head/tree/clean check
+  PASS: K2 every step group retired (active set empty) before fixture stop (O1/P2, E9)
+  PASS: K2 end line: no active group remains, retired list present (active-vs-retired authority)
+  PASS: K2 every leader was acked before exec (10 ack files: 10,20,21,30,31,32,40,45,50,51)
+  PASS: K2 real harness offline refusal (hosted URL)
+  PASS: K2 real harness offline refusal (no confirm)
+  PASS: K2 fixture init inherited fd 9 (private lock)
+  PASS: K2 harness saw fd 9 closed
+  PASS: K2 harness inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 discriminator inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 cleanup client inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 owned stop client fully reaped (P3)
+  owned cleanup: TERM recorded pids [10289 10290 ] 10289  9844 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;10290  9844 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K3-term-during-step40 (declared max 12 s, remaining 51s) [t=8.31s]
+  k3 runner exit=124 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/ enclosure_group=10628
+  PASS: k3 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k3 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k3 outer+inner manifests re-verify (immutable publication)
+  PASS: k3 inner manifest lists no manifest/temporary entry (A02)
+  K3 recorded-owned alive after runner exit: []
+  PASS: K3 signal exit recorded as first exit; cleanup class 0
+  FAIL: K3 step interrupted, stop 0, no survivors (expected /composition=interrupted\(TERM\) s1_r4_discriminator=notrun fixture_stop=0 survivors=none/ in /home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z//exit-codes.txt)
+  PASS: no step-40 child survives
+  FAIL: ordering signal=16 reap=19 stop=
+  PASS: K3 lock held through cleanup
+  K3 timing: cleanup_seconds=0.20 cleanup_seconds_total=0.32
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+ONE-STRIKE STOP before K4-escapee-quarantine: previous control missed an expectation — remaining controls NOT RUN
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  controllers ended: census_after=[empty]
+  watchdog stopped: shell=9657 sleeper=9658 census_after=[empty]
+SET=k controls_run=3/6 strike=1 wall=12.16s of 60s (reserve 8s) aggregate_exit=1 (pre-publication); lane lock: FREE; predecessor lock: absent; current_authority_file=[] (must be empty); canonical lock file: exists (never opened)

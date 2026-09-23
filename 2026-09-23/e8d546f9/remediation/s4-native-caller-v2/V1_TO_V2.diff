@@ -1,0 +1,47 @@
+--- s4-native-caller-v1/native/s4-r6-native-caller-v1.sh
++++ s4-native-caller-v2/native/s4-r6-native-caller-v2.sh
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S4 R6 — NATIVE bounded-observer caller V1 (additive successor to the SLOT_REQUEST_V6/V61 §5 `bash -c` caller).
++# S4 R6 — NATIVE bounded-observer caller V2 (V1 + S4-NATIVE-V1-A01 receipt-write propagation; additive successor to the SLOT_REQUEST_V6/V61 §5 `bash -c` caller).
+ # Sole purpose (S4_V6_RECOVERY_RULING §Decision; SLOT_REQUEST_V61 §5.1): keep THREE facts separate that the plain
+ # `bash -c` caller collapses into one hang when the launcher SELF-HOLDs (retains fd 9 and never exits):
+ #   (1) ACTUAL launcher exit      -> this caller prints `launcher exit=N` and exits N (raw, unchanged; 12 is never faked);
+@@ -14,7 +14,7 @@
+ # marked `[driver Lnn]`. No fault seams, no controls, no lock probe (a `flock -n` probe would touch the canonical
+ # lock), no reaping of anybody's session, no recovery.
+ # Invocation (non-job-control; exact bytes below are the only "caller" a native grant needs to quote):
+-#   bash /home/user/workspace/execution/s4-r6-validation/native-caller-v1/s4-r6-native-caller-v1.sh   (restored OUTSIDE the frozen v6 dir)
++#   bash /home/user/workspace/execution/s4-r6-validation/native-caller-v2/s4-r6-native-caller-v2.sh   (restored OUTSIDE the frozen v6 dir)
+ # Exit map of THIS process (observer):  N = launcher's actual exit (any N incl. 0/5/6/7/8/9/11/12/70-75/124/143)
+ #   97 launcher alive at the observer bound after one TERM + teardown allowance (retained/unresolved; receipt written)
+ #   91 packet manifest verification failed (nothing spawned)   70 packet dir / receipt dir unusable (nothing spawned)
+@@ -140,17 +140,17 @@
+ if [[ $OBSERVER == 0 ]] && { [[ -z $d || -z $sid || $C_STATE != EMPTY || $qh_live == true ]]; }; then OBSERVER=94; kind="ACTUAL_LAUNCHER_EXIT_0_CONTRADICTED(run='${d:-<none>}' sid='${sid:-<none>}' census=$C_STATE live_holder=$qh_live)"; note "launcher exit 0 contradicted by current facts: $kind — observer 94"; fi
+ if [[ -n $LAUNCHER_RC && $LAUNCHER_RC == 12 ]]; then note "launcher ACTUALLY exited 12: SELF-HOLD exec failed and the process is gone (recorded in its console/record); this is an exit, not a retained holder — STOP and inspect"; fi
+ 
+-{
+-  printf 'NATIVE-CALLER receipt %s\ncaller_pid=%s caller_start=%s launcher=%s launcher_sha256=%s\n' "$(now)" "$$" "$(proc_start $$)" "$LAUNCHER" "$(sha256sum "$LAUNCHER" 2>/dev/null | cut -d" " -f1)"
+-  printf 'launcher_pid=%s launcher_start_at_spawn=%s launcher_start_now=%s alive_now=%s run=%s identity=%s\n' "$ACTIVE_PID" "${ACTIVE_START:-unknown}" "${st_now:-<gone>}" "$alive" "${d:-<none>}" "$RUN_IDENTITY"
+-  printf 'ACTUAL_LAUNCHER_EXIT=%s   OBSERVER_RETURN=%s   classification=%s\n' "${LAUNCHER_RC:-none}" "$OBSERVER" "$kind"
+-  printf 'observer_bound_s=%s elapsed_s=%s cancelled=%s cancel_sent_epoch=%s\n' "$OBSERVE_S" "$(( $(date +%s) - T0 ))" "${CANCELLED:-}" "${CANCEL_SENT:-}"
+-  printf 'live_launcher_fd9=%s live_launcher_cmdline=%s lease_path=%s lease_held_by_live_launcher=%s\n' "${fd9:-<none>}" "${cmd:-<none>}" "$LEASE_PATH" "$([[ $fd9 == "$LEASE_PATH" ]] && echo true || echo false)"
+-  printf 'console_SELF_HOLD_line=%s\nrecord(overall launcher_exit self_hold quarantine_ok receipt_ok)=%s\n' "${self_hold_line:-<none>}" "${self_hold_rec:-<none>}"
+-  printf 'recorded_quarantine_holder(pid starttime token)=%s live_identity_checked=%s\n' "${qh_id:-<none>}" "$qh_live"
+-  printf 'owned_session_sid=%s census_now=%s members=%s (read-only; UNKNOWN is never empty)\n' "${sid:-<none>}" "$C_STATE" "${C_MEMBERS:-}"
+-  printf 'UNRESOLVED=%s\n' "${UNRESOLVED:-}"
+-  printf '%s\n' "${NOTES[@]}"
++{  # V2 (S4-NATIVE-V1-A01): every required write is AND-chained, so ANY failed printf fails the group, skips mv and reaches the failure branch
++  printf 'NATIVE-CALLER receipt %s\ncaller_pid=%s caller_start=%s launcher=%s launcher_sha256=%s\n' "$(now)" "$$" "$(proc_start $$)" "$LAUNCHER" "$(sha256sum "$LAUNCHER" 2>/dev/null | cut -d" " -f1)" &&
++  printf 'launcher_pid=%s launcher_start_at_spawn=%s launcher_start_now=%s alive_now=%s run=%s identity=%s\n' "$ACTIVE_PID" "${ACTIVE_START:-unknown}" "${st_now:-<gone>}" "$alive" "${d:-<none>}" "$RUN_IDENTITY" &&
++  printf 'ACTUAL_LAUNCHER_EXIT=%s   OBSERVER_RETURN=%s   classification=%s\n' "${LAUNCHER_RC:-none}" "$OBSERVER" "$kind" &&
++  printf 'observer_bound_s=%s elapsed_s=%s cancelled=%s cancel_sent_epoch=%s\n' "$OBSERVE_S" "$(( $(date +%s) - T0 ))" "${CANCELLED:-}" "${CANCEL_SENT:-}" &&
++  printf 'live_launcher_fd9=%s live_launcher_cmdline=%s lease_path=%s lease_held_by_live_launcher=%s\n' "${fd9:-<none>}" "${cmd:-<none>}" "$LEASE_PATH" "$([[ $fd9 == "$LEASE_PATH" ]] && echo true || echo false)" &&
++  printf 'console_SELF_HOLD_line=%s\nrecord(overall launcher_exit self_hold quarantine_ok receipt_ok)=%s\n' "${self_hold_line:-<none>}" "${self_hold_rec:-<none>}" &&
++  printf 'recorded_quarantine_holder(pid starttime token)=%s live_identity_checked=%s\n' "${qh_id:-<none>}" "$qh_live" &&
++  printf 'owned_session_sid=%s census_now=%s members=%s (read-only; UNKNOWN is never empty)\n' "${sid:-<none>}" "$C_STATE" "${C_MEMBERS:-}" &&
++  printf 'UNRESOLVED=%s\n' "${UNRESOLVED:-}" &&
++  printf '%s\n' "${NOTES[@]}" &&
+   printf 'SEMANTICS: OBSERVER_RETURN 97 is a bounded observer return, NOT a launcher exit, NOT success, NOT a normal exit 12. A live launcher or holder listed above is the last exclusion owner: recovery ONLY by the parent, ONLY if /proc/<pid>/stat starttime, cmdline token and readlink /proc/<pid>/fd/9 == %s all match the recorded values, after the owned session is verified EMPTY (UNKNOWN never counts). Never signal a bare pid. Nothing was killed or cleaned by this caller.\n' "$LEASE_PATH"
+ } > "$RECEIPT.tmp" 2>/dev/null && mv -f "$RECEIPT.tmp" "$RECEIPT" 2>/dev/null || { [[ $OBSERVER == 0 ]] && OBSERVER=90; echo "caller: receipt could not be written ($RECEIPT); observer now $OBSERVER" >&2; }
+ 

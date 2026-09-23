@@ -1,0 +1,84 @@
+{
+  "audit": "OP88-S4-NATIVE-CALLER-V2-B",
+  "tier": "T4",
+  "frozen_at_utc": "2026-09-23T01:36:47Z",
+  "role": "independent non-builder reviewer B, exact V1->V2 delta closure; requested policy Claude Fable 5 / High; runtime identity not observable, not asserted",
+  "mode": "read/sha256/diff/read-only grep only; nothing executed; no probe/process/lock/network/install/source write; sole writes execution/e8d546f9/audits/s4-native-caller-v2-b",
+  "not_read": [
+    "execution/e8d546f9/audits/s4-native-caller-v2-a (current peer)",
+    "state/takeover narratives"
+  ],
+  "candidate": {
+    "manifest_sha256": "7bff8f2c9fd7c15ac6ebab18524e6cf2b122fa38506e98864f23b15ccea3f8bf",
+    "check": "7/7 OK from packet root; non-self-including; FREEZE.json outside",
+    "caller_script_sha256": "ba73a99b2602e5640a6339b3e1ec0e79e02272e00914fc5a60faf22f5630a1c1",
+    "caller_cmd_sha256": "ef45fd8d8cc6276de070a9cd0a1674e34174360863327db09c564345d52bae84",
+    "predecessor_v1_manifest": "f5e621b1007ad2cfbf30201dfcc347dd0be83b15e8414f0a39a9e0d2188dbea4",
+    "predecessor_v1_script": "6d6a193f0968520b852f7059764ff7b6ff153106ee3ac412adab41761f7bf8b9"
+  },
+  "reproduction": {
+    "diff_reproduces": "diff -u V1->V2 == V1_TO_V2.diff modulo ---/+++ headers; 13-/13+",
+    "changed_v2_lines": [
+      2,
+      17,
+      143,
+      144,
+      145,
+      146,
+      147,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153
+    ],
+    "identical_ranges": "3-16, 18-142, 154-160 cmp-identical to V1",
+    "discriminator": {
+      "lines_144_153_without_trailing_and": 0,
+      "line_154_ends_with_and": false,
+      "line_155_identical_to_v1": true
+    },
+    "caller_line_diff": "reproduces V6 \u00a75 line -> native-caller-v2.cmd",
+    "v61_staged": "12/12 OK (671d08c3...), not re-reviewed",
+    "stage1": "9c84eab2... not retested"
+  },
+  "findings": {
+    "S4-NATIVE-V1-A01": {
+      "status": "SOURCE_CLOSED_UNRUN",
+      "validity": "valid and binding: new receipt-group masked write failure (V1 group status = last printf only), conflicts with the ruling's prohibition on ignored publication failure; missed by my V1-B review (it checked the failure branch, not the group-status semantics)",
+      "closure": "eleven writes AND-chained (144-153 trailing &&, 154 final); first failing printf (builtin returns nonzero on write error) ends the chain nonzero -> group nonzero -> mv skipped -> unchanged || branch: observer 0 -> 90, stderr diagnostic, nonzero observers unchanged, .tmp left unpublished; stdout `launcher exit=N` (158) outside the group, unaffected",
+      "matches_A_smallest_correction": true
+    }
+  },
+  "preserved_properties": "all V1 accepted properties unchanged bytes (actual exit/observer/retained owner separation; one TERM + 127 s, no wait on unresolved, no KILL; SELF_HOLD_RETAINED identity test; 94 on contradicted 0; 90 only from 0; read-only census/identity; no flock/reap/recovery). Mirrored greps unchanged: kill -KILL 0, executable flock 0, kill -TERM 1, guarded wait 1, all timeout --foreground.",
+  "introduced_defects": {
+    "material": [],
+    "statement": "none"
+  },
+  "nonmaterial_notes": [
+    "command-substitution failures inside printf arguments (e.g. sha256sum of the launcher) produce empty fields, not write failures; visible in receipt; unchanged from V1",
+    "V1-B N2-N7 carry unchanged (post-deadline-exit race -> 97 with alive_now=false; `caller receipt=` printed even on write failure; 70/90/91 code overlap - key on stdout line + receipt; oldest-match run glob, runs/ absent; HUP untrapped; S4R6_* knobs); V1-B N1 (tail) now carried as request \u00a74.1",
+    "line 141 wording remains a diagnostic prompt; cause of an actual 12 must be read from SUPERVISOR_RECORD.json (request \u00a74.2 correct: launcher L348 passes runner nonzero through)"
+  ],
+  "request_qualifications_checked": {
+    "bound_tail": ">=3569 s post-spawn (3422+127+4x5), 3589 s incl. 20 s manifest allowance; no KILL deadline - agrees with V1-B N1",
+    "actual_12": "runner 12 -> launcher RUNNER_NONZERO 12 -> actual 12; 12 never synthesised for live SELF-HOLD (97)",
+    "identity_limits": "BOUND = pid-glob association; SELF token shape match; receipt facts not signalling authority"
+  },
+  "grantability": {
+    "status": "GRANTABLE_ON_B_SIDE_AFTER_OTHER_INDEPENDENT_V2_REVIEW_AND_RUNTIME_PRECONDITIONS",
+    "preconditions": [
+      "other independent V2 review clean (not read)",
+      "copy to execution/s4-r6-validation/native-caller-v2/ (absent now) and pin ba73a99b.../ef45fd8d... before launch",
+      "Stage 2 inputs green (restored 91990 worktree/predecessor/probes; runner-side install under that grant)",
+      "separate canonical-lock grant",
+      "Stage 1 transport; three artefacts kept separate",
+      "unprivileged same user; setsid/pgrep/ps/timeout/python3 present; S4R6_* defaults stated",
+      "\u00a74.1 allowance wording, no KILL deadline"
+    ],
+    "success_shape": "actual launcher 0 AND observer 0 AND complete receipt AND consistent evidence; never 97 / would-be 12 / missing-partial receipt / UNKNOWN census"
+  },
+  "not_proven": "no execution; bash semantics (brace-group status, && short-circuit, builtin printf nonzero on write error) documented, not measured; SYNTAX_CHECKS.txt unverified",
+  "smallest_next_proof": "after the other review closes clean: copy+pin V2, confirm Stage 2 inputs green, single canonical-lock native grant quoting native-caller-v2.cmd under the Stage 1 transport; collect three artefacts; any 97/94/90/nonzero stops for parent reading; no retry, no signal without identity triple + EMPTY census. One of two attestations, not a grant."
+}

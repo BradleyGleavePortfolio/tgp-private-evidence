@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated2026-09-23 01:33UTC. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
+Updated2026-09-23 after S2 STOP and S4 caller V2 closure. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
 
 ## Current handoff point
 
@@ -10,14 +10,13 @@ Current continuation is op88 next-proof, NOT awaiting EXECUTE/S0. Prior worker �
 
 ## Work underway
 
-- S2V59: frozen4341ce30 16/16; independent A abbf2c34/B1a325a4c close N6, no material delta defect. Eight-set controls eligible after S5 slot, no new revision/reinstall; standalonewdcancel3 accepted.
+- S2V59: one granted run STOP/k1 with K3 placement miss (signal in30, not intended40), manifestd749a4b1; probe0/wdtest0/wdcancel3 and K1/K2 passed, later controls NOTRUN. Clean slot closed, failure unchanged. Independent result reviews plus source-only V60 correction, no retry/reinstall/real proof.
 - S4V6.1: Stage1 PASS9c84eab2,158/158; raw0/all12controls/363predicates/87s, no retained owner, slot closed. Native source/probes restored; parent completed pinned-base unshallow with candidate/tree/lock clean and unchanged. Only known native-caller correction now assigned, no repeated Stage1 or native execution.
 - S5V10: independent B provider-blocked twice despite passive-review clarification, no verdict/approval; unchanged diagnostic remains held. Existing A preserved, expectedC3 source counterexample not a run. No provider-safeguard bypass.
-- S5V10.1: private diagnostic PASS8e16701b176/176,25 checks/raw0/23s, clean slot closed. Setup-v2 b96dc732 under independent review; exact source/dirty fingerprint ready via local core.abbrev8, no setup/T0 grant.
-- S4 native caller: V1A6c730911 finds one required receipt-write propagation defect; V2 narrowly fixes it while B stays independent. V61/Stage1 unchanged and not rerun; native inputs ready718b9757.
-- S6: source-only exact product/C6 restoration active; accepted private primitive now permits a bounded consumer-adaptation assignment, never inherited runtime clearance.
-- S1/S2/S3: exactd5cd/predecessor37files restored, PREP2 reproduced from both parents; fresh S2 environment setup now complete. No controls/real DB proof/product change/hook/commit.
-- S6C6: frozen19-file discriminator and narrowB preserved. Shared launch consumer/setup dependency held; no repeat valid C5A/B/D.
+- S5V10.1: private diagnostic PASS8e16701b176/176 preserved. SetupV2 Afa876aa6/B8b1b53a7 ready for exact fake11 only; canonical A01/A02/B01/B02 remain held, narrow V3 source correction assigned. Exact source/fingerprint ready, no setup/T0 grant.
+- S4 native caller: V2 7bff8f2c7/7 independently clear A1b2634a0/B8bece05b, required writes AND-chained. Native inputs ready718b9757; separate S4_NATIVE_V2_GRANT queued after exact restore/transport prep and publication, no Stage1 rerun.
+- S6: restoration COMPLETEb8b35c8b; source-only two-consumer V101 adaptation assigned to sole original S5 builder. Exact primitive immutable, runtime held, no repeated C5A/B/D.
+- S1/S2/S3: fresh S2 environment still valid; PREP2 materialized at worktrees/s3-prep2 with staged treea584 and HEADd5cd, no fabricated merge. Frozen9a7a4039; schema/generator unchanged and reserved. No real DB/integration proof/hook/commit.
 
 ## Truth and resource boundary
 
@@ -27,7 +26,7 @@ Product heads: S156fb0d22, S2d5cd9b8b, S35c7b42b3, S491990ae9, S5143d451e, S6d51
 
 ## Immediate next action
 
-Activate S2_V59_CONTROL_GRANT after publication, then freeze/dual-review its evidence before real composition. S4 narrow caller correction, S5 setup-v2 review and S6 source continuation proceed independently. V10B remains blocked, not awaited or bypassed. No repeat of passed S4 Stage1 or S5 V10.1 diagnostic.
+Activate S4_NATIVE_V2_GRANT after exact prep and publication, then preserve actual native proof and three distinct receipts. S2 failed-result reviews/narrow V60 correction, S5 canonical V3 repair and S6 source adaptation proceed independently; S5 fake11 waits for a separate slot. V10B remains blocked, not awaited or bypassed. No repeat of passed S4 Stage1 or S5 V10.1 diagnostic.
 
 Containment/governed delivery → stagedG2 → C1/server lifecycle/forward2.x → native writers/relationships/reconciliation → real integrated two-platform proof → measured pilot → importer acceptance → retainedV1.
 

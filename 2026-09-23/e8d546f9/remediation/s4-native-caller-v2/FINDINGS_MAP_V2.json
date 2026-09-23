@@ -1,0 +1,35 @@
+{
+  "packet": "s4-native-caller-v2",
+  "predecessor": {
+    "path": "/home/user/workspace/execution/e8d546f9/s4-native-caller-v1",
+    "manifest_sha256": "f5e621b1007ad2cfbf30201dfcc347dd0be83b15e8414f0a39a9e0d2188dbea4",
+    "verified": "6/6 OK before copy",
+    "script_sha256": "6d6a193f0968520b852f7059764ff7b6ff153106ee3ac412adab41761f7bf8b9"
+  },
+  "findings": [
+    {
+      "id": "S4-NATIVE-V1-A01",
+      "source": "/home/user/workspace/execution/e8d546f9/audits/s4-native-caller-v1-a/REPORT.json",
+      "audit_manifest_sha256": "6c73091175fa8169ebdccbd52c69a130d6f9820eebaf3c197a95818fa472a665",
+      "report_sha256": "864efbc4cea3ca29e1722c124ec80178eda7f3d677368c6eaf0346f8c34bbba6",
+      "change": "native/s4-r6-native-caller-v2.sh lines 144-153: trailing ' &&' on each non-final printf of the receipt group (143-155); group status = conjunction of all 11 writes; mv (155) only on success; existing failure branch (0->90, diagnostic) unchanged",
+      "discriminator": "awk 'NR>=144&&NR<=153' native/s4-r6-native-caller-v2.sh | grep -vc ' &&$'  => 0 ; line 154 does not end in && ; line 155 byte-identical to V1",
+      "status": "SOURCE_CORRECTED_UNEXECUTED"
+    }
+  ],
+  "nonblocking_qualifications_carried_in_request_only": [
+    "bound tail: >=3569 s post-spawn / 3589 s incl. manifest allowance; no KILL deadline",
+    "actual exit 12 causality: read SUPERVISOR_RECORD overall/runner.exit/lease.self_hold; line 141 note is diagnostic only",
+    "BOUND is glob association; SELF token test is shape match; receipt facts are not signalling authority"
+  ],
+  "not_read": [
+    "execution/e8d546f9/audits/s4-native-caller-v1-b (current independent B)"
+  ],
+  "unchanged": {
+    "v61_manifest": "671d08c3633378ef392a4aee6bbb70b78319994727d74e439b75830a6d63d8ee",
+    "stage1_result_manifest": "9c84eab2f4a4fe2567d952e9a6bded8ea301d9f2110d8427363f181c9ff940d7",
+    "v1_packet": "frozen, immutable"
+  },
+  "executed": "nothing (bash -n, python compile, patch/cmp on temp copies)",
+  "created_utc": "2026-09-23T01:33:42Z"
+}

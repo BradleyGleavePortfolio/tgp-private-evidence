@@ -1,0 +1,41 @@
+# SYNTAX_CHECKS — S5 setup-exclusion v2 (static only; nothing executed). Generated 2026-09-23T01:23:37Z
+## bash -n
+OK   launch-s5-setup-exclusion.v2.sh
+OK   run-s5-setup-npm-ci.v101x.sh
+OK   observe-s5-setup-exclusion.v2.sh
+OK   controls-exclusion/ctl-exclusion.v2.sh
+OK   controls-exclusion/fake-runner.v2.sh
+OK   verify-embedded-block.sh
+## embedded block identity (verify-embedded-block.sh, static diff)
+IDENTICAL launch-s5-setup-exclusion.v2.sh
+IDENTICAL run-s5-setup-npm-ci.v101x.sh
+block sha256 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5
+## pins
+launcher PIN_RUNNER: PIN_RUNNER=81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a
+actual runner v101x:  81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a
+ctl PIN_L:            PIN_L=b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09
+actual launcher v2:   b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09
+## v10x hunk identity: body of the v101->v101x inherited-lease hunk vs frozen setup-v10-to-v10x.diff hunk
+IDENTICAL hunk body (+6/-1)
+runner v101->v101x changed lines: 12 (5 header comment lines + 6 body lines added, 1 removed = same shape as v10->v10x +11/-1)
+## wiring greps (launcher v2, consumer part)
+handoff capability deleted (code lines mentioning RECOVERY_ACCEPT/handoff_accepted/how=handoff): 0
+census_state (registry-emptiness) references: 0
+own_census used for a decision in consumer code: 0
+release callers and their retention:
+  L192: release "self-hold-then-empty" 90; -> ; esac; fi
+  L198: release "$1-then-empty" 90; ->  self_hold "$1: census=$CENSUS reap_rc=$rrc"; }
+  L201: release "nothing-launched" 74; ->  say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74; }
+  L202: release "nothing-launched" 74; ->  say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74; }
+  L219: release "normal" "${RAW_RC:-70}"; ->  self_hold "release publication failed (normal; session empty)" ;;
+session_state call sites: 4
+inner IDENTITY path used: INNER_LOGS=$EX/logs/setup-v1 ; runner OWN_ROOT: OWN_ROOT="$LOGS/attempts" with LOGS=LOGS=$EX/logs/setup-v1
+runner IDENTITY record line (own_record "$ATT/IDENTITY" "pid=$CUR_PID attempt=... self_sid=$OWN_SELF_SID decoy=..."): 1 line (v101x L245; unchanged V10.1 bytes)
+inner sids never in OWN_PGIDS / never signalled (consumer code adding to OWN_PGIDS): 0
+trap before spawn: trap L199 < spawn L205; IDENTITY L209 before own_adopt (same line) before RUNNING L213
+## wiring greps (controls v2)
+checks: 11 ; X1 IDENTITY path: logs/setup-exclusion/attempts"/*/IDENTITY
+rm -rf / pkill / pgrep -f in harness or fakes (code lines): ctl 0 (the single textual match is the L9 header comment stating they were dropped), fake 0
+repair primitive: rm -f "$t" where t="$1/$2.tmp.$LPID" then rmdir; own_record tmp name in block: local tmp="$1.tmp.$$"
+scenarios in fake v2: normal normal-slow descendant overrun subsession-90 
+## nothing executed: no launcher/runner/ctl/fake/observer invocation, no lock open, no process spawned beyond bash -n/diff/sha256sum/grep/sed

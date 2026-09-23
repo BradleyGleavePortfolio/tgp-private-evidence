@@ -1,0 +1,90 @@
+{
+  "audit": "S4-NATIVE-CALLER-V2-A",
+  "status": "FROZEN_INDEPENDENT_NONBUILDER_EXACT_DELTA_CLOSURE",
+  "tier": "T4",
+  "verdict": {
+    "S4-NATIVE-V1-A01": "SOURCE_CLOSED_UNEXECUTED",
+    "native_caller": "GRANTABLE_AFTER_INDEPENDENT_V2_B_CLOSURE_AND_RUNTIME_PRECONDITIONS_UNDER_SEPARATE_PARENT_NATIVE_GRANT",
+    "material_introduced_defects": [],
+    "summary": "The ten added AND operators close the intermediate-printf failure counterexample; the unchanged final write and mv/failure branch now propagate any required write failure, with all other caller semantics preserved. [Exact delta](../../s4-native-caller-v2/V1_TO_V2.diff) [Receipt chain](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L143-L160)",
+    "grant_issued": false
+  },
+  "reviewer": {
+    "role": "Independent nonbuilder A; inherited model requested",
+    "runtime_model_identity_settings": "Unexposed; not asserted",
+    "sole_writes": "/home/user/workspace/execution/e8d546f9/audits/s4-native-caller-v2-a",
+    "mode": "Source/hash/diff/byte-comparison only",
+    "candidate_syntax_execution_process_probe_lock_network_install": false,
+    "current_v2_b_access": false,
+    "state_or_takeover_access": false,
+    "scope": "Only V1 A01 closure, materially introduced V2 delta, preserved caller applicability, and request-bound/actual-12 qualifications",
+    "not_repeated": "V6.1 review, Stage 1, native execution, product audit, generalized SELF-HOLD suite",
+    "authority": "Live AGENT_RULES and S4 recovery ruling hashes rechecked unchanged from the full readings in V1 review"
+  },
+  "exact_inputs": {
+    "candidate_root": "/home/user/workspace/execution/e8d546f9/s4-native-caller-v2",
+    "manifest_sha256": "7bff8f2c9fd7c15ac6ebab18524e6cf2b122fa38506e98864f23b15ccea3f8bf",
+    "manifest_check": "7/7 OK; non-self-including",
+    "freeze_sha256": "2ae4a8ee50146ff94d85557a89a1573adffce519ac1c7f9f2ecf451c8d5f3ef2",
+    "freeze_scope": "FREEZE.json separately hashed, outside manifest",
+    "script_sha256": "ba73a99b2602e5640a6339b3e1ec0e79e02272e00914fc5a60faf22f5630a1c1",
+    "invocation_sha256": "ef45fd8d8cc6276de070a9cd0a1674e34174360863327db09c564345d52bae84",
+    "diff_sha256": "f0bc184bb15f3785fe6c3ee408a6e8452b385efd72816fcaee19c91d254307b5",
+    "request_sha256": "f691cd558fc2c1b2944eb24ee1f5c7591084877479c8ceb8d45f7de44f478f62",
+    "finding_map_sha256": "c9b648e33a338488c539e91baecaed21240bc951cedd6acb0e4f2021b81b44ae",
+    "predecessor_manifest_sha256": "f5e621b1007ad2cfbf30201dfcc347dd0be83b15e8414f0a39a9e0d2188dbea4",
+    "predecessor_manifest_check": "6/6 OK",
+    "predecessor_script_sha256": "6d6a193f0968520b852f7059764ff7b6ff153106ee3ac412adab41761f7bf8b9",
+    "prior_v1_a": {
+      "manifest_sha256": "6c73091175fa8169ebdccbd52c69a130d6f9820eebaf3c197a95818fa472a665",
+      "report_sha256": "864efbc4cea3ca29e1722c124ec80178eda7f3d677368c6eaf0346f8c34bbba6",
+      "manifest_check": "1/1 OK"
+    },
+    "prior_v1_b": {
+      "manifest_sha256": "8f3b717090cb10e445e2846a7a258693fdab71fb1b0354188b4a583c150212de",
+      "report_sha256": "60a64672f0fcfbc25d52182b1462371380e22f1ed500e0f75148932f4c5e6eb7",
+      "findings_sha256": "22651253a841868a4d77fff4fbfe9075637890f490ab0fd6da522e7879c1221f",
+      "manifest_check": "3/3 OK; frozen prior B REPORT.md read"
+    },
+    "rules_sha256": "edd63115537049e41ada062d35c74b4a1224f1bf784272ca45cf6c61398e173c",
+    "ruling_sha256": "f05993ec9409cd0929824f3897347394ab78d6ffbe8ff5215a2bd54dc881502c",
+    "prior_applicability_not_retested": {
+      "v61_manifest": "671d08c3633378ef392a4aee6bbb70b78319994727d74e439b75830a6d63d8ee",
+      "passed_stage1_manifest": "9c84eab2f4a4fe2567d952e9a6bded8ea301d9f2110d8427363f181c9ff940d7",
+      "reference": "The existing frozen V1 A report binds the prior passed Stage 1 and restoration evidence; this delta does not invalidate or repeat them. [Prior applicability](../s4-native-caller-v1-a/REPORT.json)"
+    }
+  },
+  "independent_static_checks": {
+    "submitted_diff": "Exact diff -u independently reproduced from frozen V1 and V2 with the submitted labels; byte-for-byte match",
+    "changed_line_scope": "Only lines 2, 17 and 143-153 differ; deleting those line ranges from both scripts yields byte-identical remainder",
+    "receipt_chain": "Ten non-final printf lines 144-153 each end in &&; final printf line 154 and publication/failure line 155 are byte-identical to V1",
+    "invocation": "Added caller line exactly equals native-caller-v2.cmd; removed line exactly equals the frozen V6 native caller line",
+    "syntax_or_runtime": "None performed; builder SYNTAX_CHECKS.txt is not this auditor's execution evidence"
+  },
+  "closure": {
+    "id": "S4-NATIVE-V1-A01",
+    "status": "SOURCE_CLOSED_UNEXECUTED",
+    "reason": "All eleven required printf calls now form one AND-list: failure of any non-final call short-circuits later calls and leaves a failing group status, while failure of the final call also fails the group; either skips mv and reaches the existing failure branch. [Complete chain](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L143-L155)",
+    "counterexample_disposition": "The V1 case of an intermediate failed write followed by a successful footer can no longer publish a partial receipt as a successful group: later prints are skipped, observer 0 becomes 90, and the raw LAUNCHER_RC is unchanged. [Failure propagation and raw output](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L143-L160)",
+    "other_write_failures": "Opening the temporary file and mv remain checked by the same outer AND/OR expression; existing nonzero observer codes remain nonzero, with stderr diagnosing failed receipt publication, and a partial temporary file is not promoted into the final receipt. [Publication outcome](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L155-L160)",
+    "prior_disagreement": "The frozen V1 B no-material-defect opinion did not waive the valid V1 A01 finding; closure here comes from the exact changed source, not majority disposition or inherited B clearance. [Prior A finding](../s4-native-caller-v1-a/REPORT.json) [Prior B opinion](../s4-native-caller-v1-b/REPORT.md) [Actual correction](../../s4-native-caller-v2/V1_TO_V2.diff)",
+    "runtime_limit": "No storage fault or caller execution was performed; actual complete receipt, actual launcher status and observer return remain evidence to collect under the later native grant. [Requested proof boundary](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L29-L35)"
+  },
+  "preserved_semantics": [
+    "No executable change outside receipt write chaining: topology, fresh-proof PID-bound run lookup, spawn/starttime capture, read-only census/holder checks, single TERM and absolute cancellation deadline, guarded actual-parent wait, and retained-owner classification remain applicable exactly as qualified in V1 A. [Exact delta](../../s4-native-caller-v2/V1_TO_V2.diff) [Prior accepted properties](../s4-native-caller-v1-a/REPORT.json)",
+    "Actual launcher exit stays distinct from observer return: retained/unresolved owner yields 97 without a fabricated launcher exit or synthesized 12, contradictory raw 0 yields observer 94, and failed required receipt publication now reliably prevents observer 0 for the named write-failure class. [Classification](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L133-L141) [Receipt and stdout](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L143-L160)",
+    "No KILL, lock acquisition, session cleanup, holder recovery, new seam, new control or HUP behavior is introduced; V1 identity/PID-reuse and missing-receipt qualifications remain limitations, not new polish gates. [Exact delta](../../s4-native-caller-v2/V1_TO_V2.diff) [Preserved scope](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L13-L27)"
+  ],
+  "request_qualification_review": {
+    "bound": "The additive request correctly carries 3422 + 127 + 20 = 3569 seconds of post-spawn declared allowances and 3589 including the initial manifest timeout, with unenclosed-operation/polling qualification and no attached KILL deadline; these are not hard completion guarantees despite the unchanged V1 script comments. [V2 bound qualification](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L23-L25)",
+    "actual12": "The request correctly requires the cause of actual exit 12 to be read from SUPERVISOR_RECORD.json rather than inferred from the unchanged line-141 note; consult the supervisor record itself for runner.exit, since the caller's compact record summary does not print runner.exit. This does not change the correct actual-exit versus retained-97 classification and is not an additional gate. [V2 cause qualification](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L26-L26) [Compact record extraction](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L129-L129) [Classification](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L133-L141)",
+    "identity": "The request retains the fresh-run-context restriction and independently checked exact run/token/starttime/fd9 plus EMPTY owned-session recovery rule; neither BOUND nor token-shape classification alone authorizes recovery signalling. [Identity qualification](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L27-L27) [Recovery ruling](/home/user/workspace/tgp-private-evidence/execution/op88/S4_V6_RECOVERY_RULING.md)"
+  },
+  "smallest_next_action": {
+    "recommendation": "No further caller edit or harness work is requested by A: obtain independent V2 B closure, restore and pin this caller outside frozen v6, verify exact V2/V6.1/invocation bytes and remaining runtime/source preconditions, then issue the separate single canonical-lock/native grant using the existing detached transport. [Exact request and restoration target](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L29-L35)",
+    "caller_when_granted": "bash /home/user/workspace/execution/s4-r6-validation/native-caller-v2/s4-r6-native-caller-v2.sh",
+    "runtime_preconditions": "Fresh native output/run context; normal VALIDATION/default-bound environment; pinned restored 91990 source/predecessor/probes; required runtime tools and current canonical-lock authority; existing runner dependency/install steps only within that later grant, with no S5 setup/controls dependency. [Prior native prerequisites](../s4-native-caller-v1-a/REPORT.json) [V2 carried grant boundary](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L29-L31)",
+    "evidence": "Collect separately the transport observer-exit receipt, complete checked caller receipt and primary supervisor/runner records; success requires actual launcher 0 and observer 0 with complete consistent evidence, while 97, unknown census, failed publication or any nonzero result stops for parent review without retry or KILL of the retained owner. [V2 acceptance](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L31-L31) [Caller result contract](../../s4-native-caller-v2/native/s4-r6-native-caller-v2.sh#L143-L160)",
+    "not_requested": "No Stage 1 rerun, unchanged V6.1/product re-review, generalized SELF-HOLD suite or optional HUP/polish gate. [Narrow delta scope](../../s4-native-caller-v2/NATIVE_CALLER_REQUEST_V2.md#L5-L21) [Recovery ruling](/home/user/workspace/tgp-private-evidence/execution/op88/S4_V6_RECOVERY_RULING.md)"
+  }
+}
