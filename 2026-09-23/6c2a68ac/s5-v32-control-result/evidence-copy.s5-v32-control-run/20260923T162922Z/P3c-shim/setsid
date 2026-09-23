@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# P3c control shim: seen ONLY by the launcher process via PATH. Like P3a it does NOT create a session (execs argv unchanged -> decoy -> adoption refused; the runner never runs).
+# When invoked as the gate (not --version) this process IS the one whose pid becomes the launcher's SESSION, so it seeds a STALE-shaped setup.EXIT_RECORD carrying exactly that number as pgid=,
+# the current UTC second as stamp (not before the holder's spawn: the equal/future class of S5-V31-A-01) and a FOREIGN token: the record v3.1 would have bound and imported. Writes only under S5X_EX.
+case "${1:-}" in --version) echo "setsid SHIM-P3c (control fault: no new session; seeds a same-number not-before-spawn stale record)"; exit 0;; esac
+IL=${S5X_EX:?}/logs/setup-v1; mkdir -p "$IL" || exit 74; T=$(date -u +%FT%TZ)
+{ echo "$T START pid=$$ pgid=$$ ppid=1 token=STALE-TOKEN-P3c runner_sha256=stale (P3c fixture: stale record whose number equals this attempt's SESSION and whose stamp is not before its spawn)"; echo "$T lease INHERITED fd=9 path=${S5X_LOCK:?} token=STALE-TOKEN-P3c holder_pid=1 (stale)"; echo "$T npm-ci IDENTITY attempt=attempt-stale identity_rc=0 adoption=published state=released"; echo "$T EXCLUSION_UNPRESERVED after 0s: stale"; echo "$T CLEANUP_FAILURES=1"; echo "FINAL rc=90 (stale)"; } > "$IL/setup.EXIT_RECORD.tmp" && mv -f "$IL/setup.EXIT_RECORD.tmp" "$IL/setup.EXIT_RECORD" || exit 74
+sha256sum "$IL/setup.EXIT_RECORD" | cut -c1-64 > "$S5X_EX/P3c.seed.sha256"; exec "$@"

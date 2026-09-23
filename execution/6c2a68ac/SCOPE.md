@@ -169,6 +169,12 @@ Fresh S2 setup7f1a68c0 was accepted directly. Real proof result seal `bbde4b0b86
 
 Purchased decision: S3 PREP2 local integration, not production or universal-importer acceptance. Exact conditional downstream grants already prepared: `S3_PREP2_INTEGRATION_GRANT.md` and `S6_EXCLUSION_SUCCESSOR_BUILD_GRANT.md`; neither is activated by these reviews alone.
 
+## Current activation after accepted real proofs
+
+The reviews and private-control activation above are COMPLETE. Parent disposition is `REAL_PROOF_ACCEPTANCE_AND_INTEGRATION_ACTIVATION.md`: S1/S2 resultbbde4b0b accepted with independent A448a8b60/Bab50754d; S5 private resulta21622ee accepted raw0/11PASS, runtime released16:31:09Z. C qualifications are retained, no further cycle.
+
+S3 PREP2 tooling/setup/hooked integration and targeted validation are ACTIVE under `S3_PREP2_INTEGRATION_GRANT.md`, sole builder/executor `restore_s3_candidate_mue9wspd`, individual/cumulative T4, sole canonical runtime. Exact staged treea584a1b9, parentsd5cd/5c7b; no authored source changes. S6 setup/C6 successor is ACTIVE source-only under `S6_EXCLUSION_SUCCESSOR_BUILD_GRANT.md`, sole builder `restore_s6_substrate_mue9osen`; both children T4, cumulative T4, only fresh `s6-exclusion-v1/**`. Two independent changed-composition reviews follow freeze. Canonical S5 setup/T0 and S6 runtime remain inactive.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

@@ -1,0 +1,28 @@
+2026-09-23T16:29:22Z CTL_START driver_sha256=4323dc41953f321394e0ee98ffa7c2186943b83067b2cb6886a03aafbca35a3c launcher_sha256=55acc00fe9b04d0e015f37bbdac90e582925c4b4564f7aaaa55c21a13304cf0a launcher=/home/user/workspace/execution/6c2a68ac/s5-v32-builder/s5-setup-v32-controls/../s5-setup-exclusion-v32/launch-s5-setup-exclusion.v32.sh fake_sha256=045d5284993217e98b85932bb33d6ba6e9a272097070ffd1f3c0f42a7b02f838 real_setsid=/usr/bin/setsid out=/home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z
+2026-09-23T16:29:22Z LAUNCH P1 scenario=bound-subsession-90 lpid=18033 path_prefix=[none]
+2026-09-23T16:29:23Z PASS P1.prior_records_preserved prior LEASE_HOLDER and fallback SELF_HOLD moved by their tokens under prior/ byte-identical to the seeds (nothing deleted); current holder record is the new token
+2026-09-23T16:29:23Z PASS P1.inner_live_hold bound fake exited 90; its IDENTITY bound inner sid=18178; holder in SELF-HOLD with busy lock; an acknowledged heartbeat census contains 18178 (retention baseline)
+2026-09-23T16:29:23Z FIXTURE P1 chmod a-rwx /home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P1/logs/setup-v1/attempts (inner evidence subtree unlistable; nothing deleted)
+2026-09-23T16:29:25Z PASS P1.evidence_loss_keeps_retained_sid with the IDENTITY subtree unlistable the census is typed unknown AND still names the retained inner sid 18178 (v2 would have read no inner sid: census empty -> release while 18178 lived)
+2026-09-23T16:29:38Z P1 inner sleep gone=yes
+2026-09-23T16:29:39Z PASS P1.no_release_on_unavailable_evidence inner session ended but the evidence subtree is still unavailable: hold retained (unknown != empty), no RELEASE
+2026-09-23T16:29:39Z REPAIR P1 chmod u+rwx (permission restored; no file touched)
+2026-09-23T16:29:41Z PASS P1.release_after_evidence_restored after restoring only the permission: readable evidence, 18178 positively empty, released self-hold-then-empty rc 90; raw 90 separate; no verified-empty claim; lock free
+2026-09-23T16:29:41Z LAUNCH P2 scenario=bound-normal-slow lpid=19503 path_prefix=[none]
+2026-09-23T16:29:41Z FIXTURE P2 LEASE_HOLDER -> directory (record preserved as LEASE_HOLDER.at-running); fifo at /home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P2/LEASE_HOLDER.tmp.19503 (the launcher's next holder update blocks here until the driver reads)
+2026-09-23T16:29:50Z P2 launcher wchan=[wait_for_partner] state=[S] (blocked at the fifo open: it cannot pass the holder update without a reader)
+2026-09-23T16:29:50Z FIXTURE P2 first receipt preserved as LEASE_RELEASE.first-receipt; LEASE_RELEASE -> directory
+2026-09-23T16:29:50Z PASS P2.first_receipt_published_ok the first receipt says publication=ok final_rc=0 (this is the stale receipt v2 exited 0 behind); the launcher is still alive and has not logged LEASE_RELEASED
+2026-09-23T16:29:51Z P2 fifo read rc=0 content=[token=20260923T162941Z-19503-30916 holder_pid=19503 holder_sid=19503 holder_pgid=19503 start_time=396846 state=RELEASED(normal) since=2026-09-23T16:29:47Z lock=]
+2026-09-23T16:29:51Z PASS P2.corrective_rewrite_failure_holds holder update failed, corrective receipt rewrite failed (deposit inside the directory obstacle), launcher did NOT exit: SELF-HOLD with busy lock, raw=observed 0 kept separate
+2026-09-23T16:29:54Z REPAIRED /home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P2/LEASE_RELEASE (removed only LEASE_RELEASE.tmp.19503)
+2026-09-23T16:29:54Z REPAIRED /home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P2/LEASE_HOLDER (removed only LEASE_HOLDER.tmp.19503)
+2026-09-23T16:29:55Z PASS P2.release_after_exact_repair after removing only the launcher's own deposits + empty directories: checked receipt with both causes, final_rc=90 while raw 0 is retained separately, holder RELEASED, lock free
+2026-09-23T16:29:55Z LAUNCH P3a scenario=never-runs lpid=20442 path_prefix=[/home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P3a-shim]
+2026-09-23T16:29:58Z PASS P3a.never_adopted_stale_not_imported gate positively refused (identity unconfirmed, attributable shim in own_stamp), unadopted gate ended by the existing refusal path (raw 143), stale record classified not-this-attempt and left untouched, no stale-derived hold, released rc 90, lock free
+2026-09-23T16:29:58Z LAUNCH P3c scenario=never-runs lpid=21102 path_prefix=[/home/user/workspace/execution/6c2a68ac/s5-v32-control-run/20260923T162922Z/P3c-shim]
+2026-09-23T16:30:01Z PASS P3c.same_number_not_before_spawn_stale_not_bound NEGATIVE (S5-V31-A-01): stale record with pgid=21165 (this attempt's exact SESSION number), stamp 2026-09-23T16:29:58Z not before this holder's HELD stamp 2026-09-23T16:29:58Z, foreign token: v3.2 classified it not-this-attempt (v3.1 would have bound it and imported released=1 -> stale-derived unknown hold); never-adopted gate ended by the existing refusal path (raw 143), stale record untouched, no stale-derived hold, released rc 90, lock free
+2026-09-23T16:30:01Z LAUNCH P3b scenario=early-death-75 lpid=21828 path_prefix=[none]
+2026-09-23T16:30:01Z PASS P3b.early_adopted_death_released adopted fake wrote only START (pgid=21891 = outer session) and died 75 before the binding line: v3.1 binds this attempt's record, released normal with final_rc=75 = raw, no dead-end hold (v3 would have held unknown), lock free
+2026-09-23T16:30:01Z ALL_CASES_DONE pass=11 fail=0 (static expectation 11 checks; not evidence until executed under grant)
+2026-09-23T16:30:01Z SUMMARY pass=11 fail=0
