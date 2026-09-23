@@ -1,0 +1,169 @@
+{
+  "assignment": "S2-V57-A",
+  "risk": "T4: trusted privileged validation and evidence",
+  "independence": {
+    "role": "Independent nonbuilder auditor A",
+    "requested_model": "No named auditor model supplied in this assignment; scope names Claude Fable 5 for builders, not an observed auditor identity",
+    "observable_identity": "API assistant; underlying model/version and runtime reasoning setting not observable",
+    "reasoning_request": "High is requested policy, not observed telemetry",
+    "current_peer_or_current_state_read": false,
+    "candidate_modified": false,
+    "method": "Read/hash/diff only; no candidate execution, syntax checking, process inspection/control, lock access, network, dependency installation, or product edits",
+    "sole_output": "/home/user/workspace/execution/e8d546f9/audits/s2-v57-a"
+  },
+  "exact_candidate": {
+    "root": "/home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57",
+    "manifest": "SHA256SUMS.outer",
+    "manifest_sha256": "72b9cfb5048b52433b62d62d921bad02721e3775c51f45af7c92356ca0703061",
+    "verification": "15/15 manifested files match; non-self-including manifest; stubs manifest 4/4 match",
+    "runner_sha256": "efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c",
+    "driver_sha256": "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+    "control_request_sha256": "c61ae5f2614d4885cade78030693aa5291ab90e83b063845c2966c64c1c33530",
+    "proof_request_sha256": "83d3586d6c01c2d0a991bfbc5afe4e604b09e2d1aa4a0374a13d2c5047a45123",
+    "source_diff": "Independent diff bodies match both packet diffs exactly, excluding their path/time header lines; K1 mechanism, four stubs, and stubs manifest are byte-identical to V56",
+    "product_head_pin": "d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c",
+    "product_head_runtime_verification": "Not performed; this audit binds the packet, not a newly restored worktree or installation"
+  },
+  "verdicts": {
+    "CONTROL_REQUEST_12": "HOLD: five concrete material findings below; do not execute the sequence merely to rediscover these source counterexamples.",
+    "PROOF_REQUEST_13": "HOLD separately: successful reviewed controls, fresh separately granted setup, and the explicit canonical slot remain prerequisites, not inherited evidence. [Proof request L5-L15](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/PROOF_REQUEST_13.md#L5)",
+    "wdcancel_exception": "Standalone wdcancel=3 is the already documented caller exception and is NOT a new defect or a reason for a runner revision. [Control request L27-L30](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/CONTROL_REQUEST_12.md#L27)",
+    "product": "No product, final release, landing, deployment, hosted-setting, or customer clearance."
+  },
+  "findings": [
+    {
+      "id": "S2-V57-A01",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "prior_boundary": "S2-V56-A01/A04/A05/A06 and B D-02: watchdog identity, cancellation and total finish bound",
+      "file": "controls-proposed/run-controls-v57.sh",
+      "sha256": "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+      "lines": [157, 211, 213, 215, 217, 370, 375, 376, 385, 386, 465],
+      "title": "Parent-identity guard examines BASHPID inside a command substitution, not the watchdog/alarm shell",
+      "counterexample": "At D211, BASHPID is expanded inside $(ps ... | tr ...), so it denotes a shell in that command-substitution/pipeline execution, not the outer watchdog whose parent must equal DRIVER_PID; the queried parent is therefore a nested shell rather than the driver, or the lookup fails, and wd_parent_ok returns false before D214 on an ordinary live-driver path. [Driver L209-L218](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L209)",
+      "consequence": "The watchdog exits at its first guard without the required TERM, KILL or driver-cancellation stages, so W1/N7 cannot satisfy their watchdog assertions and C1/N8 cannot prove cancellation; the identical BASHPID expression in the finish alarm disables its driver-KILL branch as well, leaving the claimed total-tail bound unestablished. [Driver L154-L158](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L154) [W1/C1 L365-L386](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L365) [N7/N8 L454-L467](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L454)",
+      "smallest_correction": "Capture each actual watchdog/alarm shell's BASHPID in that shell before entering command substitution, and query that stable captured pid's parent; retain the parent-alive guard and existing W1/C1/N7/N8 assertions, not weaker substitutes.",
+      "evidence_class": "Static shell-semantics counterexample; no reproduction or probe executed"
+    },
+    {
+      "id": "S2-V57-A02",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "prior_boundary": "Ownership-record format migration and existing neg/N1-N2 controls",
+      "file": "controls-proposed/run-controls-v57.sh",
+      "sha256": "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+      "lines": [73, 74, 75, 76, 91, 129, 130, 132, 337, 343, 346],
+      "title": "N1 still registers a bare PID after rec_alive was changed to accept only pPID:start and gPGID records",
+      "counterexample": "N1's D337 calls record \"$DECOY\", but rec_alive D73-L77 has only p* and g* cases, so this numeric record never expands into a cleanup target and prune_groups removes it; D343 consequently does not end the N1 decoy. [Driver L73-L91](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L73) [N1 L335-L343](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L335)",
+      "consequence": "While the 25-second decoy remains alive, N2's child sees the same s2r53-stub-escapee pattern and aborts 2 instead of exercising the intended injected assertion and returning 1; interruption of the outer driver also cannot clean this decoy through either registry. [Pattern and precondition L66-L67,L203-L205](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L203) [N1/N2 L337-L350](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L337) [Finally L122-L135,L163](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L122)",
+      "smallest_correction": "Register N1's own child with the existing generation-bearing pid record and controller ownership mechanism, with the same interruption-safe acquisition discipline as the other controller resources; retain the child-refusal and subsequent N2 discrimination.",
+      "evidence_class": "Static incompatible producer/consumer record contract; no runtime failure claimed"
+    },
+    {
+      "id": "S2-V57-A03",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "prior_boundary": "S2-V56-A07: exact allowed write/lock set",
+      "files": [
+        "CONTROL_REQUEST_12.md",
+        "controls-proposed/run-controls-v57.sh",
+        "/home/user/workspace/tgp-private-evidence/2026-09-22/remediation/s2-setup-prep/proposal-1/run-composition-r53-v5.3.1-when-granted.sh"
+      ],
+      "sha256": [
+        "c61ae5f2614d4885cade78030693aa5291ab90e83b063845c2966c64c1c33530",
+        "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+        "fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925"
+      ],
+      "title": "Frozen predecessor still creates a private lock under stubs, outside the request's write set",
+      "counterexample": "K7pre and K8pre pass S2_RUNNER_STUBS=$STUBS to the unchanged predecessor; predecessor L52 chooses LOCK=$STUBS/test-validation.lock and L164 opens it for writing, so moving only the successor and driver lock to runtime/ does not move this predecessor lock. [Driver L285,L302](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L285) [Predecessor L52,L164](file:///home/user/workspace/tgp-private-evidence/2026-09-22/remediation/s2-setup-prep/proposal-1/run-composition-r53-v5.3.1-when-granted.sh#L52)",
+      "consequence": "CONTROL_REQUEST_12 L34 says Nothing else after enumerating runtime/, runner outputs, results and predecessor outputs, omitting execution/op88/s2-v57/controls-proposed/stubs/test-validation.lock; the driver final gate also probes only the new runtime lock, not the predecessor's distinct lock. [Request L32-L35](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/CONTROL_REQUEST_12.md#L32) [Driver L58,L165](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L165)",
+      "smallest_correction": "Reconcile and explicitly authorize exactly the predecessor's existing private-lock path for new1 and account for that lock at handoff, or use an explicitly reviewed path arrangement with unchanged predecessor/stub bytes; do not edit the frozen predecessor or silently broaden permissions.",
+      "evidence_class": "Static definite write-path mismatch; no lock opened",
+      "nonblocker_note": "The request's extra predecessor-directory permission for new2 is unnecessary because new2 runs successor K10, but that overdescription alone is not raised as another material finding. [Driver L320-L322](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L320)"
+    },
+    {
+      "id": "S2-V57-A04",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "prior_boundary": "S2-V56-A04 historical PID reacquisition remains materially open",
+      "file": "controls-proposed/run-controls-v57.sh",
+      "sha256": "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+      "lines": [70, 71, 72, 75, 80, 83, 84, 85, 86, 87, 132, 133, 134, 188, 189],
+      "title": "Import-time starttime and sleep shape do not bind a historical PID to its original spawned process",
+      "counterexample": "After a logged spawned pid has died, let that number be reused before record_from_run by an unrelated sleep 30 launched after this driver started; D84 accepts liveness, D85 accepts its post-T0 start, D86 accepts its command shape, and D87 snapshots the replacement's own starttime as a new owned record rather than comparing against an identity captured when the original child was owned. [Driver L70-L87](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L70) [Import occurs after runner returns, L188-L189](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L188)",
+      "consequence": "rec_alive then validates that newly captured replacement starttime and owned_cleanup can TERM/KILL the unrelated process; the new record format protects against reuse after import, but not the prior finding's reuse before import. [Driver L75,L129-L134](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L129) [Prior A04](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/audits/s2-v56-a/AUDIT.json#L48)",
+      "smallest_correction": "Preserve provenance from actual ownership acquisition for these imports, or refuse to promote an unprovable historical number into signal authority; do not use post-T0 plus a common sleep name as a substitute for that binding.",
+      "evidence_class": "Specific reuse schedule at the already-open historical-import boundary; not a claim that PID reuse was observed and not an arbitrary-setsid containment requirement"
+    },
+    {
+      "id": "S2-V57-A05",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "prior_boundary": "S2-V56-A06 controller cancellation closure",
+      "file": "controls-proposed/run-controls-v57.sh",
+      "sha256": "698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f",
+      "lines": [55, 66, 115, 123, 124, 127, 163, 165, 166, 174, 394, 395],
+      "title": "N4's decoy remains unowned during its deliberate pre-registration sleep",
+      "counterexample": "Deliver TERM to the driver after N4 starts the 60-second caller-group decoy at D394 and during its sleep 0.2, before D395 appends the pid record to CTRL; on_cancel enters finish without reaching that registration, PENDING_ENC is not a controller latch, and neither registry contains this decoy. [N4 L393-L396](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L393) [Cancellation/finally L115-L128,L161-L174](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L161)",
+      "consequence": "The decoy is deliberately outside PAT, so both controller census and the final detected-survivor gate can report empty while it survives the cancelled driver; adding a finally registry only after the acknowledgement delay does not close the prior cancellation boundary. [Pattern L66](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L66) [Census and gate L123-L128,L163-L166](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L123)",
+      "smallest_correction": "Make acquisition of this controller child interruption-safe before the readiness wait, and have finally resolve any pending controller acquisition; keep it excluded from tested owned-work cleanup while retained by its controller's cancellation path.",
+      "evidence_class": "Concrete signal schedule in the existing 0.2-second window, not a new broad fault-coverage project"
+    }
+  ],
+  "closure_ledger": [
+    {
+      "prior": "S2-V56-A01 / B D-01; B D-02",
+      "disposition": "K1's unbound R55 is source-corrected to the lane-local R57 copy and an EXIT handler is present; full watchdog/abnormal-completion closure is withheld on S2-V57-A01. [Driver L175-L176,L225](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L175)"
+    },
+    {
+      "prior": "S2-V56-A02",
+      "disposition": "SOURCE-CLOSED for the exact self-including temporary-manifest defect: both hash pipelines exclude SHA256SUMS* and verify the completed inner manifest; successor controls also reject manifest entries within the runner's inner manifest. [Runner L350-L351](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/run-composition-r57-v5.7-when-granted.sh#L350) [Driver L145-L147,L194-L195](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L145)"
+    },
+    {
+      "prior": "S2-V56-A03",
+      "disposition": "SOURCE-CORRECTED for the explicit checked-registration-before-ack and post-spawn/pre-STEP_PID examples: driver registration/CURRENT read-back precede ack, and pending-enclosure/runner-step recovery paths were added; this is not runtime boundary proof or an assertion that every controller acquisition is closed. [Driver L98-L120](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L98) [Runner L178-L198,L239-L243](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/run-composition-r57-v5.7-when-granted.sh#L178)"
+    },
+    {
+      "prior": "S2-V56-A04",
+      "disposition": "PARTIAL: watchdog stop now terminates/reaps the shell before reading the final sleeper, and p-records include a starttime; historical-import authority remains open as S2-V57-A04 and watchdog parent checking fails as S2-V57-A01. [Driver L70-L87,L136-L142,L211](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L136)"
+    },
+    {
+      "prior": "S2-V56-A05",
+      "disposition": "PARTIAL: unconfirmed cleanup children still alive after KILL are no longer unconditionally waited, runner receipt/outer publication has a timeout and final PUBLICATION write failure forces nonzero, and driver publication has a post-publication deadline check; the claimed enclosing finish alarm fails S2-V57-A01, so total-completion closure is not granted. [Runner L285-L293,L356-L376](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/run-composition-r57-v5.7-when-granted.sh#L285) [Driver L143-L171](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L143)"
+    },
+    {
+      "prior": "S2-V56-A06 / B D-03,D-04",
+      "disposition": "PARTIAL: N4b asserts the actual interrupted step, N5b refuses an unseen seam and validates group membership, N6 has a ready-under-lock acknowledgement, and W1's need gate has the requested slack; controller cancellation still fails S2-V57-A05 and watchdog discrimination is blocked by S2-V57-A01. [Driver L370,L394-L402,L423-L450](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L423)"
+    },
+    {
+      "prior": "S2-V56-A07 / B D-05",
+      "disposition": "PARTIAL: raw per-set status and the explicit standalone wdcancel=3 exception are documented, and successor lock writes moved to runtime; predecessor lock write remains omitted under S2-V57-A03. [Request L18-L35](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/CONTROL_REQUEST_12.md#L18)"
+    },
+    {
+      "prior": "B R-1,R-2,R-3",
+      "disposition": "SOURCE-CORRECTED for the named after-ack duplicate/untruthful stamp, unconfirmed-client polling loops and deadline label: registration is checked before re-append with ack-aware wording, the specified loops include CLEANUP_DEADLINE, and receipt says deadline_exceeded. [Runner L188-L189,L285-L288,L353](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/run-composition-r57-v5.7-when-granted.sh#L188)"
+    },
+    {
+      "prior": "B P-01,P-02,P-03",
+      "disposition": "REQUEST-CORRECTED for the named 900-second/header mismatch, absent install-stamp instruction and wrong fixture path: request now uses the runner-header 2100/60 invocation, explicitly requires the exact lock stamp, and names execution/s2-setup-prep/infra/s2-fixture-r53.sh; no installation or proof is inferred. [Proof request L7-L17](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/PROOF_REQUEST_13.md#L7)"
+    },
+    {
+      "prior": "Already source-closed product/client and ownership properties",
+      "disposition": "No request to reopen the fixed IDDIR reset, installed-CLI hash-before-first-use ordering, CHECKPOINT_DISABLE carry, first-failure/cleanup separation, no-destroy quarantine, or the explicitly limited K9 boundary; those code properties remain in the reviewed successor. [Runner L107,L126-L139,L317-L343,L404-L412,L428-L432](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/run-composition-r57-v5.7-when-granted.sh#L404) [K9 L313-L318](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/controls-proposed/run-controls-v57.sh#L313)"
+    }
+  ],
+  "environment_boundary": {
+    "current_environment": "Not probed; prior environment observations are historical, not inherited grants or current verification",
+    "before_any_later_control": "Exact operational paths/worktree/predecessor restoration and the explicitly writable predecessor output parent must be verified by the granting party; ENV01 is documented and is separate from code closure. [Request L11-L16](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/CONTROL_REQUEST_12.md#L11)",
+    "before_real_proof": "Fresh setup/install stamp, green reviewed controls and a separately granted canonical slot remain required. [Proof request L5-L10](file:///home/user/workspace/tgp-private-evidence/2026-09-22/op88/remediation/s2-v57/PROOF_REQUEST_13.md#L5)"
+  },
+  "smallest_next_action": "Preserve V57 unchanged. Return only S2-V57-A01..A05 to the sole execution-layer builder/parent: stable watchdog/alarm self identity, valid N1 ownership record, exact predecessor-lock permission/handoff, no historical-number reacquisition, and interruption-safe N4 controller acquisition. Freeze the smallest additive driver/request successor, with any narrowly necessary ownership-provenance change explicitly identified, then obtain independent exact-delta material-closure review. Do not require product or broad harness changes. No controls or real proof are granted by this audit.",
+  "truth": {
+    "implemented": "This audit dataset and its input/freeze manifests only",
+    "verified": "Exact input hashes, complete runner/driver/stub/request read, prior V56 A/B material findings, packet diff-body equality and unchanged K1/stub bytes",
+    "tested": "Nothing",
+    "unrun": "All controls, syntax checks, process/lock probes, setup and real composition",
+    "finding_kind": "Source counterexamples and exact grant-scope contradiction, not observed runtime failures",
+    "independent_freeze": "No peer/current-round report accessed before freezing"
+  }
+}

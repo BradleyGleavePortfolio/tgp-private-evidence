@@ -10,16 +10,16 @@ Current continuation is op88 next-proof, NOT awaiting EXECUTE/S0. Prior worker â
 
 ## Work underway
 
-- S2V57: fresh independent A/B source review, immutable72b9cfb5 packet. Exact controls immediately upon closure; caller accepts only documented standalonewdcancel3 exception.
+- S2V57: A frozen06a2705a identifies five concrete driver/request defects; B still independent. Sole Fable V58 narrowly corrects them, then dual delta closure and controls; standalonewdcancel3 remains accepted caller exception.
 - S4V6.1: Fable sole writer, only A01/A02/B01/B02 from frozen V6 reports. Then dual delta readback/control, no broad fault-coverage program.
-- S5V10: independent B completes missing verdict without A exposure. Existing A frozen. Safe private diagnostic may proceed separately after dual clearance; expectedC3 failure never promoted to25PASS.
+- S5V10: independent B provider-blocked twice despite passive-review clarification, no verdict/approval; unchanged diagnostic remains held. Existing A preserved, expectedC3 source counterexample not a run. No provider-safeguard bypass.
 - S5V10.1: separate Fable writer repairs A01..03 only, incorporates B after independent freeze. Setup-exclusion9-file successor held separately; R1 valid, no rerun.
 - S1/S2/S3: source-only restoration of exactd5cd/predecessor37files and bounded PREP2 inputs. No install, runtime, product change or hook/commit.
 - S6C6: frozen19-file discriminator and narrowB preserved. Shared launch consumer/setup dependency held; no repeat valid C5A/B/D.
 
 ## Truth and resource boundary
 
-No current control/setup/heavy/DB/browser/lock execution grant. Two CPUs/about8GB,9.8GB disk before source restoration; prior dependencies not inherited. Source/review run in parallel; one later named heavy slot. All failed evidence and original reports remain intact.
+Fresh conditional S2SETUP grant to upstream worker only: exact restored37-file setup05 scripts, clients/pinned binaries/locked dependencies, no server/DB/controls. Separate setup-exclusion A/B reviews dispatched. Two CPUs/about8GB,9.7GB after source restoration; prior dependencies not inherited. Source/review parallel; all other heavy execution held. All failed evidence and original reports remain intact.
 
 Product heads: S156fb0d22, S2d5cd9b8b, S35c7b42b3, S491990ae9, S5143d451e, S6d51a1910. Full SHAs/trees in current state and source bundles. Nothing landed/deployed/enabled/customer-accepted by this continuation.
 

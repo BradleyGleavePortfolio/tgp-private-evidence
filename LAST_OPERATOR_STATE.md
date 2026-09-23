@@ -33,19 +33,19 @@ All64 open PR head/base/name records re-queried; zero mismatches with `execution
 | Lane | Grade | Exact product head | Current next transition |
 |---|---|---|---|
 | S1 R4 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Source preserved, independent source reviews frozen; TRUNCATE/membership dynamic proof after S2 controls/setup. |
-| S2 V5.7 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Frozen runner72b9cfb5 verified15/15; fresh A/B dispatched because prior active reviews have no published final outputs. Controls unrun. |
+| S2 V5.7→V5.8 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V57A frozen06a2705a: five concrete driver/request findings HOLD controls; B remains independent. Sole Fable V58 correction dispatched, product unchanged. |
 | S3 PREP2 | T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source bundle940ce711 restored; prepared composition treea584a1b95423f95dae8daabf673ef3776604acbb retained. Upstream proof, hook/composed-lock/final reviews pending. |
 | S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V6 manifest8b04adaf12/12; both audits frozen. Fresh sole builder corrects only four concrete findings; V6.1 was not published at intake. |
-| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10fdc9977120/20; existing A frozen, fresh independent B dispatched. Separate builder A01..03 only; setup-exclusion0a6901119/9 remains held. R1 valid, no rerun. |
+| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10fdc9977120/20; existing A frozen, B provider-blocked with no verdict. Separate builder A01..03 only; setup-exclusion0a6901119/9 now fresh dual review. R1 valid, no rerun. |
 | S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 manifest04d761f019/19, narrow B5196e231 preserved. Shared launch exact consumer adaptation/setup pending; no repeat C5 A/B/D. |
 
 Actual source objects/tree identities restored from prerequisite-verified bundles. S1 `56fb` is an actual ancestor of S2 `d5cd` (fresh Git check), not merely matching content. S4 current bundle is `af2c8207…b0dd` for91990, not the older R5 bundlef8de3d63. Source restoration and manifest checks are not new product tests/audits.
 
 ## Ownership and resources
 
-Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCHES.md` and root mirror. Six assignments dispatched; no old op88 worker ID, PID, installation or grant is inherited as live. Parent is sole telemetry/private publisher. S1 schema/generator remains reserved, no mutation assigned. Auditors do not read their current peer conclusions, implement source, run duplicate heavy tests or self-clear.
+Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCHES.md` and root mirror. Initial six assignments plus S2V58 and two separate setup reviewers; V10B blocked. No old op88 worker ID, PID, installation or grant is inherited as live. Parent is sole telemetry/private publisher. S1 schema/generator remains reserved, no mutation assigned. Auditors do not read their current peer conclusions, implement source, run duplicate heavy tests or self-clear.
 
-Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; canonical lock path absent, not acquired. No current install/PG/app fixture assumed. No heavy/setup/control/DB/browser/canonical-lock slot granted. Source/review parallel; later heavy execution serialized with explicit exact-input grant and nonblocking canonical lock.
+Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration;9.7GB after. Fresh conditional S2SETUP grant to upstream worker only, existing setup05 bytes after exact restoration/capacity checks (`execution/e8d546f9/S2_SETUP_GRANT.md`); permits client/binary/locked-dependency install, not server/DB/controls. No other heavy slot. Source/review parallel; canonical use nonblocking, old fixtures not inherited.
 
 ## Proven, unproven and current material findings
 
@@ -57,6 +57,8 @@ Unproven: current real-PG composition, S1 dynamic discriminator, S3 runtime inte
 - OWN-V10-A01/A02/A03: fixture loses primary refusal rc; unknown session authority retired when leader gone; failed required control EXIT record ignored. Frozen private diagnostic may be safe independently of setup, but B must independently freeze before grant. Expected C3 failure is not25PASS.
 - Setup exclusion: unknown/live ownership may not lose final exclusion; separately frozen9-file successor requires independent scope review. No automatic transfer to S6 or T0.
 - S2: current V57 reviews incomplete; expected standalonewdcancel3 handled by explicit caller allowance, no new revision for grant wording. ENV01 allows only new additive outputs under future grant; fresh setup/installstamp required. Existing setup05 bytes and evidence preserved, no new harness requested.
+- S2-V57-A01..05 concrete material blockers: BASHPID evaluated inside command substitution disables watchdog/finish parent guards; N1 old bare-PID record incompatible with new consumer; predecessor stub-lock outside grant/handoff; historical PID import can adopt a replacement sleep; N4 pre-registration delay loses decoy on cancellation. V58 limited driver/request and narrowly necessary original synthetic identity provenance; no product change. B not shared before freeze.
+- V10B provider blocked passive review twice including clarification; no approval/incomplete-review masquerade and no routing around provider safeguard. Unchanged V10 diagnostic remains held. S4/S2/setup-source work continues independently.
 - Integration: C1/G2 collision in `docs/contracts/importer-openapi.json` and `scripts/importer-contract.ts` prevents consumer freeze. Actual replay164 parent migrations+candidate165 required, not ledger-only.
 
 ## Failed evidence preserved
@@ -77,9 +79,9 @@ Acceptance unchanged: ≥one authorized real nonempty native/reconciled complete
 
 ## Next six slices and exact next action
 
-1. Finish fresh S2V57 dual reviews; grant exact private controls immediately on material closure.
+1. Finish independent S2V57B and narrow V58 material correction; dual exact-delta closure, then private controls immediately.
 2. Freeze S4V6.1 four-finding successor; independent dual delta review then controls.
-3. Freeze independent V10 B; if compatible with existing A safe-subset verdict, grant unchanged private diagnostic with expected failure preserved.
+3. V10B unavailable due provider block; no unchanged diagnostic grant. Preserve this incomplete review separately from source defects; advance legitimate changed V10.1 repair without inherited approval.
 4. Finish S5V10.1 concrete corrections and setup-only review; exact reviewed controls then setup/T0, no R1 rerun.
 5. Restore upstream paths; existing fresh setup after slot; unchangedd5cd/S1 real composition/TRUNCATE then dual evidence follow-up; S3 integration afterwards.
 6. Shared primitive closure → exact S6 consumer adaptation/applicability → fresh setup → C6 only.
