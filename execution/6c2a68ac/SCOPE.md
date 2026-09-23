@@ -50,6 +50,35 @@ Read/hash/diff only. No runtime/probes/install/lock operations/signals/source ed
 
 On source restoration completion, parent compares fresh substrate to already dual-cleared S2 V61 source and k=120 addenda. If unchanged and prerequisites verified, issue one fresh activation of k/new1/new2/neg/neg2; preserve P1/W1/C1, stop at first nonzero, then independently review actual result. No new source audit merely for restoration. S5 source/control review is independent of that slot. S6 remains held until S5 corrected base dual closure and explicit composition activation.
 
+## Additional disjoint assignments
+
+### S5-V2-RESULT-A and S5-V2-RESULT-B
+
+- Tier: T4 each; cumulative S5 T4.
+- Why: independent evaluation of actual failed trusted validation and accountable recovery.
+- T4 trigger scan: evidence/recovery/process ownership; T3 trigger scan: lifecycle authority.
+- Bounded T1: NO, recovery/privilege.
+- Route: independent nonbuilder A inherits parent; B requests Claude Fable 5 / High.
+- Parent owner: EXEC-6c2a68ac.
+- Sole writes: execution/6c2a68ac/audits/s5-v2-result-a or s5-v2-result-b.
+- Acceptance: exact source/grant/result/recovery binding; raw1 and 8PASS1FAIL preserved; later checks NOT RUN; no invented failed operand; distinguish intended final90 from wait-observed exit; verify original immutable copies and disclosed live drift; scoped slot closure only.
+- Stop triggers: incomplete or unavailable evidence, peer contamination, provider restriction or material contradiction.
+
+Read/hash/diff only, no runtime or recovery. Use only the archived s5-setup-v2-control-result packet, exact V2 grant and X6 recovery grant, named V2 source/control packet and prior source reviews if needed. Do not read current peer result conclusions or parent result-disposition summary as a substitute for your own assessment. This is the outstanding review of an attributable failure, not a new control framework or demand to rerun V2.
+
+### S6-RESTORE
+
+- Tier: T4; cumulative S6 T4.
+- Why: exact sensitive-data consumer and diagnostic evidence recovery.
+- T4 trigger scan: source/evidence provenance and recovery; T3 trigger scan: cross-consumer lifecycle.
+- Bounded T1: NO, privacy/recovery.
+- Canonical builder: Claude Fable 5 / High. Parent owner: EXEC-6c2a68ac.
+- Sole writes: fresh source/mobile, worktrees/s6-diagnostic, execution/op88/s6-c6-prep and execution/6c2a68ac/s6-restore.
+- Acceptance: exact mobile main prerequisite, verified bundle d51a191098f483cea9abec6cc7e9f3beffd18c06/tree62bf67b88e0f123f1a23ee34a1a75cb43029d9fb, clean source, C6 packet 19/19 and subset11/11, no installation/runtime.
+- Stop triggers: any pin mismatch, collision, missing named source or ownership expansion.
+
+Follow only the archived 2026-09-23/e8d546f9/s6-source-restore/REPORT.md and named packet. Fresh pinned public mobile clone/fetch is allowed, remote writes are not. No product edit, primitive adaptation, setup, test, browser, canonical lock operation, process signal, hook or commit. S6 implementation and runtime remain HELD; this anticipatory restoration does not activate them.
+
 ## Baseline
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

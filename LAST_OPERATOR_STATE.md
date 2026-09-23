@@ -46,6 +46,8 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
+Six disjoint workers active: S2 restoration, S5 V31 A/B, S5 V2 failed-result/recovery A/B, and anticipatory S6 source restoration. No runtime slot is occupied; S6 implementation remains held.
+
 ## DAG
 
 S2 substrate restore → one V61 k/new1/new2/neg/neg2 execution → dual result review → S1/S2 real PostgreSQL composition and discriminator proof → S3 integration/setup.
