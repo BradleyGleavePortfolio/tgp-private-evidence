@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated 2026-09-23 00:51 UTC. Executive parent session `e8d546f9-bc43-4fd2-8bae-b6038a849bc1` (EXEC-e8d546f9). Recon CLOSED; continuation dispatched. This private root is the current operational index, not public-context telemetry.
+Updated 2026-09-23 01:01 UTC. Executive parent session `e8d546f9-bc43-4fd2-8bae-b6038a849bc1` (EXEC-e8d546f9). Recon CLOSED; execution continuing. This private root is the current operational index, not public-context telemetry.
 
 ## Mission and authority
 
@@ -35,8 +35,8 @@ All64 open PR head/base/name records re-queried; zero mismatches with `execution
 | S1 R4 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Source preserved, independent source reviews frozen; TRUNCATE/membership dynamic proof after S2 controls/setup. |
 | S2 V5.7→V5.8 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V57A frozen06a2705a: five concrete driver/request findings HOLD controls; B remains independent. Sole Fable V58 correction dispatched, product unchanged. |
 | S3 PREP2 | T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Source bundle940ce711 restored; prepared composition treea584a1b95423f95dae8daabf673ef3776604acbb retained. Upstream proof, hook/composed-lock/final reviews pending. |
-| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V6 manifest8b04adaf12/12; both audits frozen. Fresh sole builder corrects only four concrete findings; V6.1 was not published at intake. |
-| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10fdc9977120/20; existing A frozen, B provider-blocked with no verdict. Separate builder A01..03 only; setup-exclusion0a6901119/9 now fresh dual review. R1 valid, no rerun. |
+| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | V6.1 manifest671d08c312/12 frozen00:58:25; only four corrections, five codefiles unchanged. Fresh independent A/B delta review dispatched; controls not run. Native observer caller separately held. |
+| S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V10fdc9977120/20; existing A frozen, B provider-blocked with no verdict. Separate builder A01..03. Setup-exclusion A c7958e2b/B cb976bbd both frozen with concrete findings; setup held. R1 valid, no rerun. |
 | S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 manifest04d761f019/19, narrow B5196e231 preserved. Shared launch exact consumer adaptation/setup pending; no repeat C5 A/B/D. |
 
 Actual source objects/tree identities restored from prerequisite-verified bundles. S1 `56fb` is an actual ancestor of S2 `d5cd` (fresh Git check), not merely matching content. S4 current bundle is `af2c8207…b0dd` for91990, not the older R5 bundlef8de3d63. Source restoration and manifest checks are not new product tests/audits.
@@ -47,6 +47,10 @@ Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCH
 
 Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration;9.7GB after. Fresh conditional S2SETUP grant to upstream worker only, existing setup05 bytes after exact restoration/capacity checks (`execution/e8d546f9/S2_SETUP_GRANT.md`); permits client/binary/locked-dependency install, not server/DB/controls. No other heavy slot. Source/review parallel; canonical use nonblocking, old fixtures not inherited.
 
+Fresh restoration complete: exact clean d5cd and37-file predecessor, V57 frozen runtime-path copy; S3 PREP2 tree reproduced from BOTH parents using preserved patches, not a merge/runtime attestation. Upstream report manifest frozen. Additive disclosure requested because original report calls P5 existence-only but includes version/getconf/process census; do not rewrite original.
+
+S2 setup observed actual receipts: setup10raw0 at00:56:29UTC, setup20raw0 at00:57:04UTC; setup30 locked npm install started, no final result yet. No server/DB initialized. Grant remains occupied until attributable stage completion/cleanup.
+
 ## Proven, unproven and current material findings
 
 Verified this session: live mains/64 PR refs; candidate bundle prerequisites/actual trees; S1-in-S2; current packet manifest counts above; dispatch mirrors identical. Preserved valid S5 R1 and earlier source/test evidence retain original applicability only.
@@ -56,6 +60,7 @@ Unproven: current real-PG composition, S1 dynamic discriminator, S3 runtime inte
 - S4-V6-A01/A02: census status captured outside pipeline subshell; dependent-local nounset. V6B01/B02: stale fault-census PIDs can become signal authority; trap installed after lease/standby. All four bind despite B's narrower grantability opinion. V6.1 only these corrections then dual delta readback/control.
 - OWN-V10-A01/A02/A03: fixture loses primary refusal rc; unknown session authority retired when leader gone; failed required control EXIT record ignored. Frozen private diagnostic may be safe independently of setup, but B must independently freeze before grant. Expected C3 failure is not25PASS.
 - Setup exclusion: unknown/live ownership may not lose final exclusion; separately frozen9-file successor requires independent scope review. No automatic transfer to S6 or T0.
+- Setup-exclusion A/B now frozen: outer census omits inner npm session; unknown tracking can be retired on leader collection; normal publication failure does not retain holder; unproved live handoff; stale observer release/raw/publication truth; wrong X1 IDENTITY path; X4 mv-into-directory prevents rmdir recovery; fake descendant assertions do not prove actual nested-session boundary. Parent chooses NO live/unknown transfer capability: retain original owner until exact empty, not a new recovery framework. S5 builder finishes V10.1 first then returns smallest separate setup-change map; not yet granted setup source edits.
 - S2: current V57 reviews incomplete; expected standalonewdcancel3 handled by explicit caller allowance, no new revision for grant wording. ENV01 allows only new additive outputs under future grant; fresh setup/installstamp required. Existing setup05 bytes and evidence preserved, no new harness requested.
 - S2-V57-A01..05 concrete material blockers: BASHPID evaluated inside command substitution disables watchdog/finish parent guards; N1 old bare-PID record incompatible with new consumer; predecessor stub-lock outside grant/handoff; historical PID import can adopt a replacement sleep; N4 pre-registration delay loses decoy on cancellation. V58 limited driver/request and narrowly necessary original synthetic identity provenance; no product change. B not shared before freeze.
 - V10B provider blocked passive review twice including clarification; no approval/incomplete-review masquerade and no routing around provider safeguard. Unchanged V10 diagnostic remains held. S4/S2/setup-source work continues independently.

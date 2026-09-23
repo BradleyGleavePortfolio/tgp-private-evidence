@@ -1,0 +1,116 @@
+--- v6/launcher/s4-r6-launch-v6.sh
++++ v61/launcher/s4-r6-launch-v6.sh
+@@ -4,6 +4,16 @@
+ #   bash execution/s4-r6-validation/v6/launcher/s4-r6-launch-v6.sh              (kind=VALIDATION)
+ #   S4R6_CONTROL=1 S4R6_SCENARIO=<name> bash .../s4-r6-launch-v6.sh              (kind=CONTROL, stub runner)
+ #
++# V6.1 changes versus V6 (frozen reviews S4-V6-A-01, S4-V6-B-01, S4-V6-B-02; additive successor, nothing else changed):
++#  * A-01 census raw status: pgrep stdout AND its exit status are captured in the SAME scope (no pipe, no PIPESTATUS read
++#    after the assignment). rc 0 with output => MEMBERS; rc 1 => EMPTY; anything else, including rc 0 with no output and
++#    124 (timeout), => UNKNOWN:<rc>. The newline->space formatting happens afterwards, in-process.
++#  * B-01 signal targets from the REAL census only: signal_session disarms the CONTROL-only census faults around its own
++#    two census calls, so injected "persisting" members drive classification/quarantine but are never a kill target.
++#  * B-02 traps before exclusion: the INTERRUPT traps are installed BEFORE the lease is opened/flocked and the standby
++#    holder is spawned; an interrupt received before the runner spawn exits INTERRUPTED 143 through publish_and_exit
++#    (standby holder released identity-checked, nothing owned, record written) instead of dying with the holder unrecorded.
++#
+ # V5 changes versus V4 (frozen reviews S4-V4-A-02/03/04, S4-V4-B-01/05):
+ #  * Cleanup state before outcome precedence (A-03/B-01): SURVIVORS is resolved FIRST on every post-exit
+ #    path; TIMEOUT/INTERRUPTED never bypass lease retention. The cause stays in bounds.timed_out/interrupt.
+@@ -100,10 +110,16 @@
+ #   EMPTY   (pgrep rc 1, no member)   MEMBERS (rc 0)   UNKNOWN:<rc> (124 timeout / other error / no SID yet)
+ # UNKNOWN is never treated as empty by any caller.
+ census() {
+-  local rc; MEMBERS=""
++  local raw rc; MEMBERS=""
+   if [[ -z $SID ]]; then CENSUS_STATE=UNKNOWN:nosid; return 0; fi
+-  MEMBERS=$(timeout --foreground "$CENSUS_S" pgrep -s "$SID" 2>/dev/null | tr '\n' ' '); rc=${PIPESTATUS[0]}
+-  case $rc in 0) CENSUS_STATE=MEMBERS;; 1) CENSUS_STATE=EMPTY; MEMBERS="";; *) CENSUS_STATE="UNKNOWN:$rc"; MEMBERS="";; esac
++  # V6.1 A-01: the status of timeout/pgrep itself, captured in the same scope as its output (no pipe; the V6 assignment's
++  # PIPESTATUS[0] was the substitution's status, i.e. tr's). Formatting is done afterwards in-process.
++  raw=$(timeout --foreground "$CENSUS_S" pgrep -s "$SID" 2>/dev/null); rc=$?
++  case $rc in
++    0) if [[ -n $raw ]]; then CENSUS_STATE=MEMBERS; MEMBERS=${raw//$'\n'/ }; else CENSUS_STATE=UNKNOWN:0-empty; fi;;   # rc 0 without pids is not evidence of members or of emptiness
++    1) CENSUS_STATE=EMPTY;;
++    *) CENSUS_STATE="UNKNOWN:$rc";;
++  esac
+   if [[ $FAULT_ARMED == true ]]; then   # CONTROL-ONLY data-level faults (B-06); real census result replaced AFTER the runner exited
+     if has_fault census-members-persist; then CENSUS_STATE=MEMBERS; MEMBERS=${MEMBERS_AT_DEADLINE:-$SID}; fi
+     if has_fault census-unknown; then CENSUS_STATE=UNKNOWN:124; MEMBERS=""; fi
+@@ -125,9 +141,11 @@
+ }
+ # signal_session <SIG>: every foreign process group in the owned session (-pgid), then every pid.
+ signal_session() {
+-  local sig=$1 p g
++  local sig=$1 p g armed=$FAULT_ARMED
++  FAULT_ARMED=false   # V6.1 B-01: targets come from the REAL session census only; CONTROL census faults shape classification, never a kill target
+   census; for p in $MEMBERS; do g=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' '); [[ -n $g ]] && kill "-$sig" -- "-$g" 2>/dev/null; done
+   census; for p in $MEMBERS; do kill "-$sig" "$p" 2>/dev/null; done
++  FAULT_ARMED=$armed
+   return 0
+ }
+ log() { echo "[$(now)] $*" | tee -a "$CONSOLE"; }
+@@ -221,6 +239,7 @@
+ RUNNER_SHA=$(sha "$RUNNER")
+ [[ -n $RUNNER_SHA ]] || { REFUSAL="runner missing: $RUNNER"; log "REFUSE: $REFUSAL"; publish_and_exit REFUSED 72; }
+ # ---- 1b. lease (A-04): taken here, outside the killable workload, before anything is spawned -------
++trap 'INTERRUPT=TERM' TERM; trap 'INTERRUPT=INT' INT   # V6.1 B-02: installed BEFORE exclusion exists (fd 9, flock, standby holder); INTERRUPT initialised above
+ exec 9>"$LEASE_PATH" || { REFUSAL="cannot open lease $LEASE_PATH"; log "REFUSE: $REFUSAL"; publish_and_exit REFUSED 70; }
+ if ! flock -n 9; then REFUSAL="lease busy: $LEASE_PATH (a free lease is not permission; nothing spawned)"; log "REFUSE: $REFUSAL"; publish_and_exit LEASE_BUSY 75; fi
+ LEASE_HELD=true; echo "$$ launcher $RUN_ID $(now)" >&9
+@@ -233,10 +252,13 @@
+ else
+   REFUSAL="standby lease holder could not be verified within ${QH_VERIFY_S}s (nothing spawned; lease released at exit)"; log "REFUSE: $REFUSAL"; publish_and_exit STANDBY_HOLDER_FAILED 8
+ fi
++# V6.1 B-02: an interrupt that landed while the lease/standby holder were being set up ends here — nothing is owned, no
++# runner is spawned; publish_and_exit releases the standby holder identity-checked and records the interrupt.
++if [[ -n $INTERRUPT ]]; then log "supervisor received $INTERRUPT before the runner was spawned — nothing owned; standby holder released at exit"; publish_and_exit INTERRUPTED 143; fi
+ log "launch kind=$KIND scenario=${S4R6_SCENARIO:-} run=$RUN_ID runner=$RUNNER sha256=$RUNNER_SHA outer=${OUTER_S}s grace=${GRACE_S}s confirm=${CONFIRM_S}s post=${POST_S}s publish=${PUBLISH_S}s read=${READ_S}s qverify=${QH_VERIFY_S}s worst=$((OUTER_S+GRACE_S+CONFIRM_S+POST_S+PUBLISH_S+WORST_EXTRA_S))s launcher_start=$(proc_start $$)"
+ 
+ # ---- 2. detached session; ownership by construction ----------------------------------------------------
+-INTERRUPT=""; trap 'INTERRUPT=TERM' TERM; trap 'INTERRUPT=INT' INT
++# (V6.1 B-02: the INTERRUPT traps are installed before 1b and INTERRUPT is NOT reset here, so a signal in the gap is never lost.)
+ S4R6_RUN_ID=$RUN_ID S4R6_OUT=$OUT S4R6_LAUNCH_TOKEN=$RUN_ID S4R6_KIND=$KIND S4R6_SCENARIO=${S4R6_SCENARIO:-} \
+ S4R6_LEASE=$LEASE_KIND S4R6_LEASE_PID=$$ S4R6_LEASE_PATH=$LEASE_PATH \
+   setsid bash "$RUNNER" >>"$CONSOLE" 2>&1 < /dev/null &
+--- v6/controls/run-controls-v6.sh
++++ v61/controls/run-controls-v6.sh
+@@ -39,6 +39,14 @@
+ #  * Cancel wait has +5 s slack over the launcher's own teardown allowance (V5B-04); a launcher alive at the deadline is
+ #    UNRESOLVED even when its starttime cannot be compared (never an unconditional wait).
+ #
++# V6.1 changes versus V6 (frozen review S4-V6-A-01 / S4-V6-A-02; additive successor, nothing else changed):
++#  * A-01 census raw status: `census` captures pgrep's stdout and its exit status in the SAME scope (no pipe; V6 read the
++#    assignment's PIPESTATUS, i.e. tr's status). rc 0 with pids => MEMBERS; rc 1 => EMPTY; anything else, including rc 0
++#    without output and 124, => UNKNOWN:<rc> (stops the run with 99 as before; never counted as empty).
++#  * A-02 holder_identity: `d` and the dependent `f` are declared and initialised in separate commands, so the ordinary
++#    top-level holder_alive/holder_identity lookup no longer expands an unset `d` under set -u (a valid recorded holder
++#    was treated as absent before recovery). The pid+starttime+token+fd 9 rule is unchanged.
++#
+ # Runs the controls in order through the ACTUAL V6 launcher/stub/library. Stops at the first unexpected
+ # result (no retry). No network, no install, no canonical lock (the controls use the PRIVATE lease
+ # v6/control-runs/.private-control-lease.lock), no worktree, no browser.
+@@ -107,15 +115,19 @@
+ }
+ # census <sid>: bounded owned-session census (A-05). Sets C_MEMBERS and C_STATE: EMPTY | MEMBERS | UNKNOWN:<rc>.
+ census() {
+-  local rc; C_MEMBERS=""; C_STATE=""
+-  C_MEMBERS=$(timeout --foreground "$SCAN_S" pgrep -s "$1" 2>/dev/null | tr '\n' ' '); rc=${PIPESTATUS[0]}
+-  case $rc in 0) C_STATE=MEMBERS;; 1) C_STATE=EMPTY; C_MEMBERS="";; *) C_STATE="UNKNOWN:$rc"; C_MEMBERS="";; esac
++  local raw rc; C_MEMBERS=""; C_STATE=""
++  raw=$(timeout --foreground "$SCAN_S" pgrep -s "$1" 2>/dev/null); rc=$?   # V6.1 A-01: status of timeout/pgrep itself, same scope, no pipe
++  case $rc in
++    0) if [[ -n $raw ]]; then C_STATE=MEMBERS; C_MEMBERS=${raw//$'\n'/ }; else C_STATE=UNKNOWN:0-empty; fi;;   # rc 0 without pids is neither members nor empty
++    1) C_STATE=EMPTY;;
++    *) C_STATE="UNKNOWN:$rc";;
++  esac
+   return 0
+ }
+ # holder_identity <run_dir>: prints "pid starttime token" of the recorded quarantine holder from the receipt, else from
+ # SUPERVISOR_RECORD.json (the receipt-failure case), else nothing. Bounded read.
+ holder_identity() {
+-  local d=$1 f=$d/QUARANTINE_LEASE_HOLDER
++  local d f; d=$1; f=$d/QUARANTINE_LEASE_HOLDER   # V6.1 A-02: separate declaration/initialisation (no same-command dependent local)
+   if [[ -s $f ]]; then sed -n '1s/^pid=\([0-9]*\) starttime=\([0-9]*\) token=\([^ ]*\) .*/\1 \2 \3/p' "$f"; return 0; fi
+   [[ -f $d/SUPERVISOR_RECORD.json ]] || return 0
+   timeout --foreground "$SCAN_S" python3 -c 'import json,sys

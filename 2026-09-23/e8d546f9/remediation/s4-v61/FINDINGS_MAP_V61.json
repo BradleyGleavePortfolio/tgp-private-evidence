@@ -1,0 +1,92 @@
+{
+ "packet": "execution/e8d546f9/s4-v61 (V6.1, additive successor to V6 8b04adaf7d4f0a511ee68e960d880e0ec386187335b7da9fde9c44c1c74a050b)",
+ "slice": "S4-V61-BUILD (T4; EXEC-e8d546f9)",
+ "builder_identity": "requested policy Claude Fable 5 / High; observable runtime model and settings not exposed, not asserted",
+ "basis": {
+  "v6_manifest": "8b04adaf7d4f0a511ee68e960d880e0ec386187335b7da9fde9c44c1c74a050b (12/12 OK, non-self-including)",
+  "audit_a_v6": "audits/s4-v6-a/FINDINGS.json 7e9cc8ffcd684acd8be9055fc21ef824e6ff7c1eac5f679c67efc83832b1f8b7; REPORT.md 326610c7e7a91d4ab6ad686094a258ece813830cc6177d574ab822ff8e396799",
+  "audit_b_v6": "audits/s4-v6-b/FINDINGS.json 47f2a2252f3a87e22f3d19e159198891806b94551dd82f648aaf91b09f44392c; REPORT.md c5c2817cee8f3fde63dcc4de211ae37b393203cfceefdbf4e799f0820850d349",
+  "ruling": "execution/op88/S4_V6_RECOVERY_RULING.md f05993ec9409cd0929824f3897347394ab78d6ffbe8ff5215a2bd54dc881502c",
+  "scope": "recon/EXECUTION_SCOPE.md f06655da376a13b4eb6c2a0e602e1e267a3162c3dedf900bbfd886f6ed4f20c7",
+  "rules": "tgp-agent-context/AGENT_RULES.md edd63115537049e41ada062d35c74b4a1224f1bf784272ca45cf6c61398e173c"
+ },
+ "truth": {
+  "implemented": true,
+  "files_edited": ["launcher/s4-r6-launch-v6.sh", "controls/run-controls-v6.sh"],
+  "files_copied_byte_identical": ["controls/control-predicates-v6.py", "controls/s4-r6-control-stub-v6.sh", "runner/chrome-pipe-discriminator-v6.mjs", "runner/s4-r6-lib-v6.sh", "runner/s4-r6-validate-v6.sh"],
+  "syntax_checked": true,
+  "hashed": true,
+  "diffed": true,
+  "tested": false,
+  "executed": false,
+  "v6_or_audit_paths_modified": false,
+  "product_touched": false
+ },
+ "corrections": [
+  {
+   "id": "S4-V6-A-01",
+   "severity": "HIGH",
+   "lineage": "S4-V5-A-05",
+   "status": "IMPLEMENTED_UNTESTED",
+   "files": {"launcher/s4-r6-launch-v6.sh": "112-128", "controls/run-controls-v6.sh": "117-126"},
+   "change": "census captures pgrep stdout and exit status in the same scope: raw=$(timeout ... pgrep ...); rc=$? (no pipe, no PIPESTATUS read after an assignment). rc 0 with output => MEMBERS (newline->space in-process); rc 1 => EMPTY; any other rc, and rc 0 with empty output, => UNKNOWN:<rc> / UNKNOWN:0-empty. Callers unchanged: UNKNOWN is never empty (launcher quarantine, driver 99).",
+   "closes_counterexamples": ["clean first control: pgrep 1 / tr 0 became MEMBERS '' => quarantine 5 instead of SUCCESS", "scan timeout with tr 0 became MEMBERS '' and the driver tested '' as absence of leftovers"],
+   "discriminator": "V6 would exit 5 on the first normal control; V6.1 normal controls must yield census_state EMPTY and their predicate exits; a real timeout yields driver census=UNKNOWN:124 + EXIT code=99"
+  },
+  {
+   "id": "S4-V6-A-02",
+   "severity": "MEDIUM",
+   "lineage": "V5-A-03 / V5-B-06 identity-checked private recovery",
+   "status": "IMPLEMENTED_UNTESTED",
+   "files": {"controls/run-controls-v6.sh": "129-130"},
+   "change": "holder_identity: local d f; d=$1; f=$d/QUARANTINE_LEASE_HOLDER (declaration and dependent initialisation in separate commands). pid+starttime+token+fd9 rule unchanged.",
+   "closes_counterexamples": ["top-level holder_alive \"$run_dir\" (driver 260) had no caller-local d => unbound variable under set -u inside $(holder_identity) => valid holder treated as absent => quarantine-class control stopped at 94 before recovery"],
+   "discriminator": "quarantine-class controls log 'recover_holder: identity verified pid=... KILL' then private_lease_free=true"
+  },
+  {
+   "id": "S4-V6-B-01",
+   "severity": "MEDIUM",
+   "status": "IMPLEMENTED_UNTESTED",
+   "files": {"launcher/s4-r6-launch-v6.sh": "143-150"},
+   "change": "signal_session saves FAULT_ARMED, sets it false around its two census calls, restores it: kill targets come from the real session census only; the census-members-persist seam still shapes ORPHANS/SURVIVORS/SURVIVORS_STATE at 328/335 so classification, quarantine, receipt, exit codes and wall-clock waits are unchanged.",
+   "closes_counterexamples": ["fault-survivors-quarantine / fault-receipt-unwritable: stale deadline pids (dead ~7-12 s) were ps/kill -SIG -- -pgid and kill -SIG pid targets; a reused pid would have received TERM then KILL"],
+   "discriminator": "same predicates and exit codes (5 / 11) as V6 for the two controls; no signal is issued to any pid outside the live census; orphans.log still lists injected pids (read only)"
+  },
+  {
+   "id": "S4-V6-B-02",
+   "severity": "MEDIUM",
+   "lineage": "S4-V5-A-03 closure completeness",
+   "status": "IMPLEMENTED_UNTESTED_NOT_EXERCISED_BY_STAGE1",
+   "files": {"launcher/s4-r6-launch-v6.sh": "242, 255-257, 261"},
+   "change": "INTERRUPT traps installed immediately before exec 9> (lease), flock and spawn_holder; INTERRUPT (initialised at 101) is no longer reset before the runner spawn; after the standby branch, [[ -n $INTERRUPT ]] => publish_and_exit INTERRUPTED 143 with nothing owned (release_standby_holder runs identity-checked inside publish_and_exit; failure is logged and recorded, lease then stays held => next launcher refuses 75).",
+   "closes_counterexamples": ["TERM/INT between lease open and trap install (<= QH_VERIFY_S 5 s) killed the launcher by default disposition, leaving the standby holder on the lease with no SUPERVISOR_RECORD / OWNED_SID / console identity line"],
+   "discriminator": "static only (no listed control cancels during startup): traps precede exec 9>; INTERRUPT assignments in code = init + two trap strings; LEASE_RELEASED_AT_EXIT=true appears once (init). If it occurs: SUPERVISOR_RECORD overall=INTERRUPTED, bounds.interrupt=TERM, owned_session.sid=null, lease.standby_holder_released=true; driver still classifies 99 NO OWNED SESSION (unchanged, truthful STOP) with private_lease_free=true"
+  }
+ ],
+ "preserved_from_v6": [
+  "S4-V5-A-01/B-01 current-run binding (driver resolve_active_run unchanged)",
+  "S4-V5-A-02/B-03/B-04 once-budgeted cancel (1x kill -TERM \"$ACTIVE_PID\", 0x kill -KILL \"$ACTIVE_PID\", 0 bare exit 0)",
+  "S4-V5-A-03/B-08 standby holder, receipt-failure retention 11, SELF-HOLD 12, no exit 10; LEASE_RELEASED_AT_EXIT=true only at init",
+  "S4-V5-A-04/B-02 success through finish 0 + terminal receipt",
+  "S4-V5-A-05 UNKNOWN != EMPTY (strengthened: rc 0 with no output is UNKNOWN too)",
+  "S4-V5-B-06 four CONTROL-only fault seams, has_fault gating KIND==CONTROL && S4R6_FAULT unchanged, inert for VALIDATION",
+  "budget constants, control list/order, CENSUS_CALLS_MAX=16, both worst-case formulas, record fields, predicates (byte-identical)",
+  "lib latch/seam, launcher-owned lease attribution, S00 pins, artifact joins, pipe helper (all byte-identical)",
+  "quoted-heredoc JSON writer 56/56 argv; setsid ownership; uutils exit set"
+ ],
+ "not_implemented_reported_separately": [
+  {"item": "native bounded-observer caller cannot represent SELF-HOLD (Stage 2 prerequisite; ruling 'narrow caller correction')", "action": "report only; needs its own reviewed correction before any native grant"},
+  {"item": "driver finish classifies a pre-spawn INTERRUPTED launcher (new B-02 path) as 99 NO OWNED SESSION", "action": "unchanged; truthful STOP; not a listed control"},
+  {"item": "orphans.log reads /proc/<injected pid>/cmdline in two fault controls (read only, no signal)", "action": "unchanged"},
+  {"item": "V6 nonmaterial notes V6B-03..08, V4-B-06 fd-9 stub limit, READ_S count qualification", "action": "unchanged, remain recorded"}
+ ],
+ "not_exercised_by_stage1": ["B-02 startup-interrupt path", "SELF-HOLD (12)", "standby holder loss + respawn", "canonical lock", "native runner steps"],
+ "path_adaptation": {
+  "packet_root_here": "/home/user/workspace/execution/e8d546f9/s4-v61",
+  "runtime_root_hardcoded": "/home/user/workspace/execution/s4-r6-validation/v6",
+  "restoration": "copy the whole packet directory content (7 code files, SHA256SUMS and the documents it lists) to the runtime root; driver verifies SHA256SUMS from the packet root (91 on mismatch); only one packet may occupy the path (V6 or V6.1, never both/mixed)",
+  "names_kept": "file names -v6 and RUN_ID prefix CONTROL-V6- retained so unchanged files stay byte-identical and the driver's pid binding glob is untouched; packet identity = manifest sha256",
+  "absent_here": ["execution/s4-r6-validation", "worktrees/s4-r6", "execution/s4-r6", "execution/test-validation.lock"]
+ },
+ "smallest_next_action": "two independent exact-delta reviews of this packet's SHA256SUMS (no peer access); on both clean, one Stage 1 run on these bytes under a separate grant; Stage 2 waits for that pass, the native caller correction and V6 §5 prerequisites"
+}

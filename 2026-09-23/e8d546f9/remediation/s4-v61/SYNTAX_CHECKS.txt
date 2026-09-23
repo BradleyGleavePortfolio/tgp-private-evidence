@@ -1,0 +1,26 @@
+SYNTAX-ONLY CHECKS, V6.1 packet, 2026-09-23T00:57:11Z. No script executed; no probe; no lock; no install; no network.
+launcher/s4-r6-launch-v6.sh: bash -n OK
+controls/run-controls-v6.sh: bash -n OK
+controls/s4-r6-control-stub-v6.sh: bash -n OK
+runner/s4-r6-lib-v6.sh: bash -n OK
+runner/s4-r6-validate-v6.sh: bash -n OK
+controls/control-predicates-v6.py: compile() OK (no bytecode written)
+runner/chrome-pipe-discriminator-v6.mjs: node --check OK
+byte-identical to frozen V6 (cmp): controls/control-predicates-v6.py controls/s4-r6-control-stub-v6.sh runner/chrome-pipe-discriminator-v6.mjs runner/s4-r6-lib-v6.sh runner/s4-r6-validate-v6.sh 
+V6_TO_V61.diff reproduces from frozen V6: OK
+launcher delta: +27 -5; driver delta: +16 -4
+launcher PIPESTATUS in code: 0 (0 expected)
+driver PIPESTATUS in code: 1 (1 expected: prc=${PIPESTATUS[0]} after the real predicates pipeline in the current shell, line 257)
+census 'rc=$?' same-scope captures: launcher 1, driver 1 (1 each expected)
+same-command dependent locals (manual review of every 'local' line in launcher and driver): 0 (V6 driver line 118 split into 'local d f; d=$1; f=...')
+launcher trap install line(s): 242 (before 'exec 9>' at line 243); INTERRUPT= assignments in code: 2 lines (init + trap line)
+launcher pre-spawn interrupt exit: line 257 precedes runner spawn line 264
+launcher signal_session FAULT_ARMED save/disarm/restore lines: 144 145 148 
+launcher census invocations (comment-stripped token count): V6 10 == V6.1 10; signal_session still exactly 2; CENSUS_CALLS_MAX=16 and both formulas unchanged
+launcher SUPERVISOR_RECORD writer: shell args 56 == python tuple 56: OK
+quoted heredocs: launcher 1 unquoted 0; driver 0/0
+driver: kill -TERM "$ACTIVE_PID": 1 (1 expected); kill -KILL "$ACTIVE_PID": 0 (0 expected); bare 'exit 0': 0 (0 expected)
+launcher LEASE_RELEASED_AT_EXIT=true in code: 1 (1 expected: init)
+launcher has_fault gates: 4 uses; has_fault() gated on KIND == CONTROL: True
+unchanged constants: 9 launcher lines identical to V6 (.........); driver budget line identical: OK; CONTROLS list identical: OK
+documents parse: FINDINGS_MAP_V61.json OK, INPUTS.json OK
