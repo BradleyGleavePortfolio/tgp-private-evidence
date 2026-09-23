@@ -2,7 +2,7 @@
 
 The data/system work continues under S1–S12, while the mobile experience has a separate UX-01–UX-08 planning lane. These are coordinated workstreams, not competing phase numbers, and the UX labels do not authorize rebuilding existing mobile features.
 
-This snapshot follows S5's final acceptance, S6 R2's step-06 checkpoint, and S7's formatter-correction READY packet. It distinguishes accepted results from prepared changes and future implementation.
+This snapshot follows final acceptance of S6 and S7's foundation composition, with C1 integration now underway. It distinguishes accepted results from active changes and future implementation.
 
 ## Done
 
@@ -10,7 +10,8 @@ This snapshot follows S5's final acceptance, S6 R2's step-06 checkpoint, and S7'
 |---|---|---|
 | S1–S4 | Previously accepted foundation, integration and technical proof | Their existing acceptance is retained; no duplicate proof runs |
 | S5 | Exact backend candidate passed the fresh PostgreSQL 17.6 suite: 51/51, normal proof exit, successful stop and two independent final attestations | This proves the S5 boundary, not the whole importer |
-| S6 source corrections | Both independent reviewers granted the R2 source candidate; all product bytes remain unchanged from the previously reviewed product fix | Final runtime proof and commit acceptance are still pending |
+| S6 | Identity-bound mobile cache and sign-out ordering accepted on the exact committed candidate, with both final attestations | Recorded receipt qualifications remain; this is not whole-importer acceptance |
+| S7 foundation composition | Accepted S3 and S5 work combined into one exact local commit; formatting, lint, typecheck and commit-message checks passed, with both final attestations | This closes the foundation composition only, not all of S7 |
 | UX inventory | Existing mobile work has been mapped into the new UX outcomes | Inventory is not new implementation or usability acceptance |
 | UX planning package | Official job/PR map, dependency map, mobile journey specification, state/edge-case matrix and contract questions delivered | This completes the initial planning package, not the UX jobs' implementation |
 
@@ -20,25 +21,24 @@ The failed first S5 attempt and failed S6 P3 receipts remain recorded as failure
 
 | Work | Current activity | What comes next |
 |---|---|---|
-| S6 | Steps 00–05 passed: typecheck, identity 19/19, navigation 4/4, persistence 5/5 and sign-out 4/4. Regression step 06 passed all 25 assertions and exited normally, but two log postchecks refused the receipt | Independent disposition of the recorded postcheck failures; still-unrun checks are separately authorized. Ordinary commit and final acceptance remain gated |
-| S7 foundation composition | The first real-hook commit refused formatting in 13 files and exhausted the default TypeScript heap; no commit was created | Independent review of the pinned formatter-only correction, then one normal-hook commit using the established heap setting |
+| S7 C1 integration | Reusing the existing durable import-setup work on the accepted foundation, with one schema/generator owner in an isolated worktree | Freeze the exact candidate, obtain independent review, then run the C1-specific validation |
 
-S7's correction is prepared, not yet activated. It changes formatting only; it does not replace S5's proof or authorize a new database run.
+S7's first hook refusal remains recorded; its later corrected commit passed without bypassing hooks. Accepted S3/S5 evidence transfers at its existing boundaries, rather than being repeated.
 
-S6's regression postcheck matched `todo` inside a dependency's stack-trace filename and also detected Jest's one-second exit warning. The process subsequently exited on its own with status zero; the warning's owner is not established, and the strict postcheck failure remains recorded rather than being renamed a clean pass.
+S6 passed typecheck, identity19/19, navigation4/4, persistence5/5, sign-out4/4 and regression25/25, plus the expected hazard-control outcome. Its strict log/count postcheck failures remain recorded with both reviewers' narrow qualifications, including the one-second exit warning followed by normal self-exit; they were not rewritten as clean passes.
 
 ## Planned, but not started as new implementation
 
 | System work | Remaining outcome |
 |---|---|
-| Remaining S7 work | C1 integration and generated-contract reconciliation, then the missing lifecycle stages |
+| Remaining S7 work after C1 | Missing backfill/drain and subsequent lifecycle stages |
 | S8 | Native destination writers |
 | S9 | Relationships and reconciliation |
 | S10 | Unseen-source induction with no source-specific core changes |
 | S11 | Complete customer journey and multi-host integration |
 | S12 | Real acceptance and pilot proof |
 
-The new UX lane is planning-only at this point. No new UX implementation PR, customer-facing prototype or usability session is claimed.
+The new UX lane is planning-only at this point. No new UX implementation PR, customer-facing prototype or usability session is claimed; the accepted mobile base is now available for future implementation.
 
 ## Official UX jobs and PR naming
 

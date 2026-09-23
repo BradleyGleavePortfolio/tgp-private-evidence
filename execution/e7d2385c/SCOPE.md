@@ -6,7 +6,7 @@ Bradley issued EXECUTE on 2026-09-23 at 12:31 PDT in session e7d2385c-108e-44bd-
 
 Parent is orchestration and private publication only, never product implementation or independent audit. Builders own product changes. Independent nonbuilders review exact T4 candidates. Requested model settings are not runtime model telemetry.
 
-S1 through S5 are ACCEPTED at their frozen proof boundaries. No repeat proof, baseline diagnostic, new harness or audit of unchanged accepted bytes. S6 remains unfinished. The current wave is foundation, not importer completion. On closure, continue through the existing canonical G2/C1/lifecycle work toward native transformation, relationships/reconciliation, induction, multi-host customer journey and universal importer acceptance. NEW SOURCE → CORE DIFF = 0.
+S1 through S6 and S7-1 foundation composition are ACCEPTED at their frozen proof boundaries. No repeat proof, baseline diagnostic, new harness or audit of unchanged accepted bytes. These foundations are not importer completion. Continue through the existing canonical G2/C1/lifecycle work toward native transformation, relationships/reconciliation, induction, multi-host customer journey and universal importer acceptance. NEW SOURCE → CORE DIFF = 0.
 
 No product remote push/merge, deployment, production/customer enablement, hosted security setting, real source-account access, destructive action, external communication or new spending is granted. Public backend main still auto-deploys. Parent alone may make ordinary private telemetry/evidence commits, preserving Bradley author/committer, no AI trailers, no force push, and a fresh remote-tip comparison. A concurrent private writer must be reconciled rather than overwritten.
 
@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-S6 ordinary20–23 is terminal and released21:24:12Z, headbc7b4e96/treeacb41c2b, same-review final attestations pending. S7 foundation5c760b77/tree7800ecb4 is accepted by both reviewers and parent under S7_FOUNDATION_FINAL_ACCEPTANCE.md. The sole heavy owner is now canonical_s7_continuation_map_muei9t11 for necessary existing local generation in the bounded S7-2 C1 implementation only; no test/DB/hook/commit activation yet. That worker is the sole schema/generator mutation owner in new worktrees/s7-c1 and execution/e7d2385c/s7-c1. Accepted worktrees/dependencies remain read-only to it.
+S6 is acceptedbc7b4e96/treeacb41c2b with finalsealsAa8461003/B6d867c8a; release21:24:12Z. S7 foundation5c760b77/tree7800ecb4 is accepted under S7_FOUNDATION_FINAL_ACCEPTANCE.md. The sole heavy owner is canonical_s7_continuation_map_muei9t11 for necessary existing local generation in bounded S7-2 C1 implementation only; no test/DB/hook/commit activation yet. That worker is sole schema/generator mutation owner in new worktrees/s7-c1 and execution/e7d2385c/s7-c1. Accepted worktrees/dependencies remain read-only to it.
 
 S6's strict06/08/20post1 receipts remain preserved with the exact dispositions in S6_R2_VALIDATION_DISPOSITION.md. The requested initial UX planning package is complete and shared, without product or runtime changes. Missing setup wrapper receipt stays C, no reinstall.
 
@@ -61,7 +61,7 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 ## Current next transitions
 
 - S5 is accepted. Preserve its exact proof and both attempts without another run.
-- S6 ordinary20–23 completedbc7b4e96; obtain both same-review final exact-head attestations. Mobile has no configured hooks; do not describe invented hook execution.
+- S6 is acceptedbc7b4e96 under S6_FINAL_ACCEPTANCE.md and requires no furthercycle. Mobile has no configured hooks; do not describe invented hook execution.
 - S7 foundation5c760b77 is accepted at its exact boundary; preserve failed first attempt and all C qualifications.
 - S7-2 C1 implementation is activated in isolation under its sole schema/generator owner. Only necessary local generation is granted now; source READY precedes independent review and a separate validation grant. No accepted-substrate reconstruction or repeated E/T-Q0 proof.
 - Initial official UX-01–UX-08 map and canonical mobile journey planning are delivered. UX-07 planning can start alongside UX-01; contract-dependent implementation waits for real contracts, and final journey proof converges at S11/S12. PR289–292 already exist in the S6 lineage; no new M5-rebase job.

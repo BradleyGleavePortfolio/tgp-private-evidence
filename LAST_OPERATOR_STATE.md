@@ -21,10 +21,10 @@ Live mains reconciled 2026-09-23 19:09 UTC: backend `c23b9d9f3fcc106b92c061ceb7d
 | S3 | T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration;31 suites/825 tests, composed72/68/48, dual final6bb8ab6c/49e9a3e4 |
 | S4 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | ACCEPTED exact technical proof;1742 full/105 focused, no rerun |
 | S5 | T4 | `98d39610f511505558373f3a59fa019804c94bd7`, tree`67fc1db5f353f0d363fe7134a78d455c0decfb55`, parent143d451e | ACCEPTED exact realfresh51 boundary; dual final A1f7ac4da/Bf2a23ef6, receiptce4edd98; no rerun |
-| S6 | T4 | Actual HEAD `bc7b4e96fc1db54568bc209dbe1f7a4121501ac9`, parentd51a1910, tree `acb41c2baab6e856573d86e02135430c3304828b` | COMMITTED; ordinary21/22/23raw0, exact10paths/identity/message/clean/bundle85836076, packet a9a580da;06/08/20strictpost1 preserved and qualified; dual final-head attestations pending |
+| S6 | T4 | Actual HEAD `bc7b4e96fc1db54568bc209dbe1f7a4121501ac9`, parentd51a1910, tree `acb41c2baab6e856573d86e02135430c3304828b` | ACCEPTED exact boundary; dual final Aa8461003/B6d867c8a, packet a9a580da/bundle85836076;06/08/20strictpost1 preserved with C qualifications |
 | S7-1 foundation | T4 | HEAD `5c760b774598532e90d5d217e15adc9285c3c3f4`, tree `7800ecb4d294a48ed3d7282363265e5f07339f97` | ACCEPTED exact local composition, dual final A51f608d5/B31840caa, packet4c08991a; no new PG/cross-side runtime claim |
 
-S1–S5 are CLOSED at recorded boundaries. Exact S3 acceptance remains `execution/6c2a68ac/S3_FINAL_INTEGRATION_ACCEPTANCE.md`; current S5 acceptance is `execution/e7d2385c/S5_FINAL_ACCEPTANCE.md`. Failed evidence remains preserved, not relabelled.
+S1–S6 and S7-1 are CLOSED at recorded boundaries. Exact S3 acceptance remains `execution/6c2a68ac/S3_FINAL_INTEGRATION_ACCEPTANCE.md`; current records are S5_FINAL_ACCEPTANCE.md, S6_FINAL_ACCEPTANCE.md and S7_FOUNDATION_FINAL_ACCEPTANCE.md under execution/e7d2385c. Failed evidence remains preserved, not relabelled.
 
 ## Ownership and runtime
 
@@ -32,7 +32,7 @@ Current scope: `execution/e7d2385c/SCOPE.md`; actual assignments: `execution/DIS
 
 S6 released after ordinary20–23 at21:24:12Z. The current sole heavy owner, limited to necessary existing local generation, is canonical_s7_continuation_map_muei9t11 for S7-2 C1 implementation. It is the sole schema/generator mutation owner in isolated worktrees/s7-c1 and execution/e7d2385c/s7-c1; no tests/DB/hooks/commit granted yet.
 
-S6 actual20 met the narrow disposition: raw0, treeacb, exacttenpaths, worktree/index equality, no untracked/hazard, sole count9vs10post1 preserved. Alternate21commanda6e94f17 committed approvedmessage06e7, Bradley bothfields/no trailers;22 thirteenchecks pass;23bundle85836076 verifies. HEADbc7b4e96 clean, packet a9a580da029d008f661f8fdb28954a3ab6ac6cd5ddb7fb98f444d3a14309177f. Both same reviewers now attest actual head/result; no source restart.
+S6 actual20 met the narrow disposition: raw0, treeacb, exacttenpaths, worktree/index equality, no untracked/hazard, sole count9vs10post1 preserved. Alternate21commanda6e94f17 committed approvedmessage06e7, Bradley bothfields/no trailers;22 thirteenchecks pass;23bundle85836076 verifies. HEADbc7b4e96 clean, packet a9a580da029d008f661f8fdb28954a3ab6ac6cd5ddb7fb98f444d3a14309177f. Both same-review final attestations are complete (Aa8461003/B6d867c8a), and parent accepts without further S6 cycle.
 
 S7-1 is ACCEPTED by both final reviews and parent: HEAD5c760b77/tree7800ecb4, orderedparentsbe0then98d, actualordinaryhooks/raw0, exactmessage67a3df02/Bradley/clean/bundle3e81299d. FinalsealsA51f608d5/B31840caa. First refusal and executor C qualifications remain preserved. The conditional prod-readiness job was a no-op, not production-readiness proof. See S7_FOUNDATION_FINAL_ACCEPTANCE.md; no new PG or cross-side runtime claim.
 
@@ -40,7 +40,7 @@ The two disjoint source-only UX planning assignments are COMPLETE and delivered:
 
 ## Current constraint and next execution
 
-Finish S6's two final exact-head attestations. Concurrent S7-2 implements only existing C1 PR526 on accepted5c760b77, expected two version conflicts plus one assertion re-pin and existing generator once; freeze actual source candidate, then two independent reviewers and a separate runtime grant. Only C1-specific proof is scheduled later, not another E/T-Q0 run. Transfer applicable evidence, never relabel strict failures.
+S7-2 implements only existing C1 PR526 on accepted5c760b77, expected two version conflicts plus one assertion re-pin and existing generator once; freeze actual source candidate, then two independent reviewers and a separate runtime grant. Only C1-specific proof is scheduled later, not another E/T-Q0 run. S6 is accepted and closed; acceptedbc7b4e96 satisfies the mobile S6-BASE dependency in the delivered UX plan.
 
 S6 step06's strict postcheck failure is preserved: broad `todo` matches are two stack filenames, and the real one-second exit warning precedes self-exit with raw0; owner unknown. Step08's count4 is the describe header plus three required failure-detail headers, while all intended outcomes/sites match. Both reviewers classify these C with no rerun; parent adopts qualified evidence in S6_R2_VALIDATION_DISPOSITION.md. Strict postchecks/status1 remain unchanged. Review A runtime sealsd68a580e/4af8af42; B a6729e53. No diagnostic, criterion edit or receipt rewriting.
 
@@ -54,6 +54,6 @@ Read-only ancestry checks established that final mobile PR289–292 heads are al
 
 Delivered planning preserves extension-owned Start with no phone Start button; mobile may request Stop through the server once that contract exists. It separates server eligibility from account-scoped offer decisions, transmitted Stop from unsent offline actions, and approved reason copy from raw error prose. No new endpoint or governance gate is invented. Private archive: `evidence/ux-planning-final-7cc0021c-journey-9701ab29.tar.gz` (sha256a6e0a7b2d4da8b0755fb44be69a2bd1f55842b3a19894c67b5185226d1f36876); progress brief `IMPORTER_PROGRESS_AND_PARALLEL_UX_PLAN.md`.
 
-Still pending or unproven: S6 final exact-head acceptance; C1 integration/proof and later lifecycle; native destinations/relationships/reconciliation; autonomous induction; second host; three-site and customer/pilot proof; release/production acceptance. Unprotected mains and backend auto-deploy block later landing, not independent local work.
+Still pending or unproven: C1 integration/proof and later lifecycle; native destinations/relationships/reconciliation; autonomous induction; second host; three-site and customer/pilot proof; release/production acceptance. Unprotected mains and backend auto-deploy block later landing, not independent local work.
 
 BRADLEY DECISION REQUIRED: NO for the current local continuation.
