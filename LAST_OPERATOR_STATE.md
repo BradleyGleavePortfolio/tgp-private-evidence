@@ -46,7 +46,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S2 owns the sole runtime slot; S5 V32 repairs concrete findings; S5 and S3 restore exact source. Both V31 reviewers and both historical V2 result reviewers are complete. Their independent capacity is available immediately for new frozen S2 results and V32 final bytes, not redundant reviews. No competing runtime. S6 implementation remains held.
+S2 owns the sole runtime slot until final result/ownership disposition; S5 V32 repairs concrete findings; S3 restores exact source. S5 source restoration is accepted under receipt64611811 at head143d + patchc36258b3 and exact dirty fingerprint6850b32e, with core.abbrev8. Both V31 reviewers and both historical V2 result reviewers are complete. Independent capacity is available immediately for new frozen S2 results and V32 final bytes, not redundant reviews. No competing runtime. S6 implementation remains held.
 
 ## DAG
 
