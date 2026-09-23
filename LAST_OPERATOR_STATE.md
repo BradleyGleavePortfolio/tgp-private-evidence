@@ -21,7 +21,7 @@ Live mains reconciled 2026-09-23 19:09 UTC: backend `c23b9d9f3fcc106b92c061ceb7d
 | S3 | T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration;31 suites/825 tests, composed72/68/48, dual final6bb8ab6c/49e9a3e4 |
 | S4 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | ACCEPTED exact technical proof;1742 full/105 focused, no rerun |
 | S5 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus stagedtree`756a0d7966c9125749339abbcfd681eb7e713ede` | Fresh exact recovery and five-binding/normal hooked continuation ACTIVE; no new head or realPG proof yet |
-| S6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` plus patch`20c6594c200d38c9946f4f62d2c778f634bcacbe26b430b05e8291cc5f571cbd` | Frozen698cf631/15; recovery/preparation and two independent source reviews ACTIVE; no new runtime |
+| S6 | T4 | P1 `d51a191098f483cea9abec6cc7e9f3beffd18c06` plus patch`20c6594c200d38c9946f4f62d2c778f634bcacbe26b430b05e8291cc5f571cbd` | Exact recovery COMPLETE; A source NOT GRANTABLE with two A/one B; independent B still ACTIVE; minimum isolated P2 correction ACTIVE, no runtime |
 
 S1–S4 are CLOSED, not reopened by takeover. Exact S3 acceptance remains `execution/6c2a68ac/S3_FINAL_INTEGRATION_ACCEPTANCE.md`. All original failed evidence remains preserved at intake, not relabelled.
 
@@ -29,13 +29,13 @@ S1–S4 are CLOSED, not reopened by takeover. Exact S3 acceptance remains `execu
 
 Current scope: `execution/e7d2385c/SCOPE.md`; actual assignments: `execution/DISPATCHES.md`. Previous parent/session liveness is UNKNOWN because session access is denied. Previous worker grants/PIDs/installations are not active authority in this sandbox. This sandbox has no inherited product installations; minimum fresh environment recovery is allowed where needed, without rebuying accepted proof.
 
-S5 builder `s5_exact_candidate_continuation_muei56lb` owns `worktrees/s5-r4` and its fresh output, and the only heavy runtime slot for required new-environment setup and genuine hooks. S6 preparer `s6_frozen_source_recovery_muei56l7` owns exact restoration and source-only validation preparation. Independent S6 A `s6_independent_privacy_review_muei56ks` and B `s6_independent_lifecycle_review_muei56lg` own separate audit outputs and do not read peer conclusions. No S6 runtime is active. S1 schema/generator remains unassigned.
+S5 builder `s5_exact_candidate_continuation_muei56lb` owns `worktrees/s5-r4` and its fresh output, and the only heavy runtime slot for required new-environment setup and genuine hooks. S6 `s6_frozen_source_recovery_muei56l7` has restored exact P1 and now owns isolated `worktrees/s6-p2` / `execution/e7d2385c/s6-p2` source-only correction under `S6_P2_CORRECTION.md`. Original P1 remains immutable for independent B. S6 A `s6_independent_privacy_review_muei56ks` completed source findings0266ff53; B `s6_independent_lifecycle_review_muei56lg` is still independently reviewing P1 and receives no A conclusions before its findings freeze. No S6 runtime is active. S1 schema/generator remains unassigned.
 
 ## Current constraint and next execution
 
 S5 exact recovery → five authorized aliases/pinned formatting → true-hooked head → two independent exact-head/runner reviews → existing fresh51 real proof. In parallel, frozen S6 source → independent source closure → bounded actual validation/true-hooked head → final attestations in those same reviews. No accepted controls, T0 or C6 baseline diagnostic is repeated.
 
-S5's hook refusal is an existing execution prerequisite, not a newly invented product/proof defect. S6's reproduced identity/privacy hazards remain Class A; the observed teardown hang remains the scoped lifecycle/proof boundary. C qualifications include launcher90 versus normal setup, S1 membership scope, S3 negative-path WARN/ERROR output, and unknown S6 transient member; none creates another cycle.
+S5's hook refusal is an existing execution prerequisite, not a newly invented product/proof defect. S6 A01/A02 identify post-unmount orphan persistence and signOut completion before retirement/drain/final purge; B03 identifies unawaited lifecycle/deferred-read/fixture-write test defects. Minimum correction is limited to their existing product/test paths, then changed-byte follow-up in the same reviews and actual validation. See `execution/e7d2385c/S6_P2_CORRECTION.md` for concrete harm/decision/minimum closure/execution unlocked. C qualifications include launcher90 versus normal setup, S1 membership scope, S3 negative-path WARN/ERROR output, and unknown S6 transient member; none creates another cycle.
 
 After foundation closure: reuse G2 E → T/Q0 → B/drain → R → N/Q1 → C and C1/forward-2.x lifecycle work for S7, then deterministic native writers (S8), relationships/reconciliation (S9), unseen-source induction (S10), complete customer/multi-host journey (S11), real acceptance/pilot (S12). Do not invent another substrate wave.
 

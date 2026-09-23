@@ -5,8 +5,8 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 | Slice | Worker | Requested route | Sole owned writes | Current state |
 |---|---|---|---|---|
 | S5 exact recovery and hooked continuation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `worktrees/s5-r4/**`, `execution/e7d2385c/s5-continuation/**` | ACTIVE; only heavy runtime owner, minimum fresh setup and true hooks; no realPG yet |
-| S6 frozen recovery and validation preparation | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | `worktrees/s6-diagnostic/**`, `execution/e7d2385c/s6-preparation/**`, `execution/e7d2385c/s6-inputs/**` | ACTIVE source-only; exact P1 bytes immutable; no runtime |
-| S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | ACTIVE static complete-source review; no peer conclusions/product edits/runtime |
+| S6 frozen recovery/preparation then P2 correction | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Recovery outputs sealed; new `worktrees/s6-p2/**`, `execution/e7d2385c/s6-p2/**` | P1 restored exactly; minimum A01/A02/B03 source correction ACTIVE; P1 immutable, no runtime |
+| S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | SOURCE COMPLETE0266ff53, NOT GRANTABLE two A/one B; preserved, awaits scoped changed-byte follow-up |
 | S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | ACTIVE static complete-source review; no peer conclusions/product edits/runtime |
 | S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | ACTIVE source-only reuse/dependency mapping of existing C1/G2; no new implementation/audit/runtime |
 
