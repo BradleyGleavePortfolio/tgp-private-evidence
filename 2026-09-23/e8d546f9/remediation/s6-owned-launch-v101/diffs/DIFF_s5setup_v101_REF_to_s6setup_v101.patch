@@ -1,0 +1,241 @@
+--- a/s5-v101/controls-v101-t0/run-s5-setup-npm-ci.v101.sh
++++ b/s6-owned-launch-v101/run-c5-setup-npm-ci.v101.sh
+@@ -1,60 +1,60 @@
+ #!/usr/bin/env bash
+-# OP88-S5-V10.1 ADDITIVE SETUP SUCCESSOR of V10 8fa80828 (v1/V8/V9/V10 preserved; NOT LAUNCHED). ONLY change: the embedded OWN-BLOCK is v10.1 (owned-launch-v10-a A02:
+-# leader collection separated from session authority; own_collect/own_retire retire a session only on positively observed-empty/foreign census, never on leader exit alone),
+-# byte-identical to own-block-v101.sh. NOTHING else changed: npm ci argv/env/pins/lock fd, provenance gates, die/quarantine/final_accounting and the HOLD_BOUND
+-# exclusion branch (L162-168 in v10 numbering) are the v10 bytes — the exclusion boundary belongs to the separate OP88-S5-SETUP-EXCLUSION slice, not to V10.1. V10 header follows.
+-# OP88-S5-V10 ADDITIVE SETUP SUCCESSOR of V9 da5228c2 (v1 74736a58, V8, V9 preserved; NOT LAUNCHED). Corrects owned-launch-v9-a A-01/A-03/A-04/A-05
+-# and owned-launch-v9-b V9B-02/03/04/05 in this consumer: in-shell `wait` via own_finish variables (never $(...)); OWN_STAMP written AFTER the START
+-# record creation (no truncation); required IDENTITY published (own_record, checked) BEFORE ADOPT release — failure => never released; every
+-# post-release fatal publication path goes through `die`, which now reaps registered/pending/session ownership, collects, censuses and quarantines
+-# before finish; quarantine outcome is checked (primary $EX/QUARANTINE, fallback $LOGS/QUARANTINE), and if NO marker can be written while owned
+-# work is unresolved the runner HOLDS the lease (fd 9) polling the current census for HOLD_BOUND s before exiting FINAL 90 with
+-# exclusion=unpreserved (boundary reported to parent; see request). final_accounting uses the CURRENT registry census (live/zombie/foreign/
+-# retired/unknown) — historical OWNED_PGIDS is evidence only; legacy reap_group removed (unused). npm ci command/env/pins/lock fd unchanged. V9 header follows.
+-# OP88-S5-V9 ADDITIVE SETUP SUCCESSOR of V8 bca83158 (v1 74736a58 and V8 preserved; NOT LAUNCHED). Parent-approved bounded child-side
+-# ADOPTION GATE: `npm ci` execs only after this attempt's identity is confirmed and adoption is published to a fresh private attempt path
+-# under $LOGS/attempts and verified by the child; otherwise the child exits 75/76 and NO install runs. Folds OWN-V8-A-01..A-06: phase-bound
+-# $! fallback, retire after actual wait, no `wait` on unconfirmed termination (RC synthetic 137, raw "unobserved" recorded), group/descendant
+-# escalation independent of leader liveness with foreign-number refusal, and fail-closed exclusion: any unverified termination writes
+-# $EX/QUARANTINE (the existing control precondition path that refuses later runs) BEFORE finish, so the lease is never released as clean
+-# with owned work possibly alive. Identity/EXIT/FINAL record writes are checked (rc 74 on failure). npm ci command/env/pins unchanged. V8 header follows.
+-# OP88-S5-V8 ADDITIVE SETUP SUCCESSOR of frozen setup-v1 74736a58 (NOT LAUNCHED; original preserved byte-identical). Closes
+-# P88-S5-SETUP-01 (same class as S5-V7-A-02/A-03): v1 L90-91 spawned npm ci, slept 0.2 s, then sampled the pgid; a TERM in that
+-# window reached on_signal with CUR_PGID empty (no reap), and a pre-setsid sample could adopt the runner's OWN group as signal target.
+-# v8 embeds the SAME OWN-BLOCK v8 as ctl-t0-only.v8.sh (byte-identical): register the pid synchronously after `&`; confirm
+-# pgid==sid==pid and != self pgid within 2 s or die rc 2 (startup-identity-unconfirmed) after pid-only TERM/KILL; on_signal reaps
+-# every registered pid regardless of CUR_PGID; group signals only to the re-confirmed own-session leader; bounded waits with no
+-# unconditional `wait` after an unconfirmed KILL (synthetic rc 137 => die). Everything else (pins, gates, lock fd 9, --ignore-scripts,
+-# ancestor gate, FIRST_EXIT/FINAL, after-checks, external timeout -k 30 1290 = 1200 budget + 30 grace + 2 confirm + <=13 reap + checks
+-# + accounting, a nominal allowance not a completion attestation) is the v1 bytes. Original v1 header follows.
+-# S5-R4 TIER2 SETUP-ONLY V1 — proportionate adaptation of the audited S6 setup 91fe0f1b (run-c5-setup-npm-ci.v3.sh):
+-# exactly one `npm ci --ignore-scripts` from the committed backend lockfile in the isolated s5-r4 worktree.
+-# Adapted ONLY: backend pins (HEAD 143d451e, lock blob 354de3da), the EXPECTED dirty patch (2 test files, fingerprint
+-# 6850b32e… before AND after), `--ignore-scripts` (skips `postinstall: prisma generate` and `prepare: lefthook install`:
+-# no Prisma engine download, no hook install, no hidden installation), and the strict identity list
+-# (jest 30.4.2, ts-jest 29.4.9, typescript 5.9.3, jest-circus, jest-runtime, @jest/core, babel-jest, @babel/core,
+-# @prisma/client 6.19.3 package present without a generated client). Mechanics (owned pgid, budget TERM/KILL,
+-# fail-closed reap, ancestor gate, lock fd closed in child, FIRST_EXIT vs FINAL) are unchanged from 91fe0f1b.
+-# NOT LAUNCHED until the parent grants it. No tests, no scripts, no Prisma generate, no hooks, no commit.
+-# Invoke (parent-granted; external bound 1200 s install + 60 s cleanup + 30 s kill margin):
+-#   mkdir -p /home/user/workspace/execution/s5-r4/logs/setup-v1 && \
+-#   setsid nohup timeout -k 30 1290 bash /home/user/workspace/execution/s5-r4/setup-v1/run-s5-setup-npm-ci.v1.sh \
+-#     > /home/user/workspace/execution/s5-r4/logs/setup-v1/run-setup.out 2>&1 < /dev/null &
++# OP88-S6-SETUP-ADAPT V10.1 — ADDITIVE SETUP SUCCESSOR of the audited S6 setup v3 91fe0f1b (run-c5-setup-npm-ci.v3.sh; original preserved byte-identical;
++# NOT LAUNCHED; no grant implied). Mechanical consumer adaptation to the UNCHANGED OWN-BLOCK v10.1 (4aebf96f…, embedded byte-identical between the
++# `# >>> OWN-BLOCK v10.1` / `# <<< OWN-BLOCK v10.1` markers) with the already-reviewed S5 V10.1 setup consumer semantics (run-s5-setup-npm-ci.v101.sh
++# 5f94783b…) mapped line for line: closes C6_SETUP_CORRECTION_REQUEST §3 R1 (child lost on TERM in the spawn→sleep 0.2→ps sample window: the pid is
++# registered synchronously after `&` and the signal trap reaps registered/pending/confirmed ownership, never CUR_PGID-dependent), R2 (a sampled caller
++# PGID could be signalled: identity is confirmed pgid==sid==pid, direct child, != self group BEFORE release; no ps-sample fallback to a number),
++# R3 (job-control mode: OWN_STAMP records monitor mode + setsid/timeout/ps versions and own_precondition REFUSES `set -m`) and S6_C6_REVIEW_B Part B
++# (b) single-pid TERM/KILL when only the pid is known (own_reap_all/own_signal), (c) phase-bound $! fallback (own_pending), (d) `wait` in THIS shell
++# only after verified absence (own_finish; zombies are not survivors). The `npm ci` is released ONLY after the adoption gate (identity confirmed,
++# IDENTITY record published and checked, ADOPT published and verified by the gate child); otherwise the gate child exits 75/76 and NO install runs.
++# Every post-release fatal path goes through `die` (reap → collect → census → quarantine marker → finish). final_accounting uses the CURRENT registry
++# census; historical OWNED_PGIDS is evidence only; legacy reap_group removed (unused).
++# UNCHANGED from 91fe0f1b: paths (WT/EX/LOGS/LOCK), npm ci argv/env/pins (the S5 consumer's --ignore-scripts is an S5-backend choice and is NOT carried over;
++# the v3 argv is kept byte-identical), lock fd 9 (+ 9>&- in the child), provenance gates (HEAD d51a1910, clean tree, node_modules absent, ancestor package.json absent),
++# ancestor-inventory gate, budgets (1200 s + 30 s grace), after-checks (clean tree, strict 20-module resolution), FIRST_EXIT vs FINAL semantics, rc 90 fail-closed.
++# LAST-EXCLUSION BOUNDARY (explicitly mapped, NOT claimed safe — see ../docs/FINDINGS_AND_APPLICABILITY.md §5): when NO quarantine marker can be written
++# (primary $EX/QUARANTINE, fallback $LOGS/QUARANTINE) while owned work is unresolved, this consumer copies the reviewed S5 V10 behaviour: hold the lease
++# (fd 9) polling the census for HOLD_BOUND s, then exit FINAL 90 with EXCLUSION_UNPRESERVED recorded. That branch releases the lease with owned work
++# possibly alive; it is the known residual boundary of this consumer class (S5 setup-exclusion slice, separate owner), inherited here UNCHANGED and
++# reported, not solved. No wrapper/launcher is built in this packet.
++# External bound unchanged: timeout -k 30 1290 = 1200 budget + 30 grace + 2 confirm + <=13 reap + checks + accounting (nominal allowance, not a completion attestation).
++# Invoke (parent-granted ONLY; identical shape to v3, new script path):
++#   mkdir -p /home/user/workspace/execution/s6-diagnostic/logs/setup-v3 && \
++#   setsid nohup timeout -k 30 1290 bash /home/user/workspace/execution/e8d546f9/s6-owned-launch-v101/run-c5-setup-npm-ci.v101.sh \
++#     > /home/user/workspace/execution/s6-diagnostic/logs/setup-v3/run-setup.out 2>&1 < /dev/null &
++# Original v3 header follows.
++# C5-S6 SETUP-ONLY V3 — successor of 6fa69510… closing the parent's two allocation questions and B-04:
++#   (1) a nonzero post-install reap_group (cleanup_exit) or any owned survivor now FAILS CLOSED (FINAL rc 90 when the
++#       primary npm rc was 0); the primary rc stays in FIRST_EXIT. V2 line 82 only logged cleanup_exit.
++#   (2) ancestor-inventory equality (/home/user/node_modules names+mtimes) is now a GATE, not a report: CHANGED => FINAL != 0.
++#   (3) lock fd 9 closed in the npm child (9>&-), so a quarantined survivor cannot keep the canonical lock.
++#   Everything else (one install, guards, budgets, raw npm logs, strict resolution) unchanged from V2.
++# C5-S6 SETUP-ONLY — exactly one `npm ci` from the committed lockfile on d51 in the isolated worktree.
++# NOT LAUNCHED until the parent grants it. Runs no tests, no scripts of ours, touches nothing outside $WT/node_modules
++# (+ npm's own cache under $HOME/.npm and the raw npm logs redirected into our evidence dir).
++# Invoke (parent-granted; external bound 1200 s install + 60 s cleanup margin):
++#   mkdir -p /home/user/workspace/execution/s6-diagnostic/logs/setup-v3 && \
++#   setsid nohup timeout -k 30 1290 bash /home/user/workspace/execution/s6-diagnostic/v3/run-c5-setup-npm-ci.v3.sh \
++#     > /home/user/workspace/execution/s6-diagnostic/logs/setup-v3/run-setup.out 2>&1 < /dev/null &
++# Guards: canonical lock held by this runner (fd 9) through cleanup; cwd == $WT; HEAD == d51; tree clean before;
++# node_modules ABSENT before (one install, never a second); /home/user/package.json absent; the platform-owned
++# /home/user/node_modules (pre-existing, 212 links, Sep 20) is inventoried before/after and must be UNCHANGED —
++# it is never deleted, moved or treated as a project install. After: tree still clean, node_modules present,
++# lockfile unchanged, STRICT resolution of relevant modules into $WT/node_modules recorded.
+ set -u
+-WT=/home/user/workspace/worktrees/s5-r4
+-EX=/home/user/workspace/execution/s5-r4
+-LOGS=$EX/logs/setup-v1
++WT=/home/user/workspace/worktrees/s6-diagnostic
++EX=/home/user/workspace/execution/s6-diagnostic
++LOGS=$EX/logs/setup-v3
+ LOCK=/home/user/workspace/execution/test-validation.lock
+ EXIT_RECORD=$LOGS/setup.EXIT_RECORD
+-PIN_HEAD=143d451ead6ccdbebd92ca3031ba7a89867d6cfc
+-PIN_LOCK_BLOB=354de3dae19449970497da6e4d87f0a1225a8f43
+-PIN_DIRTY_FINGERPRINT=6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0
+-PIN_DIRTY_STATUS=$' M test/rls-g2-pg17-etq0.spec.ts\n M test/utils/g2-pg17-bootstrap.sh'
+ INSTALL_BUDGET=1200; INSTALL_GRACE=30
+ START=$(date +%s)
+ export CI=1 NODE_OPTIONS=--max-old-space-size=2048 TZ=UTC
+ CPU="taskset -c 0,1"
+ OWNED_PGIDS=""; CUR_PID=""; CUR_PGID=""; FIRST_EXIT=""; CLEANUP_FAILURES=0; ACCOUNTED=0
++
+ # >>> OWN-BLOCK v10.1 (successor of v10 df200b52 per audits/owned-launch-v10-a OWN-V10-A02 ONLY: leader collection is separated from session authority.
+ # own_finish collects the leader at the actual `wait` (pid leaves OWN_PIDS, enters OWN_RETIRED evidence; a pid is never waited twice, so no fabricated
+ # non-child 127 can appear as a COLLECTED rc); SESSION authority (the confirmed pgid in OWN_PGIDS) is removed by own_retire ONLY on a positively
+@@ -169,7 +169,6 @@
+ rec() { echo "$(ts) step=$1 rc=$2 elapsed=$(( $(date +%s) - START ))s ${3:-}" >> "$EXIT_RECORD"; }
+ alive() { kill -0 "$1" 2>/dev/null || return 1; [ "$(ps -o stat= -p "$1" 2>/dev/null | cut -c1)" != "Z" ]; }
+ ancestor_inventory() { ( cd /home/user/node_modules 2>/dev/null && ls -A --time-style=+%s -l | awk '{print $6, $7}' | sort ) | sha256sum | cut -d' ' -f1; }
+-dirty_fingerprint() { ( cd "$WT" && { git diff HEAD; printf '%s\n' "$(git status --porcelain --untracked-files=all)"; } | sha256sum | cut -c1-64 ); }
+ final_accounting() {
+   [ "$ACCOUNTED" = 1 ] && return; ACCOUNTED=1
+   if [ -n "${ANCESTOR_BEFORE:-}" ]; then local a; a=$(ancestor_inventory)
+@@ -177,20 +176,20 @@
+     else echo "$(ts) ancestor_inventory_before=$ANCESTOR_BEFORE after=$a CHANGED — GATE FAILED (this runner never writes there)" >> "$EXIT_RECORD"; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); fi; fi
+   echo "$(ts) historical owned_pgids=[$OWNED_PGIDS] (evidence only, not current facts)" >> "$EXIT_RECORD"; own_collect "$(ts) final " >> "$EXIT_RECORD"; own_census | sed "s/^/$(ts) final census /" >> "$EXIT_RECORD"; own_census >/dev/null || CLEANUP_FAILURES=$((CLEANUP_FAILURES+1))
+   echo "$(ts) CLEANUP_FAILURES=$CLEANUP_FAILURES" >> "$EXIT_RECORD"
+-  ( cd "$WT" 2>/dev/null && echo "$(ts) dirty_fingerprint_after=$(dirty_fingerprint) status_lines=$(git status --porcelain | wc -l) node_modules_present=$([ -d node_modules ] && echo yes || echo no) hooks_pre_commit=$([ -e .git/hooks/pre-commit ] && echo PRESENT || echo absent) generated_client=$([ -d node_modules/.prisma/client ] && echo PRESENT || echo absent)" >> "$EXIT_RECORD" )
++  ( cd "$WT" 2>/dev/null && echo "$(ts) tree_status_lines=$(git status --porcelain | wc -l) node_modules_present=$([ -d node_modules ] && echo yes || echo no)" >> "$EXIT_RECORD" )
+   echo "$(ts) lock held until exit (fd 9)" >> "$EXIT_RECORD"; }
+ HOLD_BOUND=${HOLD_BOUND:-60}; QUAR_STATE=none
+-quarantine() { # <reason>: checked exclusion marker; QUAR_STATE=written|fallback|failed. On failed with unresolved ownership: hold the lease and poll (bounded), then FINAL 90 exclusion=unpreserved
+-  local body="QUARANTINE $(ts) setup-v10 $1"$'\n'"worktree=$WT lock_path=$LOCK (lease released by exit; owned work may remain: no run may start here until parent clears)"
++quarantine() { # <reason>: checked exclusion marker; QUAR_STATE=written|fallback|failed. On failed with unresolved ownership: hold the lease and poll (bounded), then FINAL 90 exclusion=unpreserved (KNOWN RESIDUAL BOUNDARY, mapped in docs/FINDINGS_AND_APPLICABILITY.md §5; not claimed safe)
++  local body="QUARANTINE $(ts) s6-setup-v101 $1"$'\n'"worktree=$WT lock_path=$LOCK (lease released by exit; owned work may remain: no run may start here until parent clears)"
+   if own_record "$EX/QUARANTINE" "$body"; then QUAR_STATE=written; elif own_record "$LOGS/QUARANTINE" "$body"; then QUAR_STATE=fallback; else QUAR_STATE=failed; fi
+   echo "$(ts) QUARANTINE state=$QUAR_STATE reason=[$1]" >> "$EXIT_RECORD"; echo "QUARANTINE state=$QUAR_STATE $1" >&2
+   if [ "$QUAR_STATE" = failed ]; then local h=0; echo "$(ts) EXCLUSION_HOLD: no marker writable; holding lock fd 9 up to ${HOLD_BOUND}s while ownership unresolved" >> "$EXIT_RECORD"
+-    while ! own_census >/dev/null 2>&1 && [ $h -lt "$HOLD_BOUND" ]; do sleep 2; h=$((h+2)); done; own_census >/dev/null 2>&1 && echo "$(ts) EXCLUSION_HOLD released after ${h}s: ownership resolved" >> "$EXIT_RECORD" || { echo "$(ts) EXCLUSION_UNPRESERVED after ${h}s: owned work unresolved and no marker written — parent boundary" >> "$EXIT_RECORD"; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); }; fi; }
++    while ! own_census >/dev/null 2>&1 && [ $h -lt "$HOLD_BOUND" ]; do sleep 2; h=$((h+2)); done; own_census >/dev/null 2>&1 && echo "$(ts) EXCLUSION_HOLD released after ${h}s: ownership resolved" >> "$EXIT_RECORD" || { echo "$(ts) EXCLUSION_UNPRESERVED after ${h}s: owned work unresolved and no marker written — parent boundary (known residual; lease released by exit)" >> "$EXIT_RECORD"; echo "EXCLUSION_UNPRESERVED" >&2; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); }; fi; }
+ finish() { final_accounting
+   if [ "$CLEANUP_FAILURES" -gt 0 ]; then echo "FINAL rc=$(( $1 == 0 ? 90 : $1 )) (primary rc=$1 in FIRST_EXIT; CLEANUP_FAILURES=$CLEANUP_FAILURES => fail-closed; node_modules state must be treated as unverified)" >> "$EXIT_RECORD"; [ "$1" -eq 0 ] && exit 90 || exit "$1"; fi
+   echo "FINAL rc=$1" >> "$EXIT_RECORD" || { echo "FINAL_RECORD_WRITE_FAILED" >&2; exit 74; }; exit "$1"; }
+ on_signal() { trap '' TERM INT HUP; echo "$(ts) RUNNER-SIGNAL child_pid=${CUR_PID:-none} pgid=${CUR_PGID:-none}" >> "$EXIT_RECORD"
+-  local o rrc; o=$(own_reap_all 20); rrc=$?; printf '%s\n' "$o" | sed "s/^/$(ts) runner-signal /" >> "$EXIT_RECORD"   # v9: registered pids + phase-bound pending fork + confirmed groups (descendants), never CUR_PGID-dependent
++  local o rrc; o=$(own_reap_all 20); rrc=$?; printf '%s\n' "$o" | sed "s/^/$(ts) runner-signal /" >> "$EXIT_RECORD"   # R1/R2/Part B(b)(c): registered pids + phase-bound pending fork + confirmed groups (descendants), never CUR_PGID-dependent, never a sampled number
+   own_collect "$(ts) runner-signal " >> "$EXIT_RECORD"; if [ "$rrc" != 0 ] || ! own_census >/dev/null; then CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); quarantine "runner-signal: ownership unresolved after reap: $(printf '%s' "$o" | grep -E 'SURVIVOR|GROUP_SURVIVORS|CENSUS_ERROR' | tr '\n' ';')"; fi
+   [ -n "$FIRST_EXIT" ] || FIRST_EXIT="npm-ci rc=143 how=runner-signal"; echo "FIRST_EXIT $FIRST_EXIT" >> "$EXIT_RECORD"; echo "$(ts) install INCOMPLETE; node_modules state undefined — report, do not retry without a new grant" >> "$EXIT_RECORD"; finish 143; }
+ trap on_signal TERM INT HUP; trap final_accounting EXIT
+@@ -199,51 +198,47 @@
+ 
+ mkdir -p "$LOGS/npm-logs"
+ echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"
+-echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"
++echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"   # R3 / Part B stamp required
+ exec 9>"$LOCK"; flock -n 9 || die lock-busy 75; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"
+ cd "$WT" || die cd 1
+ [ "$PWD" = "$WT" ] || die cwd 1
+ 
+-# provenance before (dirty patch is EXPECTED and pinned; anything else is a refusal)
+-ANCESTOR_BEFORE=$(ancestor_inventory); DIRTY_BEFORE=$(dirty_fingerprint)
++# provenance before
++ANCESTOR_BEFORE=$(ancestor_inventory)
+ { echo "cwd=$PWD"; echo "HEAD=$(git rev-parse HEAD)"; echo "TREE=$(git rev-parse HEAD^{tree})"
+   echo "lock_blob=$(git ls-files -s package-lock.json | awk '{print $2}')"; echo "lock_sha256=$(sha256sum package-lock.json | cut -d' ' -f1)"
+   echo "package_json_sha256=$(sha256sum package.json | cut -d' ' -f1)"; echo "lockfileVersion=$(grep -m1 '"lockfileVersion"' package-lock.json)"
+-  echo "dirty_fingerprint_before=$DIRTY_BEFORE (expected $PIN_DIRTY_FINGERPRINT)"
+   echo "node=$(node -v) node_path=$(command -v node) npm=$(npm -v) npm_path=$(command -v npm)"
+-  echo "node_modules_present_before=$([ -d node_modules ] && echo yes || echo no) hooks_pre_commit_before=$([ -e .git/hooks/pre-commit ] && echo PRESENT || echo absent)"
++  echo "node_modules_present_before=$([ -d node_modules ] && echo yes || echo no)"
+   echo "ancestor_package_json_absent=$([ ! -e /home/user/package.json ] && echo yes || echo NO)"
+   echo "ancestor_node_modules=$(ls -ld /home/user/node_modules 2>&1) entries=$(ls -A /home/user/node_modules 2>/dev/null | wc -l) inventory_before=$ANCESTOR_BEFORE (platform-owned; read-only for this runner)"
+   echo "npm_cache=$(npm config get cache 2>/dev/null)"; echo "registry=$(npm config get registry 2>/dev/null)"
+-  echo "npm_debug_log_dir_before=$(ls /home/user/.npm/_logs 2>/dev/null | wc -l) files"
+   git status --porcelain | sed 's/^/status: /'; } > "$LOGS/setup.provenance.txt" 2>&1
+-[ "$(git rev-parse HEAD)" = "$PIN_HEAD" ] || die provenance-head 2
+-[ "$(git ls-files -s package-lock.json | awk '{print $2}')" = "$PIN_LOCK_BLOB" ] || die provenance-lock-blob 2
+-[ "$(git status --porcelain)" = "$PIN_DIRTY_STATUS" ] || die provenance-dirty-status-not-the-pinned-patch 2
+-[ "$DIRTY_BEFORE" = "$PIN_DIRTY_FINGERPRINT" ] || die provenance-dirty-fingerprint 2
++[ "$(git rev-parse HEAD)" = "d51a191098f483cea9abec6cc7e9f3beffd18c06" ] || die provenance-head 2
++[ -z "$(git status --porcelain)" ] || die provenance-tree-not-clean 2
+ [ ! -d node_modules ] || die provenance-node-modules-already-present-one-install-only 2
+ [ ! -e /home/user/package.json ] || die provenance-ancestor-package-json-present 2
+ rec provenance 0
+ 
+-# the one install, in its own owned process group, lifecycle scripts ignored, raw npm logs kept in the evidence dir
++# the one install, in its own owned session/process group behind the adoption gate, raw npm logs kept in evidence dir (argv unchanged from v3)
+ OWN_ROOT="$LOGS/attempts"; mkdir -p "$OWN_ROOT" || die attempts-dir 74; ATT=$(own_attempt) || die attempt-path 74 "fresh private attempt path could not be created under $OWN_ROOT"
+ own_spawn_begin
+-setsid bash -c "$OWN_GATE" own-gate "$ATT" $$ $CPU npm ci --no-audit --no-fund --ignore-scripts --loglevel=error --logs-dir="$LOGS/npm-logs" --logs-max=10 > "$LOGS/setup.npm-ci.out" 2>&1 < /dev/null 9>&- &
++setsid bash -c "$OWN_GATE" own-gate "$ATT" $$ $CPU npm ci --no-audit --no-fund --loglevel=error --logs-dir="$LOGS/npm-logs" --logs-max=10 > "$LOGS/setup.npm-ci.out" 2>&1 < /dev/null 9>&- &
+ CUR_PID=$!; own_register "$CUR_PID"
+ own_confirm "$CUR_PID" 2; IDRC=$?; PUB=not-attempted; STATE=never-released
+-if [ "$IDRC" = 0 ]; then   # A-03: required recoverable identity published and verified BEFORE release
++if [ "$IDRC" = 0 ]; then   # required recoverable identity published and verified BEFORE release
+   if own_record "$ATT/IDENTITY" "pid=$CUR_PID attempt=${ATT##*/} pgid_sid=[$(own_identity "$CUR_PID")] self_pgid=$OWN_SELF_PGID self_sid=$OWN_SELF_SID decoy=${OWN_LAST_DECOY:-none} budget=${INSTALL_BUDGET}s grace=${INSTALL_GRACE}s"; then PUB=$(own_adopt "$CUR_PID" "$ATT"); [ "$PUB" = published ] && STATE=released; else PUB=identity-publication-failed; fi; fi
+ echo "$(ts) npm-ci IDENTITY attempt=${ATT##*/} identity_rc=$IDRC adoption=$PUB state=$STATE" >> "$EXIT_RECORD" || { [ "$STATE" = released ] && STATE=released-then-cancelled; die post-release-record-failed 74 "EXIT_RECORD append failed after state=$STATE (die reaps/quarantines before finish)"; }
+ if [ "$STATE" != released ]; then own_signal "$CUR_PID" TERM >/dev/null; own_wait_gone "$CUR_PID" 5 || { own_signal "$CUR_PID" KILL >/dev/null; own_wait_gone "$CUR_PID" 3; }
+   own_finish "$CUR_PID"; FIN="$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC}"; [ "$OWN_FIN" = observed ] && own_retire "$CUR_PID"
+   die startup-adoption-refused 2 "identity_rc=$IDRC adoption=$PUB raw=$FIN state=$STATE (never released: the gate child exits 75/76 without npm ci; caller group never signalled)"; fi
+ CUR_PGID=$CUR_PID; OWNED_PGIDS="$CUR_PGID"                       # confirmed + identity published + adopted: install released (OWNED_PGIDS kept as historical evidence only)
+-echo "$(ts) npm-ci START child_pid=$CUR_PID child_pgid=$CUR_PGID budget=${INSTALL_BUDGET}s grace=${INSTALL_GRACE}s cmd=[npm ci --no-audit --no-fund --ignore-scripts --loglevel=error]" >> "$EXIT_RECORD"
++echo "$(ts) npm-ci START child_pid=$CUR_PID child_pgid=$CUR_PGID budget=${INSTALL_BUDGET}s grace=${INSTALL_GRACE}s cmd=[npm ci --no-audit --no-fund --loglevel=error]" >> "$EXIT_RECORD"
+ w=0; while own_alive "$CUR_PID" && [ $w -lt "$INSTALL_BUDGET" ]; do sleep 2; w=$((w+2)); done
+ HOW=exited
+ if own_alive "$CUR_PID"; then HOW=budget-TERM; echo "$(ts) npm-ci BUDGET reached: TERM owned $(own_signal "$CUR_PID" TERM) pid=$CUR_PID" >> "$EXIT_RECORD"
+   own_wait_gone "$CUR_PID" "$INSTALL_GRACE" || { HOW=budget-KILL; own_signal "$CUR_PID" KILL >/dev/null; own_wait_gone "$CUR_PID" 3 || HOW=budget-KILL-unconfirmed; }; fi
+-own_finish "$CUR_PID"; FIN="$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC}"; case $OWN_FIN in observed) RC=$OWN_FIN_RC;; unobserved) RC=137; HOW=$HOW-unconfirmed; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); quarantine "npm-ci termination unverified pid=$CUR_PID how=$HOW";; *) RC=70; HOW=$HOW-wait-mechanism-error; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1));; esac   # A-01/V9B-02: wait in THIS shell
++own_finish "$CUR_PID"; FIN="$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC}"; case $OWN_FIN in observed) RC=$OWN_FIN_RC;; unobserved) RC=137; HOW=$HOW-unconfirmed; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); quarantine "npm-ci termination unverified pid=$CUR_PID how=$HOW";; *) RC=70; HOW=$HOW-wait-mechanism-error; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1));; esac   # Part B (d): wait in THIS shell, only after verified absence
+ own_record "$ATT/EXIT" "raw=$FIN validation_rc=$RC how=$HOW state=$STATE" || { echo "$(ts) EXIT_RECORD_PUBLICATION_FAILED $ATT" >> "$EXIT_RECORD"; CLEANUP_FAILURES=$((CLEANUP_FAILURES+1)); }
+ echo "$(ts) npm-ci first_exit rc=$RC how=$HOW npm_logs=[$(ls "$LOGS/npm-logs" 2>/dev/null | tr '\n' ',')]" >> "$EXIT_RECORD"
+ GO=$(own_group_signal "$CUR_PGID" TERM); own_group_wait_empty "$CUR_PGID" 10 || { GO="$GO+KILL:$(own_group_signal "$CUR_PGID" KILL)"; own_group_wait_empty "$CUR_PGID" 3; }
+@@ -252,24 +247,18 @@
+ FIRST_EXIT="npm-ci rc=$RC how=$HOW"
+ [ "$RC" -eq 0 ] || die npm-ci "$RC" "how=$HOW (node_modules may be partial: report; no retry)"
+ 
+-# provenance after: dirty patch unchanged (node_modules is gitignored), lockfile unchanged, strict identities, no hooks, no generated client
+-{ echo "tree_status_after:"; git status --porcelain; echo "lock_sha256_after=$(sha256sum package-lock.json | cut -d' ' -f1)"; echo "dirty_fingerprint_after=$(dirty_fingerprint)"
++# provenance after: clean tree, lockfile unchanged, strict resolution into $WT/node_modules, versions
++{ echo "tree_status_after:"; git status --porcelain; echo "lock_sha256_after=$(sha256sum package-lock.json | cut -d' ' -f1)"
+   echo "node_modules_top_entries=$(ls -A node_modules | wc -l)"; echo "node_modules_bytes=$(du -sb node_modules 2>/dev/null | cut -f1)"
+-  echo "node_modules_package_lock_sha256=$(sha256sum node_modules/.package-lock.json 2>/dev/null | cut -c1-64)"
+-  echo "bins: $(cd node_modules/.bin 2>/dev/null && ls jest tsc eslint prettier lefthook prisma 2>&1 | tr '\n' ' ')"
+-  echo "generated_client_absent=$([ ! -d node_modules/.prisma/client ] && echo yes || echo NO) hooks_pre_commit=$([ -e .git/hooks/pre-commit ] && echo PRESENT || echo absent)"; } > "$LOGS/setup.after.txt" 2>&1
+-[ "$(git status --porcelain)" = "$PIN_DIRTY_STATUS" ] || die after-dirty-status-changed 6
+-[ "$(dirty_fingerprint)" = "$PIN_DIRTY_FINGERPRINT" ] || die after-dirty-fingerprint-changed 6
+-[ ! -e .git/hooks/pre-commit ] || die after-hooks-installed-despite-ignore-scripts 6
++  echo "npm_ls_summary: $(npm ls --depth=0 2>/dev/null | tail -1)"; } > "$LOGS/setup.after.txt" 2>&1
++[ -z "$(git status --porcelain)" ] || die after-tree-not-clean 6
+ node -e '
+ const p=require("path"); const wt=process.argv[1]; let bad=0;
+-const want={"jest":"30.4.2","ts-jest":"29.4.9","typescript":"5.9.3","@prisma/client":"6.19.3","prisma":"6.19.3","lefthook":"2.1.9","eslint":"10.5.0"};
+-for (const m of ["jest","jest-circus","jest-runtime","@jest/core","ts-jest","typescript","babel-jest","@babel/core","@prisma/client","prisma","lefthook","eslint"]) {
++for (const m of ["react","react-test-renderer","react-native","@testing-library/react-native","@tanstack/react-query","@tanstack/query-core","@tanstack/react-query-persist-client","@tanstack/query-persist-client-core","@tanstack/query-async-storage-persister","@react-native-async-storage/async-storage","jest-expo","jest","jest-circus","jest-runtime","@jest/core","babel-jest","@babel/core","babel-preset-expo","zustand","scheduler"]) {
+   let r; try { r=require.resolve(m+"/package.json",{paths:[wt]}); } catch(e){ console.log(`BAD ${m} unresolved`); bad++; continue; }
+-  const v=require(r).version; const inside=r.startsWith(p.join(wt,"node_modules")+p.sep); const pinOk=!(m in want)||want[m]===v;
+-  console.log(`${inside&&pinOk?"OK ":"BAD"} ${m}@${v}${m in want?" (pin "+want[m]+")":""} ${r}`); if(!inside||!pinOk) bad++; }
+-try { require.resolve("prettier/package.json",{paths:[wt]}); console.log("NOTE prettier resolves (unexpected: not in application lock)"); } catch(e){ console.log("NOTE prettier absent from application lock (expected; hook-formatter resolution is a separate grant)"); }
++  const v=require(r).version; const inside=r.startsWith(p.join(wt,"node_modules")+p.sep);
++  console.log(`${inside?"OK ":"BAD"} ${m}@${v} ${r}`); if(!inside) bad++; }
+ process.exit(bad?1:0)' "$WT" > "$LOGS/setup.module-paths.txt" 2>&1 || die after-strict-resolution 5
+ rec after-checks 0
+-echo "FIRST_EXIT $FIRST_EXIT" >> "$EXIT_RECORD"; echo "$(ts) primary setup rc=0 (node_modules present in $WT; pinned dirty patch unchanged; strict identities OK; no hooks; no generated client) — FINAL decided by cleanup/ancestor gates" >> "$EXIT_RECORD"
++echo "FIRST_EXIT $FIRST_EXIT" >> "$EXIT_RECORD"; echo "$(ts) primary setup rc=0 (node_modules present in $WT; tree clean; strict resolution OK) — FINAL decided by cleanup/ancestor gates" >> "$EXIT_RECORD"
+ finish 0

@@ -35,9 +35,9 @@ All64 open PR head/base/name records re-queried; zero mismatches with `execution
 | S1 R4 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Source preserved, independent source reviews frozen; TRUNCATE/membership dynamic proof after S2 controls/setup. |
 | S2 V5.9 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Single control run STOP/k=1, resultd749a4b1: probe0/wdtest0/wdcancel3, K1/K2 pass, K3 TERM reached step30 rather than intended40; remaining controls NOTRUN. Clean slot closed. Independent result reviews and narrowly assigned V60 placement repair; real proof held, no retry/reinstall. |
 | S3 PREP2 | T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | worktrees/s3-prep2 materialized: HEADd5cd, staged treea584a1b95423f95dae8daabf673ef3776604acbb, 48 staged paths, no merge commit/state fabricated. Frozen9a7a4039; upstream proof, setup/generator ruling and integration remain pending. |
-| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Stage1 PASS9c84eab2 preserved. CallerV2 7bff8f2c exact A1b2634a0/B8bece05b close receipt defect; native inputs ready718b9757. Exact caller restore/transport prep, then separate S4_NATIVE_V2_GRANT activation; no Stage1 rerun. |
+| S4 R6 / V6.1 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | NATIVE RUNNING from01:50:31UTC under published S4_NATIVE_V2_GRANT20d42065; prepf96700eb, caller7bff8f2c dual-clear. Run VALIDATION-V6-20260923T015032Z-16321-76044a34; no outcome yet. Stage1 PASS9c84eab2 preserved, no rerun. |
 | S5 / V10.1 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | Private primitive diagnostic PASS8e16701b preserved. SetupV2 Afa876aa6/B8b1b53a7 permit unchanged fake11 diagnostic, separately queued; canonical held on A01/A02 plus B01/B02. Narrow setupV3 source repair assigned; fingerprint6850b32e ready via localcore.abbrev8. No setup/T0 grant. |
-| S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Exact source/C6 restoration COMPLETEb8b35c8b, packet04d761f0 19/19. Sole source adapter s5_v10_1_narrow_repair_muddwjam owns s6-owned-launch-v101; two consumers only, primitive immutable, no runtime/C5 A/B/D repetition. |
+| S6 C6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Two-consumer adaptation6b2be238 frozen but explicitly NOT safe on inherited HOLD_BOUND/unpreserved branch. No final audit/runtime grant yet; sole builder prepares bounded s6-exclusion-scope map before implementation. Product/classifier/primitive unchanged, no C5 A/B/D repetition. |
 
 Actual source objects/tree identities restored from prerequisite-verified bundles. S1 `56fb` is an actual ancestor of S2 `d5cd` (fresh Git check), not merely matching content. S4 current bundle is `af2c8207…b0dd` for91990, not the older R5 bundlef8de3d63. Source restoration and manifest checks are not new product tests/audits.
 
@@ -45,7 +45,7 @@ Actual source objects/tree identities restored from prerequisite-verified bundle
 
 Fresh IDs, sole-write paths and model requests: synchronized `execution/DISPATCHES.md` and root mirror. Initial six assignments plus S2V58 and two separate setup reviewers; V10B blocked. No old op88 worker ID, PID, installation or grant is inherited as live. Parent is sole telemetry/private publisher. S1 schema/generator remains reserved, no mutation assigned. Auditors do not read their current peer conclusions, implement source, run duplicate heavy tests or self-clear.
 
-Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; about9GB after fresh setup. S2SETUP, S4_STAGE1 and S5_V101_CONTROL closed cleanly. S2_V59_CONTROL stopped at01:37:09 and closed cleanly as FAILED, not a pass. S4_NATIVE_V2_GRANT is queued for exact prep/publication/activation; S5 fake11 waits for a separate nonoverlapping slot. Source/review parallel; old fixtures not inherited.
+Fresh resource observation00:44UTC:2CPUs,7966MiB RAM,9.8GB free before public source restoration; about9GB after fresh setup. S2SETUP, S4_STAGE1 and S5_V101_CONTROL closed cleanly. S2_V59_CONTROL stopped at01:37:09 and closed cleanly as FAILED. S4_NATIVE_V2_GRANT ACTIVE, sole runtime from01:50:31UTC; S5_SETUP_V2_CONTROL_GRANT is QUEUED only. Source/review parallel; old fixtures not inherited.
 
 Fresh restoration complete: exact clean d5cd and37-file predecessor, V57 frozen runtime-path copy; S3 PREP2 tree reproduced from BOTH parents using preserved patches, not a merge/runtime attestation. Upstream report preserved with additive DISCLOSURE_ADDENDUM naming the version/getconf/process-census observations; original report not rewritten.
 
@@ -92,7 +92,7 @@ Acceptance unchanged: ≥one authorized real nonempty native/reconciled complete
 5. Upstream paths and fresh setup complete; unchangedd5cd/S1 real composition/TRUNCATE after controls and accurate real-proof bound disposition, then dual evidence follow-up; S3 integration afterwards.
 6. Exact accepted primitive → bounded S6 consumer adaptation and dual applicability → fresh setup → C6 only; restoration parallel.
 
-Bradley decision required: NO for current local execution. Exact next action: activate S4_NATIVE_V2_GRANT after exact prep and publication; S2 bounded source/result review, S5 canonical narrow repair and S6 source adaptation stay parallel. Reserved owner decisions remain downstream.
+Bradley decision required: NO for current local execution. Exact next action: observe and freeze the sole S4 native run without retry; review changed S2/S5 source candidates and S6 exclusion scope in parallel. Reserved owner decisions remain downstream.
 
 ## Entry points
 

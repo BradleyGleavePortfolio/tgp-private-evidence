@@ -23,3 +23,13 @@ Independent A/B result reviews examine exact actual evidence, passed-subset appl
 Builder `s2_v5_8_concrete_repair_mude34f9` owns source-only `execution/e8d546f9/s2-v60/`: correct only K3 placement using attributable existing readiness evidence, not a larger guessed sleep or weakened assertion. Runner, product and other mechanisms stay unchanged unless a concrete necessity is returned before expansion. The continuation request must preserve valid completed evidence and cover corrected K3 plus unrun controls; any unavoidable repeat or selector change must be explicit.
 
 No rerun, real fixture, install, network, database, or `PROOF_REQUEST_17` execution is granted. Changed final control bytes require two independent exact-delta attestations and a separate continuation grant.
+
+## Frozen independent result reviews
+
+A manifest `96e4d876345f02ce0bd917d1adb747c1baf031416169b874601bbad8e567ed3e` and B manifest `41b5b5e069c177422f952040ba492c016b0767d1cfae4a30e41cbf4a618f8587` both confirm the driver trigger-placement defect, consistent early runner cleanup/publication, and the P1/W1/C1/K1/K2 passes. K3's no-step-40-survivor assertion was vacuous; it is not active-step proof.
+
+The same bounded cause applies to unrun K4 and N4b placement sites. Parent permits their narrow placement correction, not a new runner or general controller framework.
+
+B initially recommended all eight sets again; A recommended corrected K3 plus unrun remainder. Parent requires relevant-input applicability rather than invalidation solely by changed driver hash. B subsequently confirmed that rule: preserve untouched paths, identify any exact shared hunk requiring a repeat, and rerun only the necessary existing set where controls cannot be separated. No optional resume framework is requested merely to save the approximately eight seconds of K1/K2 if set k is inseparable.
+
+B's Git-wrapper environment observation is retained for real-proof provenance, not a source correction demand. Real proof and its separate fixture-init daemon boundary remain held.

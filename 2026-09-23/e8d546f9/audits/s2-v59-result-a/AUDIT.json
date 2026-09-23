@@ -1,0 +1,85 @@
+{
+  "audit": "S2-V59-RESULT-A",
+  "status": "FROZEN — partial control evidence accepted; sequence FAILED at K3; continuation and real proof HELD",
+  "scope": {
+    "reviewer": "Independent nonbuilder A; requested parent-model inheritance is policy, not observable runtime identity/settings.",
+    "method": "Read/hash/diff only; no candidate execution, syntax checks, process or lock probes, network, installs, source edits, current peer report, current successor output, state or takeover reads.",
+    "sole_writes": "/home/user/workspace/execution/e8d546f9/audits/s2-v59-result-a/",
+    "preservation": "Earlier source reviews remain frozen; this is actual-result attribution and evidence applicability, not a blanket source re-audit."
+  },
+  "exact_binding": {
+    "executor_root": "/home/user/workspace/execution/e8d546f9/s2-v59-control-result",
+    "executor_manifest_sha256": "d749a4b1a3c2671a73e7672e1d86a0c064860a5931904a3c4bc710c2308d24f0",
+    "executor_manifest_entries_verified": 8,
+    "results_and_inputs_sha256": "67cc617dcaa63a420a713919ae0b83ad21d1405acf552a53ec5f491b85bafc02",
+    "results_and_inputs_entries_verified": 116,
+    "candidate_manifest_sha256": "4341ce30553bf950c32b40ef0f6466502bd2f189c99643733fa141dc5bd08bb5",
+    "candidate_entries_verified": 16,
+    "driver_sha256": "924768a25c644da980f320d331d1d767fc202343f03260177c62fddb4b839706",
+    "runner_sha256": "efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c",
+    "control_request_16_sha256": "28a7c46b3da441345b90497db7f578d19014805d8ce4ffc0e98bd50e49868feb",
+    "grant_sha256": "3fe730589a25c950f79a5d75cfa87a0eeb357565ee4afc77e61ca77b19c0b4f1",
+    "prior_source_A_manifest_sha256": "abbf2c34ef85a13b959a5ed17c95477e59ad24d0e9874a2fbf6d41689cdc160c",
+    "k_result_sha256": "369e18e7785d9e38cbcfb330a49f8c297a9eb7faab9e696d559032d8d44e8b69",
+    "k3_stamp_sha256": "8b9a5f99cc97b47041b2cc00c9a3bfe5f5de68952c5df05a8b2946e130d5c291",
+    "k3_exit_codes_sha256": "709d95ec016fba31c8a0ed941e41f21e37b3ffc1bc058c1bac70202bd67439a7",
+    "k3_receipt_sha256": "3553a42c3fca99fc85e57eaed04bdec27bb9a0e6c3dd4a96b8fe1acf4d33a4f8",
+    "k3_publication_sha256": "6e66ff62c429e6ac152ed5aecc5d086c7e5e876bbe4589b730038deb0cd90f9d",
+    "additional_verification": "All four set inner manifests and both runner inner/outer manifests independently reverified with no mismatch; executor RESULTS_AND_INPUTS additionally binds the post-inner control receipts and runner PUBLICATION files. [Frozen result inventory](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/RESULTS_AND_INPUTS.sha256)"
+  },
+  "actual_outcome": {
+    "sequence": "probe=0, wdtest=0, wdcancel=3 accepted exception, k=1; STOP at k with no subsequent sets launched. [Raw caller lines 20–125](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/caller-stdout-stderr.txt#L20)",
+    "caller": "Request lines 24–31 and caller lines 13–20 compare byte-identically; the caller's final echo/done is completion, not all-set success. [Frozen request](file:///home/user/workspace/execution/e8d546f9/s2-v59/CONTROL_REQUEST_16.md#L24) [Executed caller](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/caller.sh#L13)",
+    "k_aggregate": "3/6 controls reached, strike=1, aggregate_exit=1, publication_status=ok; the first miss stopped before K4, as required. [K result lines 43–61](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L43) [K receipt](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RECEIPT.txt)",
+    "not_run": "K4–K6; new1 (K7pre,K8pre,K7,K8,K9); new2 (K10); neg (N1–N3); neg2 (N4,N5a,N5b,N6,N7,N8), including the source-closed N6 pre-session boundary, have no execution proof in this bundle. [Set ledger](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/SET_LEDGER.txt#L6) [Frozen workload map](file:///home/user/workspace/execution/e8d546f9/s2-v59/CONTROL_REQUEST_16.md#L33)"
+  },
+  "material_finding": {
+    "id": "S2-V59-RESULT-A01",
+    "title": "K3 launch-relative TERM precedes the intended active step-40 scenario",
+    "disposition": "OPEN — control placement correction and affected execution required; not evidence of a product or runner cleanup defect.",
+    "exact_source": "Driver line 301 supplies a 3-second run-launch timeout through run_runner/enclose at lines 234–236 and 131–144, not a step-40-relative trigger; assertions at lines 304 and 306–307 require interrupted composition and subsequent fixture stop. [Driver](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh#L301)",
+    "observed": "The actual signal occurred at 01:37:08Z during 30-fixture-init (pid/pgid 10936), before fixture start and composition; status is fixture=interrupted(TERM), composition=notrun, discriminator=notrun, fixture_stop=notrun. [K3 stamp lines 15–23](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/stamp.txt#L15) [K3 status](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/exit-codes.txt)",
+    "two_failures_one_cause": "K result line 51 fails the composition-interrupted/stop-zero tuple, and line 53 fails SIGNAL < REAP < fixture-stop because stop is absent; both follow from the misplaced signal, not independent cleanup failures. [K assertions](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L49)",
+    "why_stop_notrun_is_consistent": "FIXTURE_STARTED begins at 0, becomes attempted only after init returns and before step31, while cleanup stops only if that flag is nonzero; the actual stub init only printed its fd/parent and no fixture start was reached. [Runner lines 133,320,445–450](file:///home/user/workspace/execution/e8d546f9/s2-v59/run-composition-r57-v5.7-when-granted.sh#L445) [Stub init](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/stubs/fixture.sh#L7) [Actual init](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/30-fixture-init.log)",
+    "status_reconciliation": "Runner final/first/process exit143 and cleanup0 agree across status, receipt and publication; the outer timeout's raw124 is the separately expected enclosure status, while k aggregate1 is the assertion miss. [K3 receipt](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/RECEIPT.txt) [K3 publication](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/PUBLICATION.txt) [Driver expected outer124](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh#L310) [K raw124](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L44)",
+    "claim_limit": "The PASS 'no step-40 child survives' is vacuous for this run because step40 never ran; it cannot substitute for active-step interruption/reap-before-stop proof. [K result line 52](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L52) [Actual K3 status](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/exit-codes.txt)",
+    "repeated_cause_scope": "K4 line312 uses the same 3-second launch timeout but needs the step40 escapee to exist; N4b line451 uses a 4-second launch timeout and line452 explicitly asserts active40 placement. These are the bounded related placement sites, not additional observed failures; K4 and N4b were NOT RUN. [K4](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh#L312) [N4b](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/run-controls-v59.sh#L451) [Stop ledger](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/SET_LEDGER.txt#L6)",
+    "owner_and_smallest_correction": "Builder: correct the bounded placement of the affected active-step controls, retain their scenario/status/order assertions, existing ownership and cleanup authority, and truthful budgets; do not relabel this run PASS, weaken to accept step30, or revise the runner merely to satisfy the control. A specific new acknowledgement framework or generalized fault suite is not required by this finding.",
+    "timing_qualification": "Attribution rests on immutable signal-step and status records, not the executor's unbound log-mtime latency estimates; no claim that another fixed delay guarantees all host timings is made. [K3 stamp](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/stamp.txt#L16)"
+  },
+  "accepted_partial_evidence": [
+    {
+      "control": "P1",
+      "verdict": "PASS on exact V59: acknowledged enclosure registration/current authority and retirement, aggregate0. [Probe result lines 4–13](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/probe-20260923T013620Z-8921/CONTROLS_RESULT.txt#L4)"
+    },
+    {
+      "control": "W1",
+      "verdict": "PASS on exact V59: watchdog TERM at12s then KILL at16s against validated authority9157; group empty at16.09s and aggregate0. [W1 result lines 5–20](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/wdtest-20260923T013621Z-9110/CONTROLS_RESULT.txt#L5)"
+    },
+    {
+      "control": "C1",
+      "verdict": "Expected standalone aggregate3 accepted, not a new failure: driver cancelled at18.06s, controller sleeper cleaned, watchdog/controllers empty, publication ok. The retained controller record p9422:340219 is historical authority, not a surviving process claim. [C1 result](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/wdcancel-20260923T013638Z-9378/CONTROLS_RESULT.txt#L5) [Controller record](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/wdcancel-20260923T013638Z-9378/controller-pids.txt) [Receipt](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/wdcancel-20260923T013638Z-9378/CONTROLS_RECEIPT.txt)"
+    },
+    {
+      "control": "K1",
+      "verdict": "PASS intentional predecessor-mechanism counterexample: outer124, stop ran while the step40 child tree survived, then driver cleaned recorded survivors; this is not execution of the full v5.3.1 predecessor, whose K7pre/K8pre remain unrun. [K1 raw log](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/k1/driver.log) [K result lines 4–16](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L4) [Workload map](file:///home/user/workspace/execution/e8d546f9/s2-v59/CONTROL_REQUEST_16.md#L33)"
+    },
+    {
+      "control": "K2",
+      "verdict": "PASS normal stub path with real head/dirty/lockfile/closure checks and two real offline refusals64/64; ten step acknowledgements, fd9 and CHECKPOINT_DISABLE predicates, reap-before-stop and stop/status completion passed. Composition's '0 passed, 0 failed' is explicitly a stub, not real composition/discriminator/fixture proof. [K2 stamp](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013700Z/stamp.txt#L1) [K2 assertions](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L18)",
+      "cleanup_qualification": "Two enclosure members (git-status wrapper and sleep) remained after runner exit0 and were retained/cleaned by the driver; therefore the supported end-to-end claim includes driver cleanup, not that every enclosure process was already gone at runner exit. [K2 driver line34](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/k2.driver.log#L34) [K cleanup lines 40–41](file:///home/user/workspace/execution/e8d546f9/s2-v59/controls-proposed/results/k-20260923T013657Z-9623/CONTROLS_RESULT.txt#L40)"
+    },
+    {
+      "control": "K3 partial only",
+      "verdict": "Actual early TERM path preserved143, reaped owned work, kept lock through cleanup, reported no survivors, cleanup0, receipt/publication ok within deadline (cleanup0.20s, total0.32s); these are valid observations but do not pass K3's active40 criterion. [K3 stamp lines 15–23](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/stamp.txt#L15) [K3 receipt](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/RECEIPT.txt) [K3 publication](file:///home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T013705Z/PUBLICATION.txt)"
+    }
+  ],
+  "handoff_and_limits": {
+    "frozen_accounting": "All four sets record empty owned/current authority, free lane lock and absent predecessor lock; caller records each watchdog/controller/finish-alarm census empty and then STOP. This auditor verified frozen records, not live process/lock state. [Raw caller](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/caller-stdout-stderr.txt#L13)",
+    "executor_only_observation": "Whole-host post-run zero-zombie/no-process census, unchanged canonical-lock metadata and slot release are executor-attested observations, not independently repeated live probes here. [Executor result line34](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/RESULT.md#L34)",
+    "setup": "ENV01 receipt records only predecessor output-directory creation and restoring parent0555, with PRE-OK; new1 did not run. No reinstall or new setup requirement follows from K3's placement miss. [ENV01 receipt](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/ENV01_RECEIPT.txt) [Ledger](file:///home/user/workspace/execution/e8d546f9/s2-v59-control-result/SET_LEDGER.txt#L7)",
+    "smallest_next_proof": "After the changed exact placement delta and continuation request receive the required independent T4 attestations and explicit grant: prove K3 active40 interruption/reap-before-stop, then the already-required unrun remainder with first-failure stop and truthful raw statuses. Preserve P1/W1/C1/K1/K2 as exact-V59 evidence; reusing them on a successor needs explicit relevant-input applicability, not automatic inheritance or blanket reruns. [G09–G10](file:///home/user/workspace/tgp-agent-context/AGENT_RULES.md#L71) [No broadening rule](file:///home/user/workspace/recon/EXECUTION_SCOPE.md#L13)",
+    "no_self_grant": "No continuation is authorized by this report; the original grant stopped on k=1 and forbids retry or later sets after failure. [Grant lines21–25](file:///home/user/workspace/tgp-private-evidence/execution/e8d546f9/S2_V59_CONTROL_GRANT.md#L21)",
+    "real_proof": "PROOF_REQUEST_17 stays separately HELD; stub controls, actual early cancellation, source closure and setup receipt supply no real-composition, product, customer or release clearance. [Grant line41](file:///home/user/workspace/tgp-private-evidence/execution/e8d546f9/S2_V59_CONTROL_GRANT.md#L41)"
+  }
+}
