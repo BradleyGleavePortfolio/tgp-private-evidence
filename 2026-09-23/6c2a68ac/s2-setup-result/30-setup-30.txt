@@ -1,0 +1,35 @@
+utc=2026-09-23T16:09:44Z invocation_env: CHECKPOINT_DISABLE=1 (exported; setup-30 sets PRISMA_GENERATE_SKIP_AUTOINSTALL=1 itself, guard retained) cwd=/home/user/workspace
+npm _logs before: 0 files
+$ bash /home/user/workspace/execution/s2-setup-prep/infra/check-lock.sh
+lock FREE (/home/user/workspace/execution/test-validation.lock)
+check_lock_shell_rc=1 (observation is the printed line)
+$ bash /home/user/workspace/execution/s2-setup-prep/infra/launch-detached.sh start setup-30-6c2a68ac timeout --kill-after=60 2160 bash /home/user/workspace/execution/s2-setup-prep/infra/setup-30-npm-ci.sh
+started setup-30-6c2a68ac pid=8168 log=/home/user/workspace/execution/s2-setup-prep/runs/setup-30-6c2a68ac.log exit_sentinel=/home/user/workspace/execution/s2-setup-prep/runs/setup-30-6c2a68ac.exit
+launch_utc=2026-09-23T16:09:44Z pid=8168 pgid=8168 sid=8168 cmd: timeout --kill-after=60 2160 bash /home/user/workspace/execution/s2-setup-prep/infra/setup-30-npm-ci.sh
+start_rc=0 start_utc=2026-09-23T16:09:44Z
+$ bash /home/user/workspace/execution/s2-setup-prep/infra/launch-detached.sh wait setup-30-6c2a68ac 2300   (verbatim, detached; stdout -> 30-wait.txt)
+wait launched utc=2026-09-23T16:09:44Z
+child env check (read-only /proc): pid=7957;
+pid=7960;
+CHECKPOINT_DISABLE=1 pid=8168;
+CHECKPOINT_DISABLE=1 pid=8176;
+CHECKPOINT_DISABLE=1 pid=8177;
+pid=8300;
+pid=8302;
+--- post-S30 observation utc=2026-09-23T16:16:12Z
+sentinel runs/setup-30-6c2a68ac.exit=0 pid=8168 pid_alive=no
+survivors (pgrep npm|prisma|setup-30|timeout --kill|node .*s2-runner53): [9521 tee -a /home/user/workspace/execution/6c2a68ac/s2-setup-result/30-setup-30.txt;]
+outside-root after: /home/user/node_modules entries=209 prisma_outside=absent package.json=absent package-lock.json=absent
+outside-root inventory before=c3fc09cbf60ed1ac after=5eda3b9d3de02311 identical=NO
+WT HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c porcelain=0 node_modules_dirs=666 prisma_cli_sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+PRE-OK: 37/37 disk_free=8.5G mem_avail_MB=7693
+npm _logs after: 2026-09-23T16_09_45_023Z-debug-0.log 
+$ bash /home/user/workspace/execution/s2-setup-prep/infra/check-lock.sh   (final granted check)
+lock FREE (/home/user/workspace/execution/test-validation.lock)
+check_lock_shell_rc=1 (observation is the printed line) lock_file=present size=0 mode=644
+--- inventory-difference analysis utc=2026-09-23T16:16:36Z: diff of the two inventory files is exactly one line, the '..' entry of /home/user/node_modules (= /home/user itself): nlink 11->12, mtime 15:25->16:08. Cause: granted S20 created /home/user/pg17 (dir mtime 16:08:59, /home/user mtime 16:08:58). All 209 node_modules entries (names, sizes, mtimes, modes) and package.json/package-lock.json absence are byte-identical between the two files. Script-level check outside_root_before == outside_root_after passed (nm=209 pkg=absent lock=absent prisma_outside=absent). No file appeared under /home/user/node_modules or /home/user/package*.json.
+diff:
+3c3
+< drwxr-x---+   11 user user  4096 Sep 23 15:25 ..
+---
+> drwxr-x---+   12 user user  4096 Sep 23 16:08 ..
