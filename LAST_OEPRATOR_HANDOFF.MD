@@ -1,6 +1,6 @@
 # LAST OPERATOR HANDOFF
 
-Updated2026-09-23 01:01UTC. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
+Updated2026-09-23 01:12UTC. Executive parent sessione8d546f9-bc43-4fd2-8bae-b6038a849bc1. Requested misspelled filename preserved.
 
 ## Current handoff point
 
@@ -10,22 +10,22 @@ Current continuation is op88 next-proof, NOT awaiting EXECUTE/S0. Prior worker �
 
 ## Work underway
 
-- S2V57: A frozen06a2705a identifies five concrete driver/request defects; B still independent. Sole Fable V58 narrowly corrects them, then dual delta closure and controls; standalonewdcancel3 remains accepted caller exception.
-- S4V6.1: frozen671d08c3,12/12; only A01/A02/B01/B02. Fresh independentA/B now in delta review, then control, no broad fault-coverage program.
+- S2V57: A06a2705a/B7596b9f5 both frozen; material findings bind. V58efde06b5 18/18 verified, runner unchanged, parent accepts dual-lane paths. Independent A/B delta review active; standalonewdcancel3 remains accepted caller exception.
+- S4V6.1: frozen671d08c3,12/12; independent A32c35647/B94c5921e close all four defects without new blockers. Whole runtime packet restored; single Stage1 grant prepared, activate after publication. Native remains separately held.
 - S5V10: independent B provider-blocked twice despite passive-review clarification, no verdict/approval; unchanged diagnostic remains held. Existing A preserved, expectedC3 source counterexample not a run. No provider-safeguard bypass.
 - S5V10.1: separate Fable writer repairs A01..03 only, incorporates B after independent freeze. Setup-exclusion9-file successor held separately; R1 valid, no rerun.
-- S1/S2/S3: source-only restoration of exactd5cd/predecessor37files and bounded PREP2 inputs. No install, runtime, product change or hook/commit.
+- S1/S2/S3: exactd5cd/predecessor37files restored, PREP2 reproduced from both parents; fresh S2 environment setup now complete. No controls/real DB proof/product change/hook/commit.
 - S6C6: frozen19-file discriminator and narrowB preserved. Shared launch consumer/setup dependency held; no repeat valid C5A/B/D.
 
 ## Truth and resource boundary
 
-S2SETUP grant active with upstream worker only: exact restored37-file setup05 scripts; S10/S20 raw0, S30locked install underway, no server/DB/controls. Separate setup-exclusion A/B frozen with concrete nested-session/exclusion/publication and control-path findings. Parent chooses no live/unknown recovery transfer; S5 finishes V10.1 before separate setup-change map. Two CPUs/about8GB,9.7GB before install; prior dependencies not inherited. All other heavy execution held; original evidence intact.
+S2SETUP COMPLETE: each stage raw0; npm/prisma CLI/stamp/lock pins verified, d5cd clean, outside-root inventory unchanged. Frozen9c11436327/27, no survivors/lock FREE01:04:17UTC; no server/DB/controls. Slot released. S4 Stage1 is next sole runtime slot after publication/activation. Setup-exclusion A/B separately frozen; parent chooses no live/unknown recovery transfer, minimal setup-change map only. Two CPUs/about8GB,about9GB after setup; prior dependencies not inherited. Original evidence intact.
 
 Product heads: S156fb0d22, S2d5cd9b8b, S35c7b42b3, S491990ae9, S5143d451e, S6d51a1910. Full SHAs/trees in current state and source bundles. Nothing landed/deployed/enabled/customer-accepted by this continuation.
 
 ## Immediate next action
 
-Collect fresh S2A/B and V10B plus narrow S4/S5 successors. Grant next safe exact private proof on concrete material closure, do not invent another revision. Advance existing setup/real composition after controls; S4 remains independent and S6 waits only on its actual shared-launch/setup dependencies.
+Activate exact S4 Stage1 single-run grant after publication, preserving attributable raw exit and terminal/lease accounting. Collect independent S2V58 delta reviews while S5 finishes its legitimate changed successor and minimal setup map; V10B remains blocked, not awaited as a route to automatic approval. S2 real composition follows controls and accurate separate bound disposition; S6 waits only on shared-launch/setup dependencies.
 
 Containment/governed delivery → stagedG2 → C1/server lifecycle/forward2.x → native writers/relationships/reconciliation → real integrated two-platform proof → measured pilot → importer acceptance → retainedV1.
 

@@ -1,0 +1,212 @@
+--- a/controls-proposed/run-controls-v57.sh
++++ b/controls-proposed/run-controls-v58.sh
+@@ -1,4 +1,21 @@
+ #!/usr/bin/env bash
++# PROPOSED, NOT EXECUTED (S2-V58, 2026-09-23). Successor of execution/op88/s2-v57/controls-proposed/run-controls-v57.sh
++# (698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f, immutable) — v58 delta bound ONLY to frozen audit S2-V57-A (A01..A05, FINDINGS_MAP_V58.md):
++#   A01(V57)  the watchdog and the finish alarm capture THEIR OWN shell pid (BASHPID read in that shell) BEFORE any command substitution and pass it to
++#             wd_parent_ok <self>; v57 expanded $BASHPID inside $(ps …), i.e. a nested subshell whose parent is never the driver → every guard failed closed.
++#   A02(V57)  N1's decoy is booked with the generation-bearing p<pid>:<starttime> record through the controller mechanism (ctrl_arm/ctrl_book) and is ALSO
++#             owned work (the N1 `owned_cleanup` still ends exactly it); v57 wrote a bare numeric record that rec_alive could never expand.
++#   A03(V57)  the UNCHANGED v5.3.1 predecessor opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock (predecessor L52/L164): that path is now an
++#             enumerated write (set new1 only, CONTROL_REQUEST_14), asserted from the predecessor stamp, and probed at handoff (HELD → 4).
++#   A04(V57)  log-imported pids are promoted to signal authority ONLY with producer-published start identity (`spawned|escapee pid=<n> start=<ticks>`, emitted by
++#             the stub that owned the child at spawn) that still equals the live /proc starttime; numbers without provenance (QUARANTINE survivors, legacy lines)
++#             are reported in HIST (skip-unprovable) and never recorded. Live/post-T0/shape filters retained as additional rejections only.
++#   A05(V57)  controller acquisition is interruption-safe: ctrl_arm latches BEFORE the spawn, ctrl_book books immediately after `&` (before any readiness wait/ack),
++#             resolve_pending_controller in finish() lists a spawned-but-unbooked controller child so controller_cleanup ends it (N1/N4 decoys, N5b seam controller,
++#             N6 holder session, C1 sleeper). N4's decoy stays OUT of owned work (its owned_cleanup survival assertions are unchanged).
++#   Lanes: driver/stubs/K1/results live in execution/e8d546f9/s2-v58 ($R58). The runner is BYTE-IDENTICAL to v5.7 (efa273c7…) and keeps its own pinned lane
++#          execution/op88/s2-v57 (runner L97) for stub-mode outputs (runner-selftest-r57/) and its private lock (runtime/) → $RLANE below; no runner edit.
++# ---- v57 header retained below for provenance ----
+ # PROPOSED, NOT EXECUTED (OP88-S2-V57, 2026-09-22). Successor of execution/op88/s2-v56/controls-proposed/run-controls-v56.sh
+ # (10c48b69f63cbc6795a6818aef5ce0aa5e7ac76a82f24af9d6dfce2ca1997de5, immutable) — v57 delta bound to the frozen V5.6 audits (FINDINGS_MAP_V57.md):
+ #   A01/D-01/D-02  K1 bound to THIS lane's byte-identical k1 copy ($R57); `trap on_exit EXIT` routes any abnormal termination (e.g. nounset) into bounded owner
+@@ -48,15 +65,18 @@
+ # v5.3.1 bytes read-only to reproduce the finding; their outputs land under s2-setup-prep/runner-selftest-r531/ (additive; the 37 frozen files
+ # are untouched). One invocation = one set. CTL_BUDGET default 60.
+ set -u
+-R57=/home/user/workspace/execution/op88/s2-v57; RUNNER=$R57/run-composition-r57-v5.7-when-granted.sh; STUBS=$R57/controls-proposed/stubs
++R58=/home/user/workspace/execution/e8d546f9/s2-v58; RUNNER=$R58/run-composition-r57-v5.7-when-granted.sh; STUBS=$R58/controls-proposed/stubs
++RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R58
+ PRE_RUNNER=/home/user/workspace/execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh   # frozen v5.3.1 fb0d7ce4…, read-only (restored per upstream-prereqs-2)
+ SET=${CTL_SET:-k}; BUDGET=${CTL_BUDGET:-60}; RESERVE=8; INJECT_FAIL=${CTL_INJECT_FAIL:-0}
+-CTL=$R57/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
++CTL=$R58/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
+ CTRL=$CTL/controller-pids.txt; : > "$CTRL" || exit 2   # A06: controller resources (decoy/holder/seam controller/cancel sleeper) — separate registry with its own finally path
+ MY_PGID=$(ps -o pgid= -p $$ | tr -d ' '); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d ' '); ENCL=$CTL/.encl; mkdir -p "$ENCL" || exit 2
+ CURF=$ENCL/CURRENT; : > "$CURF" || exit 2   # E7: the single current validated enclosure authority (one pgid or empty); the ONLY watchdog target source
+-mkdir -p "$R57/runtime"; LANE_LOCK=$R57/runtime/test-validation.lock   # A07: lane-private lock in the enumerated runtime/ write set (same path the stub-mode runner uses)
++mkdir -p "$RLANE/runtime"; LANE_LOCK=$RLANE/runtime/test-validation.lock   # A07: lane-private lock in the enumerated runtime/ write set (same path the stub-mode runner uses: runner L115 under ITS lane)
++PRE_LOCK=$STUBS/test-validation.lock   # A03(V57): the UNCHANGED v5.3.1 predecessor (L52) opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock — enumerated write (new1 only), asserted per run, probed at handoff
+ T0=$(date +%s.%N); T0_EPOCH=${T0%.*}; STRIKE=0; RUN=0; PLANNED=0; WATCHDOG=; WD_CENSUS=; DRIVER_PID=$$; CUR=none; FINISHED=0; PENDING_ENC=; ENC_PGID=; RC=; O=
++PENDING_CTRL=; PENDING_CTRL_KIND=p; PENDING_CTRL_OWNED=; PENDING_CTRL_PREV=   # A05(V57): controller-acquisition latch (armed before a controller spawn, released by ctrl_book, resolved in finish)
+ WD_TERM_AT=$((BUDGET-RESERVE)); WD_KILL_AT=$((BUDGET-RESERVE/2)); WD_CANCEL_AT=$((WD_KILL_AT+2))   # E7 escalation schedule (s from T0); 2 s between KILL and driver cancellation lets a control that observed the KILL finish normally
+ ACK_TICKS=150   # E8: 3 s leader ack wait (×0.02 s); the driver's identity poll is ≤ 2 s
+ LEADER=': s2r57-enclosure-leader; echo $$ > "$1" || exit 70; i=0; while [ ! -e "$1.ack" ]; do i=$((i+1)); [ "$i" -gt "$2" ] && exit 70; sleep 0.02; done; shift 2; exec timeout --foreground -k "$@"'   # E8/A03: same contract as the runner; marker makes an unreaped leader scannable
+@@ -77,14 +97,18 @@
+   esac; :; }
+ record(){ # record <rec…> : CHECKED registry write (A03) — returns 1 if any write fails; HIST is a receipt, never a kill source
+   local p ok=0; for p in "$@"; do [ -n "$p" ] || continue; echo "$p" >> "$OWNED" || ok=1; echo "$(date -u +%T) $p" >> "$HIST" || ok=1; grep -qxF -- "$p" "$OWNED" || ok=1; done; return $ok; }
+-record_from_run(){ # record_from_run <outdir> : owned groups stamped by the runner; spawned/escapee/QUARANTINE pids ONLY if live, started after this driver, cmdline of the owned-work shape (A04: no historical pid authority)
+-  local O=$1 g p se; [ -d "$O" ] || return 0
++record_from_run(){ # record_from_run <outdir> : owned groups stamped by the runner; spawned/escapee pids ONLY with producer-published start identity (A04(V57): `pid=<n> start=<ticks>` written by the stub that owned the child at spawn) that still equals the live /proc starttime; then live/started-after-this-driver/owned-work-shape as additional rejections. QUARANTINE survivor numbers carry no acquisition identity → HIST only, never authority.
++  local O=$1 g p st ls se; [ -d "$O" ] || return 0
+   for g in $(grep -o 'owned_groups=\[[0-9 ]*\]' "$O/stamp.txt" 2>/dev/null | tr -dc '0-9 \n'); do record "g$g" || STRIKE=1; done
+-  for p in $( { grep -ohE '(spawned|escapee) pid=[0-9]+' "$O"/*.log 2>/dev/null; grep -oE 'survivor: +[0-9]+' "$O/QUARANTINE.txt" 2>/dev/null; } | grep -oE '[0-9]+$' | sort -u); do
++  for p in $(grep -ohE '(spawned|escapee) pid=[0-9]+( start=[0-9]+)?' "$O"/*.log 2>/dev/null | sed -E 's/^(spawned|escapee) pid=//; s/ start=/:/' | sort -u); do
++    st=${p#*:}; [ "$st" = "$p" ] && st=; p=${p%%:*}
++    [ -n "$st" ] || { echo "$(date -u +%T) skip-unprovable $p (log line carries no producer start identity; number never promoted)" >> "$HIST"; continue; }
+     kill -0 "$p" 2>/dev/null || { echo "$(date -u +%T) skip-dead $p" >> "$HIST"; continue; }
++    ls=$(pstart "$p"); [ "$ls" = "$st" ] || { echo "$(date -u +%T) skip-identity $p (live start ${ls:-none} != producer start $st: number reused by another process; never signalled)" >> "$HIST"; continue; }
+     se=$(pstart_epoch "$p") || continue; [ "$se" -ge "$T0_EPOCH" ] || { echo "$(date -u +%T) skip-predates-run $p" >> "$HIST"; continue; }
+     ps -o args= -p "$p" 2>/dev/null | grep -qE '^(sleep [0-9.]+|s2r53-stub-escapee( |$))' || { echo "$(date -u +%T) skip-shape $p" >> "$HIST"; continue; }
+-    record "$(pid_rec "$p")" || STRIKE=1; done
++    record "p$p:$st" || STRIKE=1; done
++  for p in $(grep -oE 'survivor: +[0-9]+' "$O/QUARANTINE.txt" 2>/dev/null | grep -oE '[0-9]+$' | sort -u); do echo "$(date -u +%T) skip-unprovable $p (QUARANTINE survivor: runner-reported number without acquisition identity; report only)" >> "$HIST"; done
+   # E1: NO adoption of a pgid read from a child log (v54 adopted the harness's inherited group here)
+ }
+ prune_groups(){ # E4/E7/A04: keep only records with live identity-validated members; clear CURRENT if its group is gone (history retained in $HIST)
+@@ -120,6 +144,16 @@
+   else say "  PENDING enclosure leader pid=$lastbg without published identity → bounded pid-only TERM/KILL"; record "$(pid_rec "$lastbg")" || true; bounded_pid_halt "$lastbg" 3 || say "  pending leader pid=$lastbg STILL ALIVE after KILL → owned survivor"; fi
+ }
+ ctrl_record(){ record "$@"; echo "$*" >> "$CTRL" || STRIKE=1; }   # A06: controller resources are BOTH owned (cleanup) and separately listed (finally census)
++ctrl_arm(){ PENDING_CTRL_PREV=${!-}; PENDING_CTRL_KIND=${2:-p}; PENDING_CTRL_OWNED=${3:-}; PENDING_CTRL=$1; }   # A05(V57): ctrl_arm <name> [p|g] [owned] — latch armed BEFORE the controller spawn (name set LAST, after the pre-spawn $! is captured, so a trap inside ctrl_arm never resolves an older child); p = p<pid>:<start> record, g = g<pid> session record; 'owned' also registers as owned work
++ctrl_book(){ # ctrl_book <pid> : CHECKED booking of the latched controller child into CTRL (+OWNED when armed 'owned'), immediately after `&` and before any readiness wait; releases the latch; 1 (+STRIKE) if the identity is already gone or the write failed
++  local rec= ok=1; case $PENDING_CTRL_KIND in g) rec=g$1;; *) rec=$(pid_rec "$1");; esac
++  if [ -n "$rec" ]; then [ "$PENDING_CTRL_OWNED" = owned ] && { record "$rec" || STRIKE=1; }; echo "$rec" >> "$CTRL" 2>/dev/null; grep -qxF -- "$rec" "$CTRL" && ok=0; fi
++  PENDING_CTRL=; [ "$ok" = 0 ] || STRIKE=1; return $ok; }
++resolve_pending_controller(){ # A05(V57): cancellation/finally path — a controller child spawned (new $!) but not yet booked is listed so controller_cleanup ends it; never waited on
++  [ -n "$PENDING_CTRL" ] || return 0; local name=$PENDING_CTRL lastbg=${!-} rec=; PENDING_CTRL=
++  [ -n "$lastbg" ] && [ "$lastbg" != "$PENDING_CTRL_PREV" ] || return 0   # no new background child since arming → nothing was spawned
++  case $PENDING_CTRL_KIND in g) [ -n "$(rec_alive "g$lastbg")" ] && rec=g$lastbg;; *) rec=$(pid_rec "$lastbg");; esac
++  [ -n "$rec" ] || return 0; echo "$rec" >> "$CTRL" || true; say "  PENDING controller $name pid=$lastbg (spawned, not yet booked) → listed for controller cleanup"; }
+ controller_cleanup(){ # A06: finally path for controller resources (decoy, lock holder, seam controller, cancel sleeper): TERM → bounded → KILL; census reported
+   local x pids= p; while read -r x; do [ -n "$x" ] && pids="$pids $(rec_alive "$x" | tr '\n' ' ')"; done < "$CTRL"; pids=$(echo $pids)
+   if [ -n "$pids" ]; then say "  controller cleanup: TERM [$pids]"; kill -TERM $pids 2>/dev/null; sleep 0.5; pids=; while read -r x; do [ -n "$x" ] && pids="$pids $(rec_alive "$x" | tr '\n' ' ')"; done < "$CTRL"; pids=$(echo $pids)
+@@ -153,19 +187,20 @@
+   echo "CONTROLS_RECEIPT: publication_status=$pub aggregate_exit=$code (classified after publication)"; PUB_CODE=$code; }
+ start_finish_alarm(){ # A05: total completion bound for the unenclosed finish tail — closed ownership (own trap kills its sleeper; parent identity re-checked before the KILL)
+   local pb; pb=$(left); [ "$pb" -lt 3 ] && pb=3; pb=$((pb+2))
+-  ( trap 'kill $! 2>/dev/null; exit 0' TERM; sleep "$pb" & echo $! > "$ENCL/fin.sleeper"; wait $!
+-    [ "$(ps -o ppid= -p $BASHPID 2>/dev/null | tr -d ' ')" = "$DRIVER_PID" ] || exit 0
++  ( FA_SELF=$BASHPID; trap 'kill $! 2>/dev/null; exit 0' TERM; sleep "$pb" & echo $! > "$ENCL/fin.sleeper"; wait $!   # A01(V57): own pid captured in THIS shell, never inside a $(…)
++    wd_parent_ok "$FA_SELF" || exit 0
+     echo "FINISH ALARM: driver tail exceeded ${pb}s after finish start → KILL driver pid=$DRIVER_PID (publication incomplete by construction; never exit 0)" | tee -a "$R"; kill -KILL "$DRIVER_PID" 2>/dev/null ) & FIN_ALARM=$!; }
+ stop_finish_alarm(){ [ -n "${FIN_ALARM:-}" ] || return 0; local s; kill -TERM "$FIN_ALARM" 2>/dev/null; wait "$FIN_ALARM" 2>/dev/null; s=$(tr -dc '0-9' < "$ENCL/fin.sleeper" 2>/dev/null); [ -n "$s" ] && kill -TERM "$s" 2>/dev/null; sleep 0.1
+   FIN_CENSUS=; kill -0 "$FIN_ALARM" 2>/dev/null && FIN_CENSUS="$FIN_CENSUS $FIN_ALARM"; [ -n "$s" ] && kill -0 "$s" 2>/dev/null && FIN_CENSUS="$FIN_CENSUS $s"; echo "  finish alarm stopped: shell=$FIN_ALARM sleeper=${s:-none} census_after=[${FIN_CENSUS:-empty}]"; FIN_ALARM=; }
+ finish(){ # finish <code> — E3/E7/E10/A05/A06: assertions passing is not a handoff; survivors / non-free lane lock / new pattern matches / watchdog or controller residue force 4
+   local code=$1; trap ':' TERM; FINISHED=1   # no-op handler (not SIG_IGN): a late TERM cannot abort cleanup; children keep default TERM so bounds stay TERM-then-KILL
+-  resolve_pending_enclosure; owned_cleanup; controller_cleanup; stop_watchdog; start_finish_alarm
++  resolve_pending_enclosure; resolve_pending_controller; owned_cleanup; controller_cleanup; stop_watchdog; start_finish_alarm
+   [ "$code" = 0 ] && { [ "$RUN" -lt "$PLANNED" ] || [ "$STRIKE" = 1 ]; } && code=1
+-  local surv newpat lockst; surv=$(owned_live | tr '\n' ' '); newpat=$(detect | grep -vxF -f "$CTL/pre-snapshot.txt" | tr '\n' ' '); lockst=$(flock -n "$LANE_LOCK" true && echo FREE || echo HELD)
+-  if [ -n "$surv" ] || [ -n "$newpat" ] || [ "$lockst" != FREE ] || [ -n "$WD_CENSUS" ] || [ -n "${CTRL_CENSUS:-}" ]; then say "HANDOFF FAILURE: owned survivors [$surv] new pattern matches [$newpat] lane lock $lockst watchdog census [${WD_CENSUS:-empty}] controller census [${CTRL_CENSUS:-empty}] → aggregate 4 (no further set may start)"; code=4; fi
++  local surv newpat lockst prelockst; surv=$(owned_live | tr '\n' ' '); newpat=$(detect | grep -vxF -f "$CTL/pre-snapshot.txt" | tr '\n' ' '); lockst=$(flock -n "$LANE_LOCK" true && echo FREE || echo HELD)
++  prelockst=$(if [ -e "$PRE_LOCK" ]; then flock -n "$PRE_LOCK" true && echo FREE || echo HELD; else echo absent; fi)   # A03(V57): the predecessor's private lock is part of the handoff (probe only an existing file — never created here)
++  if [ -n "$surv" ] || [ -n "$newpat" ] || [ "$lockst" != FREE ] || [ "$prelockst" = HELD ] || [ -n "$WD_CENSUS" ] || [ -n "${CTRL_CENSUS:-}" ]; then say "HANDOFF FAILURE: owned survivors [$surv] new pattern matches [$newpat] lane lock $lockst predecessor lock $prelockst watchdog census [${WD_CENSUS:-empty}] controller census [${CTRL_CENSUS:-empty}] → aggregate 4 (no further set may start)"; code=4; fi
+   [ "$(left)" -lt 0 ] && { say "AGGREGATE DEADLINE EXCEEDED before publication ($(now)s > ${BUDGET}s)"; [ "$code" = 0 ] && code=3; }
+-  say "SET=$SET controls_run=$RUN/$PLANNED strike=$STRIKE wall=$(now)s of ${BUDGET}s (reserve ${RESERVE}s) aggregate_exit=$code (pre-publication); lane lock: $lockst; current_authority_file=[$(tr -dc '0-9' < "$CURF" 2>/dev/null)] (must be empty); canonical lock file: $([ -e /home/user/workspace/execution/test-validation.lock ] && echo exists || echo absent) (never opened)"
++  say "SET=$SET controls_run=$RUN/$PLANNED strike=$STRIKE wall=$(now)s of ${BUDGET}s (reserve ${RESERVE}s) aggregate_exit=$code (pre-publication); lane lock: $lockst; predecessor lock: $prelockst; current_authority_file=[$(tr -dc '0-9' < "$CURF" 2>/dev/null)] (must be empty); canonical lock file: $([ -e /home/user/workspace/execution/test-validation.lock ] && echo exists || echo absent) (never opened)"
+   publish_results "$code"; code=$PUB_CODE
+   [ "$(left)" -lt 0 ] && [ "$code" = 0 ] && { echo "AGGREGATE DEADLINE EXCEEDED after publication ($(now)s > ${BUDGET}s) → 3"; code=3; }   # A05: post-publication elapsed check
+   stop_finish_alarm; [ -n "${FIN_CENSUS:-}" ] && { echo "finish alarm residue [$FIN_CENSUS] → 4"; code=4; }
+@@ -195,11 +230,12 @@
+     grep -q 'SHA256SUMS' "$O/SHA256SUMS" 2>/dev/null && { say "  FAIL: $CUR inner manifest inventories a manifest/temporary (A02)"; STRIKE=1; } || say "  PASS: $CUR inner manifest lists no manifest/temporary entry (A02)"
+   else   # E9: frozen v5.3.1 predecessor writes exit-codes.txt + inner SHA256SUMS only (predecessor L156–L157); never require RECEIPT.txt from it
+     expect "$O/exit-codes.txt" '^final=[0-9]+ first_exit=' "$CUR predecessor exit-codes present (v5.3.1 format)"
++    expect "$O/stamp.txt" "^lock acquired pid=[0-9]+ fd9=$PRE_LOCK " "$CUR predecessor private lock opened at the enumerated stubs path (A03(V57): predecessor L52/L164, write set of CONTROL_REQUEST_14)"
+     [ -s "$O/SHA256SUMS" ] && say "  PASS: $CUR predecessor inner manifest present (v5.3.1 format; NOT re-verified: v5.3.1 has the known post-hash stamp mutation, R54-A-03/R54B-03)" || { say "  FAIL: $CUR predecessor inner manifest missing"; STRIKE=1; }
+   fi; }
+-OUT57=$R57/runner-selftest-r57; OUT531=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531
++OUT57=$RLANE/runner-selftest-r57; OUT531=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531
+ 
+-say "S2-R57 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
++say "S2-V58 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
+ detect > "$CTL/pre-snapshot.txt"
+ say "pre-snapshot pattern matches (never signalled): [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")]"
+ [ -s "$CTL/pre-snapshot.txt" ] && abort "pre-existing pattern matches [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")] — not ours; refusing without cleanup"
+@@ -208,13 +244,13 @@
+ # pid published for the stop census); re-checks that its parent is still THIS driver before every signal (no signal to a reused pid after an abnormal exit).
+ # Escalation: TERM(current enclosure)@BUDGET-RESERVE → KILL(current enclosure)@BUDGET-RESERVE/2 → TERM(driver)@+1 s so finish() runs inside the reserve.
+ wd_target(){ local g; g=$(tr -dc '0-9' < "$CURF" 2>/dev/null); [ -n "$g" ] && [ "$g" != "$MY_PGID" ] && [ "$g" != "$PARENT_PGID" ] && [ -n "$(rec_alive "g$g")" ] && echo "$g"; }
+-wd_parent_ok(){ [ "$(ps -o ppid= -p $BASHPID 2>/dev/null | tr -d ' ')" = "$DRIVER_PID" ]; }
+-( trap 'kill $! 2>/dev/null; exit 0' TERM; trap - EXIT
+-  sleep "$WD_TERM_AT" & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok || exit 0
++wd_parent_ok(){ [ "$(ps -o ppid= -p "$1" 2>/dev/null | tr -d ' ')" = "$DRIVER_PID" ]; }   # A01(V57): wd_parent_ok <self> — <self> is the watchdog/alarm shell's OWN pid captured in that shell ($BASHPID inside the $(…) would name the substitution subshell, whose parent is never the driver)
++( WD_SELF=$BASHPID; trap 'kill $! 2>/dev/null; exit 0' TERM; trap - EXIT   # A01(V57): stable self identity captured first
++  sleep "$WD_TERM_AT" & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok "$WD_SELF" || exit 0
+   g=$(wd_target); echo "WATCHDOG fired at $(date -u +%FT%TZ) (t=${WD_TERM_AT}s) current_authority=${g:-none} → TERM group" | tee -a "$R"; [ -n "$g" ] && kill -TERM -- "-$g" 2>/dev/null
+-  sleep $(( WD_KILL_AT - WD_TERM_AT )) & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok || exit 0
++  sleep $(( WD_KILL_AT - WD_TERM_AT )) & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok "$WD_SELF" || exit 0
+   g=$(wd_target); if [ -n "$g" ]; then echo "WATCHDOG escalation at t=${WD_KILL_AT}s: current_authority=$g still live → KILL group" | tee -a "$R"; kill -KILL -- "-$g" 2>/dev/null; else echo "WATCHDOG escalation at t=${WD_KILL_AT}s: no live current authority → nothing to KILL" | tee -a "$R"; fi
+-  sleep $(( WD_CANCEL_AT - WD_KILL_AT )) & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok || exit 0
++  sleep $(( WD_CANCEL_AT - WD_KILL_AT )) & echo $! > "$ENCL/wd.sleeper"; wait $!; wd_parent_ok "$WD_SELF" || exit 0
+   echo "WATCHDOG: cancelling the driver (TERM pid=$DRIVER_PID, parent identity re-checked) at t=${WD_CANCEL_AT}s — reserve kept for owned cleanup/publication" | tee -a "$R"; kill -TERM "$DRIVER_PID" 2>/dev/null ) & WATCHDOG=$!
+ case $SET in k) PLANNED=6;; new1) PLANNED=5;; new2) PLANNED=1;; neg) PLANNED=3;; neg2) PLANNED=6;; probe) PLANNED=1;; wdtest) PLANNED=1;; wdcancel) PLANNED=1;; *) abort "unknown CTL_SET=$SET";; esac
+ [ "$INJECT_FAIL" = 1 ] && say "NEGATIVE MODE: an impossible expectation is injected after the first control (expected aggregate exit 1)"
+@@ -222,7 +258,7 @@
+ if [ "$SET" = k ]; then
+   # ---------- K1 predecessor MECHANISM counterexample (v5.1 shape; unchanged from s2-runner53)
+   need K1-predecessor-mechanism 8; K1=$CTL/k1; mkdir -p "$K1"
+-  enclose k1 2 5 bash "$R57/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
++  enclose k1 2 5 bash "$R58/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
+   say "  K1 outer exit=$rc; stamp:"; sed 's/^/    /' "$K1/stamp.txt" | tee -a "$R"; surv=$(owned_live | tr '\n' ' ')
+   say "  K1 recorded-owned processes alive after runner exit: [$surv]"
+   [ "$rc" = 124 ] && say "  PASS: outer timeout fired (124)" || { say "  FAIL: outer exit $rc"; STRIKE=1; }
+@@ -334,7 +370,7 @@
+ elif [ "$SET" = neg ]; then
+   # ---------- N1: pre-existing decoy must survive the child driver's refusal (A03)
+   need N1-decoy-survives-refusal 18
+-  bash -c 'exec -a s2r53-stub-escapee sleep 25' </dev/null >/dev/null 2>&1 & DECOY=$!; record "$DECOY"; sleep 0.3
++  ctrl_arm n1-decoy p owned; bash -c 'exec -a s2r53-stub-escapee sleep 25' </dev/null >/dev/null 2>&1 & DECOY=$!; ctrl_book "$DECOY" || say "  FAIL: decoy pid=$DECOY could not be booked (identity gone or registry write failed)"; sleep 0.3   # A02/A05(V57): p<pid>:<start> record, owned AND controller-listed, latched across the spawn
+   say "  decoy pid=$DECOY launched by THIS driver (recorded owned); invoking child driver CTL_SET=k which must refuse"
+   enclose n1 "$(clip 12)" 5 env CTL_SET=k CTL_BUDGET=20 bash "$0" >"$CTL/n1.child.log" 2>&1; rc=$RC; say "  N1 child driver exit=$rc (expected 2)"; grep -h 'ABORT' "$CTL/n1.child.log" | head -1 | sed 's/^/    /' | tee -a "$R"
+   [ "$rc" = 2 ] && say "  PASS: refusal exit 2" || { say "  FAIL: exit $rc"; STRIKE=1; }
+@@ -382,7 +418,7 @@
+   # ---------- C1: total cancellation self-test (N8's inner target). The driver itself blocks (owned controller sleeper, `wait` builtin so the trap can run)
+   # until the watchdog's third stage TERMs the DRIVER; on_cancel → finish 3 must run pending/owned/controller cleanup, stop the watchdog and publish inside the reserve.
+   need C1-driver-cancellation $((BUDGET-RESERVE-3)); CUR=c1
+-  sleep "$BUDGET" </dev/null >/dev/null 2>&1 & ctrl_record "$(pid_rec $!)"; say "  C1 blocking on controller sleeper pid=$! until the watchdog cancels this driver at t=${WD_CANCEL_AT}s"
++  ctrl_arm c1-sleeper p owned; sleep "$BUDGET" </dev/null >/dev/null 2>&1 & ctrl_book $! || say "  FAIL: C1 sleeper could not be booked"; say "  C1 blocking on controller sleeper pid=$! until the watchdog cancels this driver at t=${WD_CANCEL_AT}s"   # A05(V57): latched acquisition
+   wait $!; say "  FAIL: C1 wait returned without cancellation (rc=$?)"; STRIKE=1
+   owned_cleanup
+ 
+@@ -391,8 +427,9 @@
+   # and an exceptional (K3-like TERM into step 40) runner cleanup, the driver's owned cleanup, and the active-vs-retired checks. It IS a controller resource (A06):
+   # its state is acknowledged before use and controller_cleanup ends it on every exit path.
+   need N4-caller-group-decoy 34
+-  bash -c 'exec -a s2r56-caller-decoy sleep 60' </dev/null >/dev/null 2>&1 & DECOY=$!; sleep 0.2; dpg=$(ps -o pgid= -p "$DECOY" 2>/dev/null | tr -d ' ')
+-  if alive "$DECOY" && [ "$dpg" = "$MY_PGID" ]; then echo "$(pid_rec "$DECOY")" >> "$CTRL" || STRIKE=1; say "  decoy ACKNOWLEDGED: pid=$DECOY alive in the driver's own group $dpg (controller-listed, NOT owned-work, outside every pattern)"
++  ctrl_arm n4-decoy p; bash -c 'exec -a s2r56-caller-decoy sleep 60' </dev/null >/dev/null 2>&1 & DECOY=$!; ctrl_book "$DECOY" || say "  FAIL: decoy pid=$DECOY could not be booked as a controller resource"   # A05(V57): controller-listed BEFORE the 0.2 s acknowledgement wait (never owned work)
++  sleep 0.2; dpg=$(ps -o pgid= -p "$DECOY" 2>/dev/null | tr -d ' ')
++  if alive "$DECOY" && [ "$dpg" = "$MY_PGID" ]; then say "  decoy ACKNOWLEDGED: pid=$DECOY alive in the driver's own group $dpg (controller-listed, NOT owned-work, outside every pattern)"
+   else say "  FAIL: decoy not in the expected state (alive=$(alive "$DECOY" && echo yes || echo no) group=$dpg driver=$MY_PGID) → N4 not exercised"; STRIKE=1; fi
+   CUR=n4a; run_runner "$RUNNER" "$OUT57" 15 S2_RUNNER_STUBS=$STUBS
+   expect "$O/exit-codes.txt" '^final=0 first_exit=0 cleanup_exit=0 signal=none reap=ok' "N4a normal path final=0"
+@@ -420,12 +457,12 @@
+   # ---------- N5b: deterministic INTERRUPTION between publication and adoption (stub seam STUB_HOLD_ACK=40-composition). A controller-listed seam
+   # controller waits for the runner's SEAM stamp; ONLY if the seam was seen does it TERM the runner pid, and only after validating that the pid belongs to
+   # the CURRENT enclosure authority (D-04). A timed-out wait sends nothing and is reported → STRIKE (A06: refuse timed-out synchronization).
+-  need N5b-startup-interruption 16; CUR=n5b; before=$(ls -1d "$OUT57"/*/ 2>/dev/null)
++  need N5b-startup-interruption 16; CUR=n5b; before=$(ls -1d "$OUT57"/*/ 2>/dev/null); ctrl_arm n5b-seam-controller p owned   # A05(V57): latched acquisition
+   ( for ((i=0;i<100;i++)); do d=$(comm -13 <(echo "$before") <(ls -1d "$OUT57"/*/ 2>/dev/null) | tail -1); [ -n "$d" ] && grep -q '^SEAM: 40-composition identity [0-9]* read; HOLDING' "$d/stamp.txt" 2>/dev/null && break; sleep 0.1; done
+     if [ "$i" -ge 100 ]; then echo "seam controller: SEAM NOT SEEN within 10 s → no signal sent (refused timed-out synchronization)"; exit 1; fi
+     p=$(sed -n 's/^lock acquired pid=\([0-9]*\) .*/\1/p' "$d/stamp.txt" 2>/dev/null | head -1); cur=$(tr -dc '0-9' < "$CURF" 2>/dev/null); ppg=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')
+     if [ -n "$p" ] && [ -n "$cur" ] && [ "$ppg" = "$cur" ]; then echo "seam controller: seam seen after $((i/10)).$((i%10))s in $d; runner pid=$p validated in CURRENT enclosure $cur → TERM"; kill -TERM "$p"; exit 0
+-    else echo "seam controller: runner pid=${p:-NONE} pgid=${ppg:-NONE} NOT in CURRENT enclosure ${cur:-NONE} → no signal sent"; exit 2; fi ) >"$CTL/n5b.seam-controller.log" 2>&1 & SEAMC=$!; ctrl_record "$(pid_rec "$SEAMC")"
++    else echo "seam controller: runner pid=${p:-NONE} pgid=${ppg:-NONE} NOT in CURRENT enclosure ${cur:-NONE} → no signal sent"; exit 2; fi ) >"$CTL/n5b.seam-controller.log" 2>&1 & SEAMC=$!; ctrl_book "$SEAMC" || say "  FAIL: seam controller pid=$SEAMC could not be booked"
+   run_runner "$RUNNER" "$OUT57" 12 STUB_HOLD_ACK=40-composition S2_RUNNER_STUBS=$STUBS; wait "$SEAMC" 2>/dev/null; src=$?; sed 's/^/    /' "$CTL/n5b.seam-controller.log" | tee -a "$R"
+   [ "$src" = 0 ] && say "  PASS: seam controller saw the seam and signalled a validated pid" || { say "  FAIL: seam controller rc=$src (no valid signal was sent; any interruption came from the outer bound)"; STRIKE=1; }
+   expect "$O/stamp.txt" '^SEAM: 40-composition identity [0-9]+ read; HOLDING before adoption/ack' "N5b seam engaged (published, not yet adopted)"
+@@ -438,8 +475,8 @@
+   # ---------- N6: intentional HANDOFF FAILURE — a controller-listed holder (own session) takes the lane-private lock and ACKNOWLEDGES readiness by writing
+   # its pid under the lock; the driver waits for that ack (bounded, refuses on timeout). A nested child driver (set probe) passes its only control; the child's
+   # final gate must return 4 with 'lane lock HELD', evidence preserved; the holder is then ended by its controller and the lock re-observed FREE.
+-  need N6-handoff-failure-lock-held 18; rm -f "$ENCL/n6.holder.ready"
+-  setsid flock "$LANE_LOCK" bash -c 'echo $$ > "$1"; exec sleep 40' _ "$ENCL/n6.holder.ready" </dev/null >/dev/null 2>&1 & HOLDER=$!; ctrl_record "g$HOLDER"   # the lock fd is inherited by the sleep: the whole holder SESSION is the controller resource
++  need N6-handoff-failure-lock-held 18; rm -f "$ENCL/n6.holder.ready"; ctrl_arm n6-holder g owned   # A05(V57): latched acquisition (session record)
++  setsid flock "$LANE_LOCK" bash -c 'echo $$ > "$1"; exec sleep 40' _ "$ENCL/n6.holder.ready" </dev/null >/dev/null 2>&1 & HOLDER=$!; ctrl_book "$HOLDER" || say "  FAIL: holder session $HOLDER could not be booked"   # the lock fd is inherited by the sleep: the whole holder SESSION is the controller resource
+   for ((i=0;i<30;i++)); do [ -s "$ENCL/n6.holder.ready" ] && break; sleep 0.1; done
+   if [ -s "$ENCL/n6.holder.ready" ] && ! flock -n "$LANE_LOCK" true 2>/dev/null; then say "  holder ACKNOWLEDGED: session pid=$HOLDER holds the lane lock (ready written under the lock by pid $(cat "$ENCL/n6.holder.ready"))"
+     enclose n6 "$(clip 12)" 5 env CTL_SET=probe CTL_BUDGET=20 bash "$0" >"$CTL/n6.child.log" 2>&1; rc=$RC; say "  N6 child driver exit=$rc (expected 4)"; grep -h 'HANDOFF FAILURE' "$CTL/n6.child.log" | head -1 | sed 's/^/    /' | tee -a "$R"

@@ -1,0 +1,42 @@
+# CONTROL_REQUEST_14 — stub-only controls for runner v5.7 (unchanged) / driver v58 (NOT executed; requires a grant)
+
+Scope: stub mode only (`S2_RUNNER_STUBS` set by the driver). No DB, network, install, product/client execution, canonical lock, commits. Supersedes CONTROL_REQUEST_12 for exactly the S2-V57-A findings A01..A05 (A03: predecessor private-lock path enumerated; A03 nonblocker note: predecessor-directory permission is needed by `new1` only, not `new2`). Standalone `wdcancel=3` remains the already documented caller exception (S2-V57-A verdict), not a defect.
+
+## Candidate bytes (must match before any run)
+```
+cd /home/user/workspace/execution/e8d546f9/s2-v58 && sha256sum -c --quiet SHA256SUMS.outer && echo LANE-OK
+```
+Driver `controls-proposed/run-controls-v58.sh`; runner `run-composition-r57-v5.7-when-granted.sh` is BYTE-IDENTICAL to V57 (efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c); stubs `harness.sh`/`fixture.sh` changed (A04 additive `start=` provenance), `guard-spec.sh`/`discriminator.sh`/`k1-predecessor-mechanism.sh` byte-identical to V57/V56. Hashes in SHA256SUMS.outer / REPORT.md.
+
+## Path arrangement (explicit; decided by the granting party, not by the builder)
+The runner is unchanged, so it keeps ITS pinned lane `execution/op88/s2-v57` (runner L97): in stub mode it writes `execution/op88/s2-v57/runtime/test-validation.lock` (L115) and `execution/op88/s2-v57/runner-selftest-r57/<utc>/`. The v58 driver reads/probes exactly those paths (`RLANE`, `LANE_LOCK`, `OUT57`) and keeps its own lane `execution/e8d546f9/s2-v58` for stubs, K1, and `controls-proposed/results/`. The restored V57 lane's 15 manifested files are NOT modified by this (additive directories only; `sha256sum -c` of its SHA256SUMS.outer stays valid). If the parent prefers a single lane instead, that is a one-line runner change (L97) producing a new runner hash and is NOT part of this candidate.
+
+## Environment prerequisites (verify; do not create silently)
+1. `worktrees/s2-runner53` at d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c, clean (`git status --porcelain` empty).
+2. `execution/s2-setup-prep/`: `sha256sum -c --quiet SHA256SUMS.outer && echo PRE-OK` (37 OK; predecessor v5.3.1 fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 at `execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh`).
+3. `execution/op88/s2-v57/`: `sha256sum -c --quiet SHA256SUMS.outer` (15 OK, manifest 72b9cfb5…) and the directory writable by the executor (runner-pinned lane, see above).
+4. ENV01: `execution/s2-setup-prep` is mode 0555 and `runner-selftest-r531/` is absent. Set `new1` ONLY (K7pre/K8pre run the frozen v5.3.1 predecessor) writes `execution/s2-setup-prep/runner-selftest-r531/<utc>/`. **At grant time** the granting party makes exactly that one directory writable (create `runner-selftest-r531/` owned by the executor, or `chmod u+w execution/s2-setup-prep` for the slot); nothing has been chmod'd by the builder. `new2` (K10) runs the successor runner only and needs NO predecessor-directory permission (corrects CONTROL_REQUEST_12 §3).
+5. Tools: bash ≥ 5, `timeout` with `-k`/`--foreground` (driver stamps `timeout_impl=`), util-linux `flock`/`setsid`, procps `pgrep`/`ps`, `/proc` readable, `getconf CLK_TCK`.
+6. No pre-existing pattern matches (driver aborts 2 otherwise).
+
+## Execution (sequential, raw status, STOP at first ≠ 0 — with the ONE documented exception)
+```
+D=/home/user/workspace/execution/e8d546f9/s2-v58/controls-proposed/run-controls-v58.sh
+declare -A B=([probe]=20 [wdtest]=20 [wdcancel]=20 [k]=60 [new1]=60 [new2]=60 [neg]=90 [neg2]=150)
+for s in probe wdtest wdcancel k new1 new2 neg neg2; do
+  CTL_SET=$s CTL_BUDGET=${B[$s]} bash "$D"; rc=$?; echo "$s=$rc"
+  if [ "$rc" -eq 0 ] || { [ "$s" = wdcancel ] && [ "$rc" -eq 3 ]; }; then continue; fi
+  echo "STOP at $s (aggregate $rc)"; break
+done
+```
+Raw exits are printed for every set; nothing is piped or `|| true`d. Actual set → workload map (from the driver's `need` lines): probe = P1 (1); wdtest = W1 watchdog TERM→KILL escalation self-test (1, ≈16 s); wdcancel = C1 driver cancellation self-test (1, ≈18 s; **standalone exit 3 is by design — the driver cancels itself and reports aggregate 3 — and is the only accepted nonzero; when nested by N8 the same 3 is asserted**); k = K1–K6 (6); new1 = K7pre, K8pre, K7, K8, K9 (5); new2 = K10 (1); neg = N1–N3 nested drivers (3); neg2 = N4, N5a, N5b, N6, N7, N8 (6).
+
+Expected: aggregate 0 for all sets except wdcancel (3). Codes: 1 assertion miss, 2 precondition, 3 budget/cancellation, 4 handoff failure (survivors, held lane or predecessor lock, watchdog/controller/finish-alarm residue).
+
+## Limits granted by this request
+- Signals: only to identity-validated recorded processes (self-published groups validated by session id; pids validated by start identity — log-imported numbers ONLY when the producing stub published `start=<ticks>` and the live process still has it), the driver's own controllers (N1/N4 decoys, N6 holder session, N5b seam controller, C1 sleeper — booked before any readiness wait, or listed by the pending-controller resolver on cancellation), the driver's own watchdog/finish-alarm shells and sleepers, and — by the watchdog — the driver itself.
+- Writes (complete): `execution/e8d546f9/s2-v58/controls-proposed/results/`; `execution/op88/s2-v57/runtime/` (runner/driver lane lock `test-validation.lock`); `execution/op88/s2-v57/runner-selftest-r57/`; and for `new1` ONLY: `execution/s2-setup-prep/runner-selftest-r531/` (see 4) and **`execution/e8d546f9/s2-v58/controls-proposed/stubs/test-validation.lock`** — the frozen v5.3.1 predecessor opens ITS private lock at `$S2_RUNNER_STUBS/test-validation.lock` (predecessor L52/L164; A03). The driver asserts that path from the predecessor stamp (`lock acquired pid=… fd9=<that path>`) and probes it FREE at handoff (HELD → 4; absent is fine). After `new1`, that lock file exists beside the four stub scripts; `SHA256SUMS.stubs`/`SHA256SUMS.outer` verification is unaffected (they list files, not directories). Nothing else. The canonical lock `execution/test-validation.lock` is never opened (driver reports exists/absent only).
+- Not granted: real fixture/DB, node/prisma/psql, installs, network, destroy, canonical lock, commits, product edits, edits to `execution/op88/s2-v57` manifested files or to `execution/s2-setup-prep` manifested files.
+
+## Return
+Per-set raw exits, all results directories frozen (each has SHA256SUMS + CONTROLS_RECEIPT.txt), LANE-OK/PRE-OK output, `timeout_impl` line, ENV01 action taken, the `owned-history.txt` files (A04 `skip-*` lines are expected evidence, not failures), any deviation. No product-clearance claim follows from these controls.
