@@ -1,0 +1,16 @@
+utc=2026-09-23T01:24:54Z S3: fingerprint contradiction analysis (read-only; NO config persisted, worktree untouched)
+diff(live 'git diff HEAD', frozen patch) — only the two 'index' lines differ (abbrev 7 vs 8 hex):
+  2c2
+  < index 77bb94b..ff5a38b 100644
+  ---
+  > index 77bb94b6..ff5a38b8 100644
+  43c43
+  < index c85eaca..85a636b 100755
+  ---
+  > index c85eaca0..85a636ba 100755
+content check: post-image blob ids from working files = ff5a38b8 / 85a636ba == patch index post-ids ff5a38b8 / 85a636ba
+pin reproduction: sha256(frozen patch bytes + status + '\n') = 6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0 == PIN_DIRTY_FINGERPRINT 6850b32e… → the pin is exactly this patch's bytes over this status; the tree content is exact
+live fingerprint (runner formula, this repo's default core.abbrev=auto → 7 hex for 3349 packed objects) = 16cc5e727a5490ccb8c37a192a517338546e85598b7ae32d6357e1081a9cfa88
+hypothesis test with NON-persisted -c core.abbrev=8: diff byte-identical to patch=yes; fingerprint=6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0
+persisted local config unchanged: core.abbrev=unset; local config keys=4
+utc_end=2026-09-23T01:24:55Z

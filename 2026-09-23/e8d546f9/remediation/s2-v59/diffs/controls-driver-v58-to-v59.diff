@@ -1,0 +1,84 @@
+--- a/controls-proposed/run-controls-v58.sh
++++ b/controls-proposed/run-controls-v59.sh
+@@ -1,4 +1,15 @@
+ #!/usr/bin/env bash
++# PROPOSED, NOT EXECUTED (S2-V59, 2026-09-23). Successor of execution/e8d546f9/s2-v58/controls-proposed/run-controls-v58.sh
++# (1e2e32eb15a7d045dd0f398d96997a65eea09a21575be74387dad5cc9cd277ef, immutable) — v59 delta bound ONLY to frozen audit S2-V58-A01 (FINDINGS_MAP_V59.md):
++#   A01(V58)  a g-kind controller child (N6 holder: `setsid flock … &`) is a plain direct child of this driver until it executes setsid; v58's g-kind
++#             booking/resolution knew it ONLY as g<pid> (a session that does not exist yet), so a cancellation before the setsid transition discarded the
++#             live child, which could then create its session and take the lane lock after the census. v59 keeps the direct child's identity-bound
++#             authority from the fork on: g-kind controllers are recorded as BOTH p<pid>:<starttime> (pid-only authority — bounded TERM/KILL of that
++#             exact process while no owned session exists) AND g<pid> (validated session-member cleanup once the session exists). controller_cleanup's
++#             existing TERM → re-evaluate → KILL → census covers the transition window (a session formed after the pid TERM is found by the g record
++#             at re-evaluation). The caller's group is never a target (p = one pid; g = members with sid == pid only). No other change.
++#   Lanes: driver/stubs/K1/results in execution/e8d546f9/s2-v59 ($R59); runner BYTE-IDENTICAL to v5.7 (efa273c7…), pinned lane execution/op88/s2-v57 ($RLANE, parent-accepted).
++# ---- v58 header retained below for provenance ----
+ # PROPOSED, NOT EXECUTED (S2-V58, 2026-09-23). Successor of execution/op88/s2-v57/controls-proposed/run-controls-v57.sh
+ # (698bbb175c768707aef41b52b1b98ba2450791771ac63a34af4bb8d9654c637f, immutable) — v58 delta bound ONLY to frozen audit S2-V57-A (A01..A05, FINDINGS_MAP_V58.md):
+ #   A01(V57)  the watchdog and the finish alarm capture THEIR OWN shell pid (BASHPID read in that shell) BEFORE any command substitution and pass it to
+@@ -65,16 +76,16 @@
+ # v5.3.1 bytes read-only to reproduce the finding; their outputs land under s2-setup-prep/runner-selftest-r531/ (additive; the 37 frozen files
+ # are untouched). One invocation = one set. CTL_BUDGET default 60.
+ set -u
+-R58=/home/user/workspace/execution/e8d546f9/s2-v58; RUNNER=$R58/run-composition-r57-v5.7-when-granted.sh; STUBS=$R58/controls-proposed/stubs
+-RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R58
++R59=/home/user/workspace/execution/e8d546f9/s2-v59; RUNNER=$R59/run-composition-r57-v5.7-when-granted.sh; STUBS=$R59/controls-proposed/stubs
++RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R59 (parent-accepted dual-lane arrangement)
+ PRE_RUNNER=/home/user/workspace/execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh   # frozen v5.3.1 fb0d7ce4…, read-only (restored per upstream-prereqs-2)
+ SET=${CTL_SET:-k}; BUDGET=${CTL_BUDGET:-60}; RESERVE=8; INJECT_FAIL=${CTL_INJECT_FAIL:-0}
+-CTL=$R58/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
++CTL=$R59/controls-proposed/results/$SET-$(date -u +%Y%m%dT%H%M%SZ)-$$; mkdir -p "$CTL" || exit 2; R=$CTL/CONTROLS_RESULT.txt; OWNED=$CTL/owned-pids.txt; : > "$OWNED" || exit 2; HIST=$CTL/owned-history.txt; : > "$HIST" || exit 2
+ CTRL=$CTL/controller-pids.txt; : > "$CTRL" || exit 2   # A06: controller resources (decoy/holder/seam controller/cancel sleeper) — separate registry with its own finally path
+ MY_PGID=$(ps -o pgid= -p $$ | tr -d ' '); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d ' '); ENCL=$CTL/.encl; mkdir -p "$ENCL" || exit 2
+ CURF=$ENCL/CURRENT; : > "$CURF" || exit 2   # E7: the single current validated enclosure authority (one pgid or empty); the ONLY watchdog target source
+ mkdir -p "$RLANE/runtime"; LANE_LOCK=$RLANE/runtime/test-validation.lock   # A07: lane-private lock in the enumerated runtime/ write set (same path the stub-mode runner uses: runner L115 under ITS lane)
+-PRE_LOCK=$STUBS/test-validation.lock   # A03(V57): the UNCHANGED v5.3.1 predecessor (L52) opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock — enumerated write (new1 only), asserted per run, probed at handoff
++PRE_LOCK=$STUBS/test-validation.lock   # A03(V57): the UNCHANGED v5.3.1 predecessor (L52) opens ITS private lock at $S2_RUNNER_STUBS/test-validation.lock — enumerated write (new1 only, CONTROL_REQUEST_16), asserted per run, probed at handoff
+ T0=$(date +%s.%N); T0_EPOCH=${T0%.*}; STRIKE=0; RUN=0; PLANNED=0; WATCHDOG=; WD_CENSUS=; DRIVER_PID=$$; CUR=none; FINISHED=0; PENDING_ENC=; ENC_PGID=; RC=; O=
+ PENDING_CTRL=; PENDING_CTRL_KIND=p; PENDING_CTRL_OWNED=; PENDING_CTRL_PREV=   # A05(V57): controller-acquisition latch (armed before a controller spawn, released by ctrl_book, resolved in finish)
+ WD_TERM_AT=$((BUDGET-RESERVE)); WD_KILL_AT=$((BUDGET-RESERVE/2)); WD_CANCEL_AT=$((WD_KILL_AT+2))   # E7 escalation schedule (s from T0); 2 s between KILL and driver cancellation lets a control that observed the KILL finish normally
+@@ -144,16 +155,18 @@
+   else say "  PENDING enclosure leader pid=$lastbg without published identity → bounded pid-only TERM/KILL"; record "$(pid_rec "$lastbg")" || true; bounded_pid_halt "$lastbg" 3 || say "  pending leader pid=$lastbg STILL ALIVE after KILL → owned survivor"; fi
+ }
+ ctrl_record(){ record "$@"; echo "$*" >> "$CTRL" || STRIKE=1; }   # A06: controller resources are BOTH owned (cleanup) and separately listed (finally census)
+-ctrl_arm(){ PENDING_CTRL_PREV=${!-}; PENDING_CTRL_KIND=${2:-p}; PENDING_CTRL_OWNED=${3:-}; PENDING_CTRL=$1; }   # A05(V57): ctrl_arm <name> [p|g] [owned] — latch armed BEFORE the controller spawn (name set LAST, after the pre-spawn $! is captured, so a trap inside ctrl_arm never resolves an older child); p = p<pid>:<start> record, g = g<pid> session record; 'owned' also registers as owned work
+-ctrl_book(){ # ctrl_book <pid> : CHECKED booking of the latched controller child into CTRL (+OWNED when armed 'owned'), immediately after `&` and before any readiness wait; releases the latch; 1 (+STRIKE) if the identity is already gone or the write failed
+-  local rec= ok=1; case $PENDING_CTRL_KIND in g) rec=g$1;; *) rec=$(pid_rec "$1");; esac
+-  if [ -n "$rec" ]; then [ "$PENDING_CTRL_OWNED" = owned ] && { record "$rec" || STRIKE=1; }; echo "$rec" >> "$CTRL" 2>/dev/null; grep -qxF -- "$rec" "$CTRL" && ok=0; fi
++ctrl_arm(){ PENDING_CTRL_PREV=${!-}; PENDING_CTRL_KIND=${2:-p}; PENDING_CTRL_OWNED=${3:-}; PENDING_CTRL=$1; }   # A05(V57): ctrl_arm <name> [p|g] [owned] — latch armed BEFORE the controller spawn (name set LAST, after the pre-spawn $! is captured, so a trap inside ctrl_arm never resolves an older child); p = p<pid>:<start> record, g = p<pid>:<start> AND g<pid> (A01(V58): direct-child identity plus session record); 'owned' also registers as owned work
++ctrl_recs(){ # ctrl_recs <pid> : the controller record(s) for a live child of the armed kind — p: p<pid>:<start>; g (A01(V58)): p<pid>:<start> (direct-child identity from the fork on, pid-only authority before the child's setsid) AND g<pid> (validated session members once established); empty if the child is already gone
++  local prec; prec=$(pid_rec "$1"); [ -n "$prec" ] || return 0; echo "$prec"; [ "$PENDING_CTRL_KIND" = g ] && echo "g$1"; :; }
++ctrl_book(){ # ctrl_book <pid> : CHECKED booking of the latched controller child into CTRL (+OWNED when armed 'owned'), immediately after `&` and before any readiness wait; releases the latch; 1 (+STRIKE) if the identity is already gone or a write failed
++  local rec ok=1 recs; recs=$(ctrl_recs "$1")
++  if [ -n "$recs" ]; then ok=0; for rec in $recs; do [ "$PENDING_CTRL_OWNED" = owned ] && { record "$rec" || STRIKE=1; }; echo "$rec" >> "$CTRL" 2>/dev/null; grep -qxF -- "$rec" "$CTRL" || ok=1; done; fi
+   PENDING_CTRL=; [ "$ok" = 0 ] || STRIKE=1; return $ok; }
+-resolve_pending_controller(){ # A05(V57): cancellation/finally path — a controller child spawned (new $!) but not yet booked is listed so controller_cleanup ends it; never waited on
+-  [ -n "$PENDING_CTRL" ] || return 0; local name=$PENDING_CTRL lastbg=${!-} rec=; PENDING_CTRL=
++resolve_pending_controller(){ # A05(V57)/A01(V58): cancellation/finally path — a controller child spawned (new $!) but not yet booked is listed with its full record set so controller_cleanup ends it (pid-only while pre-session, group members once a session exists); never waited on, never the caller's group
++  [ -n "$PENDING_CTRL" ] || return 0; local name=$PENDING_CTRL lastbg=${!-} rec recs=; PENDING_CTRL=
+   [ -n "$lastbg" ] && [ "$lastbg" != "$PENDING_CTRL_PREV" ] || return 0   # no new background child since arming → nothing was spawned
+-  case $PENDING_CTRL_KIND in g) [ -n "$(rec_alive "g$lastbg")" ] && rec=g$lastbg;; *) rec=$(pid_rec "$lastbg");; esac
+-  [ -n "$rec" ] || return 0; echo "$rec" >> "$CTRL" || true; say "  PENDING controller $name pid=$lastbg (spawned, not yet booked) → listed for controller cleanup"; }
++  recs=$(ctrl_recs "$lastbg"); [ -n "$recs" ] || return 0
++  for rec in $recs; do echo "$rec" >> "$CTRL" || true; done; say "  PENDING controller $name pid=$lastbg (spawned, not yet booked) → listed for controller cleanup [$(echo $recs)]"; }
+ controller_cleanup(){ # A06: finally path for controller resources (decoy, lock holder, seam controller, cancel sleeper): TERM → bounded → KILL; census reported
+   local x pids= p; while read -r x; do [ -n "$x" ] && pids="$pids $(rec_alive "$x" | tr '\n' ' ')"; done < "$CTRL"; pids=$(echo $pids)
+   if [ -n "$pids" ]; then say "  controller cleanup: TERM [$pids]"; kill -TERM $pids 2>/dev/null; sleep 0.5; pids=; while read -r x; do [ -n "$x" ] && pids="$pids $(rec_alive "$x" | tr '\n' ' ')"; done < "$CTRL"; pids=$(echo $pids)
+@@ -235,7 +248,7 @@
+   fi; }
+ OUT57=$RLANE/runner-selftest-r57; OUT531=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531
+ 
+-say "S2-V58 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
++say "S2-V59 controls set=$SET start $(date -u +%FT%TZ) budget=${BUDGET}s results=$CTL pid=$$ pgid=$MY_PGID timeout_impl=$(timeout --version 2>/dev/null | head -1) runner_sha256=$(sha256sum "$RUNNER" | cut -c1-64) pre_runner_sha256=$(sha256sum "$PRE_RUNNER" | cut -c1-64) stubs=$(cd "$STUBS" && sha256sum *.sh | cut -c1-16 | tr '\n' ' ')"
+ detect > "$CTL/pre-snapshot.txt"
+ say "pre-snapshot pattern matches (never signalled): [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")]"
+ [ -s "$CTL/pre-snapshot.txt" ] && abort "pre-existing pattern matches [$(tr '\n' ' ' < "$CTL/pre-snapshot.txt")] — not ours; refusing without cleanup"
+@@ -258,7 +271,7 @@
+ if [ "$SET" = k ]; then
+   # ---------- K1 predecessor MECHANISM counterexample (v5.1 shape; unchanged from s2-runner53)
+   need K1-predecessor-mechanism 8; K1=$CTL/k1; mkdir -p "$K1"
+-  enclose k1 2 5 bash "$R58/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
++  enclose k1 2 5 bash "$R59/controls-proposed/k1-predecessor-mechanism.sh" "$K1" "$STUBS" >"$K1/driver.log" 2>&1; rc=$RC; record_from_run "$K1"; say "  K1 enclosure group=${ENC_PGID:-unconfirmed} (exclusive; predecessor internals unchanged)"
+   say "  K1 outer exit=$rc; stamp:"; sed 's/^/    /' "$K1/stamp.txt" | tee -a "$R"; surv=$(owned_live | tr '\n' ' ')
+   say "  K1 recorded-owned processes alive after runner exit: [$surv]"
+   [ "$rc" = 124 ] && say "  PASS: outer timeout fired (124)" || { say "  FAIL: outer exit $rc"; STRIKE=1; }
