@@ -1,0 +1,48 @@
+utc=2026-09-23T15:36:19Z step=P5 bounded path-pin read of frozen runner/driver bytes + environment prerequisite observation (no execution of any restored file)
+-- runner v5.7 (execution/op88/s2-v57/run-composition-r57-v5.7-when-granted.sh) pins:
+94:ROOT=/home/user/workspace
+95:WT=$ROOT/worktrees/s2-runner53
+96:LANE=$ROOT/execution/s2-setup-prep   # setup/fixture lane (grant05 install, fixture 9fcc3696); pin unchanged — must be restored before any execution
+97:R57=$ROOT/execution/op88/s2-v57       # this runner's lane (sole writer OP88-S2-V57); every identity/output path must resolve under it (F01)
+98:EXPECT_HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c   # FROZEN successor r3; no override
+99:EXPECT_LOCK_SHA=62b05b908c835dae51e54af1e553d91f763a070da21813c4419d66e018d61390
+101:EXPECT_FIXTURE_SHA=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881   # infra/s2-fixture-r53.sh (REIMPLEMENTATION from 08987e4c; request-03's 6062f4ce is unpreserved); refuse if absent/different
+-- v61 driver (execution/e8d546f9/s2-v61/controls-proposed/run-controls-v61.sh) lane pins:
+103:R61=/home/user/workspace/execution/e8d546f9/s2-v61; RUNNER=$R61/run-composition-r57-v5.7-when-granted.sh; STUBS=$R61/controls-proposed/stubs
+104:RLANE=/home/user/workspace/execution/op88/s2-v57   # the UNCHANGED v5.7 runner's pinned lane (runner L97): its stub-mode outputs (runner-selftest-r57/) and private lock (runtime/) resolve HERE, not under $R61 (parent-accepted dual-lane arrangement)
+105:PRE_RUNNER=/home/user/workspace/execution/s2-setup-prep/run-composition-r53-v5.3.1-when-granted.sh   # frozen v5.3.1 fb0d7ce4…, read-only (restored per upstream-prereqs-2)
+273:OUT57=$RLANE/runner-selftest-r57; OUT531=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531
+-- literal path occurrences (counts):
+  worktrees/s2-runner53: runner=2 driver61=0 pre531=2
+  execution/s2-setup-prep: runner=3 driver61=2 pre531=2
+  execution/op88/s2-v57: runner=2 driver61=6 pre531=0
+  execution/e8d546f9/s2-v61: runner=0 driver61=2 pre531=0
+  runner-selftest-r531: runner=1 driver61=2 pre531=2
+  runner-selftest-r57: runner=2 driver61=4 pre531=0
+  execution/test-validation.lock: runner=1 driver61=1 pre531=1
+-- environment prerequisites (CONTROL_REQUEST_20 §Environment prerequisites; observed, nothing created):
+1 worktree: HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c porcelain_lines=0
+2 PRE-OK: PRE-OK predecessor=fb0d7ce4803fa0d4
+3 V57: LANE-OK dir_writable_by_user=yes
+4 ENV01: setup-prep mode=555 runner-selftest-r531 mode=755 user empty=yes writable=yes
+   V61 lane: dir_writable=yes controls-proposed_writable=yes stubs_dir_writable=yes results=absent
+5 tools (version metadata only): bash=5.3.9(1)-release; timeout (uutils coreutils) 0.8.0; flock from util-linux 2.41.3; setsid from util-linux 2.41.3; pgrep from procps-ng 4.0.4; ps=ps from procps-ng 4.0.4; git=git version 2.53.0; CLK_TCK=100; /proc readable=yes; uid=2000 user=user
+   timeout -k/--foreground support: 2 option lines matched
+   node=v20.20.1 npm=10.8.2 psql=absent pg17=absent (NOT needed for stub-only V61; not installed)
+6 pattern census (read-only pgrep, own shell excluded): 0 matches
+   canonical lock execution/test-validation.lock=absent; V57 runtime lock=absent
+   missing for real-mode PROOF (not required for V61 stub controls, not installed): worktrees/s2-runner53/node_modules=absent; .s2-composition-install-stamp=absent; execution/s2-setup-prep/{infra/logs,runs}=absent/absent
+-- read-only input manifests unchanged (private archive):
+private HEAD=0c76dfb6ca4745f625f4cc82c8738d002080bb6d porcelain=
+ea926206e5a6fedc42b89c62bc1d27bb691d93969d90a7b32d87d2d058c6c7ee  2026-09-22/remediation/s2-setup-prep/proposal-1/SHA256SUMS.outer
+72b9cfb5048b52433b62d62d921bad02721e3775c51f45af7c92356ca0703061  2026-09-22/op88/remediation/s2-v57/SHA256SUMS.outer
+ed2413420bd1ae917649cff6924683c8279f45fb31505e46ff10051d513d7b7a  2026-09-23/e8d546f9/remediation/s2-v61/SHA256SUMS.outer
+b16955a10e74ffa4a62340fdc1b33e795e07776c4e6366f2a458a374596ca9c7  2026-09-23/e8d546f9/upstream/REPORT.md
+a53f95ef0462ac3fbd47e2cd17be80ddd99c42be0efea201ba6ac322e9d38655  2026-09-23/e8d546f9/upstream/MANIFEST.sha256
+6778050885156f9ae212ce0771cbf42b7726049eaad58955fa4c70ab217e46ea  execution/e8d546f9/S2_V61_CONTROL_GRANT.md
+373f3a2af745237f0992a295845f3f59894eb2d9d9149c1cb8cfca361eb28b85  execution/6c2a68ac/SCOPE.md
+3b6cee481319dd518268b7573ebed142fa234e193b874d8712a6cdf5493c0f75  2026-09-21/remediation/s2-composition/b2-failed-and-r3-source/s2-composition-r3-d5cd9b8b-from-public-c23b9d9.bundle
+prior upstream MANIFEST.sha256 OK
+-- baseline source/backend after all steps:
+HEAD=c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7 porcelain=0 refs=2 loose_objects=0
+utc_end=2026-09-23T15:36:20Z

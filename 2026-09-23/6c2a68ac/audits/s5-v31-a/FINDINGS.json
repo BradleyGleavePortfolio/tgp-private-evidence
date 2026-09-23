@@ -1,0 +1,95 @@
+{
+  "audit": "S5-V31-A",
+  "tier": "T4",
+  "reviewer_role": "independent nonbuilder A",
+  "date": "2026-09-23",
+  "method": {
+    "allowed": [
+      "read",
+      "hash",
+      "diff",
+      "byte comparison"
+    ],
+    "not_performed": [
+      "candidate execution",
+      "control execution",
+      "syntax execution",
+      "probe",
+      "test",
+      "lock operation",
+      "process operation",
+      "signal",
+      "installation",
+      "source edit",
+      "peer-current-audit read",
+      "private live summary read",
+      "TAKEOVER read"
+    ]
+  },
+  "exact_inputs": {
+    "authority_sha256": "edd63115537049e41ada062d35c74b4a1224f1bf784272ca45cf6c61398e173c",
+    "source_manifest_sha256": "fab2b49e6f990795d980f973d58edcdeb6fbff27dcfe2a77036265bf4b7738e9",
+    "source_manifest_entries_verified": "14/14",
+    "launcher_sha256": "d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630",
+    "runner_sha256": "81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a",
+    "primitive_sha256": "4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5",
+    "control_manifest_sha256": "7d4a150dd05f4af5847bf810f9f37ccc8f443454e8f35a684d3abfc52ecd6e26",
+    "control_manifest_entries_verified": "9/9",
+    "control_driver_sha256": "f34769c3d35d853c741a50eecad9da95581067ab59c00f0f6e1c793f187ac62e",
+    "control_fake_sha256": "4e7858a240e9b70409b82cf474ced52cb32437d9a2d7c80d56ee2161cc07704e",
+    "prior_v3_a_manifest_sha256": "d9104403fa899235f2f3ca8e7a32ac341155eae4297cd9901533b41e2fc4741c",
+    "prior_v3_b_manifest_sha256": "3bb45135f2ea906e4f09cc9c7d8e889bace398876f22513913444377e7056145",
+    "predecessor_source_manifest_sha256": "8b128b4dbef5f26ca11a26480bc07bdaf6bcc40c9c381c7da0c47e34109841c9",
+    "predecessor_control_manifest_sha256": "19529fa7ef7247dc72fa3a447c16ad3557b111d71c21b70ebae924d025976e73",
+    "source_diffs_recomputed_equal": true,
+    "control_diff_recomputed_equal": true,
+    "all_ten_check_statements_byte_identical": true,
+    "builder_syntax_claims_rerun_by_reviewer": false
+  },
+  "material_findings": [
+    {
+      "id": "S5-V31-A-01",
+      "severity": "Medium",
+      "material": true,
+      "boundary": "T4 canonical exclusion and evidence provenance",
+      "title": "START fallback is time/number correlation, not exact attempt binding",
+      "affected": {
+        "launcher_lines": "180-192, 227-230",
+        "runner_lines": "205-212"
+      },
+      "mechanism": "A tokenless record binds when a START line has pgid equal to the newly assigned SESSION and a UTC-second stamp lexically greater than or equal to SPAWN_TS. An earlier legitimate START in the same UTC second compares equal, and a future-dated stale line also passes. Exclusive locking does not encode subsecond ordering or prevent later numeric session reuse.",
+      "trigger": "A stale readable shared record remains because the current attempt never adopts a runner or fails to replace START; the stale line has an equal-or-later second stamp and the same numeric PGID as the newly selected SESSION.",
+      "consequence": "runner_truth can import stale released/final/unpreserved/cleanup facts, causing a stale-derived dead hold and false attempt evidence. The direction is generally exclusion-conservative but exact provenance and truthful evidence are not established.",
+      "control_gap": "P3b truncates the stale file before proving positive START recognition; P3a uses a deliberately old stamp. Neither rejects the admitted equality/future stale cases.",
+      "closure_required": "Publish and require an unguessable current-attempt value, preferably the inherited lease token, in the earliest checked runner START record, or use a checked per-attempt record path. Fresh dual exact source review is required."
+    }
+  ],
+  "assessments": {
+    "source_closure": {
+      "status": "BLOCKED",
+      "exact_attempt_binding": "NOT_CLOSED",
+      "stale_import": "NOT_CLOSED",
+      "early_adopted_death": "CLOSED_ONLY_WHEN_CURRENT_START_WAS_SUCCESSFULLY_PUBLISHED",
+      "v3_b_01": "NOT_FULLY_CLOSED_AS_EXACT_ATTEMPT_PROVENANCE",
+      "v3_b_02": "CLOSED_AS_FAKE_APPLICABILITY_STATEMENT",
+      "prior_v3_a_logic_affected_by_delta": false,
+      "primitive_runner_static_applicability": "POSITIVE_EXACT_BYTES_NO_RUNTIME_CLAIM"
+    },
+    "controls": {
+      "p2_acknowledgement_wait": "ADEQUATE_STATIC_CLOSURE_OF_THE_REPORTED_RACE",
+      "assertion_weakening": false,
+      "writes_signals_bounds": "STATICALLY_ACCEPTABLE_WITH_DECLARED_PARENT_RECOVERY_AND_FRESH_RESOLVED_OUTPUT_PRECONDITIONS",
+      "runner_scope": "FAKE_ONLY_NO_REAL_NPM_RUNNER_OR_INSTALL",
+      "one_private_control_grant": "DENIED_DUE_TO_OPEN_SOURCE_PREREQUISITE"
+    },
+    "canonical_setup_t0": "HELD",
+    "product_clearance": "NONE"
+  },
+  "overall": {
+    "source_packet": "BLOCKED",
+    "control_bytes": "STATICALLY_ACCEPTABLE_BUT_NOT_GRANTABLE",
+    "private_runtime_grant_issued": false,
+    "canonical_runtime_grant_issued": false,
+    "product_clearance_issued": false
+  }
+}
