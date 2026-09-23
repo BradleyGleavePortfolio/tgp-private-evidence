@@ -8,6 +8,7 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 | S6 frozen recovery and validation preparation | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | `worktrees/s6-diagnostic/**`, `execution/e7d2385c/s6-preparation/**`, `execution/e7d2385c/s6-inputs/**` | ACTIVE source-only; exact P1 bytes immutable; no runtime |
 | S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | ACTIVE static complete-source review; no peer conclusions/product edits/runtime |
 | S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | ACTIVE static complete-source review; no peer conclusions/product edits/runtime |
+| S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | ACTIVE source-only reuse/dependency mapping of existing C1/G2; no new implementation/audit/runtime |
 
 Parent alone owns private telemetry/evidence publication. S1 schema/generator has no mutation owner. S1–S4 remain accepted and closed. No product remote, browser, customer/production/source-account or new spending action is active.
 

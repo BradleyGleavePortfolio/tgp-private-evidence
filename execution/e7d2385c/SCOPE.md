@@ -26,6 +26,7 @@ One heavy runtime slot exists in this sandbox. Initially it is reserved to the S
 | S6 recovery/preparation | T4 | Sensitive identity/privacy source and exact validation provenance; canonical builder Claude Fable 5 / High; bounded T1 NO | Recover baseline d51 and patch20c6594c / manifest698cf631; candidate immutable; minimum exact validation and hook commands; no product repair/runtime |
 | S6 review A | T4 | Identity/privacy independent assurance; parent-model inheritance; bounded T1 NO | Independent complete source verdict, concrete A/B or source closure, final actual-result attestation later in the same review |
 | S6 review B | T4 | Lifecycle/integration independent assurance; Claude Fable 5 / High; bounded T1 NO | Independent complete source verdict, concrete A/B or source closure, final actual-result attestation later in the same review |
+| S7 canonical continuation map | T4 | Source-only lifecycle/identity/generated-contract decomposition; Claude Fable 5 / High; bounded T1 NO | Reuse PR526/528/529, locate actual contract collision and next 1–3 bounded product slices; no implementation, audit or runtime |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
