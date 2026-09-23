@@ -1,6 +1,6 @@
 # S5 canonical setup activation
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVATE exactly one canonical setup under `S5_CANONICAL_SETUP_GRANT.md`; sole runtime is assigned to `repair_s5_binding_mue9vjso`.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED one canonical setup, result94584aa8/27; actual launcher90, runner0, installed substrate qualified under the later disposition. Runtime returned17:59:03Z. Historical activation below is not a repeat grant.
 
 S3 executor has returned runtime after its one-shot proof: closure17:44:37Z, re-confirmed17:47:20Z, no attributable processes, socket54354 or lock fd holders. Its frozen packet2d4615e7/118 proceeds to the two existing final-head reviewers independently. S6 is source-only. No additional lock probe or setup audit is required.
 

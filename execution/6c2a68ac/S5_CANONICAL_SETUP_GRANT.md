@@ -1,6 +1,6 @@
 # S5 canonical setup: conditional single-execution grant
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE exactly once under `S5_CANONICAL_SETUP_ACTIVATION.md`, after S3 returned runtime and re-confirmed closure17:47:20Z. This is the actual setup unlocked by accepted V32 source and private proof, not another control or audit. The activation clarifies the already-permitted simple detached caller/direct launcher wait receipt without changing frozen source or deadlines.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED exactly once, result94584aa8/27: npm/runner0,12/12 strict pins, launcher actual raw90/published90 with accountable release17:59:03Z. `S5_SETUP_DISPOSITION_AND_T0_ACTIVATION.md` accepts installed substrate and closure only, not normal setup PASS. No repeat setup is granted; original command/bounds below are historical scope.
 
 ## Scope and ownership
 

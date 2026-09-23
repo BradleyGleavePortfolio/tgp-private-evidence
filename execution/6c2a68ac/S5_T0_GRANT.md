@@ -1,6 +1,6 @@
 # S5 T0: conditional exact predecessor diagnostic
 
-Parent EXEC-6c2a68ac, 2026-09-23. NOT ACTIVE until parent accepts actual canonical setup and explicitly assigns runtime. This is the already-reviewed T0-only proof; no new harness, primitive review, control family or acceptance condition.
+Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE exactly once under `S5_SETUP_DISPOSITION_AND_T0_ACTIVATION.md`. Parent accepts the actual installed substrate and accountable setup closure with exceptional launcher90 preserved, not normal setup PASS. This is the already-reviewed T0-only proof; no new harness, primitive review, control family or acceptance condition.
 
 ## Tier, owner and purchased decision
 
