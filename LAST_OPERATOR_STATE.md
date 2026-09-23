@@ -10,7 +10,7 @@ TrueCoach and another real platform are conformance targets, not the product bou
 
 EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
 
-Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. S5 original hooked-candidate attempt stopped06 on baseline-wide formatter nonconformance, result492f7104/16; no commit. A pinned one-file formatting correction and remaining07–10 are now authorized, without reinstall/generate/T0 repetition or hook bypass. T0 is accepted driver0/sixPASS with expected predecessorJest1. Setup installed12/12 but returned exceptional launcher90; substrate/closure accepted, not normal setup PASS. S3 exact local integration is ACCEPTED with both final reviews closed. S6 candidate is frozen for two independent reviews and disjoint validation preparation.
+Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. S5 formatting is corrected, but actual pre-commit refused five baseline unused bindings, result9d47c0dc/28; no commit. Exactly five binding aliases and a normal hooked commit are now authorized, without reinstall/generate/T0 repetition or hook bypass. T0 is accepted driver0/sixPASS with expected predecessorJest1. Setup installed12/12 but returned exceptional launcher90; substrate/closure accepted, not normal setup PASS. S3 exact local integration is ACCEPTED with both final reviews closed. S6 candidate is frozen for two independent reviews and disjoint validation preparation.
 
 ## Verified GitHub baseline
 
@@ -41,14 +41,14 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
 | S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration; targeted31/825 and composed0/72/68/48. Final A6bb8ab6c/B49e9a3e4 closed, no A/B. No remote landing or customer claim. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
-| S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, stagedtree3d30aeb0 before authorized format | T0 ACCEPTED0b50d653/31. Hooked attempt STOP06 raw1, result492f7104/16, no commit. One-file pinned format338defe8 and remaining07–10 authorized; no realPG proof yet. Setup90 and V2 failure retained. |
+| S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, stagedtree756a0d79 | T0 accepted;06F format passed. Real pre-commit STOP07 on five baseline unused-binding warnings; tsc/Prettier/R75 passed. Result9d47c0dc/28, no commit. Exact five-binding correction and normal07R–10 now authorized; no realPG proof yet. |
 | S6 P1 | T4 / T4 | baseline `d51a191098f483cea9abec6cc7e9f3beffd18c06` plus patch20c6594c | Product candidate FROZEN698cf631/15, nine authorized files; two independent exact-source reviews ACTIVE. C6 diagnostic failure/closure retained; no corrected runtime result or hooked head yet. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S5 executor `restore_s5_source_mue9wsph` returned original runtime/mutation ownership18:16Z. `S5_FORMATTER_DISPOSITION_AND_CONTINUATION.md` now assigns the sole S5 runtime and exact one-file formatting plus original remaining07–10; successful00–05 and T0 are not repeated. No commit yet, no true-hook outcome yet. Setup launcher90 remains qualified. S3 final A/B and exact integration are CLOSED/ACCEPTED; no repeated work. S6 builder has frozen698cf631/15 and released source mutation ownership. Independent reviewers `audit_s5_v31_lens_a_mue9eid4` and `audit_s5_v31_lens_b_mue9eidl` own only their separate audit outputs under `S6_P1_EXACT_CANDIDATE_REVIEW_SCOPE.md`; no S6 runtime.
+S5 executor `restore_s5_source_mue9wsph` returned runtime/mutation ownership18:30Z after real hook refusal, then receives the minimum five-binding correction and07R–10 under `S5_LINT_DISPOSITION_AND_COMMIT_ACTIVATION.md`. No commit yet; original failures preserved and all true hooks remain mandatory. Setup launcher90 remains qualified. S3 final A/B and exact integration are CLOSED/ACCEPTED; no repeated work. S6 builder has frozen698cf631/15 and only validation-preparation output ownership. Independent reviewers `audit_s5_v31_lens_a_mue9eid4` and `audit_s5_v31_lens_b_mue9eidl` own separate audit outputs under `S6_P1_EXACT_CANDIDATE_REVIEW_SCOPE.md`; no S6 runtime.
 
 ## DAG
 
@@ -74,7 +74,7 @@ Original failures and all qualifications remain immutable under the intake commi
 
 ## Next executable slices
 
-1. T4 apply the authorized one-file pinned formatting-only correction, then original S5 steps07–10 with true hooks. Preserve original06 failure; no repeat install/generate/T0. Two independent exact-head/runner reviews and separately granted real fresh51 proof follow.
+1. T4 apply only the five authorized ESLint-safe binding aliases, pinned formatting and normal S5 commit07R–10. Preserve original06/07 failures; no repeat install/generate/T0 or standalone checks. Two independent exact-head/runner reviews and separately granted real fresh51 proof follow.
 2. Preserve S3 composed real result and ten-case release comparison without another run.
 3. Preserve accepted S3 as the exact local backend foundation for later explicitly scoped integration; no new S3 audit or proof.
 4. T4 finish the two independent S6 exact-source reviews of frozen698cf631/15, then bounded actual validation/true-hooked head and final evidence closure in those same reviews.

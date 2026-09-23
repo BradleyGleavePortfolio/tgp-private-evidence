@@ -1,6 +1,6 @@
 # S5 formatter disposition and hooked-candidate continuation
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE once for `restore_s5_source_mue9wsph`, requested Claude Fable 5 / High. Individual and cumulative T4. Sole S5 mutation and runtime ownership pass back to this executor after the prior release at18:16Z. S6 remains independently source-only.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED:06F succeeded exactly, then07 raw1 stopped on real pre-commit ESLint refusal; no commit. Result9d47c0dc/28 frozen, runtime returned18:30Z. Follow-on authority is exclusively `S5_LINT_DISPOSITION_AND_COMMIT_ACTIVATION.md`; no retry under this historical grant. Individual and cumulative T4.
 
 ## Evidence and minimum disposition
 
