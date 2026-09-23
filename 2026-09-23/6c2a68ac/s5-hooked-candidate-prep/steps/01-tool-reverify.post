@@ -1,0 +1,7 @@
+source $P/steps/chk.sh
+eq "prettier --version" 3.9.6 "$(node $TOOL/node_modules/prettier/bin/prettier.cjs --version)"
+eq "CLI sha256" 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e "$(sha256sum $TOOL/node_modules/prettier/bin/prettier.cjs | cut -c1-64)"
+eq "tool lock sha256" 3e2189ffec7b867997fd37f28ae77ac0bed5aef745a42e8d5687cc711c5a53b7 "$(sha256sum $TOOL/package-lock.json | cut -c1-64)"
+eq "tool package.json sha256" 6c39ea3db029c5dda4d663f256419496b494129619a034e60e0f609711a4a774 "$(sha256sum $TOOL/package.json | cut -c1-64)"
+eq "node_modules entries" ".bin .package-lock.json prettier" "$(find $TOOL/node_modules -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' ' | sed 's/ $//')"
+exit $FAIL

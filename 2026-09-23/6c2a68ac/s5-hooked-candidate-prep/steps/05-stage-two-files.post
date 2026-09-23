@@ -1,0 +1,9 @@
+source $P/steps/chk.sh
+eq "staged tree (expected post-commit tree)" 3d30aeb08c58d47b53837dfe22b60f8dbef37871 "$(git write-tree)"
+eq "staged paths" $'test/rls-g2-pg17-etq0.spec.ts\ntest/utils/g2-pg17-bootstrap.sh' "$(git diff --cached --name-only)"
+eq "status after staging" $'M  test/rls-g2-pg17-etq0.spec.ts\nM  test/utils/g2-pg17-bootstrap.sh' "$(git status --porcelain)"
+chk "worktree == index" git diff --quiet
+eq "staged blobs/modes" $'100644 ff5a38b89ecc4de064f04df1dd9213be6a05c15a 0\ttest/rls-g2-pg17-etq0.spec.ts\n100755 85a636ba75607604032cef7af1d285cb198ca263 0\ttest/utils/g2-pg17-bootstrap.sh' "$(git ls-files -s test/rls-g2-pg17-etq0.spec.ts test/utils/g2-pg17-bootstrap.sh)"
+eq "git diff --cached HEAD == frozen patch bytes" c36258b39d0c92f0b760f11982a61427c6e7cce963eecffe2554f447346c5491 "$(git diff --cached HEAD | sha256sum | cut -c1-64)"
+echo "NOTE: runner dirty fingerprint now differs from 6850b32e by design (status ' M'->'M '); T0 gate would refuse from here on: $({ git diff HEAD; printf '%s\n' "$(git status --porcelain --untracked-files=all)"; } | sha256sum | cut -c1-64)"
+exit $FAIL

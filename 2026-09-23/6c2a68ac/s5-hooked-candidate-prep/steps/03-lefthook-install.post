@@ -1,0 +1,11 @@
+source $P/steps/chk.sh
+chk "pre-commit hook present" test -f .git/hooks/pre-commit
+chk "commit-msg hook present" test -f .git/hooks/commit-msg
+chk "pre-commit names lefthook" grep -q lefthook .git/hooks/pre-commit
+chk "commit-msg names lefthook" grep -q lefthook .git/hooks/commit-msg
+eq "core.hooksPath unset" "" "$(git config --get core.hooksPath)"
+chk "no lefthook-local.yml" test ! -e lefthook-local.yml; chk "no .lefthook-local.yml" test ! -e .lefthook-local.yml
+echo "hooks installed (non-sample): $(ls .git/hooks | grep -v '\.sample$' | tr '\n' ' ')"
+eq "write-tree unchanged" d0e122d35022377196908b7d132fc34c1af2fc6b "$(git write-tree)"
+eq "status pin unchanged" $' M test/rls-g2-pg17-etq0.spec.ts\n M test/utils/g2-pg17-bootstrap.sh' "$(git status --porcelain)"
+exit $FAIL

@@ -1,0 +1,5 @@
+# Correction carried against the frozen setup receipt (bytes not rewritten)
+
+Frozen packet `execution/6c2a68ac/s5-canonical-setup-result` (seal `94584aa85ed55c1e1dba94f9f0f97db8a1b09e93a5a986f51e54e350d6e9d2f0`, RECEIPT.md `f881471067e0a5796f67d56d24d2498a8c2f89ce23c9b08684f744d3c57386da`) remains byte-frozen.
+
+Its acceptance table row "launcher raw/final 0 — raw observed 0; final 90" must be read as: **launcher actual raw (direct `setsid -w` wait) = 90 and launcher published final = 90**. The launcher's `RUNNER_RAW observed rc=0` / `raw=observed 0` field is the launcher's separate wait on the runner leader (pid 1583), i.e. **runner raw 0**, not the launcher's own return. The normal launcher-0 criterion is unmet. Parent disposition `S5_SETUP_DISPOSITION_AND_T0_ACTIVATION.md` (`138d796409b1764348c3e8e9b3e86ae7cfee83421212f6fcef986ecae3a8962a`) accepts installed substrate 12/12 + unchanged bindings + accountable closure only, not normal setup PASS. Executor: repair_s5_binding_mue9vjso, 2026-09-23.

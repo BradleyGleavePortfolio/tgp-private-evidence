@@ -1,0 +1,1546 @@
+ts-jest[config] (WARN) 
+    The "ts-jest" config option "isolatedModules" is deprecated and will be removed in v30.0.0. Please use "isolatedModules: true", see https://www.typescriptlang.org/tsconfig/#isolatedModules
+  
+FAIL test/predecessor.spec.ts
+  stage 1: E on a populated narrow base with the actual O binary
+    ✕ populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows (1 ms)
+    ✕ applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+    ✕ keeps the actual O writer and readers working on E, creating NULL provenance (1 ms)
+    ✕ retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim
+    ✕ refuses a wrong public index owner in up on the populated base
+    ✕ refuses a wrong public index owner in down on the populated base (1 ms)
+    ✕ schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+    ✕ forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false) (1 ms)
+    ✕ rolls E back only while every provenance is NULL, preserving rows, then re-applies
+  stage 2: E recorded through the real release mechanism
+    ✕ prisma migrate deploy applies exactly E on the populated database and records history
+  stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17
+    ✕ claims historical NULL history at volume with honest multi-page accounting and identical replay
+    ✕ claims only the exact coach/intent/family identity and leaves adjacent tenants untouched
+    ✕ creates every outcome with actual provenance, isolates failures and replays honestly
+    ✕ claims historical NULL on reconstructed attempts
+    ✕ claims historical NULL on skipped attempts
+    ✕ claims historical NULL on failed attempts
+    ✕ rolls back new and pre-existing clients target changes on late mismatch (1 ms)
+    ✕ rolls back new and pre-existing workouts target changes on late mismatch
+    ✕ fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+    ✕ preserves success and reason on skip failure/skip, but still checks mismatch
+    ✕ preserves success and reason on throw failure/skip, but still checks mismatch
+    ✕ preserves success and reason on database failure/skip, but still checks mismatch
+    ✕ rejects invalid staging before writes and preserves narrow staging/ledger identities
+    ✕ cross-intent same source: same platform converges on one Person, different platform mints a second
+    ✕ characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+    ✕ characterizes actual O after T: provenance stays but O can downgrade success
+  stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17
+    ✕ concurrent success replays with false old winner converge on one target
+    ✕ concurrent success replays with true old winner converge on one target
+    ✕ two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+    ✕ retries real PostgreSQL serialization failure once for skip
+    ✕ retries real PostgreSQL serialization failure once for throw
+    ✕ retries real PostgreSQL serialization failure once for success
+    ✕ exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+    ✕ success holds claim while a failing false old writer waits
+    ✕ success holds claim while a failing true old writer waits
+    ✕ success holds claim while a skipped false old writer waits
+    ✕ success holds claim while a skipped true old writer waits
+    ✕ T success upgrades serialized skip while target write is open
+    ✕ T success upgrades serialized throw while target write is open
+    ✕ concurrent different-platform NULL claims serialize and the loser rolls back target changes (1 ms)
+  stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission
+    ✕ enumerates exact narrow-schema clients page union and retains NULL legacy history
+    ✕ enumerates exact narrow-schema workouts page union and retains NULL legacy history
+    ✕ characterizes clients ties ONLY in a temporary future-schema fixture
+    ✕ characterizes workouts ties ONLY in a temporary future-schema fixture
+    ✕ bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection (1 ms)
+    ✕ bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+  stage 5: rollout recovery boundaries after T has claimed provenance
+    ✕ refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+    ✕ E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+    ✕ characterizes down against an actual T claim transaction paused inside its interactive transaction
+    ✕ refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+  ● stage 1: E on a populated narrow base with the actual O binary › populates synthetic legacy history without a provenance column and O reconstructs 600 staged rows
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › applies E: rows, OIDs, keys, RLS and policies preserved; column nullable without default
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › keeps the actual O writer and readers working on E, creating NULL provenance
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › retains forced RLS denial for anon/authenticated on every touched table, even with a hostile claim
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in up on the populated base
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › refuses a wrong public index owner in down on the populated base
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › schema-qualifies both directions despite search_path decoys, leaving 1230 populated rows intact
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=true)
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › forced-RLS non-bypass owning role cannot drop hidden provenance (populated=false)
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 1: E on a populated narrow base with the actual O binary › rolls E back only while every provenance is NULL, preserving rows, then re-applies
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 2: E recorded through the real release mechanism › prisma migrate deploy applies exactly E on the populated database and records history
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL history at volume with honest multi-page accounting and identical replay
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims only the exact coach/intent/family identity and leaves adjacent tenants untouched
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › creates every outcome with actual provenance, isolates failures and replays honestly
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on reconstructed attempts
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on skipped attempts
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › claims historical NULL on failed attempts
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing clients target changes on late mismatch
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rolls back new and pre-existing workouts target changes on late mismatch
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › fail-stops mid-batch on a legacy provenance contradiction, keeping earlier committed rows and honest durable counts
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on skip failure/skip, but still checks mismatch
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on throw failure/skip, but still checks mismatch
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › preserves success and reason on database failure/skip, but still checks mismatch
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › rejects invalid staging before writes and preserves narrow staging/ledger identities
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › cross-intent same source: same platform converges on one Person, different platform mints a second
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes the retained narrow ledger collision: one intent cannot carry two platforms for one source
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3: T provenance, atomicity, accounting and collisions on PostgreSQL 17 › characterizes actual O after T: provenance stays but O can downgrade success
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with false old winner converge on one target
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent success replays with true old winner converge on one target
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › two absent skip inserts observe real P2002 contention and bounded full-transaction retry
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for skip
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for throw
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › retries real PostgreSQL serialization failure once for success
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › exhausted real ledger serialization conflicts stop after two transactions with no invented tally
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing false old writer waits
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a failing true old writer waits
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped false old writer waits
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › success holds claim while a skipped true old writer waits
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized skip while target write is open
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › T success upgrades serialized throw while target write is open
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 3b: deterministically coordinated T/T and O/T processes on PostgreSQL 17 › concurrent different-platform NULL claims serialize and the loser rolls back target changes
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema clients page union and retains NULL legacy history
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › enumerates exact narrow-schema workouts page union and retains NULL legacy history
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes clients ties ONLY in a temporary future-schema fixture
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › characterizes workouts ties ONLY in a temporary future-schema fixture
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds clients cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 4: Q0 real scoped reads, cursor boundaries and unchanged emission › bounds workouts cursor tokens at 8,192 characters and rejects every malformed shape without reflection
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses destructive E rollback while any claim exists, keeps history, and only a drained ledger can roll back
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › E/down lock budgets fail atomically against a live writer transaction instead of queueing behind it
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › characterizes down against an actual T claim transaction paused inside its interactive transaction
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+  ● stage 5: rollout recovery boundaries after T has claimed provenance › refuses down with a lock timeout while an actual T claim transaction outlives E's lock budget, and the released claim then commits intact
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,9 +1,9 @@
+      Object {
+        "address": "127.0.0.1",
+        "bypassrls": true,
+    -   "database": "g2_s5_etq0_disposable",
+    +   "database": "not_the_disposable_db",
+        "directory": "/ctl/pg17/clusters/s5",
+        "owner": "postgres",
+        "port": 54325,
+        "super": false,
+        "user": "postgres",
+
+    [0m [90m 37 |[39m   [90m// `postgres` role (Supabase shape); the cluster superuser only observes lock waits.[39m
+     [90m 38 |[39m   [90m// The port is whatever the operator double-confirmed through the guarded target (S1 chooses it).[39m
+    [31m[1m>[22m[39m[90m 39 |[39m   expect(identity)[33m.[39mtoMatchObject({ database[33m:[39m [32m'g2_s5_etq0_disposable'[39m[33m,[39m address[33m:[39m [32m'127.0.0.1'[39m[33m,[39m port[33m:[39m target[33m.[39mport[33m,[39m
+     [90m    |[39m                    [31m[1m^[22m[39m
+     [90m 40 |[39m     directory[33m,[39m user[33m:[39m [32m'postgres'[39m[33m,[39m [36msuper[39m[33m:[39m [36mfalse[39m[33m,[39m bypassrls[33m:[39m [36mtrue[39m[33m,[39m owner[33m:[39m [32m'postgres'[39m })[33m;[39m
+     [90m 41 |[39m   expect(sql([32m`SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tableowner<>'postgres'`[39m))[33m.[39mtoBe([32m'0'[39m)[33m;[39m
+     [90m 42 |[39m   expect([33mNumber[39m(identity[33m.[39mversion))[33m.[39mtoBe(expectedVersion)[33m;[39m[0m
+
+      at Object.<anonymous> (test/predecessor.spec.ts:39:20)
+
+Test Suites: 1 failed, 1 total
+Tests:       51 failed, 51 total
+Snapshots:   0 total
+Time:        1.109 s
+Ran all test suites matching test/predecessor.spec.ts.

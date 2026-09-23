@@ -1,0 +1,14 @@
+source $P/steps/chk.sh
+chk "log contains 'Generated Prisma Client (v6.19.3)'" grep -q 'Generated Prisma Client (v6.19.3)' "$O/logs/02-prisma-generate-guarded.log"
+chk "generated client dir" test -f node_modules/.prisma/client/schema.prisma
+chk "generated client ledger model has source_platform (bootstrap L212 gate)" bash -c "awk '/model ScoutReconstructionLedger \\{/,/\\}/' node_modules/.prisma/client/schema.prisma | grep -q source_platform"
+chk "pinned engine present (bootstrap hash_required L167)" test -f node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node
+echo "engine sha256=$(sha256sum node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node | cut -c1-64) (S3-installed copy a2924eab…; cache libquery-engine.sha256 a2924eab…) mtime=$(stat -c %y node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node)"
+echo "client engine sha256=$(sha256sum node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node 2>/dev/null | cut -c1-64)"
+eq "@prisma/client version" 6.19.3 "$(node -p "JSON.parse(require('fs').readFileSync('node_modules/@prisma/client/package.json','utf8')).version")"
+eq "write-tree unchanged" d0e122d35022377196908b7d132fc34c1af2fc6b "$(git write-tree)"
+eq "status pin unchanged" $' M test/rls-g2-pg17-etq0.spec.ts\n M test/utils/g2-pg17-bootstrap.sh' "$(git status --porcelain)"
+eq "fingerprint unchanged" 6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0 "$({ git diff HEAD; printf '%s\n' "$(git status --porcelain --untracked-files=all)"; } | sha256sum | cut -c1-64)"
+chk "no ancestor package.json created" test ! -e /home/user/package.json
+echo "client_boundary: CHECKPOINT_DISABLE=1 PRISMA_GENERATE_SKIP_AUTOINSTALL=true (inline on the generate command; step env CHECKPOINT_DISABLE=1); presence is not network-level suppression proof"
+exit $FAIL

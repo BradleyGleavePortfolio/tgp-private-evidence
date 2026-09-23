@@ -241,6 +241,8 @@ S3 composed result2d4615e7/118 is frozen: runner/final/cleanup0, guard72/composi
 
 ## Baseline pins
 
+Latest S5 transition: T0 result0b50d653/31 ACCEPTED at bounded diagnostic scope, driver0/sixPASS/predecessorJest1. Runtime released18:07:29Z and source-read ownership relinquished. `S5_T0_ACCEPTANCE_AND_HOOKED_CANDIDATE_ACTIVATION.md` assigns `restore_s5_source_mue9wsph` sole runtime and enumerated generated-client/hooks/Git metadata writes for frozen prepe9f4a5d5/21 steps00–10. Exact two-file patch unchanged, expectedtree3d30aeb0; no realPG, source/format writing, retry or remote publication. Required final exact-head/runner reviews and fresh51 remain downstream.
+
 S5 current transition: setup94584aa8/27 is CONSUMED, installed12/12 and npm/runner0 accepted as substrate; launcher actual90/published90 and unknown transient member retained, normalPASS not claimed. `S5_SETUP_DISPOSITION_AND_T0_ACTIVATION.md` assigns sole runtime for exact T0 once to `repair_s5_binding_mue9vjso`, original four input hashes, command/bounds/six assertions unchanged. Source-only hooked-candidate preparation and S6 product build remain disjoint. No setup repeat/new audit/primitive fix.
 
 S3 final transition: both final reviews COMPLETE, A6bb8ab6c and B49e9a3e4, scoped acceptance/no A/B. `S3_FINAL_INTEGRATION_ACCEPTANCE.md` accepts exact local be0ba827/treea584/parentsd5cd+5c7b and preserves all source, true-hook, targeted31/825 and composed72/68/48 evidence. No further S3 review/run, no public or deployment authority. S5 and S6 continue independently.

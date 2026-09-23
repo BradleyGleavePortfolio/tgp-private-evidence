@@ -1,6 +1,6 @@
 # S5 hooked-candidate continuation preparation
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE source-only preparation by `restore_s5_source_mue9wsph`, requested Claude Fable5/High. T4 individual/cumulative: generated-client provenance, consequential fixture safety and trusted hook/commit evidence; boundedT1 NO. The setup executor keeps sole runtime and worktree mutation authority. No runtime is assigned here.
+Parent EXEC-6c2a68ac, 2026-09-23. Preparation COMPLETE, seal e9f4a5d5/21, source unchanged. Historical source-only owner was `restore_s5_source_mue9wsph`, requested Claude Fable5/High, T4 individual/cumulative. Runtime is not granted by this preparation document; the later `S5_T0_ACCEPTANCE_AND_HOOKED_CANDIDATE_ACTIVATION.md` is the separate actual activation.
 
 ## Purchased decision
 

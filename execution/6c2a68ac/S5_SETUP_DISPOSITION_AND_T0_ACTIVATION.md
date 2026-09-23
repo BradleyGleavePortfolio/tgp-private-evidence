@@ -1,6 +1,6 @@
 # S5 setup disposition and exact T0 activation
 
-Parent EXEC-6c2a68ac, 2026-09-23. Canonical setup is CONSUMED. Accept the installed substrate and accountable historical closure, not normal setup PASS. ACTIVATE exactly one T0 diagnostic under the existing `S5_T0_GRANT.md`; sole runtime assigned to `repair_s5_binding_mue9vjso`.
+Parent EXEC-6c2a68ac, 2026-09-23. Both setup and T0 are now CONSUMED. Setup installed substrate/closure are accepted with exceptional90; T0 result0b50d653/31 is accepted as driver0/sixPASS and predecessorJest1. Original activation below is retained history, not a repeat grant. The later `S5_T0_ACCEPTANCE_AND_HOOKED_CANDIDATE_ACTIVATION.md` transfers ownership for the actual local commit.
 
 ## Actual setup and qualification
 

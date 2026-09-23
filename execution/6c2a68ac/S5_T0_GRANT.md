@@ -1,6 +1,6 @@
 # S5 T0: conditional exact predecessor diagnostic
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE exactly once under `S5_SETUP_DISPOSITION_AND_T0_ACTIVATION.md`. Parent accepts the actual installed substrate and accountable setup closure with exceptional launcher90 preserved, not normal setup PASS. This is the already-reviewed T0-only proof; no new harness, primitive review, control family or acceptance condition.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED once and ACCEPTED at the bounded diagnostic scope under `S5_T0_ACCEPTANCE_AND_HOOKED_CANDIDATE_ACTIVATION.md`: result0b50d653/31, driver0/sixPASS, predecessor Jest1 with intended refusal and mutating fake teardown, closure released18:07:29Z. No repeat grant; setup qualification and original failed-wave evidence remain unchanged.
 
 ## Tier, owner and purchased decision
 
