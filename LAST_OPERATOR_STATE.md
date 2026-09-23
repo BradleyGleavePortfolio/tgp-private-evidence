@@ -42,19 +42,19 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 | S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Stopped metadata B closed by independent25f049dd. Exact03R+steps04–14 continuation ACTIVE on preserved treea584/parentsd5cd5c7b; no reinstall/regenerate. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus frozen patchc36258b3 | Dual source CLOSED; actual private raw0/11PASS accepted, resulta21622ee/66 entries, slot released16:31:09Z. Canonical setup/T0 queued, not active. V2 stays failed. |
-| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Four-file `s6-exclusion-v1` frozen seal001b840f/28 entries; two independent setup+C6 changed-composition reviews ACTIVE. Runtime held. |
+| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Four-file seal001b840f/28 entries SOURCE-CLOSED by Ad9a9d4c5/Bb64eb282, no A/B; actual setup then C6-only queued, not active. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S3 builder `restore_s3_candidate_mue9wspd` owns sole runtime for the accepted03R observation and remaining04–14 sequence. Narrow reviewer `audit_s5_failure_lens_b_mue9oser` completed GRANTABLE seal25f049dd with no A/other B. S6 builder is frozen/released; A `audit_s5_v31_lens_a_mue9eid4` and B `audit_s5_v31_lens_b_mue9eidl` independently review both exact changed compositions. Other source/result reviews are complete.
+S3 builder `restore_s3_candidate_mue9wspd` owns sole runtime for accepted03R and remaining04–14. Narrow reviewer `audit_s5_failure_lens_b_mue9oser` is complete. S6 builder and both independent reviewers are complete and retain no slot; actual setup executor `restore_s6_substrate_mue9osen` is queued. Other source/result reviews are complete. Parent alone publishes dispositions.
 
 ## DAG
 
 S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R+steps04–14 local integration [ACTIVE] → composed-lock release proof → dual final-head attestations.
 
-In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control [all CLOSED/ACCEPTED] → S6 two-consumer correction [FROZEN] → dual changed-composition review [ACTIVE] → S6 setup/C6 proof. S5 canonical setup/T0 grants are prepared, not active, and queue without blocking S3.
+In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 correction/dual final review [all CLOSED/ACCEPTED] → actual S6 setup→C6-only [QUEUED]. S5 canonical setup/T0 grants also queue without blocking S3.
 
 Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R → N/Q1 → C → C1/lifecycle/forward-2.x → compatible mobile/extension/native writers → relationships/reconciliation → integrated host/device → real platforms and unseen-site induction → measured pilot → universal importer acceptance → retained TGP V1.
 
@@ -75,10 +75,9 @@ Original failures and all qualifications remain immutable under the intake commi
 ## Next executable slices
 
 1. T4 finish active S3 03R+steps04–14 on preserved substrate; no reinstall/generation.
-2. T4 finish S6's two independent exact setup/C6 changed-composition reviews.
-3. T4 corrected S5 canonical setup, then T0 on its own prerequisites after runtime returns.
-4. T4 S3 composed-lock release-path evidence on the actual integrated head.
-5. T4 S3 two independent final-head attestations.
-6. T4 S6 actual setup then C6-only proof after dual closure and returned runtime.
+2. T4 S3 composed-lock release-path evidence on the actual integrated head, with disjoint successor preparation.
+3. T4 S3 two independent final-head attestations.
+4. T4 S6 actual setup, then C6-only causal proof on the next appropriate returned runtime slot.
+5. T4 corrected S5 canonical setup, then exact T0 on its actual prerequisites.
 
-Bradley decision required: NO. Exact next action: finish active S3 03R+steps04–14; S6 dual review proceeds independently. See `execution/6c2a68ac/S3_STEP03_RECORDING_CONTINUATION.md`; prior acceptance remains at `REAL_PROOF_ACCEPTANCE_AND_INTEGRATION_ACTIVATION.md`.
+Bradley decision required: NO. Exact next action: finish active S3 03R+steps04–14; S6 dual source closure is accepted and actual setup/C6 queued. See `S3_STEP03_RECORDING_CONTINUATION.md` and `S6_DUAL_CLOSURE_AND_RUNTIME_QUEUE.md` under `execution/6c2a68ac/`.

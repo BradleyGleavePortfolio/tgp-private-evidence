@@ -183,6 +183,10 @@ S6 successor is frozen: `s6-exclusion-v1/SHA256SUMS.s6-exclusion-v1` =001b840f72
 
 S6 independent nonbuilder A `audit_s5_v31_lens_a_mue9eid4` (inheritance) and B `audit_s5_v31_lens_b_mue9eidl` (Fable5/High) are ACTIVE; each reviews both final compositions, each child T4/cumulativeT4 (privacy/trusted validation/recovery, lifecycle; boundedT1 NO). Sole writes respective `audits/s6-exclusion-v1-a/**` or `-b/**`. Acceptance: inheritedfd9, earliest exact token START, constants/four markers, released-attempt→boundIDENTITY→retainedSID accounting; selftest SID cannot clear released C without bound identity. Preserve no-handoff/last-owner/raw truth and unchanged primitive/product/hazard/classifier/Jest. Read/hash/diff only, no current peer/parent conclusion, execution, syntax checks, probes, locks, signals or source edits. Transfer applicable S5 V32/primitive proof without reaudit. Concrete A/B only blocks; C records/continues. Actual S6 setup/C6 are separate later grants, no new private test layer.
 
+## S6 dual-closure disposition
+
+Both exact S6 reviews COMPLETE: Ad9a9d4c54df862e8a551e48935ea7d4c5c7908d434aad7d1ae7fad061f469709 and Bb64eb2824fa19a26d2ab8f0539a772fb007f9e9cc1b25ab5acba990a9544dce5 source-close both compositions without A/B. Parent accepts at `S6_DUAL_CLOSURE_AND_RUNTIME_QUEUE.md`; all C notes and B's empty-stray-file incident retained, no code/review cycle. `S6_ACTUAL_SETUP_AND_C6_GRANTS.md` prepares separate actual stages, NOT ACTIVE. S3 retains sole runtime.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

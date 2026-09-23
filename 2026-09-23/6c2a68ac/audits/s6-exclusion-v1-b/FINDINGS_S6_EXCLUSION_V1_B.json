@@ -1,0 +1,56 @@
+{
+ "audit": "S6-EXCLUSION-V1 final-composition independent review B",
+ "child": "S6-EXCLUSION-V1-B",
+ "reviewer": "audit_s5_v31_lens_b_mue9eidl (independent nonbuilder; T4 per composition, cumulative T4; bounded T1 NO)",
+ "parent": "EXEC-6c2a68ac",
+ "method": "read / sha256sum / diff / cmp / grep only; nothing executed (no bash -n, probe, census, lock, signal, install, source or private-checkout write); peer A and parent verdict not read",
+ "accepted_transfers_not_reaudited": ["OWN-BLOCK v10.1 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5", "S5 V32 launcher 55acc00f / runner 61b565e4 source closure", "S5 V32 private proof 11 PASS (incl. P3b pgid/status behaviour of the setsid/timeout chain)"],
+ "status": "REVIEW COMPLETE - frozen",
+ "inputs": {
+  "packet": "/home/user/workspace/execution/6c2a68ac/s6-exclusion-v1",
+  "seal": {"sha256": "001b840f721db38734a12f0db937655f2ff33d99a8a03da807724e45e698b9a4", "entries": 28, "non_ok": 0, "self_listed": false},
+  "F3_setup_launcher": "6035a8f4d726b65afcb381d82903f2b1cfe22602860eda72e84a5afe61a43624",
+  "F1_setup_runner": "8a5a5161cc44ad349bc1923b54217bff84d5ba725a38d46c1adcaad6facf6633",
+  "F4_c6_launcher": "ad8130e9b5acd5e222817335c26e971ddf0bd69e858cfaa117568b1af8310a78",
+  "F2_c6_runner": "692f8db79a283135d1a609bfcb99b1fd81bf09a527692af332805976f755bc66",
+  "pin_runner_matches": {"F3": true, "F4": true},
+  "bases": {"launcher_v32": "55acc00fe9b04d0e015f37bbdac90e582925c4b4564f7aaaa55c21a13304cf0a", "setup_consumer_v101": "8b1ae8c06a7484ca92d0b1ff93c22c933c824e372c308bbc58fea4764ef3dcf3", "c6_consumer_v101": "2c9748a468cef65779365b153e7d691120e1472d3e390b8a55f30e71103628c9"},
+  "governance": {"grant": "295a315de0ccf4ac8d041fae950e340a11b63bf0f142f70717a7baf52ef5318d", "addendum_HL4": "0f5d7280b5f0c6e8d6003370d5d66c23229f3124ae696c8606e88b3626982232", "scope_map": "9cbefd0227886a5f5576776eb444cb390ff4aa74f79721407c4e2cc90f33a148"}
+ },
+ "delta_verification": {
+  "all_five_shipped_diffs_reproduced_byte_identical": true,
+  "own_block_extract_identical_in_all_four": true,
+  "F3_vs_F4": "28 changed lines = 14 consumer constants per side; H-L2/H-L4 text identical",
+  "runner_code_lines_touched": {"F1": "L209 START token; L211-216 lock branch", "F2": "L307 IDENTITY pid-first (order only); L348 START token; L350-356 lock branch"},
+  "launcher_code_lines_touched": "L42 grant, L43 CANON_EX, L47 RUNNER/bounds, L48 LOGS, L50 PIN_RUNNER, L163-166 H-L2 gate, L183 REL vars, L191 INNER_LOGS, L204 record, L207-208 runner_truth, L215-222 session_state, L253 spawn env; runner_bound comments only",
+  "counts": "launchers kill/trap/rm/flock/own_signal/exit/setsid 3/2/5/1/3/21/3 (+1 exit = gate 71); runners +1 exit = word 'exits' in comment/evidence text; flock -n 9 calls / exec 9> / child 9>&- exactly 1 each per runner"
+ },
+ "assessments": {
+  "inherited_fd9": {"result": "EXACT S5 v101y CONTRACT", "basis": "readlink fd9 = $LOCK, ^token= in $EX/LEASE_HOLDER, holder pid present, INHERITED line; else = frozen own-flock bytes; $EX defined before use (F1 L57, F2 L121) and equals launcher CANON_EX"},
+  "earliest_token_bound_START": {"result": "HOLDS", "basis": "first truncating write carries token=; launcher runner_bound bytes unchanged from V32; record path/name per launcher equals its runner's (setup-v3/setup.EXIT_RECORD, c6/c6.EXIT_RECORD)"},
+  "constants_H_L1": {"result": "AS FROZEN", "basis": "1290/30/1380 and 240/30/300, HEARTBEAT 30; launcher LOGS disjoint from runner LOGS"},
+  "four_marker_refusal_H_L2": {"result": "HOLDS", "basis": "scope-map Choice A text verbatim; four paths equal both runners' quarantine primary/fallback write paths; before TOKEN and exec 9>; exit 71; absence grants nothing"},
+  "grant_lease_names_H_L3": {"result": "HOLDS", "basis": "S6_SETUP_GRANT / S6_C6_GRANT gate + spawn env; S6_LEASE_INHERITED; runners have no GRANT gate in code so no mismatch is possible"},
+  "H_L4_accounting": {"result": "HOLDS", "basis": "REL_KNOWN union from bound record only; sed matches both consumers' released shapes and cannot match never-released; REL_BOUND colon-terminated membership prefix-safe; bind requires readable IDENTITY with self_sid=$SESSION and ^pid=; unbound => unknown; loop after inner_sids union and before census loop; unknown dominates classification; all three release call sites behind CENSUS=empty"},
+  "boundary_selftest_vs_C": {"result": "HOLDS - launcher SELF-HOLDs, never releases on selftest sid alone", "trace": "F4 L207 -> L217-221 (p empty => unknown=1, inner:released-attempt-unbound:<a>) -> L227 CENSUS=unknown -> L270 self_hold / L246 guard / L240 guard"},
+  "H_R2_pid_first": {"result": "HOLDS", "basis": "F2 L307 order only; C6 runner never parses IDENTITY content; launcher ^pid= binds both attempts"},
+  "preservation": {"result": "HOLDS", "basis": "no handoff, raw latch, typed census, SELF-HOLD, single escalation, preserve_prior, evidence-after-adoption rule: bytes unchanged from V32; primitive/product/classifier/hazard/Jest/MANIFEST.c6 check 0 bytes changed; S5X branch verbatim; observer unused; no outer timeout on holder"}
+ },
+ "blocker": {"A": "none", "B": "none", "statement": "No concrete actual-path harm or proof-invalidating defect in these exact bytes; no smallest-fix owed; no new private control needed (H-L4 error branches fail toward hold; false release requires the same evidence standard inner_sids already applies)."},
+ "findings_C": [
+  {"id": "S6-B-01", "statement": "H-L2 gate runs after mkdir -p $LOGS and LAUNCHER_START write: a refused launch still creates $EX/logs/<launcher> and logs the refusal; gate also -e-tests canonical marker paths in private S5X mode (read only; no S6 harness exists).", "action": "RECORD"},
+  {"id": "S6-B-02", "statement": "Builder C-2 confirmed: state=released.* cannot over-match never-released.", "action": "RECORD"},
+  {"id": "S6-B-03", "statement": "Released attempt with no record line (released-then-cancelled => die 74) is accounted via inner_sids only; doubly-lost evidence is the inherited A-01 boundary (map 8.5, grant).", "action": "RECORD (carried)"},
+  {"id": "S6-B-04", "statement": "Runner HOLD_BOUND/EXCLUSION_UNPRESERVED branch remains as evidence; inner timeout bounds it under the launcher; runner death before START => fail-closed hold (v3/B-01 consequence).", "action": "RECORD (carried)"},
+  {"id": "S6-B-05", "statement": "runner_bound form (b) relies on inner timeout not re-grouping its child - proven by accepted V32 P3b on this platform with the same chain; degradation would be a fail-closed hold.", "action": "RECORD (transfer accepted)"},
+  {"id": "S6-B-06", "statement": "execution/s6-diagnostic absent until F3's first granted mkdir -p (builder C-3); parent ownership acknowledgement.", "action": "RECORD"}
+ ],
+ "separated_determinations": {
+  "source_closure_setup_composition": "CLOSED - F3 6035a8f4 + F1 8a5a5161; no A/B",
+  "source_closure_c6_composition": "CLOSED - F4 ad8130e9 + F2 692f8db7; no A/B; selftest-vs-C boundary holds from source",
+  "actual_setup_grantability_prerequisites": ["S3 owns runtime; no runtime grant from this review", "directory containing exactly F3+F1 at frozen bytes; PIN_RUNNER enforced; $HERE-relative RUNNER", "invoke: setsid nohup env S6_SETUP_GRANT=granted-by-parent bash launch-s6-setup-exclusion.v1.sh > <LOGS>/launcher.out 2>&1 < /dev/null & (no outer timeout on the holder)", "job control off; util-linux setsid; procps; uutils timeout as proven by V32 P3b", "scope-map 8.6 re-verified immediately before launch: worktree HEAD d51a1910 clean, node_modules absent, lock free, no foreign node/npm, no marker at the four paths, fresh INNER_LOGS without EXIT_RECORD", "parent acknowledges creation of execution/s6-diagnostic/logs/s6-setup-exclusion", "result truth: RUNNER_RAW raw status; release only via LEASE_RELEASE with census empty; SELF-HOLD is resolved by parent, never killed"],
+  "actual_c6_grantability_prerequisites": ["separate grant after setup acceptance (node_modules present, 20/20)", "directory containing exactly F4+F2 at frozen bytes; S6_C6_GRANT; same launch shape and 8.6 preconditions", "bounds 240/30/300 nominal, not a completion attestation", "both inner attempts (selftest, C) must be in REL_BOUND/INNER_KNOWN and censused empty before release"],
+  "product_clearance": "NONE"
+ },
+ "truth": ["nothing executed by B; all diff bodies independently reproduced and every changed hunk read", "runtime/model identity not observable, not asserted", "concrete findings bind on their own terms; no majority reading implied", "review frozen; C items create no cycle"]
+}
