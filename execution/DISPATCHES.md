@@ -11,7 +11,7 @@ Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde; EXEC
 | S6 frozen recovery/preparation then P2 correction | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Sealed preparationd94c80b7; P2 worktree/packet1cf14b97 | COMPLETE FROZEN P2treedddd7c28; no runtime or current mutation grant |
 | S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | P1 preserved0266ff53; ACTIVE P2 scoped delta/affected-invariant follow-up |
 | S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | P1 preserved603a1293; ACTIVE P2 scoped delta/affected-invariant follow-up |
-| S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | ACTIVE source-only reuse/dependency mapping of existing C1/G2; no new implementation/audit/runtime |
+| S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | COMPLETE corrected overlap map; reuse S3+S5, missing C1 delta only; no repeat E/T-Q0 proof |
 
 Parent alone owns private telemetry/evidence publication. S1 schema/generator has no mutation owner. S1–S4 remain accepted and closed. No product remote, browser, customer/production/source-account or new spending action is active.
 
