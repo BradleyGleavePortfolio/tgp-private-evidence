@@ -211,6 +211,12 @@ S3 original09–14 COMPLETE: six actualraw0,31 suites/825 tests PASS, exactbe0ba
 
 `S3_TARGETED_RESULT_AND_S6_SETUP_ACTIVATION.md` assigns the returned sole runtime to S6 SETUP ONLY under the exact dual-closed `S6_ACTUAL_SETUP_AND_C6_GRANTS.md`. Executor `restore_s6_substrate_mue9osen`; no further private controls/source audit. C6, S3 composed runtime and S5 setup/T0 stay inactive. No source, remote-product or customer scope expansion.
 
+## Current S3 runtime and S6 qualified substrate disposition
+
+S6 setup result695558f8/20 verified: npm/runner0,20/20, unchanged source/ancestor; launcher recorded90 after owned outer-session escalation and empty re-census. Normal-final0 NOT met; launcher raw wait NOT observed. `S6_SETUP_DISPOSITION.md` accepts only installed substrate and historical closure for the bounded C6 diagnostic; no setup retry, new audit or raw-status substitution. Transient member identity unknown. C6 remains queued.
+
+S3 composed proof ACTIVATE once at `S3_COMPOSED_PROOF_ACTIVATION.md` after S6 explicit runtime release. Sole executor `restore_s2_substrate_mue9eidh`, exact runnere876f48c/fixture9763698b, dual A16f71ac2/B8dce0cd6 accepted. `S3_COMPOSED_PROOF_RUNTIME_GRANT.md` fixes command/env/fresh roots/scratch/bounds/stops. S3 final-head reviewers await actual result; S5 and S6 runtime not active in parallel.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

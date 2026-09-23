@@ -1,6 +1,6 @@
 # S6 actual setup and C6-only: separate conditional grants
 
-Parent EXEC-6c2a68ac, 2026-09-23. S6-SETUP ACTIVE after S3 returned runtime with sealed validation1513911d/27. Sole runtime assigned to `restore_s6_substrate_mue9osen` for setup only; dual final-composition attestations Ad9a9d4c5/Bb64eb282 are already accepted. C6 remains NOT ACTIVE pending setup acceptance and its own explicit activation. No new private-control layer.
+Parent EXEC-6c2a68ac, 2026-09-23. S6-SETUP CONSUMED: npm/runner0 and20/20, but launcher recorded exceptional final_rc90 after owned escalation, not the required normal0 and not directly waited. Runtime returned after empty-session/fd closure at17:25:13Z. `S6_SETUP_DISPOSITION.md` accepts the installed substrate and closure for the next bounded diagnostic, not all-criteria setup success; no repeat. C6 remains NOT ACTIVE pending a free runtime slot and separate activation. Dual source closure Ad9a9d4c5/Bb64eb282 remains applicable. No new private-control layer.
 
 ## Scope, identity and ownership
 
@@ -44,7 +44,7 @@ Acceptance: actual npm raw0, cleanup0, unchanged within-run ancestor inventory, 
 
 ## Stage S6-C6-ONLY
 
-After separate parent acceptance of actual setup20/20 and explicit activation. No reinstall or repeated A/B/D diagnostics. Verify unchanged workload packet `execution/op88/s6-c6-prep/MANIFEST.sha256` = `04d761f0421cfbdc99058bbbcf9c5ad4d420a76ae45b258c33c0ed0e925709a6`19 entries and `c6/MANIFEST.c6.sha256` = `34d3c3586f99a8873dff23e3485d8cae5608784efce17b7d3bcb05206926976d`11 entries. Existing hazardv5a91bb732, adapter3796be8f, instrumentcf470101 and classifier2715cf11 stay unchanged.
+After separate parent prerequisite disposition and explicit activation. `S6_SETUP_DISPOSITION.md` has accepted installed setup20/20 and historical closure while preserving exceptional launcher90 and the missing direct wait; normal0 is not claimed. No reinstall or repeated A/B/D diagnostics. Verify unchanged workload packet `execution/op88/s6-c6-prep/MANIFEST.sha256` = `04d761f0421cfbdc99058bbbcf9c5ad4d420a76ae45b258c33c0ed0e925709a6`19 entries and `c6/MANIFEST.c6.sha256` = `34d3c3586f99a8873dff23e3485d8cae5608784efce17b7d3bcb05206926976d`11 entries. Existing hazardv5a91bb732, adapter3796be8f, instrumentcf470101 and classifier2715cf11 stay unchanged.
 
 Command payload:
 

@@ -20,4 +20,8 @@ Latest transition: S3 original09–14 COMPLETE, allraw0,31 suites/825 tests PASS
 
 DAG: accepted S1/S2 → S3 hooked commitbe0ba827 + targeted validation [complete] → composed-lock release proof [source preparation] → dual final-head attestations [same reviews in progress]. In parallel S6 setup [active] → C6; S5 setup/T0 queued. Use returned runtime for the next prepared critical proof, never idle it for evidence packaging.
 
+Latest current ownership supersedes the prior setup-active description: S6 setup completed with npm/runner0 and20/20, but launcher published90 after owned escalation, not direct wait-observed. Result695558f8/20; normal setup criterion remains unmet. Parent accepts installed substrate and accountable closure only under `S6_SETUP_DISPOSITION.md`, no reinstall/audit/rerun. S6 C6 eligible but NOT ACTIVE.
+
+S3 composed proof is now ACTIVE sole runtime under `S3_COMPOSED_PROOF_ACTIVATION.md`, executor `restore_s2_substrate_mue9eidh`, exact runnere876f48c/fixture9763698b/prepbe31c041; independent A16f71ac2/B8dce0cd6 CLOSED/noA/B. After it closes, supply frozen result to existing final-head A/B (source and targeted portions already complete) and activate queued S6 C6. S5 setup/T0 follows. Preserve exceptional90, original observation failures and all C qualifications.
+
 No production/customer/source-account action, remote product push/merge, deployment, enablement or new spending is authorized. Backend main auto-deploy remains a genuine later authority boundary. Parent is sole private publisher and does not code or self-audit. Bradley decision required: NO. Continue the active local integration and disjoint source work.

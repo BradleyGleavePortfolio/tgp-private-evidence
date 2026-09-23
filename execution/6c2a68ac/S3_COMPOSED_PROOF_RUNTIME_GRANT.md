@@ -1,6 +1,6 @@
 # S3 composed-lock release proof: conditional one-shot grant
 
-Parent EXEC-6c2a68ac, 2026-09-23. NOT ACTIVE until both independent changed-binding reviews close and parent explicitly assigns a returned canonical runtime slot. Sole builder/executor `restore_s2_substrate_mue9eidh`, requested Claude Fable5/High. Individual/cumulative T4: database/release integration and trustworthy proof; bounded T1 NO.
+Parent EXEC-6c2a68ac, 2026-09-23. ACTIVE after accepted independent closures A16f71ac2/B8dce0cd6 and S6's accountable runtime release at17:25:13Z. Sole runtime assigned to builder/executor `restore_s2_substrate_mue9eidh`, requested Claude Fable5/High, for this one shot only. S6 setup is not relabelled successful: npm/runner0 and20/20, but launcher recorded90 after owned escalation; its disposition is separate from the reported empty-session/lock-holder closure used for scheduling. Individual/cumulative T4: database/release integration and trustworthy proof; bounded T1 NO.
 
 ## Exact candidate and purpose
 

@@ -39,16 +39,16 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 |---|---|---|---|
 | S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Actual discriminator48/48 at composed d5cd, guard72/72; dual final applicability accepted, membership path remains unobserved. |
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
-| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | Hooked treea584;09–14allraw0,31 suites/825 tests PASS, sealed1513911d/27, bundled204a582. Runtime released; composed proof source preparation and final-head reviews active. |
+| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | Hooked treea584;09–14allraw0,31 suites/825 tests PASS, sealed1513911d/27. Composed runner e876f48c dual-closed A16f71ac2/B8dce0cd6; one actual composed proof ACTIVE, final-head reviewers await result. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus frozen patchc36258b3 | Dual source CLOSED; actual private raw0/11PASS accepted, resulta21622ee/66 entries, slot released16:31:09Z. Canonical setup/T0 queued, not active. V2 stays failed. |
-| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Four-file seal001b840f SOURCE-CLOSED by Ad9a9d4c5/Bb64eb282; actual SETUP ACTIVE sole runtime, C6 remains separately held. |
+| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Setup695558f8: npm/runner0,20/20; launcher published90 after owned escalation, not wait-observed. Installed substrate/closure accepted with qualification, not normal setup PASS. C6 queued, not active. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S3 builder returned runtime after sealed09–14 success. S6 setup executor `restore_s6_substrate_mue9osen` now owns the sole runtime under its exact setup grant. S2 owner `restore_s2_substrate_mue9eidh` prepares the additive composed-proof binding successor source-only under `s3-composed-proof-prep/**`, no worktree/runtime writes. Independent S3 final-head reviewers A/B work on source/applicability and the frozen targeted packet; they await the composed proof for final determinations. Parent alone publishes dispositions.
+S6 setup executor returned runtime after token-bound release and empty-session/fd closure. S2 owner `restore_s2_substrate_mue9eidh` now owns the sole runtime for exact S3 composed proof under `S3_COMPOSED_PROOF_ACTIVATION.md`. Independent S3 final-head reviewers A/B have completed source/applicability and targeted portions, and await the frozen actual composed result. S6 C6 and S5 setup/T0 stay queued. Parent alone publishes dispositions.
 
 ## DAG
 
@@ -74,10 +74,10 @@ Original failures and all qualifications remain immutable under the intake commi
 
 ## Next executable slices
 
-1. T4 finish active S6 setup; direct parent result disposition then separately activate C6.
-2. T4 S3 composed-lock release-path evidence on exact be0ba827; source-only successor preparation is active while S6 runs.
+1. T4 finish active S3 composed-lock release-path evidence on exact be0ba827.
+2. T4 S6 C6-only diagnostic after the returned slot, using qualified accepted installed substrate without repeating setup.
 3. T4 S3 two independent final-head attestations.
 4. T4 S6 actual setup, then C6-only causal proof on the next appropriate returned runtime slot.
 5. T4 corrected S5 canonical setup, then exact T0 on its actual prerequisites.
 
-Bradley decision required: NO. Exact next action: active S6 setup, S3 composed-proof preparation and existing final-head reviews in parallel. See `S3_TARGETED_RESULT_AND_S6_SETUP_ACTIVATION.md`, `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` and `S3_FINAL_HEAD_REVIEW_SCOPE.md` under `execution/6c2a68ac/`.
+Bradley decision required: NO. Exact next action: active S3 composed proof, then existing final-head completion and queued S6 C6. See `S3_COMPOSED_PROOF_ACTIVATION.md`, `S6_SETUP_DISPOSITION.md` and `S3_FINAL_HEAD_REVIEW_SCOPE.md` under `execution/6c2a68ac/`. Historical DAG entries marked setup-active/source-preparation are superseded by this current ownership.
