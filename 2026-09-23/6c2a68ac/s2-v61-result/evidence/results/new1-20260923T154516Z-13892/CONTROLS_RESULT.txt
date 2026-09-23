@@ -1,0 +1,71 @@
+S2-V61 controls set=new1 start 2026-09-23T15:45:16Z budget=60s results=/home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/results/new1-20260923T154516Z-13892 pid=13892 pgid=8080 timeout_impl=timeout (uutils coreutils) 0.8.0 runner_sha256=efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c pre_runner_sha256=fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 stubs=535dc494cb47b09d 5560c9f74979b886 6dc98ce0d2539daf bc9704e639da7691 
+pre-snapshot pattern matches (never signalled): []
+
+== K7pre-v5.3.1-leader-exits-first (declared max 6 s, remaining 59s) [t=0.03s]
+  enclosure k7pre (group 13942) still has members after exit rc=0: [14229 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;14230 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k7pre runner exit=0 out=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531/20260923T154516Z/ enclosure_group=13942
+  PASS: k7pre predecessor exit-codes present (v5.3.1 format)
+  PASS: k7pre predecessor private lock opened at the enumerated stubs path (A03(V57): predecessor L52/L164, write set of CONTROL_REQUEST_14)
+  PASS: k7pre predecessor inner manifest present (v5.3.1 format; NOT re-verified: v5.3.1 has the known post-hash stamp mutation, R54-A-03/R54B-03)
+  K7pre spawned child pid=[14189] alive after runner exit: YES
+  PASS: K7pre(counterexample): v5.3.1 reports full success
+  PASS: K7pre(counterexample): v5.3.1 advanced to the discriminator and stamped survivors=none
+  PASS(counterexample): unnamed same-group child survived v5.3.1's success path (A01 reproduced)
+  owned cleanup: TERM recorded pids [14189 14229 14230 ] 14189 14179 sleep 30;14229 13942 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;14230 13942 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K7-v5.5-leader-exits-first (declared max 6 s, remaining 57s) [t=2.25s]
+  k7 runner exit=70 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154518Z/ enclosure_group=14451
+  PASS: k7 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k7 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k7 outer+inner manifests re-verify (immutable publication)
+  PASS: k7 inner manifest lists no manifest/temporary entry (A02)
+  K7 spawned child pid=[14948] alive after runner exit: no
+  PASS: K7 post-exit quiescence detected the leaked group member (O1)
+  PASS: K7 halt targeted the recorded group
+  PASS: K7 stage refused (70), cleanup clean
+  PASS: K7 next stage NOT run, fixture stopped after reap, no survivors
+  PASS: K7 deadline started before the first exceptional reap (P4)
+  PASS: leaked child gone before fixture stop/exit
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K8pre-v5.3.1-unnamed-grandchild-under-TERM (declared max 8 s, remaining 51s) [t=8.46s]
+  k8pre runner exit=124 out=/home/user/workspace/execution/s2-setup-prep/runner-selftest-r531/20260923T154525Z/ enclosure_group=15441
+  PASS: k8pre predecessor exit-codes present (v5.3.1 format)
+  PASS: k8pre predecessor private lock opened at the enumerated stubs path (A03(V57): predecessor L52/L164, write set of CONTROL_REQUEST_14)
+  PASS: k8pre predecessor inner manifest present (v5.3.1 format; NOT re-verified: v5.3.1 has the known post-hash stamp mutation, R54-A-03/R54B-03)
+  K8pre spawned grandchild pid=[15691] alive after runner exit: no (v5.3.1 signals the live group here, so 'no' is the expected, non-defective outcome — informational)
+  K8pre registers: final=143 first_exit=143 cleanup_exit=0 signal=TERM reap=ok cleanup_seconds=0.39 guard_spec=0 refusal_hosted=64 refusal_
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K8-v5.5-inner-timeout-grandchild (declared max 8 s, remaining 46s) [t=13.12s]
+  k8 runner exit=124 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154529Z/ enclosure_group=15993
+  PASS: k8 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k8 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k8 outer+inner manifests re-verify (immutable publication)
+  PASS: k8 inner manifest lists no manifest/temporary entry (A02)
+  K8 spawned grandchild pid=[16396] alive after runner exit: no
+  PASS: K8 inner 124 with a live group member detected (O1/B01)
+  PASS: K8 first exit 124 preserved, cleanup clean
+  PASS: K8 fixture stopped after reap, no survivors
+  PASS: grandchild gone
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K9-v5.5-unnamed-setsid-escape-boundary (declared max 6 s, remaining 38s) [t=21.41s]
+  enclosure k9 (group 16749) still has members after exit rc=0: [17229 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;17230 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k9 runner exit=0 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154538Z/ enclosure_group=16749
+  PASS: k9 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k9 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k9 outer+inner manifests re-verify (immutable publication)
+  PASS: k9 inner manifest lists no manifest/temporary entry (A02)
+  K9 escaped unnamed pid=[17175] alive after runner exit: YES
+  PASS: K9 v5.4 reports success (predicted: the escapee is invisible to group+pattern ownership)
+  BOUNDARY CONFIRMED (not an ownership pass): unnamed setsid escapee survives undetected — see FINDINGS_MAP K9/OS-boundary proposal
+  owned cleanup: TERM recorded pids [17175 17229 17230 ] 17175 17175 sleep 30;17229 16749 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;17230 16749 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+SET new1: all planned controls executed; strike=0
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  controllers ended: census_after=[empty]
+  watchdog stopped: shell=13926 sleeper=13927 census_after=[empty]
+SET=new1 controls_run=5/5 strike=0 wall=26.89s of 60s (reserve 8s) aggregate_exit=0 (pre-publication); lane lock: FREE; predecessor lock: FREE; current_authority_file=[] (must be empty); canonical lock file: absent (never opened)

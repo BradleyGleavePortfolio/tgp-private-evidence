@@ -81,6 +81,20 @@ Follow only the archived 2026-09-23/e8d546f9/s6-source-restore/REPORT.md and nam
 
 ## Active successor assignments
 
+### S2-V61-RESULT-A and S2-V61-RESULT-B
+
+- Tier: T4 each, cumulative T4.
+- Why: independent attestation of actual trusted-validation, recovery, process ownership and retained-evidence applicability.
+- T4 trigger scan: validation/recovery; T3 trigger scan: lifecycle/state authority.
+- Bounded T1: NO, recovery/privilege.
+- Independent A: `audit_s5_failure_lens_a_mue9osec`, parent inheritance; independent B: `audit_s5_failure_lens_b_mue9oser`, Claude Fable 5 / High requested. These workers did not build or execute S2. Parent owner EXEC-6c2a68ac.
+- Sole writes: `execution/6c2a68ac/audits/s2-v61-result-a/**` or `s2-v61-result-b/**`, respectively.
+- Exact input: result manifest `d0a1e40669cf5ae85a354c3b35944f9a3dc8b7e6e6d950d8aa2ecff2a28ba067`, 621 entries, from local `execution/6c2a68ac/s2-v61-result` and identical private archive.
+- Acceptance: exact caller/grant/input binding, k120-only approved substitution, actual raw five-set statuses and planned controls, expected negative child semantics, publication/manifests, pre/post preservation, owned-process/signal/write accounting, retained V59 P1/W1/C1 applicability and truthful stub-only limits. Explicit bounded acceptance or concrete material findings.
+- Stop triggers: missing evidence, peer contamination, contradiction or unreviewed consequential boundary.
+
+Read/hash/diff only. No rerun, test, probe, process action, lock open, signal, source change or private checkout write. Do not read the current peer output or parent conclusion as evidence. Use only the named V61/V57/predecessor packets and applicable existing V59/source reviews as needed. No historical archaeology or new framework. Fresh setup and real proof remain separate, inactive authorities pending parent disposition.
+
 ### S5-V32 narrow repair
 
 - Tier: T4 individual and cumulative.

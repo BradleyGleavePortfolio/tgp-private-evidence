@@ -1,0 +1,108 @@
+S2-V61 controls set=k start 2026-09-23T15:44:36Z budget=120s results=/home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/results/k-20260923T154436Z-8133 pid=8133 pgid=8080 timeout_impl=timeout (uutils coreutils) 0.8.0 runner_sha256=efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c pre_runner_sha256=fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 stubs=535dc494cb47b09d 5560c9f74979b886 6dc98ce0d2539daf bc9704e639da7691 
+pre-snapshot pattern matches (never signalled): []
+
+== K1-predecessor-mechanism (declared max 8 s, remaining 119s) [t=0.09s]
+  enclosure k1 (group 8179) still has members after exit rc=124: [8194 timeout --foreground 1500 bash /home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/stubs/harness.sh k1db;8195 bash /home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/stubs/harness.sh k1db;8201 sleep 20;] → retained as owned survivors (authority kept until cleaned)
+  K1 enclosure group=8179 (exclusive; predecessor internals unchanged)
+  K1 outer exit=124; stamp:
+    K1 start pid=8190 2026-09-23T15:44:36Z
+    50 fixture-stop exit=0 (v5.1 shape: stop runs whether or not step 40's child tree is alive)
+    end composition=notrun
+  K1 recorded-owned processes alive after runner exit: [8194 8195 8201 ]
+  PASS: outer timeout fired (124)
+  PASS(counterexample): fixture stop ran under a live step-40 child
+  PASS(counterexample): step-40 child tree survived the runner
+  owned cleanup: TERM recorded pids [8194 8195 8201 ]  8194  8179 timeout --foreground 1500 bash /home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/stubs/harness.sh k1db; 8195  8179 bash /home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/stubs/harness.sh k1db; 8201  8179 sleep 20;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K2-stub-success (declared max 15 s, remaining 117s) [t=2.90s]
+  enclosure k2 (group 8361) still has members after exit rc=0: [8783 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;8784 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k2 runner exit=0 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154439Z/ enclosure_group=8361
+  PASS: k2 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k2 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k2 outer+inner manifests re-verify (immutable publication)
+  PASS: k2 inner manifest lists no manifest/temporary entry (A02)
+  PASS: K2 result registers
+  PASS: K2 all steps reached, refusals 64/64, stop 0, deadline kept
+  PASS: K2 stub banner
+  PASS: K2 real head/tree/clean check
+  PASS: K2 every step group retired (active set empty) before fixture stop (O1/P2, E9)
+  PASS: K2 end line: no active group remains, retired list present (active-vs-retired authority)
+  PASS: K2 every leader was acked before exec (10 ack files: 10,20,21,30,31,32,40,45,50,51)
+  PASS: K2 real harness offline refusal (hosted URL)
+  PASS: K2 real harness offline refusal (no confirm)
+  PASS: K2 fixture init inherited fd 9 (private lock)
+  PASS: K2 harness saw fd 9 closed
+  PASS: K2 harness inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 discriminator inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 cleanup client inherited CHECKPOINT_DISABLE=1 (E6)
+  PASS: K2 owned stop client fully reaped (P3)
+  owned cleanup: TERM recorded pids [8783 8784 ]  8783  8361 /bin/sh /usr/bin/git status --porcelain --untracked-files=all; 8784  8361 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K3-term-during-step40 (declared max 18 s, remaining 111s) [t=8.34s]
+  k3 runner exit=143 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154444Z/ enclosure_group=9177
+  PASS: k3 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k3 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k3 outer+inner manifests re-verify (immutable publication)
+  PASS: k3 inner manifest lists no manifest/temporary entry (A02)
+    step-40 controller (k3): step 40 ACTIVE after 3.3s in /home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154444Z/ (adoption ack + harness workload line); runner pid=9188 validated in CURRENT enclosure 9177 → TERM
+  PASS: K3 step-40 controller saw the ACTIVE step and signalled a validated pid
+  K3 recorded-owned alive after runner exit: []
+  PASS: K3 TERM arrived during the ACTIVE composition step (placement confirmed by the runner's stamp, not inferred)
+  PASS: K3 signal exit recorded as first exit; cleanup class 0
+  PASS: K3 step interrupted, stop 0, no survivors
+  PASS: no step-40 child survives
+  PASS: ordering SIGNAL(20) < REAP ok(23) < fixture stop(26)
+  PASS: K3 lock held through cleanup
+  K3 timing: cleanup_seconds=0.58 cleanup_seconds_total=0.72
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K4-escapee-quarantine (declared max 32 s, remaining 106s) [t=13.08s]
+  k4 runner exit=143 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154449Z/ enclosure_group=10127
+  PASS: k4 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k4 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k4 outer+inner manifests re-verify (immutable publication)
+  PASS: k4 inner manifest lists no manifest/temporary entry (A02)
+    step-40 controller (k4): step 40 ACTIVE after 3.6s in /home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154449Z/ (adoption ack + harness workload line + /^escapee pid=[0-9]+ start=[0-9]+/); runner pid=10138 validated in CURRENT enclosure 10127 → TERM
+  PASS: K4 step-40 controller saw the ACTIVE step and signalled a validated pid
+  PASS: K4 TERM arrived during the ACTIVE composition step (placement confirmed by the runner's stamp)
+  K4 recorded-owned alive after runner exit (expected: the quarantined escapee): [10699 ]
+  PASS: K4 quarantine class 72 separate from first exit 143
+  PASS: K4 fixture stop REFUSED, survivors present
+  PASS: K4 QUARANTINE.txt lists the escapee
+  PASS: K4 lock not declared handed off
+  PASS: no fixture stop after failed reap
+  K4 timing: cleanup_seconds=14.71 (reap 10+5 s)
+  owned cleanup: TERM recorded pids [10699 ] 10699 10699 s2r53-stub-escapee 40;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K5-stop-failure (declared max 15 s, remaining 87s) [t=32.85s]
+  enclosure k5 (group 12502) still has members after exit rc=71: [13078 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;13079 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k5 runner exit=71 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154509Z/ enclosure_group=12502
+  PASS: k5 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k5 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k5 outer+inner manifests re-verify (immutable publication)
+  PASS: k5 inner manifest lists no manifest/temporary entry (A02)
+  PASS: K5 cleanup class 71 with first exit 0 preserved
+  PASS: K5 stop exit 1 recorded
+  owned cleanup: TERM recorded pids [13078 13079 ] 13078 12502 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;13079 12502 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== K6-first-failure (declared max 10 s, remaining 81s) [t=38.25s]
+  enclosure k6 (group 13371) still has members after exit rc=3: [13441 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;13444 sleep 1;13459 /bin/sh /usr/bin/git rev-parse --abbrev-ref HEAD;13461 sleep 1;13513 /bin/sh /usr/bin/git diff --quiet 9742037b153221de565e651ad8ba3b721bc0fb31 HEAD -- package-lock.json package.json prisma/schema.prisma;13514 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  k6 runner exit=3 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154514Z/ enclosure_group=13371
+  PASS: k6 receipt ok (frozen manifest, post-hash receipt)
+  PASS: k6 publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: k6 outer+inner manifests re-verify (immutable publication)
+  PASS: k6 inner manifest lists no manifest/temporary entry (A02)
+  PASS: K6 first failure is the process exit
+  PASS: K6 later steps notrun, no stop
+  owned cleanup: TERM recorded pids [13441 13444 13459 13461 13513 13514 ] 13441 13371 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;13444 13371 sleep 1;13459 13371 /bin/sh /usr/bin/git rev-parse --abbrev-ref HEAD;13461 13371 sleep 1;13513 13371 /bin/sh /usr/bin/git diff --quiet 9742037b153221de565e651ad8ba3b721bc0fb31 HEAD -- package-lock.json package.json prisma/schema.prisma;13514 13371 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+SET k: all planned controls executed; strike=0
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  controllers ended: census_after=[empty]
+  watchdog stopped: shell=8167 sleeper=8176 census_after=[empty]
+SET=k controls_run=6/6 strike=0 wall=40.06s of 120s (reserve 8s) aggregate_exit=0 (pre-publication); lane lock: FREE; predecessor lock: absent; current_authority_file=[] (must be empty); canonical lock file: absent (never opened)

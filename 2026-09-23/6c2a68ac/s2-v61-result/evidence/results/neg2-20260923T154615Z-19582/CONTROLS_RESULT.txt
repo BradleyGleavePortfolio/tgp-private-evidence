@@ -1,0 +1,94 @@
+S2-V61 controls set=neg2 start 2026-09-23T15:46:15Z budget=150s results=/home/user/workspace/execution/e8d546f9/s2-v61/controls-proposed/results/neg2-20260923T154615Z-19582 pid=19582 pgid=8080 timeout_impl=timeout (uutils coreutils) 0.8.0 runner_sha256=efa273c7de7d4bcc34b6f5be0fae74e412d73a5e82fc9e504a0e2a4c10367e1c pre_runner_sha256=fb0d7ce4803fa0d414c703cb0362b2e66626b8d6cf63dfa9054ed8e3eb2dc925 stubs=535dc494cb47b09d 5560c9f74979b886 6dc98ce0d2539daf bc9704e639da7691 
+pre-snapshot pattern matches (never signalled): []
+
+== N4-caller-group-decoy (declared max 40 s, remaining 149s) [t=0.04s]
+  decoy ACKNOWLEDGED: pid=19626 alive in the driver's own group 8080 (controller-listed, NOT owned-work, outside every pattern)
+  enclosure n4a (group 19645) still has members after exit rc=0: [20064 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;20065 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  n4a runner exit=0 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154615Z/ enclosure_group=19645
+  PASS: n4a receipt ok (frozen manifest, post-hash receipt)
+  PASS: n4a publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: n4a outer+inner manifests re-verify (immutable publication)
+  PASS: n4a inner manifest lists no manifest/temporary entry (A02)
+  PASS: N4a normal path final=0
+  PASS: decoy survived the normal-path runner cleanup
+  owned cleanup: TERM recorded pids [20064 20065 ] 20064 19645 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;20065 19645 sleep 1;
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  n4b runner exit=143 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154621Z/ enclosure_group=20359
+  PASS: n4b receipt ok (frozen manifest, post-hash receipt)
+  PASS: n4b publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: n4b outer+inner manifests re-verify (immutable publication)
+  PASS: n4b inner manifest lists no manifest/temporary entry (A02)
+    step-40 controller (n4b): step 40 ACTIVE after 3.3s in /home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154621Z/ (adoption ack + harness workload line); runner pid=20370 validated in CURRENT enclosure 20359 → TERM
+  PASS: N4b step-40 controller saw the ACTIVE step and signalled a validated pid
+  PASS: N4b TERM reached the sleeping composition step (A06: scenario confirmed, not inferred)
+  PASS: N4b exceptional (TERM) path: signal exit, cleanup clean
+  PASS: decoy survived the exceptional-path runner cleanup (group signals hit only self-published groups)
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  PASS: decoy survived the driver's owned cleanup (identity-validated records only)
+  PASS: no retired group remains a record/target after prune (active-vs-retired)
+  PASS: current authority empty between controls (watchdog has no stale target)
+  decoy ended by the driver itself (its controller); controller registry keeps the record for the finally census
+
+== N5a-publication-failure (declared max 10 s, remaining 139s) [t=10.45s]
+  enclosure n5a (group 21244) still has members after exit rc=70: [21295 /bin/sh /usr/bin/git rev-parse HEAD^{tree};21297 sleep 1;21314 /bin/sh /usr/bin/git status --porcelain --untracked-files=all;21316 sleep 1;21332 /bin/sh /usr/bin/git rev-parse --abbrev-ref HEAD;21334 sleep 1;21386 /bin/sh /usr/bin/git diff --quiet 9742037b153221de565e651ad8ba3b721bc0fb31 HEAD -- package-lock.json package.json prisma/schema.prisma;21387 sleep 1;] → retained as owned survivors (authority kept until cleaned)
+  n5a runner exit=70 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154625Z/ enclosure_group=21244
+  PASS: n5a receipt ok (frozen manifest, post-hash receipt)
+  PASS: n5a publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: n5a outer+inner manifests re-verify (immutable publication)
+  PASS: n5a inner manifest lists no manifest/temporary entry (A02)
+  PASS: N5a seam engaged
+  PASS: N5a leader self-exited 70 (publish failed → no exec)
+  PASS: N5a refused 70, cleanup clean
+  PASS: N5a no later step, no fixture stop, no survivors
+  PASS: guard-spec workload never started (no stub output)
+  owned cleanup: TERM recorded pids [21386 21387 ] 
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== N5b-startup-interruption (declared max 16 s, remaining 137s) [t=12.49s]
+  n5b runner exit=143 out=/home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154628Z/ enclosure_group=21925
+  PASS: n5b receipt ok (frozen manifest, post-hash receipt)
+  PASS: n5b publication ok (receipt + outer manifest written, verified, inside deadline)
+  PASS: n5b outer+inner manifests re-verify (immutable publication)
+  PASS: n5b inner manifest lists no manifest/temporary entry (A02)
+    seam controller: seam seen after 3.8s in /home/user/workspace/execution/op88/s2-v57/runner-selftest-r57/20260923T154628Z/; runner pid=21968 validated in CURRENT enclosure 21925 → TERM
+  PASS: seam controller saw the seam and signalled a validated pid
+  PASS: N5b seam engaged (published, not yet adopted)
+  PASS: N5b TERM arrived during the held step
+  PASS: N5b published identity resolved at interruption (adopted, group-signalled)
+  PASS: N5b signal exit, reap ok, cleanup clean
+  PASS: N5b step interrupted, fixture stopped, no survivors
+  PASS: harness workload never started (unacked leader never exec'd)
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== N6-handoff-failure-lock-held (declared max 18 s, remaining 131s) [t=18.14s]
+  holder ACKNOWLEDGED: session pid=23086 holds the lane lock (ready written under the lock by pid 23090)
+  N6 child driver exit=4 (expected 4)
+    HANDOFF FAILURE: owned survivors [] new pattern matches [] lane lock HELD predecessor lock FREE watchdog census [empty] controller census [empty] → aggregate 4 (no further set may start)
+  PASS: aggregate 4 on a non-free lane lock
+  PASS: gate names the held lane lock
+  PASS: assertions passed yet handoff refused (assertions ≠ handoff)
+  PASS: child evidence published with aggregate 4
+  holder ended by its controller; lane lock FREE again
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== N7-watchdog-escalation (declared max 28 s, remaining 130s) [t=19.31s]
+  N7 child driver exit=0 (expected 0)
+  PASS: wdtest child exit 0
+  PASS: TERM then KILL escalation recorded against the current authority
+  PASS: watchdog shell and owned sleeper both gone (closed stop, no residue)
+  PASS: child observed escalation and empty census
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+== N8-driver-cancellation (declared max 28 s, remaining 114s) [t=35.96s]
+  N8 child driver exit=3 (expected 3)
+  PASS: aggregate 3 after cancellation
+  PASS: watchdog cancellation reached the driver's handler
+  PASS: controller sleeper and watchdog ended on the cancellation path
+  PASS: publication completed inside the reserve with aggregate 3
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+
+SET neg2: all planned controls executed; strike=0
+  recorded-owned alive after cleanup: []; pattern-detected (report only): []
+  controllers ended: census_after=[empty]
+  watchdog stopped: shell=19616 sleeper=19617 census_after=[empty]
+SET=neg2 controls_run=6/6 strike=0 wall=55.84s of 150s (reserve 8s) aggregate_exit=0 (pre-publication); lane lock: FREE; predecessor lock: FREE; current_authority_file=[] (must be empty); canonical lock file: absent (never opened)
