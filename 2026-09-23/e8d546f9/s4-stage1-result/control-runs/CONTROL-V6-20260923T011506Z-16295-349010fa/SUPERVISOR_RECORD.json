@@ -1,0 +1,88 @@
+{
+  "kind": "CONTROL",
+  "scenario": "fault-receipt-unwritable",
+  "control_fault": "census-members-persist,receipt-unwritable",
+  "run_id": "CONTROL-V6-20260923T011506Z-16295-349010fa",
+  "overall": "QUARANTINED_RECEIPT_FAILED",
+  "launcher_exit": 11,
+  "overall_semantics": "SUCCESS only if runner exit 0 confirmed, runner EXIT_RECORD.result==SUCCESS, sentinel present, RUNNER_PID handshake matches, owned session empty without supervisor reaping; everything else is non-success. publication_ok is recorded separately by the caller after this file is parsed.",
+  "runner": {
+    "path": "/home/user/workspace/execution/s4-r6-validation/v6/controls/s4-r6-control-stub-v6.sh",
+    "sha256": "6ddf03538e1d1d412ab161349ea79de0e847b40477ce47d50b77b7ee1450d8f3",
+    "spawned_pid": 16352,
+    "exit": 15,
+    "exit_confirmed": true,
+    "exit_record_result": "FAILED",
+    "exit_record_present": true,
+    "sentinel": true,
+    "runner_pid_handshake": 16352,
+    "handshake_ok": true
+  },
+  "owned_session": {
+    "sid": 16352,
+    "census_state": "MEMBERS",
+    "signal_route": "kill -SIG -- -pgid for every foreign pgid in session, then kill -SIG pid for every member; never outside the session",
+    "signalled": "TERM",
+    "members_at_deadline": [
+      "16352",
+      "16376",
+      "16377"
+    ],
+    "orphans_after_runner_exit": [
+      "16352",
+      "16376",
+      "16377"
+    ],
+    "reaped_by_supervisor": [
+      "16352",
+      "16376",
+      "16377"
+    ],
+    "survivors_after_kill": [
+      "16352",
+      "16376",
+      "16377"
+    ]
+  },
+  "bounds": {
+    "outer_s": 4,
+    "grace_s": 6,
+    "confirm_s": 10,
+    "post_exit_reap_s": 8,
+    "publish_s": 5,
+    "read_s": 5,
+    "quarantine_verify_s": 5,
+    "timed_out": true,
+    "interrupt": null,
+    "worst_case_s": 87,
+    "worst_case_formula": "outer+grace+confirm+post_exit_reap+publish+2*read+2*quarantine_verify+16*census+2",
+    "census_s": 2,
+    "census_calls_max": 16,
+    "phases_are_wall_clock": true,
+    "bound_qualification": "sum of declared phase allowances; waits are wall-clock deadlines and every census/reader/writer/re-parse call is under timeout; mv and log lines are not enclosed by a timeout"
+  },
+  "lease": {
+    "path": "/home/user/workspace/execution/s4-r6-validation/v6/control-runs/.private-control-lease.lock",
+    "kind": "private-held-by-launcher",
+    "holder_pid": 16295,
+    "holder_starttime": 211004,
+    "held_by_launcher": true,
+    "released_at_launcher_exit": false,
+    "quarantine_holder_pid": 16328,
+    "quarantine_holder_starttime": 211007,
+    "quarantine_holder_token": "s4r6-quarantine-holder-CONTROL-V6-20260923T011506Z-16295-349010fa",
+    "quarantine_ok": true,
+    "quarantine_receipt_ok": false,
+    "quarantine_failure": "QUARANTINE_LEASE_HOLDER receipt could not be written (holder RETAINED)",
+    "standby_holder_verified": true,
+    "standby_holder_released": null,
+    "standby_holder_respawned": false,
+    "self_hold": false,
+    "semantics": "held from before spawn until verified cleanup by launcher AND a verified standby tokenized holder spawned before anything is owned; unverified survivors or UNKNOWN census on ANY path => the holder keeps the lease (QUARANTINED_SURVIVORS 5 with receipt, QUARANTINED_RECEIPT_FAILED 11 without receipt but holder retained, SELF_HOLD 12 launcher retains fd 9 itself and does not exit). Exclusion is never released while descendants are unresolved. Recovery must verify pid+starttime+token+fd9 before any kill."
+  },
+  "refusal": null,
+  "start_utc": "2026-09-23T01:15:06Z",
+  "end_utc": "2026-09-23T01:15:20Z",
+  "out_dir": "/home/user/workspace/execution/s4-r6-validation/v6/control-runs/CONTROL-V6-20260923T011506Z-16295-349010fa",
+  "console": "/home/user/workspace/execution/s4-r6-validation/v6/control-runs/CONTROL-V6-20260923T011506Z-16295-349010fa/console.log"
+}
