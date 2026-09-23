@@ -1,0 +1,65 @@
+{
+ "audit": "S5-V32 final changed-candidate independent review B",
+ "child": "S5-V32-B",
+ "reviewer": "audit_s5_v31_lens_b_mue9eidl (independent nonbuilder, T4)",
+ "parent": "EXEC-6c2a68ac",
+ "method": "read / sha256sum / diff / cmp / grep only; nothing executed; peer current output not read; prior V31 A/B reports read as previous-round findings",
+ "status": "REVIEW COMPLETE - frozen; no further review requested",
+ "inputs": {
+  "root": "/home/user/workspace/execution/6c2a68ac/s5-v32-builder",
+  "top_seal": {"sha256": "1f23abdcf2ca328f23371fa6018ceb1753553e8e21c65e8765881f814d0e0691", "entries": 34, "non_ok": 0, "self_listed": false},
+  "source_seal": {"sha256": "addc713d7297796cc98fccfb7c05bde770bedf341322a17a38850ed0cd25adba", "entries": 18, "non_ok": 0},
+  "controls_seal": {"sha256": "b99771a79d80e768a710475cd772e0fd1ccc37ca504fbfc723acabed039f036e", "entries": 11, "non_ok": 0},
+  "launcher_v32": "55acc00fe9b04d0e015f37bbdac90e582925c4b4564f7aaaa55c21a13304cf0a",
+  "runner_v101y": "61b565e48fa4c14f765fe223bfc3a8baac27ca2867763c91e6a57135fc4ea1b3",
+  "driver_v32": "4323dc41953f321394e0ee98ffa7c2186943b83067b2cb6886a03aafbca35a3c",
+  "fake_v32": "045d5284993217e98b85932bb33d6ba6e9a272097070ffd1f3c0f42a7b02f838",
+  "own_block_v101": "4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 (identical sed-extract in launcher v3.2 and runner v101y)",
+  "predecessors": {"launcher_v31": "d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630", "launcher_v3": "a10c615fedbac7c24bb1f6c4a4d18172342a1ba612727eef280c5fd70f451a17", "runner_v101x": "81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a", "ctl_v31_v2": "f34769c3d35d853c741a50eecad9da95581067ab59c00f0f6e1c793f187ac62e", "fake_v31": "4e7858a240e9b70409b82cf474ced52cb32437d9a2d7c80d56ee2161cc07704e"},
+  "governance_read": ["SCOPE.md 9e46c048...", "OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md", "S5_V31_AND_V2_RESULT_DISPOSITION.md", "S5_V32_PRIVATE_CONTROLS_GRANT.md (conditional, read as governance; peer headline sentence in SCOPE/grant not used as evidence)"]
+ },
+ "delta_verification": {
+  "launcher_v31_to_v32": {"recomputed_equals_shipped": true, "added": 14, "removed": 11, "code_lines_touched": "L38, L41, L170, L185-189, L193, old L227 removed"},
+  "launcher_v3_to_v32_cumulative": {"recomputed_equals_shipped": true},
+  "runner_v101x_to_v101y": {"recomputed_equals_shipped": true, "added": 6, "removed": 2, "code_lines_touched": "L210 only"},
+  "ctl_v31v2_to_v32": {"recomputed_equals_shipped": true, "added": 34, "removed": 7, "ten_predecessor_checks_byte_identical": true, "total_checks": 11},
+  "fake_v31_to_v32": {"recomputed_equals_shipped": true, "added": 4, "removed": 2, "code_lines_touched": "start_line only"},
+  "counts": {"launcher": "kill 4/4 trap 2/2 rm 6/6 rm-f 3/3 flock 1/1 own_signal 5/5 exit 18/18 setsid 8/8 date 3->2 SPAWN_TS 7->4(comments only)", "runner": "all identical", "driver": "every kill is kill -0 (12/12)"}
+ },
+ "assessments": {
+  "exact_attempt_binding": {"result": "HOLDS", "basis": "form (b) requires ^-anchored START with numeric pid/pgid=$SESSION/ppid and token=$TOKEN followed by a space; TOKEN=date-$$-$RANDOM has no BRE metacharacters and is never empty; no stamp operand; stale record cannot carry this token"},
+  "stale_equal_future_stamp": {"result": "CANNOT BIND", "basis": "no stamp is read; token mismatch -> not-this-attempt on the single code path"},
+  "early_death_liveness_V3B01": {"result": "RETAINED", "basis": "START (runner L210) remains earliest checked publication before L212-L216 die-75 paths; bound trace unchanged"},
+  "assertion_non_weakening": {"result": "HOLDS", "basis": "form (b) strictly narrower than v3.1; runner_truth/release/self_hold/session_state byte-identical"},
+  "primitive_applicability": {"result": "UNCHANGED_POSITIVE", "basis": "no primitive line touched, no new primitive call, own_spawn_begin immediately before spawn line, OWN-BLOCK bytes identical; no re-audit performed or needed"},
+  "p1_acknowledgement_V31B01": {"result": "CLOSED", "lines": "ctl-v32.sh L87 vs launcher self_hold L215-220", "basis": "bounded 5 s wait_text on the exact HEARTBEAT string the unchanged L88 conjunct reads; first HEARTBEAT written before first sleep; timeout -> predicate evaluated unchanged"},
+  "p2_token_bound_wait": {"result": "RETAINED", "line": "L107"},
+  "p3c_negative": {"result": "CORRECT_AND_DETERMINISTIC", "basis": "shim pid = $! = SESSION; seed atomic via mv -f before exec; own_confirm loops full 2 s on decoy before refusing so seed precedes any signal/read; counterfactual v3.1 L183-185 would bind (pgid match, stamp >= SPAWN_TS) -> discriminates; adds ~6 s, ~76 s < 180 s"},
+  "diag": {"result": "OBSERVATION_ONLY", "basis": "FAIL-only, after evaluation, before STOP; regular files only; single write $OUT/FAIL.<check>.diag; cannot convert FAIL to PASS"},
+  "raw_publication_ownership": {"result": "HOLDS", "basis": "writes only under $S5X_OUT; signal set kill -0 only; launcher signals only its own unadopted gate; canonical substrings refused; real runner hard-codes canonical paths and is never launched privately"}
+ },
+ "findings": [
+  {"id": "V32-B-01", "class": "C", "statement": "pgid=$SESSION retained as conjunct of form (b); if inner timeout re-groups its child on the actual platform, form (b) never matches and real early death degrades to fail-closed unknown hold (never a false bind). Pre-existing since v3.1; P3b measures it through the same chain.", "action": "RECORD; P3b answers"},
+  {"id": "V32-B-02", "class": "C", "statement": "SPAWN_TS removal accepted; token-collision residual requires same UTC second + same launcher pid + same $RANDOM; strictly smaller than any v3.1 residual; unchosen alternative would reintroduce clock-step-back false negative.", "action": "RECORD; no change"},
+  {"id": "V32-B-03", "class": "C", "statement": "P3c stamp comparison and all bounded waits assume no wall-clock step-back within a 2-20 s window; violation -> false FAIL with diag, never false PASS.", "action": "RECORD"},
+  {"id": "V32-B-04", "class": "C", "statement": "diag is a post-evaluation snapshot (up to one 2 s heartbeat of drift); its lock_free probe opens fd 8 on the private lock (creates file if absent) - private path only, same probe the checks use.", "action": "RECORD/QUALIFY"},
+  {"id": "V32-B-05", "class": "C (carried)", "statement": "fake logged by hash but not pinned by the driver (unchanged since v2); mitigated by sealed packet, PIN_L and grant manifest verification.", "action": "RECORD"}
+ ],
+ "carried_closures": {
+  "V31-B-01": "CLOSED (L87)",
+  "V31-B-02": "CORRECTED in driver header (predecessor e87b0a2e)",
+  "V31-B-03": "STATED in request and grant (non-root, job control off, util-linux setsid, procps, uutils timeout 0.8.0 with enumerated relied-on semantics, no GNU assertion)",
+  "V31-B-04": "CARRIED informational (fake cleanup_failures=none vs canonical 0; P3b check correct for the fake)",
+  "S5-V31-A-01": "CLOSED (token at earliest publication; P3c negative)",
+  "V3-B-01": "RETAINED",
+  "O-B-01": "ADDRESSED (diag), class C"
+ },
+ "blocker": {"A": "none", "B": "none", "statement": "No concrete harmful or proof-invalidating path identified in these exact bytes; no smallest-fix owed."},
+ "separated_determinations": {
+  "source_closure": "CLOSED - launcher v3.2 55acc00f + runner v101y 61b565e4; no A/B finding",
+  "one_shot_private_proof_grantability": "GRANTABLE AS-IS - ctl-v32.sh 4323dc41 + fake 045d5284 under the grant's stated prerequisites; success = raw 0 and ALL_CASES_DONE pass=11 fail=0 with all eleven checks logged; failures/timeouts/unresolved holders preserved and reported, not re-run",
+  "canonical_setup_T0_S6": "NOT CLEARED by this review; separate authorities; parent evaluates the actual proof; historical V2 X6 stays failed with unknown operand",
+  "product_clearance": "NONE"
+ },
+ "truth": ["nothing executed by B; all diff bodies independently reproduced; 11/11 is a static expectation, not evidence", "runtime/model identity not observable, not asserted", "concrete findings bind on their own terms; no majority reading implied", "review frozen; C findings do not delay execution"]
+}
