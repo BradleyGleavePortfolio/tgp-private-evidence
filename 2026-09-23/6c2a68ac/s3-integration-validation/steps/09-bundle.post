@@ -1,0 +1,5 @@
+source $O/steps/chk.sh; cd $W
+chk "bundle file exists" test -s $O/s3-into-s1s2-be0ba827-from-public-c23b9d9.bundle
+eq "bundle heads HEAD be0ba827" be0ba8274e486dee77f15d18fe367a13ff08ecf5 "$(git bundle list-heads $O/s3-into-s1s2-be0ba827-from-public-c23b9d9.bundle | grep ' HEAD$' | cut -d' ' -f1)"
+eq "write-tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"; eq "HEAD unchanged" be0ba8274e486dee77f15d18fe367a13ff08ecf5 "$(git rev-parse HEAD)"
+exit $FAIL

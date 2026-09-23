@@ -197,6 +197,12 @@ In parallel `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` assigns source-only T4 buil
 
 S6 and S5 remain runtime queued. The two required final-head attestations start their source/applicability portions in parallel under `S3_FINAL_HEAD_REVIEW_SCOPE.md`: independent nonbuilders `audit_s5_failure_lens_a_mue9osec` and `audit_s5_failure_lens_b_mue9oser`, each T4, sole respective `audits/s3-final-head-a/**` or `-b/**`, read/hash/diff only. Same review incorporates the frozen runtime results later; no premature final clearance or extra audit layer. Parent retains sole private publication authority; no Bradley decision required.
 
+## S3 targeted result and S6 setup transition
+
+S3 original09–14 COMPLETE: six actualraw0,31 suites/825 tests PASS, exactbe0ba827/treea584/lockb7fed preserved, result1513911d/27 entries and bundled204a582. Executor returned canonical runtime. Both already-active final-head reviewers receive this frozen result for the same review; composed proof remains pending, source preparation active.
+
+`S3_TARGETED_RESULT_AND_S6_SETUP_ACTIVATION.md` assigns the returned sole runtime to S6 SETUP ONLY under the exact dual-closed `S6_ACTUAL_SETUP_AND_C6_GRANTS.md`. Executor `restore_s6_substrate_mue9osen`; no further private controls/source audit. C6, S3 composed runtime and S5 setup/T0 stay inactive. No source, remote-product or customer scope expansion.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

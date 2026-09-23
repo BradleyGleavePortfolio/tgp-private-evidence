@@ -39,22 +39,22 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 |---|---|---|---|
 | S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Actual discriminator48/48 at composed d5cd, guard72/72; dual final applicability accepted, membership path remains unobserved. |
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
-| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | Exact two-parent local commit, treea584, all true hooks PASS. Extra step08 observation raw127 preserved; existing08D identity accepted. Original09–14 ACTIVE, composed proof preparation source-only in parallel. |
+| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | Hooked treea584;09–14allraw0,31 suites/825 tests PASS, sealed1513911d/27, bundled204a582. Runtime released; composed proof source preparation and final-head reviews active. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus frozen patchc36258b3 | Dual source CLOSED; actual private raw0/11PASS accepted, resulta21622ee/66 entries, slot released16:31:09Z. Canonical setup/T0 queued, not active. V2 stays failed. |
-| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Four-file seal001b840f/28 entries SOURCE-CLOSED by Ad9a9d4c5/Bb64eb282, no A/B; actual setup then C6-only queued, not active. |
+| S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Four-file seal001b840f SOURCE-CLOSED by Ad9a9d4c5/Bb64eb282; actual SETUP ACTIVE sole runtime, C6 remains separately held. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S3 builder `restore_s3_candidate_mue9wspd` owns sole runtime for remaining09–14. S2 owner `restore_s2_substrate_mue9eidh` prepares the additive composed-proof binding successor, source-only under `s3-composed-proof-prep/**`, no worktree/runtime writes. Narrow reviewer `audit_s5_failure_lens_b_mue9oser` is complete. S6 builder and both independent reviewers are complete and retain no slot; actual setup executor `restore_s6_substrate_mue9osen` is queued. Parent alone publishes dispositions.
+S3 builder returned runtime after sealed09–14 success. S6 setup executor `restore_s6_substrate_mue9osen` now owns the sole runtime under its exact setup grant. S2 owner `restore_s2_substrate_mue9eidh` prepares the additive composed-proof binding successor source-only under `s3-composed-proof-prep/**`, no worktree/runtime writes. Independent S3 final-head reviewers A/B work on source/applicability and the frozen targeted packet; they await the composed proof for final determinations. Parent alone publishes dispositions.
 
 ## DAG
 
-S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [ACTIVE] → composed-lock release proof [source preparation parallel] → dual final-head attestations.
+S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [allraw0,31 suites/825 tests PASS] → composed-lock release proof [source preparation active] → dual final-head attestations [source/result portions active].
 
-In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 correction/dual final review [all CLOSED/ACCEPTED] → actual S6 setup→C6-only [QUEUED]. S5 canonical setup/T0 grants also queue without blocking S3.
+In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 correction/dual final review [all CLOSED/ACCEPTED] → actual S6 setup [ACTIVE] → C6-only [HELD pending setup and separate activation]. S5 canonical setup/T0 grants also queue without blocking S3.
 
 Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R → N/Q1 → C → C1/lifecycle/forward-2.x → compatible mobile/extension/native writers → relationships/reconciliation → integrated host/device → real platforms and unseen-site induction → measured pilot → universal importer acceptance → retained TGP V1.
 
@@ -74,10 +74,10 @@ Original failures and all qualifications remain immutable under the intake commi
 
 ## Next executable slices
 
-1. T4 finish active S3 steps09–14 on exact be0ba827; no reinstall/generation/commit/identity rerun.
-2. T4 S3 composed-lock release-path evidence on the actual integrated head; disjoint source-only successor preparation is active.
+1. T4 finish active S6 setup; direct parent result disposition then separately activate C6.
+2. T4 S3 composed-lock release-path evidence on exact be0ba827; source-only successor preparation is active while S6 runs.
 3. T4 S3 two independent final-head attestations.
 4. T4 S6 actual setup, then C6-only causal proof on the next appropriate returned runtime slot.
 5. T4 corrected S5 canonical setup, then exact T0 on its actual prerequisites.
 
-Bradley decision required: NO. Exact next action: finish active S3 steps09–14 and prepare its composed proof in parallel; S6 dual source closure is accepted and actual setup/C6 queued. See `S3_STEP08_DISPOSITION_AND_VALIDATION_ACTIVATION.md`, `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` and `S6_DUAL_CLOSURE_AND_RUNTIME_QUEUE.md` under `execution/6c2a68ac/`.
+Bradley decision required: NO. Exact next action: active S6 setup, S3 composed-proof preparation and existing final-head reviews in parallel. See `S3_TARGETED_RESULT_AND_S6_SETUP_ACTIVATION.md`, `S3_COMPOSED_PROOF_PREPARATION_GRANT.md` and `S3_FINAL_HEAD_REVIEW_SCOPE.md` under `execution/6c2a68ac/`.

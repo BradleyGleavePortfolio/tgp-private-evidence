@@ -1,0 +1,1083 @@
+label=jest-targeted head=be0ba8274e486dee77f15d18fe367a13ff08ecf5 merge_head= write_tree=a584a1b95423f95dae8daabf673ef3776604acbb node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='true' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' cwd=/home/user/workspace/worktrees/s3-prep2 T=1800 loadavg='1.02 0.49 0.68 1/112 1352' mem_avail_mb=7715 utc=2026-09-23T17:07:05Z
+cmd: npx --no-install jest --ci --runInBand --verbose test/ci/r100-pathspec.spec.ts test/ci/r75-gate.spec.ts test/ci/r75-wiring.spec.ts test/ci/r75-enforcement.spec.ts test/ci/r75-boundaries.spec.ts test/ci/delivery-artifact.spec.ts test/ci/release-evidence-gate.spec.ts test/ci/dependency-audit.spec.ts test/ci/fly-readiness.spec.ts test/rate-limit.spec.ts test/observability test/contracts/importer-contract.spec.ts test/common/feature-flag-not-found.bootstrap.spec.ts src/scout/scout.service.spec.ts test/scout/scout-diagnostics-boundary.spec.ts test/scout/scout-diagnostics-public-cause.spec.ts test/scout/scout-diagnostics-public.spec.ts test/scout/scout-diagnostics.integrity.spec.ts test/health-readiness-bounded.spec.ts test/health-readiness-public.spec.ts
+PASS test/ci/delivery-artifact.spec.ts (11.446 s)
+  fly-deploy.yml — merge is not deployment
+    ✓ has no push / pull_request / schedule trigger; only workflow_dispatch with a required release_sha (8 ms)
+    ✓ deploy job needs the evidence gate, requires its success result and re-pins the sha (1 ms)
+    ✓ gate runs only from main, runs the committed gate script and has no continue-on-error / || true fallbacks (1 ms)
+    ✓ deploy passes the authorized sha as image label and build args (not GITHUB_SHA of some other ref)
+  fly-deploy.yml — gate checks the same environment the deploy job binds to
+    ✓ REQUIRED_ENVIRONMENT equals deploy environment.name (1 ms)
+  codeql.yml — fail closed
+    ✓ analyze step has no continue-on-error and no GHAS-state fallback step (1 ms)
+    ✓ still runs on PRs, pushes to main and a schedule (4 ms)
+  sbom.yml — production closure, lifecycle-free install, proven artifact
+    ✓ runs on pull requests to main and on main pushes (requirable pre-merge, verifiable post-merge) (5 ms)
+    ✓ installs with --omit=dev --ignore-scripts (the lefthook prepare hook killed the old job)
+    ✓ generates with npm sbom from the installed tree (not --package-lock-only) and runs the proof before upload (5 ms)
+  r100-quality-gate.yml — generic volume quotas retired, concrete check kept
+    ✓ has only the banned-casts job (1 ms)
+  setup-branch-protection.sh — required check list matches current workflows
+    ✓ does not require retired checks and does require CodeQL
+    ✓ gate default REQUIRED_WORKFLOWS and the protection list both name the composed dependency-audit job (S2-B8) (1 ms)
+    ✓ no longer recommends a second PAT as reviewer
+  Dockerfile / .dockerignore — production artifact shape (structural only; no image built here)
+    ✓ is multi-stage with a runtime stage that installs --omit=dev and copies dist from build
+    ✓ runtime stage asserts prisma CLI present and dev tooling absent at build time (10 ms)
+    ✓ does not bake NODE_ENV or secrets, keeps Sentry token as a build secret in the build stage only (1 ms)
+    ✓ .dockerignore excludes VCS, CI, tests and docs from the build context
+  verify-fly-release.sh — running machines must be the authorized image
+    ✓ passes for a converged app and records the digest in the manifest (66 ms)
+    ✓ fails when a machine still runs the previous image tag (15 ms)
+    ✓ fails when the image label GH_SHA does not match the release sha (14 ms)
+    ✓ fails when no machine is started (12 ms)
+    ✓ fails when started machines run two different digests (19 ms)
+    ✓ fails on malformed or missing digest (13 ms)
+    ✓ fails on non-array input (7 ms)
+  assert-prod-sbom.sh — production dependency proof
+    ✓ passes for the production closure including the dev-optional prisma CLI (33 ms)
+    ✓ fails when a lockfile dev-only package leaks in (name@version match) (19 ms)
+    ✓ fails when an explicit build/test tool is present even if the lockfile mis-flags it (25 ms)
+    ✓ fails when the prisma CLI (release_command dependency) is missing (31 ms)
+    ✓ fails on zero components or a non-CycloneDX document (11 ms)
+  privileged action refs are pinned to full commit SHAs (S2-B1 / S2-A-07)
+    ✓ .github/workflows/fly-deploy.yml: every uses: is a 40-hex pin (no @master / @vN) (1 ms)
+    ✓ .github/workflows/sbom.yml: every uses: is a 40-hex pin (no @master / @vN) (1 ms)
+    ✓ .github/workflows/codeql.yml: every uses: is a 40-hex pin (no @master / @vN)
+    ✓ .github/workflows/fly-db-secrets-set.yml: every uses: is a 40-hex pin (no @master / @vN) (1 ms)
+    ✓ .github/workflows/fly-feature-flags-set.yml: every uses: is a 40-hex pin (no @master / @vN)
+    ✓ .github/workflows/fly-launch-env-set.yml: every uses: is a 40-hex pin (no @master / @vN)
+    ✓ .github/workflows/fly-recent-auth-set.yml: every uses: is a 40-hex pin (no @master / @vN) (1 ms)
+    ✓ .github/workflows/fly-secrets-set.yml: every uses: is a 40-hex pin (no @master / @vN)
+    ✓ .github/workflows/fly-logs.yml: every uses: is a 40-hex pin (no @master / @vN) (1 ms)
+    ✓ .github/workflows/fly-secrets-list.yml: every uses: is a 40-hex pin (no @master / @vN)
+    ✓ download-artifact and upload-artifact are the same major (v5)
+  fly-deploy.yml — recovery and migration evidence (S2-B6 / S2-B7 / S2-A-05 / S2-A-06)
+    ✓ records running machines and computes the migration delta BEFORE flyctl deploy
+    ✓ only filtered machine data reaches the uploaded evidence
+    ✓ manifest artifact name and body carry the job result; deploy waits bounded
+    ✓ migrations input exists and is only an acknowledgement string, not a default-on switch
+  production-mutating Fly operator workflows are bound to the production environment (S2-B10)
+    ✓ fly-db-secrets-set.yml has environment: production (1 ms)
+    ✓ fly-feature-flags-set.yml has environment: production
+    ✓ fly-launch-env-set.yml has environment: production
+    ✓ fly-recent-auth-set.yml has environment: production (1 ms)
+    ✓ fly-secrets-set.yml has environment: production
+  Dockerfile — runtime residue (S2-B9)
+    ✓ runtime stage drops root and disables scarf telemetry during install
+  setup-branch-protection.sh — explicit review-count decision and app-bound checks (S2-B3)
+    ✓ requires REQUIRED_APPROVING_REVIEW_COUNT and CHECKS_APP_ID, never app_id -1, lists build-sbom, no private path (1 ms)
+  filter-machines.sh — evidence excludes raw machine config (S2-A-06)
+    ✓ keeps id/state/image_ref/checks, drops config.env and services (5 ms)
+  migration-delta.sh — release_command migrations need an explicit acknowledgement (S2-B7 / S2-A-05)
+    ✓ empty delta, no ack → pass and manifest records status empty (114 ms)
+    ✓ non-empty delta without ack → refused, names the files (268 ms)
+    ✓ non-empty delta with ack → pass, manifest lists files and acknowledged=true (203 ms)
+    ✓ empty delta with a stray ack → refused (the input must mean something) (182 ms)
+    ✓ wrong ack word is not an acknowledgement (219 ms)
+    ✓ running commit unknown (no GH_SHA label) → refused without ack, allowed with ack as status unknown (72 ms)
+    ✓ running commit not in this repository history → refused without ack (179 ms)
+    ✓ release sha not a commit here → refused (50 ms)
+  release.sh — verifier contract preflight before DB contact, discovery fail-closed, verifiers after deploy (S2-R2-A-03 / S1 integration)
+    ✓ step 0 discovers verify.sql files and checks the required-verifier contract BEFORE migrate deploy (1 ms)
+    ✓ uses no process substitution for discovery anywhere (a failing find must not read as an empty set)
+    ✓ step 4 runs every discovered verifier via prisma db execute on DIRECT_URL, after deploy, before exit 0, asserting counts, fail-closed
+    ✓ the required-verifier contract file exists, is non-empty, and every entry is a bare migration directory name
+    ✓ the runtime image ships prisma/, release.sh and the contract file, and asserts the contract file at build time (1 ms)
+  release.sh — behaviour with a fake prisma runner (no database, no network)
+    ✓ required verifier present → exit 0, deploy ran, counts reported (101 ms)
+    ✓ step 1 counts the genuine Prisma 6.19.3 pending block as exactly 1 (single-line metric; S1S2-B-01) (40 ms)
+    ✓ up-to-date status → pending 0 as a single line (38 ms)
+    ✓ ALL_APPLIED without a real ledger degrades to `unknown` with the cause printed, never a fabricated count (S1S2-B-02) (40 ms)
+    ✓ required verifier missing from the image → refused BEFORE migrate deploy (20 ms)
+    ✓ prisma/migrations absent (discovery impossible) → refused BEFORE migrate deploy, not "zero verifiers" (18 ms)
+    ✓ contract file missing or empty → refused BEFORE migrate deploy (39 ms)
+    ✓ contract entries with path separators, traversal or duplicates → refused (76 ms)
+    ✓ a verifier that RAISEs → exit 1 after deploy (the migration is applied; release is not green) (38 ms)
+  operator workflows — dispatch inputs are data, never shell source (S2-R2-A-01)
+    ✓ these are all the fly-* operator workflows (and fly-logs-dump.yml, the hidden machine-start, is gone)
+    ✓ fly-db-secrets-set.yml: no run: block interpolates inputs; every input reaches shell only through step env: (5 ms)
+    ✓ fly-db-secrets-set.yml: validates the app target against the allowlist before any credentialed command (2 ms)
+    ✓ fly-db-secrets-set.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-feature-flags-set.yml: no run: block interpolates inputs; every input reaches shell only through step env: (2 ms)
+    ✓ fly-feature-flags-set.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-feature-flags-set.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-launch-env-set.yml: no run: block interpolates inputs; every input reaches shell only through step env: (1 ms)
+    ✓ fly-launch-env-set.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-launch-env-set.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-logs.yml: no run: block interpolates inputs; every input reaches shell only through step env: (1 ms)
+    ✓ fly-logs.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-logs.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-recent-auth-set.yml: no run: block interpolates inputs; every input reaches shell only through step env: (2 ms)
+    ✓ fly-recent-auth-set.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-recent-auth-set.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-secrets-list.yml: no run: block interpolates inputs; every input reaches shell only through step env: (1 ms)
+    ✓ fly-secrets-list.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-secrets-list.yml: has permissions: contents: read (no write scopes)
+    ✓ fly-secrets-set.yml: no run: block interpolates inputs; every input reaches shell only through step env: (2 ms)
+    ✓ fly-secrets-set.yml: validates the app target against the allowlist before any credentialed command (1 ms)
+    ✓ fly-secrets-set.yml: has permissions: contents: read (no write scopes)
+    ✓ no operator workflow starts, stops, restarts, destroys, scales or deploys machines (S2-R2-A-02); only fly-deploy.yml deploys (5 ms)
+
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mimport.complete push failed for coach coach-1: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mimport.complete push failed for coach coach-1: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[31m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [31m  ERROR[39m [38;5;3m[ScoutService] [39m[31mscout import intent-1 has an unrecognised persisted terminal_status; failing closed to 'failed'[39m
+[31m[Nest] 1369  - [39m09/23/2026, 5:07:19 PM [31m  ERROR[39m [38;5;3m[ScoutService] [39m[31mscout import intent-1 has an unrecognised persisted terminal_status; failing closed to 'failed'[39m
+PASS src/scout/scout.service.spec.ts
+  ScoutService
+    recordProgress (hot path)
+      ✓ does not write to the DB synchronously (2 ms)
+      ✓ persists the recorded snapshot on the next flush (1 ms)
+      ✓ keys the upsert by (coach_id, intent_id, device_id) (2 ms)
+      ✓ keeps two independent rows when one import is mirrored from two devices
+      ✓ coalesces two snapshots from the same device into one upsert
+      ✓ normalises the snapshot to the persisted entity shape (1 ms)
+      ✓ writes the same snapshot on the create and update branch of the upsert (1 ms)
+      ✓ defaults last_error to null when lastError is absent (1 ms)
+      ✓ propagates lastError onto last_error when present (1 ms)
+      ✓ coalesces repeated snapshots for one import into a single upsert
+      ✓ keeps only the latest snapshot when coalescing (1 ms)
+      ✓ separates snapshots for different imports of the same coach (1 ms)
+      ✓ separates snapshots for the same intent across different coaches
+    flush
+      ✓ is a no-op when the cache is empty
+      ✓ drains the cache so a second flush writes nothing (1 ms)
+      ✓ re-queues a snapshot when its upsert fails so progress is not lost (1 ms)
+      ✓ does not re-queue a failed snapshot if a fresher one arrived mid-flush (1 ms)
+      ✓ continues flushing remaining imports after one fails (1 ms)
+    flushTick / lifecycle
+      ✓ flushTick drains the cache
+      ✓ onModuleDestroy flushes anything still cached (1 ms)
+      ✓ exposes a positive flush interval constant
+    complete (cold path)
+      ✓ inserts a completion row on the first call
+      ✓ persists coach_id, intent_id, terminal_status and final_counts (1 ms)
+      ✓ returns an acknowledgement carrying the intent_id
+      ✓ flips the parent import state to the terminal_status (R-STATE-1)
+      ✓ owns the state flip and the ledger insert in a single transaction (1 ms)
+      ✓ flushes pending progress before settling (1 ms)
+      ✓ fires the mobile push on the first completion
+      ✓ emits the scout.ingest.completed analytics event on the first completion (1 ms)
+      ✓ describes successful transport as staging rather than verified migration (1 ms)
+      ✓ uses a degraded push title/body for a partial import (1 ms)
+      ✓ uses a degraded push for a failed import
+    complete idempotency
+      ✓ treats a duplicate (P2002) as a no-op and does not re-notify (1 ms)
+      ✓ does not re-emit analytics on a duplicate completion
+      ✓ never flips the parent state outside the ledger transaction on a duplicate
+      ✓ notifies exactly once across a first call and a retry (11 ms)
+      ✓ rethrows a non-P2002 Prisma error
+      ✓ rethrows a generic (non-Prisma) error (1 ms)
+    complete resilience
+      ✓ still acknowledges when the push transport fails
+      ✓ still emits analytics when the push transport fails (1 ms)
+      ✓ omits final_counts cleanly when the extension did not send any (1 ms)
+    complete pre-settle flush is best-effort (P3: no settle-wedge)
+      ✓ still settles and notifies when the pre-settle snapshot flush fails (1 ms)
+      ✓ leaves the failed snapshot pending and retryable after settling
+      ✓ read still fails closed (5xx, not 404) while the bad snapshot remains pending (1 ms)
+      ✓ does not flush an unrelated tenant/run when settling (1 ms)
+      ✓ does not raise an unhandled rejection when the pre-settle flush fails (3 ms)
+    getImportStatus (read surface)
+      ✓ throws 404 when no evidence of the intent exists anywhere (1 ms)
+      ✓ does not emit analytics for an unknown intent
+      ✓ drains in-flight progress before reading so a just-accepted run is not falsely 404d (1 ms)
+      ✓ reports running when committed entities exist but no terminal row does (1 ms)
+      ✓ never exposes completed_at while running, even if the row carries a stray one (1 ms)
+      ✓ reports running from a progress snapshot alone (no entities, no settle)
+      ✓ reflects a settled success verbatim, preferring its started_at over the snapshot
+      ✓ reflects a settled partial verbatim (1 ms)
+      ✓ reflects a settled failed verbatim
+      ✓ fails closed to failed (not running) on an unrecognised stored terminal_status (1 ms)
+      ✓ emits an observable RED corruption signal (no offending value) when failing closed (1 ms)
+      ✓ does not raise the corruption signal for a recognised terminal state
+      ✓ derives started_at from the earliest committed entity (stable first observation) (1 ms)
+      ✓ prefers the first committed entity over the import row start on a settled run
+      ✓ exposes committed counts (proof), sorted, and never an estimate field (1 ms)
+      ✓ scopes every read by the caller coach id (IDOR / tenant ownership)
+      ✓ emits a RED-signal event carrying only intent_id + status (no PII)
+      ✓ returns only the declared safe shape — no tokens, payloads, or free-text error
+    getImportStatus concurrency + tenant isolation (key-scoped flush)
+      ✓ does not touch an unrelated tenant/run backlog on a read (no global drain)
+      ✓ coalesces two concurrent reads onto one in-flight write (no double write, no false 404) (1 ms)
+      ✓ fails closed (propagates, not a 404) when the requested-key persist fails
+      ✓ recovers on retry after a requested-key persist failure (snapshot stays pending) (16 ms)
+      ✓ drops the run from the pending index once its key persists (no repeat write) (1 ms)
+
+PASS test/contracts/importer-contract.spec.ts (50.052 s)
+  importer contract (R80 freeze)
+    ✓ redeem advertises 500 for post-claim session mint failure (1 ms)
+    drift check
+      ✓ the checked-in artifact exists (1 ms)
+      ✓ the checked-in artifact is byte-identical to a fresh regeneration (1 ms)
+      ✓ serialization is deterministic (stable key order across runs)
+    surface completeness
+      ✓ exposes exactly the importer routes, /api-prefixed (1 ms)
+      ✓ carries the bearer security scheme referenced by guarded routes
+      ✓ inlines every schema its paths reference (no dangling $refs) (5 ms)
+    shared error schemas mirror the runtime envelopes
+      ✓ ErrorEnvelope pins the always-present keys and keeps code/request_id optional (1 ms)
+      ✓ RateLimitError models the distinct 429 body (retryAfter, no timestamp/path)
+    read: GET /api/scout/import/status
+      ✓ requires the intent_id query parameter with a 1..128 bounded string schema (1 ms)
+      ✓ documents 400 and 404 without an existence oracle (flag-off ≡ not-found)
+      ✓ returns the ScoutImportStatusResult projection on 200 with exactly its five fields (1 ms)
+      ✓ pins status to the four provable states only — no pending/cancelled
+      ✓ reports committed counts as proof — the two-field DTO omits total_estimated (1 ms)
+      ✓ pins started_at and completed_at as nullable date-time strings (not object)
+    read: GET /api/scout/reconstruct/entities (IMPORTER-I)
+      ✓ requires a bounded intent_id and a non-person family query param
+      ✓ returns the ScoutEntitiesResult page projection on 200 (6 ms)
+      ✓ advertises a PII-minimal ReconstructedEntityDto row (no email/billing/coach_id)
+      ✓ documents 400 (bad query) and a no-oracle 404 (flag-off ≡ no-evidence)
+      ✓ models the reachable 401/403/404 as the shared envelope and 429 as the rate-limit body
+    auth: POST /api/auth/extension/refresh
+      ✓ returns the rotated Supabase session on 200
+      ✓ returns the shared ErrorEnvelope with a required code enum on 401
+      ✓ advertises ValidationPipe 400 as the shared ErrorEnvelope (no domain code)
+      ✓ advertises the rate-limit status as the RateLimitError body
+    pairing: POST /api/extension/pair/*
+      ✓ init returns { pairing_code, expires_at } on 201 (1 ms)
+      ✓ init 400 is the shared envelope; code is OPTIONAL and pinned to `code_mint_failed` when present
+      ✓ init advertises the reachable 429 (global authed throttle) (4 ms)
+      ✓ status returns the pending|paired|expired enum on 200
+      ✓ status advertises ValidationPipe 400 (same 6-digit code rule as redeem) (1 ms)
+      ✓ status advertises JwtAuth 401 before role 403
+      ✓ init advertises JwtAuth 401 before role 403
+      ✓ status advertises the reachable 429 (global authed throttle)
+      ✓ redeem returns the token pair + chosen_platform on 200
+      ✓ redeem 400 is the shared envelope; code is OPTIONAL and pinned to `invalid` when present (2 ms)
+      ✓ redeem 410 is the shared envelope with a REQUIRED code from the 410 enum
+      ✓ redeem advertises the dark-route 404 (envelope) and the per-IP 429 (rate-limit)
+    scout: POST /api/scout/*
+      ✓ ingest returns { received, deduped } on 202
+      ✓ ingest keeps provenance camelCase at the top of a snake_case envelope
+      ✓ ingest pins capturedAt to a strict date-time string (1 ms)
+      ✓ ingest models its 4xx as the shared envelope and 429 as the rate-limit body
+      ✓ progress requires deviceId and returns 204 (1 ms)
+      ✓ progress advertises ValidationPipe 400
+      ✓ progress advertises the reachable 403 (role) and 429 (throttle)
+      ✓ complete acknowledges the settled intent on 200 (1 ms)
+      ✓ complete advertises ValidationPipe 400
+      ✓ complete advertises the reachable 403 (role) and 429 (throttle)
+    cross-process determinism
+      ✓ a fresh subprocess regeneration is byte-identical to the committed artifact (27818 ms)
+
+PASS test/ci/release-evidence-gate.spec.ts (6.275 s)
+  release-evidence-gate.sh — passing world
+    ✓ passes and writes a manifest naming every run, the analysis and the SBOM sha256 (271 ms)
+    ✓ newest run wins: an older failure superseded by a newer success passes (230 ms)
+  release-evidence-gate.sh — exact head binding
+    ✓ rejects a short / non-hex sha (12 ms)
+    ✓ rejects RELEASE_SHA != DISPATCH_SHA (push landed after authorization) (10 ms)
+  release-evidence-gate.sh — required run negatives (one mutation each)
+    ✓ missing CI run for the sha fails (absence is not success) (28 ms)
+    ✓ stale run on a different sha does not count (27 ms)
+    ✓ newest run failed even though an older run succeeded (34 ms)
+    ✓ in-progress newest run fails (34 ms)
+    ✓ cancelled / skipped run conclusions fail (155 ms)
+    ✓ run from a fork head repository is not trusted (26 ms)
+    ✓ pull_request-event run is not trusted (workflow file may be the PR copy) (25 ms)
+    ✓ run on a non-main branch is not trusted (32 ms)
+    ✓ a same-name workflow at a different path is not the required workflow (25 ms)
+    ✓ a required job that was skipped inside a green run fails (50 ms)
+    ✓ a required job missing from the run fails (53 ms)
+    ✓ duplicate job names: a failed duplicate behind a green first entry fails (not resolved by .[0]) (52 ms)
+    ✓ duplicate job names: all entries green passes (242 ms)
+    ✓ a candidate-weakened required list (SBOM dropped) is refused (100 ms)
+    ✓ an empty required list is refused (48 ms)
+  release-evidence-gate.sh — deployment environment must already be protected
+    ✓ environment without a required_reviewers rule fails (auto-created unprotected env) (247 ms)
+    ✓ required_reviewers rule with an empty reviewer list fails (237 ms)
+    ✓ only a wait_timer rule is not a human authorization (233 ms)
+    ✓ admin bypass enabled fails even with reviewers (234 ms)
+    ✓ environment missing (404) fails (236 ms)
+    ✓ REQUIRED_ENVIRONMENT selects which environment is checked (483 ms)
+  release-evidence-gate.sh — composed dependency-audit is a required input (S2-B8)
+    ✓ fails when no dependency-audit run exists for the head sha (117 ms)
+    ✓ fails when the dependency-audit job concluded failure (134 ms)
+  release-evidence-gate.sh — CodeQL analysis and SBOM artifact negatives
+    ✓ green CodeQL job but no uploaded analysis for the sha fails (149 ms)
+    ✓ analysis for the sha with rules_count 0 (analysed nothing) fails (171 ms)
+    ✓ analysis for the sha carrying an error string fails (178 ms)
+    ✓ analysis object without rules_count at all fails (unknown is not success) (151 ms)
+    ✓ code-scanning API error (e.g. GHAS disabled → 403/404) fails instead of defaulting (145 ms)
+    ✓ SBOM artifact missing fails (167 ms)
+    ✓ SBOM artifact named for another sha fails (170 ms)
+    ✓ expired SBOM artifact fails (163 ms)
+    ✓ SBOM with zero components fails (188 ms)
+    ✓ SBOM whose closure proof fails (dev-only package present) fails at the gate, not only in sbom.yml (225 ms)
+    ✓ SBOM missing a required runtime package (prisma CLI) fails at the gate (216 ms)
+    ✓ sha256 sidecar mismatch fails (187 ms)
+    ✓ sha256 sidecar absent fails (182 ms)
+    ✓ lockfile of the release commit missing fails (178 ms)
+    ✓ SBOM download failure fails (196 ms)
+    ✓ runs listing API error fails closed (22 ms)
+
+PASS test/ci/r75-gate.spec.ts (54.281 s)
+  R75 gate — policy data
+    ✓ the checker and its policy files exist (2 ms)
+    ✓ the policy declares scan scope and tokens as data (1 ms)
+    ✓ the swallowed-error returns are three distinct token classes
+    ✓ the suppression rule states no length or character requirement
+  R75 gate — repository checker against real Git repositories
+    ✓ case: same-token net-zero: an existing banned cast is only relocated (1212 ms)
+    ✓ case: cross-token substitution: delete one banned token, introduce a different one (1240 ms)
+    ✓ case: cross-class swallowed-error substitution: null deleted, undefined introduced (1735 ms)
+    ✓ case: multiple occurrences on a single line (1210 ms)
+    ✓ case: changed test and co-located spec sources are scanned (1298 ms)
+    ✓ case: top-level source file is scanned (1179 ms)
+    ✓ case: documented suppression sharing a line with another banned token (1177 ms)
+    ✓ case: suppression with a non-empty reason is permitted (1159 ms)
+    ✓ case: a one-character reason is a reason (1101 ms)
+    ✓ case: a non-Latin reason is a reason (1066 ms)
+    ✓ case: suppression with no reason at all is a violation (1152 ms)
+    ✓ case: suppression followed only by whitespace is a violation (1098 ms)
+    ✓ case: every spelling of the swallowed-error catch is detected in its own class (1161 ms)
+    ✓ case: authored declarations are scanned while outside-root output stays excluded (1252 ms)
+    ✓ case: clean pass on a real change with no banned tokens (1608 ms)
+    ✓ case: rename within scope is net zero (1316 ms)
+    ✓ case: rename from an unscanned path INTO scope surfaces the newly-scoped violation (1169 ms)
+    ✓ case: rename out of scope is net negative, not a violation (1158 ms)
+    ✓ case: deleting a path that carried banned tokens is net negative (1228 ms)
+    ✓ case: a path with a space and a tab in its name is scanned, not skipped (1126 ms)
+    ✓ case: a path with a newline in its name is scanned, not skipped (1103 ms)
+    ✓ case: a content line that itself begins with +++ is counted (1202 ms)
+    ✓ case: multiline catches and casts are measured across complete blob contents (1054 ms)
+    ✓ case: deleting the body creates an empty catch even without adding a token line (1280 ms)
+    ✓ case: a reason on a later line does not authorize an undocumented directive (840 ms)
+    ✓ case: staged mode measures the index, not unstaged working bytes (880 ms)
+    ✓ case: staged mode fails once the violation is staged (871 ms)
+    ✓ case: staged mode applies the INDEX policy, not a weakened working-tree policy (837 ms)
+  R75 gate — operational failures never degrade to a green pass
+    ✓ uses the merge base and explicit head rather than the checked-out diverged base (1341 ms)
+    ✓ case: unresolvable base fails loudly instead of scanning an empty diff (526 ms)
+    ✓ case: missing base is not an empty diff (458 ms)
+    ✓ case: empty base string is not an empty diff (415 ms)
+    ✓ case: unsupported mode fails (445 ms)
+    ✓ case: absent mode fails (415 ms)
+    ✓ case: valueless mode fails (451 ms)
+    ✓ case: unknown option is rejected, not ignored (413 ms)
+    ✓ case: unknown option with a value is rejected (400 ms)
+    ✓ case: a repeated option is rejected rather than last-wins (443 ms)
+    ✓ case: non-option argument is rejected (415 ms)
+    ✓ case: malformed policy JSON fails (655 ms)
+    ✓ case: malformed policy JSON fails (range) (837 ms)
+    ✓ case: policy with no scan section fails (709 ms)
+    ✓ case: policy with no scan section fails (range) (819 ms)
+    ✓ case: policy with no positive selector cannot return green (686 ms)
+    ✓ case: policy with no positive selector cannot return green (range) (849 ms)
+    ✓ case: policy with an empty excludeSegments selector cannot silently exclude everything (1540 ms)
+    ✓ case: policy with an empty excludeSegments selector cannot silently exclude everything (range) (854 ms)
+    ✓ case: policy with no tokens cannot return green (702 ms)
+    ✓ case: policy with no tokens cannot return green (range) (932 ms)
+    ✓ case: policy with an empty-matching pattern is rejected (691 ms)
+    ✓ case: policy with an empty-matching pattern is rejected (range) (852 ms)
+    ✓ case: policy with an invalid regex is rejected (698 ms)
+    ✓ case: policy with an invalid regex is rejected (range) (839 ms)
+    ✓ case: policy naming a suppression for an unknown token is rejected (742 ms)
+    ✓ case: policy naming a suppression for an unknown token is rejected (range) (1246 ms)
+    ✓ a Git failure surfaces in staged mode (327 ms)
+    ✓ a Git failure surfaces in range mode (216 ms)
+    ✓ a missing policy fails in staged mode (581 ms)
+    ✓ a missing policy fails in range mode (702 ms)
+  R75 gate — CI and the pre-commit hook invoke the one committed checker
+    ✓ the CI banned-casts job runs the checker in explicit range mode (1 ms)
+    ✓ the pre-commit hook runs the same checker in staged mode
+    ✓ neither surface keeps a second, divergent token implementation (1 ms)
+    ✓ workflow_dispatch is explicitly non-certifying rather than fabricating a base (8 ms)
+
+[33m[Nest] 1369  - [39m09/23/2026, 5:09:14 PM [33m   WARN[39m [38;5;3m[ThrottlerExceptionFilter] [39mObject(7) {
+  message: [32m'throttler.rejected'[39m,
+  userId: [1mnull[22m,
+  ip: [32m'203.0.113.1'[39m,
+  path: [32m'[unmatched]'[39m,
+  method: [32m'POST'[39m,
+  limit: [32m'enforced'[39m,
+  ttl: [33m3600[39m
+}
+[33m[Nest] 1369  - [39m09/23/2026, 5:09:14 PM [33m   WARN[39m [38;5;3m[ThrottlerExceptionFilter] [39mObject(7) {
+  message: [32m'throttler.rejected'[39m,
+  userId: [1mnull[22m,
+  ip: [32m'203.0.113.1'[39m,
+  path: [32m'[unmatched]'[39m,
+  method: [32m'GET'[39m,
+  limit: [32m'enforced'[39m,
+  ttl: [33m3600[39m
+}
+[32m[Nest] 1369  - [39m09/23/2026, 5:09:14 PM [32m    LOG[39m [38;5;3m[ThrottlerConfig] [39m[32mREDIS_URL not set -- using in-memory throttler tracker. Limits do NOT cross Fly machines.[39m
+[32m[Nest] 1369  - [39m09/23/2026, 5:09:14 PM [32m    LOG[39m [38;5;3m[ThrottlerConfig] [39m[32mREDIS_URL not set -- using in-memory throttler tracker. Limits do NOT cross Fly machines.[39m
+[32m[Nest] 1369  - [39m09/23/2026, 5:09:14 PM [32m    LOG[39m [38;5;3m[ThrottlerConfig] [39m[32mREDIS_URL not set -- using in-memory throttler tracker. Limits do NOT cross Fly machines.[39m
+PASS test/rate-limit.spec.ts
+  throttler.config -- named limit table
+    ✓ has auth-login-per-min: 5/min default (2 ms)
+    ✓ has auth-login-per-hour: 30/hour default
+    ✓ has auth-password-reset: 3/hour default
+    ✓ has auth-signup: 5/hour
+    ✓ has coach-messages: 30/min default
+    ✓ has notifications-prefs: 30/min default
+    ✓ has bloodwork-write: 30/min default
+    ✓ has coach-command-center: 60/min default (1 ms)
+    ✓ has diagnostic-submit: 5/hour default
+    ✓ has a default catch-all throttler with limit >= 100 (1 ms)
+    ✓ auth-login-per-hour is tighter on a rate-per-second basis than auth-login-per-min
+  AuthController @Throttle metadata
+    ✓ POST /auth/login uses auth-login-per-min (5/min)
+    ✓ POST /auth/login uses auth-login-per-hour (30/hr) (1 ms)
+    ✓ POST /auth/apple uses auth-login-per-min AND auth-login-per-hour (1 ms)
+    ✓ POST /auth/google uses auth-login-per-min AND auth-login-per-hour
+    ✓ POST /auth/forgot-password uses auth-password-reset (3/hr) (1 ms)
+    ✓ POST /auth/register uses auth-signup (5/hr)
+    ✓ POST /auth/signup-with-code uses auth-signup (5/hr) (1 ms)
+    ✓ POST /auth/recent-auth-token uses auth-recent-auth (5/min)
+    ✓ auth-login-per-min is tighter than the default bucket (1 ms)
+  CoachMessagingController @Throttle metadata
+    ✓ POST /coach/clients/:id/messages uses coach-messages (30/min)
+  NotificationsController @Throttle metadata
+    ✓ PUT /notifications/preferences uses notifications-prefs (30/min) (1 ms)
+    ✓ GET /notifications/preferences carries no explicit throttle (falls through to default)
+  UserThrottlerGuard.getTracker
+    ✓ keys on user.id when an authenticated user is on the request
+    ✓ falls back to Fly-Client-IP when no user
+    ✓ falls back to first hop of X-Forwarded-For when no Fly-Client-IP
+    ✓ falls back to req.ip when no proxy headers (1 ms)
+    ✓ returns ip:unknown when no address is available
+    ✓ treats user.id="" as unauthenticated and falls back to IP
+    ✓ prefers Fly-Client-IP over X-Forwarded-For
+  ThrottlerExceptionFilter -- 429 response shape
+    ✓ returns statusCode 429 with Retry-After header and retryAfter body field (13 ms)
+    ✓ does not expose internal limit details in the body (1 ms)
+  AppModule -- UserThrottlerGuard is registered as APP_GUARD
+    ✓ registers UserThrottlerGuard as APP_GUARD (global throttling)
+  buildThrottlerOptions -- storage fallback
+    ✓ returns in-memory options (no storage key) when REDIS_URL is unset (1 ms)
+    ✓ returns in-memory options for whitespace-only REDIS_URL (1 ms)
+    ✓ all named throttlers are present in the returned options (1 ms)
+  THROTTLER_NAMES constant completeness
+    ✓ all constant values are unique (no duplicate throttler names)
+    ✓ THROTTLER_LIMITS has an entry for every THROTTLER_NAMES value (1 ms)
+
+PASS test/scout/scout-diagnostics-boundary.spec.ts
+  safeDiagnostic covers every supported ORM shape
+    ✓ replaces the validation error (15 ms)
+    ✓ replaces the known request error with a valid P-code (11 ms)
+    ✓ replaces the known request error with a four-digit code at range end (1 ms)
+    ✓ replaces the known request error with a lowercase code (1 ms)
+    ✓ replaces the known request error with a three-digit code (1 ms)
+    ✓ replaces the known request error with a five-digit code (1 ms)
+    ✓ replaces the known request error with a non-Prisma code (1 ms)
+    ✓ replaces the unknown request error (1 ms)
+    ✓ replaces the initialization error (1 ms)
+    ✓ replaces the rust panic error (1 ms)
+    ✓ replaces the already sanitized DatabaseRequestError (1 ms)
+    ✓ replaces the ORM error behind one ordinary wrapper (1 ms)
+    ✓ replaces the ORM error behind two ordinary wrappers (1 ms)
+    ✓ sanitizes a cyclic cause chain that still reaches the ORM error
+    ✓ terminates on a cyclic non-ORM chain and returns the original error (1 ms)
+    ✓ returns an ordinary error unchanged
+    ✓ returns a string unchanged (1 ms)
+    ✓ returns zero unchanged
+    ✓ returns false unchanged
+    ✓ returns null unchanged (1 ms)
+    ✓ returns undefined unchanged
+    ✓ returns an array unchanged
+    ✓ returns a plain object wearing an ORM name unchanged
+  filter diagnostic sinks and request correlation
+    ✓ logs and captures only the sanitized diagnostic, with correlation tags (3 ms)
+    ✓ captures the sanitized diagnostic for a 5xx HttpException wrapping an ORM cause (1 ms)
+    ✓ keeps ordinary server diagnostics intact (1 ms)
+    ✓ does not report ordinary 4xx client errors to Sentry (1 ms)
+  Sentry beforeSend allowlists the ORM envelope
+    ✓ detects an ORM failure via the original exception hint (1 ms)
+    ✓ detects an ORM failure via the serialized exception type
+    ✓ detects an ORM failure via a serialized DatabaseRequestError type (9 ms)
+    ✓ keeps ordinary diagnostics and safe tags without SDK-enriched request metadata (1 ms)
+    ✓ preserves ordinary exception diagnostics without mutating the input event
+    ✓ preserves ordinary message diagnostics and envelope identifiers
+
+PASS test/common/feature-flag-not-found.bootstrap.spec.ts
+  R-DARK-1 bootstrap 6-probe suite (real guard chain over HTTP)
+    ✓ dark 404 echoes an upstream X-Request-ID into header and body (1 ms)
+    FEATURE_SCOUT_INGEST → POST /api/scout/ingest
+      ✓ probe 1 — flag OFF, no auth → 404 (not 401) (14 ms)
+      ✓ probe 2 — flag OFF, non-coach auth → 404 (not 403) (2 ms)
+      ✓ probe 3 — flag OFF, coach auth → 404 (not 2xx) (2 ms)
+      ✓ probe 4 — flag ON, no auth → 401 (pre-ruling behavior preserved) (10 ms)
+      ✓ probe 5 — flag ON, non-coach auth → 403 (4 ms)
+      ✓ probe 6 — flag ON, coach auth → 2xx (3 ms)
+      ✓ dark 404 body is KEY-FOR-KEY identical to a truly unmounted route 404 (4 ms)
+      ✓ OPTIONS preflight on the dark route → 404 with allow-list CORS echo (2 ms)
+      ✓ OPTIONS preflight with the flag ON is still answered by cors (204) (2 ms)
+    FEATURE_EXTENSION_PAIRING → POST /api/extension/pair/init
+      ✓ probe 1 — flag OFF, no auth → 404 (not 401) (2 ms)
+      ✓ probe 2 — flag OFF, non-coach auth → 404 (not 403) (2 ms)
+      ✓ probe 3 — flag OFF, coach auth → 404 (not 2xx) (1 ms)
+      ✓ probe 4 — flag ON, no auth → 401 (pre-ruling behavior preserved) (2 ms)
+      ✓ probe 5 — flag ON, non-coach auth → 403 (2 ms)
+      ✓ probe 6 — flag ON, coach auth → 2xx (2 ms)
+      ✓ dark 404 body is KEY-FOR-KEY identical to a truly unmounted route 404 (3 ms)
+      ✓ OPTIONS preflight on the dark route → 404 with allow-list CORS echo (1 ms)
+      ✓ OPTIONS preflight with the flag ON is still answered by cors (204) (1 ms)
+  R-DARK-1 gate wiring is load-bearing
+    ✓ WITHOUT app.use(featureFlagNotFoundMiddleware), a flag-off route leaks 401 (12 ms)
+  main.ts wiring (static source assertions)
+    ✓ registers featureFlagNotFoundMiddleware via app.use (1 ms)
+    ✓ registers the gate BEFORE enableCors so OPTIONS cannot bypass it
+    ✓ keeps the gate after helmet and before the global validation pipe (1 ms)
+
+PASS test/observability.spec.ts
+  redactObject
+    ✓ replaces password field with [REDACTED] (2 ms)
+    ✓ replaces token field with [REDACTED]
+    ✓ replaces access_token field
+    ✓ strips bloodwork data
+    ✓ strips body_fat (1 ms)
+    ✓ preserves allowed fields even if they share a prefix with sensitive names
+    ✓ walks nested objects recursively (1 ms)
+    ✓ handles arrays of objects
+    ✓ handles circular references without throwing (1 ms)
+    ✓ does not mutate the original object (11 ms)
+  redactLogLine
+    ✓ redacts password in JSON string (1 ms)
+    ✓ redacts authorization token in JSON string
+    ✓ leaves unrelated fields intact (1 ms)
+  MetricsService
+    ✓ render() returns a non-empty string with HELP lines (1 ms)
+    ✓ recordRequest increments http_requests_total (1 ms)
+    ✓ histogram buckets are cumulative (observation <= bucket counts it) (1 ms)
+    ✓ recordRequest with 500 status still increments counter
+    ✓ render() returns disabled message when METRICS_ENABLED=off (1 ms)
+    ✓ output ends with a newline (Prometheus scraper requirement)
+    ✓ multiple requests accumulate correctly (1 ms)
+  AppLoggerService
+    ✓ emits JSON line containing timestamp, level, message (1 ms)
+    ✓ includes request_id when set on thread-local (1 ms)
+    ✓ redacts password from logStructured meta
+  RequestIdMiddleware
+    ✓ attaches a generated hex id when no X-Request-ID header present (1 ms)
+    ✓ honours incoming X-Request-ID header (1 ms)
+    ✓ strips non-alphanumeric chars from incoming header
+    ✓ truncates very long incoming X-Request-ID to 128 chars (1 ms)
+    ✓ resets thread-local userId on new request
+  HealthDeepController
+    ✓ returns ok:true when DB query succeeds (1 ms)
+    ✓ returns ok:false and sets 503 when DB is down
+
+PASS test/ci/dependency-audit.spec.ts
+  dependency-audit workflow structure
+    ✓ exposes exactly one audit shell step running the native npm CLI (2 ms)
+    ✓ gates pull requests and main pushes, with manual dispatch as an extra (1 ms)
+    ✓ keeps a stable reported check name for branch protection
+    ✓ requests read-only permissions and leaves no credentials in the runner (1 ms)
+    ✓ bounds job and command time (1 ms)
+    ✓ pins every action to an immutable 40-hex commit SHA (1 ms)
+    ✓ pins the runtime to the confirmed Node 20.20.1 and records versions
+    ✓ runs every shell step under an explicit bash shell (1 ms)
+    ✓ never installs dependencies or mutates the graph (1 ms)
+    ✓ has no swallowing fallback and reads no suppression file (1 ms)
+  dependency-audit shell body against controlled fake npm processes
+    ✓ case native-success exits as required and preserves npm output (137 ms)
+    ✓ case simulated-vulnerable exits as required and preserves npm output (111 ms)
+    ✓ case infrastructure-failure exits as required and preserves npm output (110 ms)
+    ✓ case empty-output-nonzero exits as required and preserves npm output (111 ms)
+    ✓ fails when npm is absent from the isolated PATH (10 ms)
+    ✓ hands npm the whole-graph argument contract (218 ms)
+  mutation detection (the tests must reject a softened gate)
+    ✓ accepts the real shell body as fail-closed (228 ms)
+    ✓ rejects a mutant that swallows the failure: trailing || true (231 ms)
+    ✓ rejects a mutant that swallows the failure: soft-fail echo branch (228 ms)
+    ✓ rejects a mutant that swallows the failure: errexit disabled (229 ms)
+    ✓ rejects a narrowing mutant via the shared graph-contract check (219 ms)
+    ✓ rejects deleting --package-lock-only via the same graph-contract check (110 ms)
+
+PASS test/ci/r75-boundaries.spec.ts (124.099 s)
+  R75 lexical and path boundaries: range
+    ✓ counts @ts-ignore in // @ts-ignore (1826 ms)
+    ✓ counts @ts-expect-error in // @ts-expect-error (1090 ms)
+    ✓ counts Coming soon in const label = 'Coming soon'; (916 ms)
+    ✓ counts lorem ipsum in const label = 'lorem ipsum'; (910 ms)
+    ✓ counts foo@bar in const label = 'foo@bar'; (917 ms)
+    ✓ counts John Doe in const label = 'John Doe'; (947 ms)
+    ✓ counts as any in value as any; (928 ms)
+    ✓ counts as unknown as in value as unknown as Result; (898 ms)
+    ✓ counts as never in value as never; (903 ms)
+    ✓ counts empty-catch-null in promise.catch(() => null); (915 ms)
+    ✓ counts empty-catch-undefined in promise.catch(() => undefined); (943 ms)
+    ✓ counts empty-catch-block in promise.catch(() => {}); (907 ms)
+    ✓ counts empty-catch-null in promise . catch (
+() => null
+); (887 ms)
+    ✓ counts empty-catch-undefined in promise.catch /* reason */ (
+() => undefined); (871 ms)
+    ✓ counts empty-catch-block in promise . /* reason */ catch
+(() => { /* nothing */ }); (958 ms)
+    ✓ counts as any in value as /* annotation */ any; (961 ms)
+    ✓ counts as unknown as in value as // annotation
+unknown /* annotation */ as Result; (999 ms)
+    ✓ counts as never in value as
+/* annotation */ never; (1296 ms)
+    ✓ bounds a directive reason: // @ts-expect-errorconst next = 1; (1000 ms)
+    ✓ bounds a directive reason: // @ts-expect-error const next = 1; (996 ms)
+    ✓ bounds a directive reason: // @ts-expect-error const next = 1; (915 ms)
+    ✓ bounds a directive reason: // @ts-expect-error
+const next = 1; (939 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error */ void 0; (921 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error */ // not a reason (959 ms)
+    ✓ bounds a directive reason: // @ts-expect-error x (849 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error 理由 */ void 0; (906 ms)
+    ✓ bounds a directive reason: // @ts-expect-error ✓const next = 1; (981 ms)
+    ✓ does not infer generated provenance from src/vendor/module.ts (912 ms)
+    ✓ does not infer generated provenance from test/generated/case.ts (919 ms)
+    ✓ does not infer generated provenance from src/build/module.ts (893 ms)
+    ✓ does not infer generated provenance from scripts/dist/tool.js (911 ms)
+    ✓ does not infer generated provenance from src/node_modules/authored.ts (876 ms)
+    ✓ does not infer generated provenance from src/coverage/module.ts (961 ms)
+    ✓ does not infer generated provenance from src/.yarn/module.ts (916 ms)
+    ✓ does not infer generated provenance from src/types.d.ts (955 ms)
+    ✓ does not infer generated provenance from src/module.mts (953 ms)
+    ✓ does not infer generated provenance from src/module.cts (872 ms)
+    ✓ does not infer generated provenance from src/module.min.js (955 ms)
+    ✓ retains the positive-root boundary for node_modules/library/index.js (987 ms)
+    ✓ retains the positive-root boundary for docs/example.ts (1918 ms)
+    ✓ retains the positive-root boundary for dist/main.js (1650 ms)
+    ✓ fails closed on an authored symlink at src/module.ts (1067 ms)
+    ✓ fails closed on an authored symlink at src/imported (1138 ms)
+    ✓ fails closed on an authored symlink at test/linked (826 ms)
+  R75 lexical and path boundaries: staged
+    ✓ counts @ts-ignore in // @ts-ignore (935 ms)
+    ✓ counts @ts-expect-error in // @ts-expect-error (924 ms)
+    ✓ counts Coming soon in const label = 'Coming soon'; (1052 ms)
+    ✓ counts lorem ipsum in const label = 'lorem ipsum'; (1012 ms)
+    ✓ counts foo@bar in const label = 'foo@bar'; (1152 ms)
+    ✓ counts John Doe in const label = 'John Doe'; (914 ms)
+    ✓ counts as any in value as any; (898 ms)
+    ✓ counts as unknown as in value as unknown as Result; (897 ms)
+    ✓ counts as never in value as never; (911 ms)
+    ✓ counts empty-catch-null in promise.catch(() => null); (905 ms)
+    ✓ counts empty-catch-undefined in promise.catch(() => undefined); (939 ms)
+    ✓ counts empty-catch-block in promise.catch(() => {}); (905 ms)
+    ✓ counts empty-catch-null in promise . catch (
+() => null
+); (923 ms)
+    ✓ counts empty-catch-undefined in promise.catch /* reason */ (
+() => undefined); (861 ms)
+    ✓ counts empty-catch-block in promise . /* reason */ catch
+(() => { /* nothing */ }); (931 ms)
+    ✓ counts as any in value as /* annotation */ any; (914 ms)
+    ✓ counts as unknown as in value as // annotation
+unknown /* annotation */ as Result; (884 ms)
+    ✓ counts as never in value as
+/* annotation */ never; (920 ms)
+    ✓ bounds a directive reason: // @ts-expect-errorconst next = 1; (915 ms)
+    ✓ bounds a directive reason: // @ts-expect-error const next = 1; (912 ms)
+    ✓ bounds a directive reason: // @ts-expect-error const next = 1; (945 ms)
+    ✓ bounds a directive reason: // @ts-expect-error
+const next = 1; (1811 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error */ void 0; (1087 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error */ // not a reason (918 ms)
+    ✓ bounds a directive reason: // @ts-expect-error x (955 ms)
+    ✓ bounds a directive reason: /* @ts-expect-error 理由 */ void 0; (899 ms)
+    ✓ bounds a directive reason: // @ts-expect-error ✓const next = 1; (934 ms)
+    ✓ does not infer generated provenance from src/vendor/module.ts (894 ms)
+    ✓ does not infer generated provenance from test/generated/case.ts (911 ms)
+    ✓ does not infer generated provenance from src/build/module.ts (895 ms)
+    ✓ does not infer generated provenance from scripts/dist/tool.js (911 ms)
+    ✓ does not infer generated provenance from src/node_modules/authored.ts (1056 ms)
+    ✓ does not infer generated provenance from src/coverage/module.ts (925 ms)
+    ✓ does not infer generated provenance from src/.yarn/module.ts (908 ms)
+    ✓ does not infer generated provenance from src/types.d.ts (890 ms)
+    ✓ does not infer generated provenance from src/module.mts (914 ms)
+    ✓ does not infer generated provenance from src/module.cts (874 ms)
+    ✓ does not infer generated provenance from src/module.min.js (879 ms)
+    ✓ retains the positive-root boundary for node_modules/library/index.js (845 ms)
+    ✓ retains the positive-root boundary for docs/example.ts (819 ms)
+    ✓ retains the positive-root boundary for dist/main.js (839 ms)
+    ✓ fails closed on an authored symlink at src/module.ts (700 ms)
+    ✓ fails closed on an authored symlink at src/imported (1062 ms)
+    ✓ fails closed on an authored symlink at test/linked (1809 ms)
+  R75 explicit committed-head contract
+    ✓ rejects an explicitly empty head: --head= (774 ms)
+    ✓ rejects an explicitly empty head: --head=    (526 ms)
+    ✓ still permits an omitted head to select HEAD (891 ms)
+    ✓ declares every canonical class independently of policy membership (10 ms)
+  R75 coherent index observation
+    ✓ rejects synchronized index drift after policy output (1079 ms)
+    ✓ rejects synchronized head drift after policy output (1116 ms)
+    ✓ ignores unstaged working-tree changes without changing the index (938 ms)
+  R75 case policy: range
+    ✓ counts capitalization of Coming soon: const label = 'Coming Soon'; (946 ms)
+    ✓ counts capitalization of Coming soon: const label = 'COMING SOON'; (967 ms)
+    ✓ counts capitalization of lorem ipsum: const label = 'Lorem ipsum'; (1002 ms)
+    ✓ counts capitalization of lorem ipsum: const label = 'LOREM IPSUM'; (953 ms)
+    ✓ counts capitalization of foo@bar: const label = 'Foo@Bar'; (1213 ms)
+    ✓ counts capitalization of foo@bar: const label = 'FOO@BAR'; (921 ms)
+    ✓ counts capitalization of John Doe: const label = 'john doe'; (924 ms)
+    ✓ counts capitalization of John Doe: const label = 'JOHN DOE'; (1108 ms)
+    ✓ retains keyword/directive case sensitivity: const label = 'AS ANY'; (912 ms)
+    ✓ retains keyword/directive case sensitivity: const label = '@TS-IGNORE'; (936 ms)
+    ✓ fails closed on unsupported flags: {"flags":null} (840 ms)
+    ✓ fails closed on unsupported flags: {"flags":1} (729 ms)
+    ✓ fails closed on unsupported flags: {"flags":"g"} (792 ms)
+    ✓ fails closed on unsupported flags: {"flags":"m"} (839 ms)
+    ✓ fails closed on unsupported flags: {"flags":"ii"} (888 ms)
+    ✓ fails closed on unsupported flags: {"flags":" i"} (813 ms)
+    ✓ fails closed on unsupported flags: {"flags":["i"]} (858 ms)
+    ✓ enables case folding for exactly the four placeholder classes (1 ms)
+  R75 case policy: staged
+    ✓ counts capitalization of Coming soon: const label = 'Coming Soon'; (1164 ms)
+    ✓ counts capitalization of Coming soon: const label = 'COMING SOON'; (896 ms)
+    ✓ counts capitalization of lorem ipsum: const label = 'Lorem ipsum'; (937 ms)
+    ✓ counts capitalization of lorem ipsum: const label = 'LOREM IPSUM'; (907 ms)
+    ✓ counts capitalization of foo@bar: const label = 'Foo@Bar'; (1189 ms)
+    ✓ counts capitalization of foo@bar: const label = 'FOO@BAR'; (1860 ms)
+    ✓ counts capitalization of John Doe: const label = 'john doe'; (944 ms)
+    ✓ counts capitalization of John Doe: const label = 'JOHN DOE'; (1227 ms)
+    ✓ retains keyword/directive case sensitivity: const label = 'AS ANY'; (927 ms)
+    ✓ retains keyword/directive case sensitivity: const label = '@TS-IGNORE'; (881 ms)
+    ✓ fails closed on unsupported flags: {"flags":null} (678 ms)
+    ✓ fails closed on unsupported flags: {"flags":1} (639 ms)
+    ✓ fails closed on unsupported flags: {"flags":"g"} (640 ms)
+    ✓ fails closed on unsupported flags: {"flags":"m"} (732 ms)
+    ✓ fails closed on unsupported flags: {"flags":"ii"} (666 ms)
+    ✓ fails closed on unsupported flags: {"flags":" i"} (590 ms)
+    ✓ fails closed on unsupported flags: {"flags":["i"]} (702 ms)
+    ✓ enables case folding for exactly the four placeholder classes (1 ms)
+
+[33m[Nest] 1369  - [39m09/23/2026, 5:11:23 PM [33m   WARN[39m [38;5;3m[DbStatsService] [39m[33mpg_stat_statements is not available; returning unavailable. Enable the extension (operator-attach).[39m
+[33m[Nest] 1369  - [39m09/23/2026, 5:11:23 PM [33m   WARN[39m [38;5;3m[DbStatsService] [39m[33mpg_stat_statements is not available; returning unavailable. Enable the extension (operator-attach).[39m
+PASS test/observability/db-stats.spec.ts
+  redactStatement
+    ✓ preserves a short query verbatim and does not flag truncation (3 ms)
+    ✓ truncates a long query to the preview length and flags it (1 ms)
+    ✓ normalises runs of whitespace to single spaces (1 ms)
+    ✓ produces a stable hash for identical normalised text (1 ms)
+    ✓ produces different hashes for different text (2 ms)
+    ✓ masks quoted and numeric literals so bound values never reach the preview (2 ms)
+    ✓ masks double-quoted literals while leaving single-digit aliases intact (28 ms)
+    ✓ masks Postgres escape-string literals without leaking the backslash-escaped tail (1 ms)
+    ✓ treats a doubled-single-quote escape as one literal (1 ms)
+    ✓ preserves $n prepared-statement placeholders while masking numeric literals (19 ms)
+    ✓ masks anonymous dollar-quoted literals ($$body$$) (1 ms)
+    ✓ masks tag-delimited dollar-quoted literals ($tag$body$tag$) (1 ms)
+  DbStatsService.topStatements
+    ✓ maps rows, coerces bigints, and redacts query text (47 ms)
+    ✓ clamps the requested topN into [1,100] (24 ms)
+    ✓ returns available:false when the extension table is missing (42P01) (21 ms)
+    ✓ returns available:false when the error mentions pg_stat_statements (9 ms)
+    ✓ rethrows unexpected errors (42 ms)
+  DbStatsController
+    ✓ returns generatedAt plus the available payload (2 ms)
+    ✓ surfaces an unavailable result unchanged (18 ms)
+
+PASS test/ci/r75-wiring.spec.ts (19.655 s)
+  R75 executable wiring contracts
+    ✓ does not load ambient startup files into a wiring subprocess (25 ms)
+    ✓ retains errexit when startup files are disabled (7 ms)
+    ✓ retains nounset when startup files are disabled (7 ms)
+    ✓ retains pipefail when startup files are disabled (6 ms)
+    ✓ rejects unfiltered script stderr in range (2308 ms)
+    ✓ rejects unfiltered script stderr in staged (1935 ms)
+    ✓ the actual range body passes the contract (2215 ms)
+    ✓ the actual staged body passes the contract (2135 ms)
+    ✓ reports the failed range subprocess without relaxing the contract (1413 ms)
+    ✓ reports the failed staged subprocess without relaxing the contract (992 ms)
+    ✓ detects a missing call in range (commented=false) (770 ms)
+    ✓ detects a missing call in range (commented=true) (728 ms)
+    ✓ detects a missing call in staged (commented=false) (475 ms)
+    ✓ detects a missing call in staged (commented=true) (533 ms)
+    ✓ rejects an empty event head instead of checkout fallback:  (712 ms)
+    ✓ rejects an empty event head instead of checkout fallback:     (804 ms)
+    ✓ rejects an unusable event base:  (677 ms)
+    ✓ rejects an unusable event base:     (784 ms)
+    ✓ rejects an unusable event base: not-a-commit (726 ms)
+    ✓ rejects a malformed event head (855 ms)
+    ✓ keeps a manual dispatch explicitly non-certifying (768 ms)
+    ✓ uses event references, an explicit shell and a pinned runtime without stored credentials (11 ms)
+
+{"timestamp":"2026-09-23T17:11:43.647Z","level":"log","context":"RoutesResolver","message":"DiagnosticController {/diagnostic-fixture}:"}
+{"timestamp":"2026-09-23T17:11:43.650Z","level":"log","context":"RouterExplorer","message":"Mapped {/diagnostic-fixture/:id, GET} route"}
+{"timestamp":"2026-09-23T17:11:43.652Z","level":"log","context":"NestApplication","message":"Nest application successfully started"}
+PASS test/observability/orm-composed-http.spec.ts
+  composed ORM diagnostics before every shared sink
+    ✓ sanitizes validation through interceptor, filter, stdout and SDK transport (220 ms)
+    ✓ sanitizes wrapped cause through interceptor, filter, stdout and SDK transport (9 ms)
+    ✓ sanitizes HTTP wrapper through interceptor, filter, stdout and SDK transport (19 ms)
+    ✓ sanitizes known request through interceptor, filter, stdout and SDK transport (11 ms)
+    ✓ retains useful successful HTTP metadata without logging concrete path identifiers (4 ms)
+    ✓ does not log path/query credentials on matched and unmatched ORM failures (20 ms)
+    ✓ does not log path/query credentials on matched and unmatched ordinary unexpected failures (10 ms)
+    ✓ does not log path/query credentials on matched and unmatched throttled failures (8 ms)
+    ✓ preserves non-ORM caller validation and does not log its private message (3 ms)
+    ✓ sanitizes the real UnhandledRejection reporter before both output sinks (7 ms)
+    ✓ sanitizes the real UncaughtException reporter before both output sinks (4 ms)
+    ✓ contains startup rejection without inspecting private content (3 ms)
+    ✓ contains startup rejection without inspecting private content (1 ms)
+    ✓ contains startup rejection without inspecting private content (12 ms)
+
+PASS test/ci/r100-pathspec.spec.ts
+  R100 pathspec coverage (git diff — the gate plumbing)
+    ✓ bare src/**/*.ts MISSES top-level files (documents the bug) (101 ms)
+    ✓ :(glob) counts top-level AND nested .ts/.tsx/.js/.jsx under src, plus scripts .js (59 ms)
+    ✓ the leading-**/ exclude drops co-located specs at top level AND nested (96 ms)
+    ✓ the TEST-side pathspec captures co-located specs and test/** (30 ms)
+    ✓ the code pathspecs NEVER select a workflow under .github/** (removed exclude was a no-op) (100 ms)
+  R100 workflow delegates measurement scope to the committed checker and policy
+    ✓ the banned-casts job runs the committed checker instead of an inline scan (1 ms)
+    ✓ carries no pathspec or token list of its own (no second implementation to drift) (1 ms)
+    ✓ the header names the policy file as the scope authority, not a scope list (5 ms)
+    ✓ policy scope covers top-level and nested src TS/JS, scripts .js and dangerfile.js (31 ms)
+    ✓ policy scope includes test sources (R75 applies to tests) and never a workflow file (1 ms)
+
+PASS test/observability/metrics-auth.spec.ts
+  constantTimeEquals
+    ✓ returns true for identical strings (1 ms)
+    ✓ returns false for same-length but different content
+    ✓ returns false for different lengths
+  extractBearerToken
+    ✓ extracts the token from a valid Bearer header (1 ms)
+    ✓ is case-insensitive on the scheme (1 ms)
+    ✓ takes the first value when the header is an array
+    ✓ returns undefined for missing or malformed headers
+  extractBearerToken ReDoS resistance
+    ✓ parses a long but legitimate bearer header well within the length cap quickly
+    ✓ does not hang on a pathological header of many spaces after the scheme
+    ✓ rejects an over-long header beyond the length cap without scanning it (1 ms)
+    ✓ rejects a 5MB whitespace-prefixed header in constant time (cap before trim) (1 ms)
+    ✓ accepts a lowercase bearer scheme
+    ✓ rejects a bearer scheme with no token
+    ✓ rejects an empty header value (1 ms)
+  MetricsAuthGuard
+    ✓ allows access when the bearer token matches (1 ms)
+    ✓ rejects with 401 when the token does not match (11 ms)
+    ✓ rejects with 401 when no Authorization header is present but a token is configured (1 ms)
+    ✓ fails closed with 503 in a prod-like env when the token is unset (1 ms)
+    ✓ allows access in development when the token is unset (11 ms)
+
+PASS test/observability/prom-metrics.spec.ts
+  registerDefaultMetrics
+    ✓ installs Node.js default runtime collectors on a fresh registry (7 ms)
+    ✓ is idempotent on the shared registry (no duplicate-registration throw) (1 ms)
+  buildHttpHistogram
+    ✓ registers http_request_duration_seconds with the seconds bucket layout (1 ms)
+    ✓ reuses an existing metric instead of registering a duplicate (1 ms)
+    ✓ exposes the operator-blessed bucket layout (1 ms)
+  normaliseRouteLabel
+    ✓ prefers the matched Express route pattern (1 ms)
+    ✓ collapses UUIDs in the raw path when no pattern is present (12 ms)
+    ✓ collapses numeric ids in the raw path
+    ✓ falls back to "unknown" when no path information is available
+  promHttpMiddleware
+    ✓ observes a duration sample with method/route/status_code labels on finish (2 ms)
+    ✓ calls next() synchronously (1 ms)
+  renderPromMetrics
+    ✓ serialises a registry to Prometheus text exposition format
+
+PASS test/observability/prom-metrics-extended.spec.ts
+  HTTP_HISTOGRAM_LABELS
+    ✓ contains exactly method, route, status_code (no PII labels) (3 ms)
+    ✓ does not include any user-identifying label (1 ms)
+  histogram bucket boundaries
+    ✓ places a 3ms sample in the 0.005 bucket and all above (2 ms)
+    ✓ places a 3s sample only in buckets >= 5 (not in 1) (1 ms)
+    ✓ places a 12s sample (beyond the tail) in no finite bucket (1 ms)
+  multi-label cardinality
+    ✓ keeps separate series per method/route/status_code combination (1 ms)
+  process-wide default instances
+    ✓ exposes a shared httpRequestDurationSeconds histogram
+    ✓ registers defaults on the shared promRegistry (5 ms)
+  promHttpMiddleware on the default histogram
+    ✓ records against the shared instance without an explicit histogram arg (1 ms)
+  normaliseRouteLabel additional cases
+    ✓ handles trailing numeric id with no suffix (1 ms)
+    ✓ does not collapse numbers embedded in a word
+    ✓ prefers an empty-string route pattern fallback to raw path
+  PromMetricsController
+    ✓ returns Prometheus text from the shared registry (12 ms)
+
+PASS test/ci/r75-enforcement.spec.ts
+  R75 conformance: standing lint
+    ✓ does not ignore the shipped checker (2 ms)
+    ✓ actually lints the unmodified checker with no ignored-file warning (2 ms)
+    ✓ reports an unused-variable mutation through the real configured rule (1 ms)
+    ✓ wires exactly the zero-warning control command without a fail-open suffix (2 ms)
+  R75 conformance: weekly dependency audit
+    ✓ declares one weekly UTC schedule while retaining change triggers (19 ms)
+    ✓ uses immutable action identities without duplicated release-version prose (2 ms)
+
+PASS test/observability/db-stats-extended.spec.ts
+  db-stats constants
+    ✓ defaults to top 20 statements (1 ms)
+    ✓ previews the first 200 characters
+  redactStatement edge cases
+    ✓ handles an empty string (1 ms)
+    ✓ treats a query exactly at the limit as not truncated (1 ms)
+    ✓ treats a query one char over the limit as truncated
+    ✓ strips leading/trailing whitespace before hashing (1 ms)
+  DbStatsService.topStatements — data handling
+    ✓ returns an empty statement list when pg_stat_statements has no rows (4 ms)
+    ✓ preserves the order returned by the query (total_exec_time DESC) (11 ms)
+    ✓ coerces plain-number columns as well as bigints (1 ms)
+    ✓ clamps a zero/negative topN up to the floor of 1 (2 ms)
+    ✓ floors a fractional topN (1 ms)
+    ✓ redacts query text in the mapped output (preview + hash) (1 ms)
+
+PASS test/observability/sentry-config.spec.ts
+  resolveEnvironment
+    ✓ uses NODE_ENV when set (2 ms)
+    ✓ defaults to production
+  resolveRelease
+    ✓ prefers an explicit SENTRY_RELEASE
+    ✓ composes from GIT_SHA and environment
+    ✓ falls back to RELEASE_VERSION (1 ms)
+    ✓ returns undefined when nothing is set (1 ms)
+  resolveTracesSampleRate
+    ✓ parses a valid rate
+    ✓ clamps above 1
+    ✓ defaults to 0.1 on invalid input (1 ms)
+  stripSensitiveHeaders
+    ✓ removes Authorization and Cookie headers (1 ms)
+  buildSentryOptions
+    ✓ wires release, environment and a tags block (1 ms)
+    ✓ wires the error-event metadata boundary
+  initSentry
+    ✓ is a no-op when SENTRY_DSN is unset (1 ms)
+    ✓ calls Sentry.init when SENTRY_DSN is set (1 ms)
+
+PASS test/scout/scout-diagnostics-public-cause.spec.ts
+  public error envelope never carries ORM-derived text
+    ✓ service unavailable object body wrapping an initialization error (15 ms)
+    ✓ conflict whose error field carries ORM text (3 ms)
+    ✓ unprocessable entity whose machine code carries ORM text (21 ms)
+    ✓ not found built from a P2025 message (2 ms)
+    ✓ forbidden wrapping an unknown request error (1 ms)
+    ✓ explicit 409 object body with an array message and a rust panic cause (2 ms)
+    ✓ 500 object body with both array message and machine code (2 ms)
+    ✓ nested repository wrapper around a validation error (2 ms)
+    ✓ three-level wrapper chain around a known request error (2 ms)
+    ✓ cyclic wrapper chain that still reaches the ORM error (2 ms)
+    ✓ already sanitized DatabaseRequestError name as cause (2 ms)
+    ✓ 400 wrapping a known request error with a malformed code shape (9 ms)
+    ✓ 409 wrapping a known request error whose meta target leaked into the body (1 ms)
+    ✓ 503 string response wrapping an initialization error (1 ms)
+    ✓ 422 array message wrapping a validation error (2 ms)
+    ✓ 500 wrapping a rust panic error message (2 ms)
+
+PASS test/scout/scout-diagnostics-public.spec.ts
+  public error envelope never carries ORM-derived text
+    ✓ bare string response wrapping a validation error (13 ms)
+    ✓ internal server error built from a known request error message (12 ms)
+    ✓ bad request string wrapping a validation error (2 ms)
+    ✓ bad request array whose first element carries ORM text (2 ms)
+    ✓ bad request array whose last element carries ORM text (2 ms)
+  ordinary client errors keep their exact public contract
+    ✓ preserves a plain 4xx string message and error name (1 ms)
+    ✓ preserves a ValidationPipe message array element-for-element (2 ms)
+    ✓ preserves a machine-readable code alongside its message (1 ms)
+    ✓ preserves a 4xx message whose cause is an ordinary non-ORM error (1 ms)
+
+[33m[Nest] 1369  - [39m09/23/2026, 5:11:47 PM [33m   WARN[39m [38;5;3m[DbStatsService] [39m[33mpg_stat_statements is not available; returning unavailable. Enable the extension (operator-attach).[39m
+PASS test/observability/observability-wiring.spec.ts
+  PromMetricsController behind MetricsAuthGuard
+    ✓ serves metrics text once the guard authorises a valid token (7 ms)
+    ✓ blocks the scrape with 401 when the token is wrong (8 ms)
+    ✓ fails closed with 503 in production when no token is configured (1 ms)
+  DbStatsController over DbStatsService
+    ✓ returns a redacted, timestamped payload when the extension is present (3 ms)
+    ✓ returns an unavailable payload when the extension is missing (2 ms)
+
+PASS test/health-readiness-bounded.spec.ts
+  readiness stays bounded when the database round-trip never settles
+    ✓ bounds the probe below the platform check timeout and reports database_unavailable (86 ms)
+    ✓ clears the bound timer when the query settles first (no stranded handle) (51 ms)
+    ✓ serves the bounded 503 over HTTP with no-store (3259 ms)
+
+PASS test/scout/scout-diagnostics.integrity.spec.ts
+  ORM diagnostics before every sink
+    ✓ removes ORM arguments from logs and captured exception: 0 (13 ms)
+    ✓ removes ORM arguments from logs and captured exception: 1 (3 ms)
+    ✓ removes ORM arguments from logs and captured exception: 2 (2 ms)
+    ✓ removes ORM arguments from logs and captured exception: 3 (12 ms)
+    ✓ does not discard ordinary non-ORM diagnostics (1 ms)
+    ✓ sanitizes ORM exception text, arguments and request data in beforeSend independently (2 ms)
+    ✓ does not log URL query payloads alongside a sanitized ORM exception (1 ms)
+
+PASS test/health-readiness-public.spec.ts
+  public readiness HTTP boundary
+    ✓ redacts a driver error without evaluating its contents (10 ms)
+    ✓ redacts a string rejection without evaluating its contents (5 ms)
+    ✓ redacts a plain object rejection without evaluating its contents (3 ms)
+    ✓ redacts a nested cause without evaluating its contents (12 ms)
+    ✓ redacts a null rejection without evaluating its contents (4 ms)
+    ✓ redacts a undefined rejection without evaluating its contents (3 ms)
+    ✓ redacts a throwing string conversion without evaluating its contents (2 ms)
+    ✓ keeps successful readiness non-cacheable at /readyz (3 ms)
+    ✓ keeps successful readiness non-cacheable at /READYZ (3 ms)
+    ✓ keeps successful readiness non-cacheable at /ReadyZ/ (3 ms)
+    ✓ keeps successful readiness non-cacheable at /readyz?probe=1 (3 ms)
+    ✓ keeps /health independent of database health (10 ms)
+    ✓ keeps /healthz independent of database health (2 ms)
+
+PASS test/observability/metrics-auth-extended.spec.ts
+  constantTimeEquals edge cases
+    ✓ returns true for two empty strings (2 ms)
+    ✓ returns false when one side is empty
+    ✓ distinguishes single trailing-character differences (1 ms)
+  extractBearerToken tolerance
+    ✓ tolerates extra whitespace around the token (1 ms)
+    ✓ trims the surrounding header value (1 ms)
+    ✓ returns undefined for a bare scheme with no token
+    ✓ returns undefined for an empty array
+  MetricsAuthGuard env permutations
+    ✓ treats an empty-string token as unset (503 in production) (9 ms)
+    ✓ fails closed with 503 in staging when token unset (2 ms)
+    ✓ accepts a whitespace-padded bearer token against the configured value (1 ms)
+    ✓ rejects a token that differs only by trailing whitespace inside the value (1 ms)
+    ✓ allows unauthenticated access when token unset in test env (11 ms)
+
+PASS test/observability/sentry-config-extended.spec.ts
+  resolveRelease precedence
+    ✓ SENTRY_RELEASE beats GIT_SHA and RELEASE_VERSION (2 ms)
+    ✓ GIT_SHA beats RELEASE_VERSION (1 ms)
+    ✓ ignores empty-string SENTRY_RELEASE and falls through (1 ms)
+    ✓ defaults the environment portion to production when NODE_ENV unset (1 ms)
+  resolveTracesSampleRate boundaries
+    ✓ clamps a negative rate to 0 (1 ms)
+    ✓ accepts exactly 0 (8 ms)
+    ✓ accepts exactly 1 (1 ms)
+    ✓ defaults to 0.1 when unset (1 ms)
+  stripSensitiveHeaders
+    ✓ is a no-op when there is no request on the event (1 ms)
+    ✓ is idempotent when run twice (1 ms)
+  buildSentryOptions tags block
+    ✓ omits the release tag when no release is resolvable (1 ms)
+    ✓ carries the resolved traces sample rate
+
+PASS test/ci/fly-readiness.spec.ts
+  Fly readiness routing configuration
+    ✓ installs exactly one service-level check rather than a monitoring-only check (11 ms)
+    ✓ uses a credential-free readiness request instead of database-independent liveness (2 ms)
+    ✓ declares a startup grace, recurring interval and finite consumer timeout (1 ms)
+    ✓ keeps the private-network probe consistent with HTTPS proxy forwarding (1 ms)
+    ✓ retains the application port, process scope and minimum running instance (1 ms)
+
+PASS test/observability/sentry-incoming-request.spec.ts
+  ✓ sanitizes actual SDK-enriched incoming errors with production-order default instrumentation (1522 ms)
+
+Test Suites: 31 passed, 31 total
+Tests:       825 passed, 825 total
+Snapshots:   0 total
+Time:        288.956 s
+Ran all test suites matching test/ci/r100-pathspec.spec.ts|test/ci/r75-gate.spec.ts|test/ci/r75-wiring.spec.ts|test/ci/r75-enforcement.spec.ts|test/ci/r75-boundaries.spec.ts|test/ci/delivery-artifact.spec.ts|test/ci/release-evidence-gate.spec.ts|test/ci/dependency-audit.spec.ts|test/ci/fly-readiness.spec.ts|test/rate-limit.spec.ts|test/observability|test/contracts/importer-contract.spec.ts|test/common/feature-flag-not-found.bootstrap.spec.ts|src/scout/scout.service.spec.ts|test/scout/scout-diagnostics-boundary.spec.ts|test/scout/scout-diagnostics-public-cause.spec.ts|test/scout/scout-diagnostics-public.spec.ts|test/scout/scout-diagnostics.integrity.spec.ts|test/health-readiness-bounded.spec.ts|test/health-readiness-public.spec.ts.
+exit=0 (124=timeout,137=killed) utc=2026-09-23T17:11:55Z write_tree_after=a584a1b95423f95dae8daabf673ef3776604acbb
+== post-conditions (each line: postcheck rc)
+postcheck: write-tree rc=0 | a584a1b95423f95dae8daabf673ef3776604acbb
+postcheck: HEAD unchanged rc=0 | be0ba8274e486dee77f15d18fe367a13ff08ecf5
+postchecks_exit=0
+step_status=0 utc=2026-09-23T17:11:55Z
