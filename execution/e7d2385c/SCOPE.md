@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists in this sandbox. S5 recovery, genuine commit and exact runner/PG17.6 prerequisite restoration are complete; prerequisite runtime released20:07:25Z. The slot is currently assigned to S6 builder for one minimum npm ci setup in worktrees/s6-p2, not tests/typecheck/commit. S5 fresh51 is next after explicit release/transfer. Source-only P3 correction uses a separate packet and cannot mutate the live S6 worktree during setup or independent source reads.
+One heavy runtime slot exists in this sandbox. S6's minimum npm ci setup completed and released20:19:59Z; the parent transferred the slot to S5 executor for the dual-granted one fresh51. S6 P3 is frozen; builder may apply its exact one-file patch to the installed worktree and prepare constant validation bindings source-only. No S6 test/typecheck/commit starts until dual delta closure and explicit runtime transfer after S5 release. Missing setup wrapper status is qualified under S6_SETUP_DISPOSITION.md, not an installation-rerun grant.
 
 ## Individually graded work
 
@@ -48,8 +48,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Finish the one already-active S6 setup and release its runtime slot.
-2. Activate existing S5 fresh51 on dual-granted exact head98d39610; preserve raw results for same-review final attestations.
-3. In parallel, finish S6 B's independent P2 conclusion and isolate the one-file P3 correction. A01/A02 source closure remains applicable; B04 blocks only identity proof.
+1. Complete the activated S5 fresh51 on dual-granted exact head98d39610; preserve raw results for same-review final attestations.
+2. In parallel, complete S6's independent one-file P3 delta reviews. Both reachability dispositions are C, A01/A02 source closure remains applicable, and no extra product fix/test is authorized.
+3. Bind the existing S6 validation to P3 and the installed substrate, then explicitly transfer runtime after S5 release.
 4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
 5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
