@@ -1,0 +1,21 @@
+label=tooling-verify head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c merge_head=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 write_tree=a584a1b95423f95dae8daabf673ef3776604acbb node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' cwd=/home/user/workspace/execution/s3-composition-prep/tooling/prettier-3.9.6 T=30 loadavg='0.11 0.09 0.48 2/111 23621' mem_avail_mb=7710 utc=2026-09-23T16:38:49Z
+cmd: source $O/steps/chk.sh
+eq "prettier --version" 3.9.6 "$(node "$TOOL/node_modules/prettier/bin/prettier.cjs" --version)"
+eq "package.json version" 3.9.6 "$(node -p "require('$TOOL/node_modules/prettier/package.json').version")"
+C="$HOME/.npm/_cacache/content-v2/sha512/3a/93/74cf355d89a880871a6eba3e5e7e9212e2c63d8fb6d8eae4799a78f9c8fcc691d92334a4897944e13dbeb4270dbd42e019800e28fbf881e3d90589a057ea"
+chk "cached tarball at integrity address" ls -la "$C"
+eq "tarball sha512" 3a9374cf355d89a880871a6eba3e5e7e9212e2c63d8fb6d8eae4799a78f9c8fcc691d92334a4897944e13dbeb4270dbd42e019800e28fbf881e3d90589a057ea "$(sha512sum "$C" | cut -d' ' -f1)"
+sha256sum "$TOOL/node_modules/prettier/bin/prettier.cjs" "$TOOL/node_modules/prettier/package.json" | tee $O/tooling-verify.txt
+eq "installed CLI sha256 (grant pin)" 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e "$(sha256sum "$TOOL/node_modules/prettier/bin/prettier.cjs" | cut -d' ' -f1)"
+eq "node_modules top-level entries" ".bin .package-lock.json prettier" "$(find "$TOOL/node_modules" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' ' | sed 's/ $//')"
+exit $FAIL
+postcheck: prettier --version rc=0 | 3.9.6
+postcheck: package.json version rc=0 | 3.9.6
+postcheck: cached tarball at integrity address rc=0 | -rw-r--r-- 1 user user 2800155 Sep 23 16:38 /home/user/.npm/_cacache/content-v2/sha512/3a/93/74cf355d89a880871a6eba3e5e7e9212e2c63d8fb6d8eae4799a78f9c8fcc691d92334a4897944e13dbeb4270dbd42e019800e28fbf881e3d90589a057ea 
+postcheck: tarball sha512 rc=0 | 3a9374cf355d89a880871a6eba3e5e7e9212e2c63d8fb6d8eae4799a78f9c8fcc691d92334a4897944e13dbeb4270dbd42e019800e28fbf881e3d90589a057ea
+6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e  /home/user/workspace/execution/s3-composition-prep/tooling/prettier-3.9.6/node_modules/prettier/bin/prettier.cjs
+b69988ff94407ccd6f9e1e66d92f54da25fdc5d14c219902fdb1ed17702f886b  /home/user/workspace/execution/s3-composition-prep/tooling/prettier-3.9.6/node_modules/prettier/package.json
+postcheck: installed CLI sha256 (grant pin) rc=0 | 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e
+postcheck: node_modules top-level entries rc=0 | .bin .package-lock.json prettier
+exit=0 (124=timeout,137=killed) utc=2026-09-23T16:38:50Z write_tree_after=a584a1b95423f95dae8daabf673ef3776604acbb
+step_status=0 utc=2026-09-23T16:38:50Z

@@ -1,0 +1,31 @@
+PATTERN_CHECKS s6-exclusion-v1 2026-09-23T16:40:46Z: the exact grep/sed expressions from the candidates applied to SYNTHESIZED lines via here-strings (no candidate file executed)
+--- runner_bound form (b): START regex (unchanged bytes from V32) vs S6 v101y START shapes
+2026-09-23T16:00:00Z START pid=123 pgid=100 ppid=99 token=20260923T160000Z-50-1234 runner_sha256=abc -> MATCH
+2026-09-23T16:00:00Z START pid=123 pgid=100 ppid=99 token=none runner_sha256=abc             -> no
+2026-09-23T16:00:00Z START pid=123 pgid=100 ppid=99 runner_sha256=abc                        -> no
+2026-09-23T16:00:00Z START pid=123 pgid=1000 ppid=99 token=20260923T160000Z-50-1234 runner_sha256=abc -> no
+2026-09-23T16:00:00Z START pid=123 pgid=100 ppid=99 token=20260923T160000Z-50-12349 runner_sha256=abc -> no
+  (expected: only line 1 MATCH: ours; token=none / v101-no-token / other pgid / token-prefix all no)
+--- runner_bound form (a): INHERITED fixed string
+2026-09-23T16:00:01Z lease INHERITED fd=9 path=/home/user/workspace/execution/test-validation.lock token=20260923T160000Z-50-1234 holder_pid=50 (outer launcher retains exclusion after this runner exits) -> MATCH
+2026-09-23T16:00:01Z lease INHERITED fd=9 path=/home/user/workspace/execution/test-validation.lock token=20260923T160000Z-50-12349 holder_pid=50 (x) -> no
+--- H-L4 released-attempt-name sed on both consumers' IDENTITY record lines
+T step=selftest IDENTITY attempt=attempt-1-000001 identity_rc=0 adoption=published state=released -> [attempt-1-000001]
+T step=C IDENTITY attempt=attempt-1-000002 identity_rc=0 adoption=published state=released   -> [attempt-1-000002]
+T step=C IDENTITY attempt=attempt-1-000003 identity_rc=2 adoption=not-attempted state=never-released -> [no]
+T npm-ci IDENTITY attempt=attempt-1-000001 identity_rc=0 adoption=published state=released   -> [attempt-1-000001]
+T step=C REFUSED: remaining 10s < needed 100s                                                -> [no]
+T RUNNER_LAUNCH pid=5 confirm_rc=0 adoption=published state=released                         -> [no]
+  (expected: lines 1,2,4 yield the attempt name; never-released, REFUSED and the launcher's own RUNNER_LAUNCH shape (no ' IDENTITY attempt=') yield nothing)
+--- H-R2: inner_sids / H-L4 anchored ^pid= sed on C6 IDENTITY shapes
+pid=555 step=C attempt=attempt-1-000002 pgid_sid=[555 555] self_pgid=100 self_sid=100 decoy=none budget=90s grace=20s cmd=[x] -> pid=[555] bound
+step=C pid=555 attempt=attempt-1-000002 pgid_sid=[555 555] self_pgid=100 self_sid=100 decoy=none -> pid=[EMPTY] bound
+pid=444 attempt=attempt-1-000001 pgid_sid=[444 444] self_pgid=100 self_sid=100 decoy=none budget=1200s grace=30s -> pid=[444] bound
+  (expected: new C6 shape -> 555 bound; OLD v101 C6 shape -> EMPTY (this is the defect H-R2 closes); setup shape -> 444 bound)
+--- H-L4 REL_BOUND membership pattern
+a=attempt-1-000001 REL_BOUND=[ attempt-1-000001:444]                                         -> already-bound
+a=attempt-1-000002 REL_BOUND=[ attempt-1-000001:444]                                         -> not-bound
+a=attempt-1-00000 REL_BOUND=[ attempt-1-000001:444]                                          -> not-bound
+  (expected: 000001 already-bound; 000002 not-bound; prefix 00000 not-bound)
+--- released=<n> count
+REL_KNOWN=[ attempt-1-000001 attempt-1-000002]                                               -> rel=2

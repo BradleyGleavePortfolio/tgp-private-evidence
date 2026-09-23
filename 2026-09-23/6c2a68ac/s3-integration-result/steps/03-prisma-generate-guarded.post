@@ -1,0 +1,9 @@
+source $O/steps/chk.sh; cd $W
+chk "log contains 'Generated Prisma Client (v6.19.3)'" grep -q 'Generated Prisma Client (v6.19.3' $O/logs/03-prisma-generate-guarded.log
+eq "deepmerge-ts version" 8.0.0 "$(node -p "require('deepmerge-ts/package.json').version")"
+eq "@prisma/config version" 6.19.3 "$(node -p "require('@prisma/config/package.json').version")"
+eq "write-tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"
+eq "non-staged porcelain lines" 0 "$(git status --porcelain | grep -v -E '^[MAD]  ' | wc -l)"
+echo "engine files: $(ls node_modules/@prisma/engines/ 2>/dev/null | tr '\n' ' ')"; echo "query engine libs: $(ls node_modules/.prisma/client/*.node 2>/dev/null | tr '\n' ' ')"
+echo "client_boundary: CHECKPOINT_DISABLE=1 PRISMA_GENERATE_SKIP_AUTOINSTALL=true (inline on the generate command; step env CHECKPOINT_DISABLE=$CHECKPOINT_DISABLE)"
+exit $FAIL

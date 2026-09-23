@@ -1,0 +1,11 @@
+label=tool-reverify head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c merge_head=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 write_tree=a584a1b95423f95dae8daabf673ef3776604acbb node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' cwd=/home/user/workspace/worktrees/s3-prep2 T=30 loadavg='0.11 0.09 0.48 1/116 23727' mem_avail_mb=7720 utc=2026-09-23T16:38:50Z
+cmd: source $O/steps/chk.sh
+eq "prettier --version" 3.9.6 "$(node $TOOL/node_modules/prettier/bin/prettier.cjs --version)"
+eq "CLI sha256" 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e "$(sha256sum $TOOL/node_modules/prettier/bin/prettier.cjs | cut -d' ' -f1)"
+eq "node_modules entries" ".bin .package-lock.json prettier" "$(find $TOOL/node_modules -mindepth 1 -maxdepth 1 -printf '%f\n' | sort | tr '\n' ' ' | sed 's/ $//')"
+exit $FAIL
+postcheck: prettier --version rc=0 | 3.9.6
+postcheck: CLI sha256 rc=0 | 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e
+postcheck: node_modules entries rc=0 | .bin .package-lock.json prettier
+exit=0 (124=timeout,137=killed) utc=2026-09-23T16:38:50Z write_tree_after=a584a1b95423f95dae8daabf673ef3776604acbb
+step_status=0 utc=2026-09-23T16:38:50Z

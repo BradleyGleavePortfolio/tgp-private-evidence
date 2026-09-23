@@ -1,0 +1,48 @@
+--- inputs/run-c6-hazard-v5-conly.v101.sh	2026-09-23 15:27:36.709062518 +0000
++++ run-c6-hazard-v5-conly.v101y.sh	2026-09-23 16:36:46.257062518 +0000
+@@ -1,5 +1,14 @@
+ #!/usr/bin/env bash
+-# OP88-S6-C6-RUNNER-ADAPT V10.1 — ADDITIVE successor of the frozen C6 runner 746e244d (run-c6-hazard-v5-conly.sh; original preserved byte-identical;
++# OP88-S6-C6-EXCLUSION runner variant v101y (ADDITIVE successor of the frozen S6 C6 consumer run-c6-hazard-v5-conly.v101.sh 2c9748a4; original preserved byte-identical; NOT LAUNCHED;
++# no grant implied). ONLY deltas, mirroring the accepted S5 V32 runner v101y 61b565e4 contract onto this consumer (S6_EXCLUSION_SCOPE_MAP H-R1 + H-R2 + S5-V31-A-01 START token):
++# (1) the START line (first, truncating write of c6.EXIT_RECORD) additionally publishes token=${S6_LEASE_INHERITED:-none}; (2) when S6_LEASE_INHERITED=<token> is set the runner verifies
++# fd 9 already open on $LOCK, that $EX/LEASE_HOLDER names the same token and a live holder pid, writes the ` lease INHERITED fd=9 path=$LOCK token=<t> holder_pid=<p> ` binding line and
++# does NOT flock (else branch = the v101 L342-L344 bytes incl. its lock-busy text; every gate child still gets 9>&-); (3) the per-step IDENTITY record starts `pid=<p> step=<s> attempt=…`
++# (field ORDER only; content unchanged) so the launcher's anchored `^pid=` read binds both the selftest and the C attempt. The runner's HOLD_BOUND/EXCLUSION_UNPRESERVED branch remains as
++# evidence but is no longer a release path under the launcher. Everything else is the v101 bytes: OWN-BLOCK v10.1 4aebf96f byte-identical, frozen C6 packet MANIFEST.c6.sha256 check,
++# hazard v5/adapter/instrument/classifier, Jest argv/selection/budgets, selftest-then-C sequencing, die/quarantine/finish. Under the launcher the invoke line below is REPLACED by
++# launch-s6-c6-exclusion.v1.sh (setsid nohup bash <launcher>; no outer timeout on the holder; frozen observer f140787a unused). v101 header follows.
++# [v101 header, retained] OP88-S6-C6-RUNNER-ADAPT V10.1 — ADDITIVE successor of the frozen C6 runner 746e244d (run-c6-hazard-v5-conly.sh; original preserved byte-identical;
+ # NOT LAUNCHED; no grant implied). Mechanical consumer adaptation of the inherited V3.1 spawn/sleep/sample class (run_owned, on_signal, reap_group,
+ # final_accounting) to the UNCHANGED OWN-BLOCK v10.1 (4aebf96f…, embedded byte-identical between the `# >>> OWN-BLOCK v10.1` / `# <<< OWN-BLOCK v10.1`
+ # markers) with the already-reviewed S5 V10.1 consumer semantics (ctl-t0-only.v101.sh run_gate / run-s5-setup-npm-ci.v101.sh) mapped per line:
+@@ -295,7 +304,7 @@
+   CUR_PID=$!; own_register "$CUR_PID"                                  # R1: registered synchronously; no sleep, no ps sample
+   own_confirm "$CUR_PID" 2; idrc=$?                                    # R2: pgid==sid==pid, direct child, != self pgid (rc0) within 2 s; rc1 gone, rc2 unconfirmed, rc3 census-error
+   if [ "$idrc" = 0 ]; then   # required recoverable identity published and verified BEFORE release
+-    if own_record "$att/IDENTITY" "step=$step pid=$CUR_PID attempt=${att##*/} pgid_sid=[$(own_identity "$CUR_PID")] self_pgid=$OWN_SELF_PGID self_sid=$OWN_SELF_SID decoy=${OWN_LAST_DECOY:-none} budget=${budget}s grace=${grace}s cmd=[$*]"; then pub=$(own_adopt "$CUR_PID" "$att"); [ "$pub" = published ] && state=released; else pub=identity-publication-failed; fi; fi
++    if own_record "$att/IDENTITY" "pid=$CUR_PID step=$step attempt=${att##*/} pgid_sid=[$(own_identity "$CUR_PID")] self_pgid=$OWN_SELF_PGID self_sid=$OWN_SELF_SID decoy=${OWN_LAST_DECOY:-none} budget=${budget}s grace=${grace}s cmd=[$*]"; then pub=$(own_adopt "$CUR_PID" "$att"); [ "$pub" = published ] && state=released; else pub=identity-publication-failed; fi; fi   # S6 H-R2: field order only (pid= first, as the setup IDENTITY and the launcher's anchored `^pid=` read require); content unchanged
+   echo "$(ts) step=$step IDENTITY attempt=${att##*/} identity_rc=$idrc adoption=$pub state=$state" >> "$EXIT_RECORD" || { [ "$state" = released ] && state=released-then-cancelled; die "$step-post-release-record-failed" 74 "EXIT_RECORD append failed after state=$state (die reaps/quarantines before finish)"; }
+   if [ "$state" != released ]; then own_signal "$CUR_PID" TERM >/dev/null; own_wait_gone "$CUR_PID" 5 || { own_signal "$CUR_PID" KILL >/dev/null; own_wait_gone "$CUR_PID" 3; }
+     own_finish "$CUR_PID"; fin="$OWN_FIN${OWN_FIN_RC:+ $OWN_FIN_RC}"; [ "$OWN_FIN" = observed ] && own_retire "$CUR_PID"
+@@ -336,12 +345,15 @@
+ }
+ 
+ mkdir -p "$LOGS"
+-echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"
++echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID token=${S6_LEASE_INHERITED:-none} runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"   # S6 v101y (= S5 v101y / S5-V31-A-01 contract): exact current-attempt identity in the earliest publication
+ echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"   # R3 / Part B stamp required
+-# canonical lock: acquired by the runner itself, held on fd 9 until the process exits (after all cleanup)
+-exec 9>"$LOCK"
+-flock -n 9 || die lock-busy 75 "canonical lock held by another owner; not a grant problem to solve here"
+-echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"
++# canonical lock: INHERITED on fd 9 from the outer launcher when S6_LEASE_INHERITED is set (verified, never re-acquired/released here); otherwise acquired by the runner itself and held on fd 9 until the process exits (after all cleanup)
++if [ -n "${S6_LEASE_INHERITED:-}" ]; then   # S6 H-S1/H-R1 (= S5 v101x/v101y contract): lease owned by the outer launcher; verify, never re-acquire, never release here
++  [ "$(readlink /proc/$$/fd/9 2>/dev/null)" = "$LOCK" ] || die lease-fd-not-inherited 75 "S6_LEASE_INHERITED set but fd 9 is not open on $LOCK"
++  grep -q "^token=$S6_LEASE_INHERITED " "$EX/LEASE_HOLDER" 2>/dev/null || die lease-holder-record-mismatch 75 "$EX/LEASE_HOLDER does not name token=$S6_LEASE_INHERITED"
++  HP=$(sed -n "s/^token=[^ ]* holder_pid=\([0-9]*\) .*/\1/p" "$EX/LEASE_HOLDER" 2>/dev/null); [ -n "$HP" ] && [ -d "/proc/$HP" ] || die lease-holder-gone 75 "holder pid=[$HP] not present"
++  echo "$(ts) lease INHERITED fd=9 path=$LOCK token=$S6_LEASE_INHERITED holder_pid=$HP (outer launcher retains exclusion after this runner exits)" >> "$EXIT_RECORD"
++else exec 9>"$LOCK"; flock -n 9 || die lock-busy 75 "canonical lock held by another owner; not a grant problem to solve here"; echo "$(ts) lock acquired fd=9 path=$LOCK" >> "$EXIT_RECORD"; fi
+ OWN_ROOT="$LOGS/attempts"; mkdir -p "$OWN_ROOT" || die attempts-dir 74   # private per-attempt evidence (IDENTITY/ADOPT/EXIT) under the run logs
+ cd "$WT" || die cd 1
+ 

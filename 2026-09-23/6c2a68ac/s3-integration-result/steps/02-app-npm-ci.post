@@ -1,0 +1,7 @@
+source $O/steps/chk.sh; cd $W
+eq "package-lock.json sha256" b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55 "$(sha256sum package-lock.json | cut -d' ' -f1)"
+chk "prettier absent from app graph (test ! -e node_modules/.bin/prettier)" test ! -e node_modules/.bin/prettier
+eq "write-tree" a584a1b95423f95dae8daabf673ef3776604acbb "$(git write-tree)"
+eq "non-staged porcelain lines" 0 "$(git status --porcelain | grep -v -E '^[MAD]  ' | wc -l)"
+echo "info: node_modules top-level package count=$(find node_modules -mindepth 1 -maxdepth 1 -type d | wc -l); .package-lock present=$([ -e node_modules/.package-lock.json ] && echo yes || echo no)"
+exit $FAIL

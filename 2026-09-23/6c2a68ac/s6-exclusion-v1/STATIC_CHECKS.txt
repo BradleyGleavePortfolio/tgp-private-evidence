@@ -1,0 +1,55 @@
+STATIC_CHECKS s6-exclusion-v1 (parse/read/hash/diff/patch-on-mktemp only; NOTHING executed) 2026-09-23T16:39:59Z GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+--- bash -n
+bash -n run-c5-setup-npm-ci.v101y.sh: rc 0
+bash -n run-c6-hazard-v5-conly.v101y.sh: rc 0
+bash -n launch-s6-setup-exclusion.v1.sh: rc 0
+bash -n launch-s6-c6-exclusion.v1.sh: rc 0
+--- OWN-BLOCK v10.1 sed-extract sha256 (want 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5)
+run-c5-setup-npm-ci.v101y.sh: 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 markers=1/1 => IDENTICAL
+run-c6-hazard-v5-conly.v101y.sh: 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 markers=1/1 => IDENTICAL
+launch-s6-setup-exclusion.v1.sh: 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 markers=1/1 => IDENTICAL
+launch-s6-c6-exclusion.v1.sh: 4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 markers=1/1 => IDENTICAL
+--- patch(1) reproduction on mktemp copies (fresh writable copy per pair)
+patch diffs/setup-runner-v101-to-v101y.diff on inputs/run-c5-setup-npm-ci.v101.sh == run-c5-setup-npm-ci.v101y.sh: YES (cmp -s)
+patch diffs/c6-runner-v101-to-v101y.diff on inputs/run-c6-hazard-v5-conly.v101.sh == run-c6-hazard-v5-conly.v101y.sh: YES (cmp -s)
+patch diffs/launcher-s5v32-to-s6-setup-v1.diff on inputs/launch-s5-setup-exclusion.v32.sh == launch-s6-setup-exclusion.v1.sh: YES (cmp -s)
+patch diffs/launcher-s5v32-to-s6-c6-v1.diff on inputs/launch-s5-setup-exclusion.v32.sh == launch-s6-c6-exclusion.v1.sh: YES (cmp -s)
+patch diffs/launcher-s6-setup-v1-to-s6-c6-v1.diff on launch-s6-setup-exclusion.v1.sh == launch-s6-c6-exclusion.v1.sh: YES (cmp -s)
+--- occurrence counts on CODE lines only (lines not starting with #): kill/trap/rm /flock/own_signal/exit/setsid
+inputs/launch-s5-setup-exclusion.v32.sh: 3/2/5/1/3/20/3/
+launch-s6-setup-exclusion.v1.sh: 3/2/5/1/3/21/3/
+launch-s6-c6-exclusion.v1.sh: 3/2/5/1/3/21/3/
+inputs/run-c5-setup-npm-ci.v101.sh: 4/2/5/1/5/14/4/
+run-c5-setup-npm-ci.v101y.sh: 4/2/5/1/5/15/4/
+inputs/run-c6-hazard-v5-conly.v101.sh: 5/3/7/1/5/24/4/
+run-c6-hazard-v5-conly.v101y.sh: 5/3/7/1/5/25/4/
+  expected deltas: launchers +1 exit (H-L2 gate exit 71) and +1 flock-word? (no: gate has none) ; runners +2 flock-word lines (comment in if-line + else) but flock CALLS stay 1 (below)
+--- code-level flock calls / exec 9> / 9>&- in runners
+inputs/run-c5-setup-npm-ci.v101.sh: flock -n 9 calls=1 exec9=1 child_9>&-=1
+run-c5-setup-npm-ci.v101y.sh: flock -n 9 calls=1 exec9=1 child_9>&-=1
+inputs/run-c6-hazard-v5-conly.v101.sh: flock -n 9 calls=1 exec9=1 child_9>&-=1
+run-c6-hazard-v5-conly.v101y.sh: flock -n 9 calls=1 exec9=1 child_9>&-=1
+--- S5 variable names left in S6 candidates (code lines; S5X_ private branch expected in launchers only)
+run-c5-setup-npm-ci.v101y.sh: S5_LEASE_INHERITED|S5_SETUP_GRANT code=0 S5X_ lines=0 S6_LEASE_INHERITED lines=5
+run-c6-hazard-v5-conly.v101y.sh: S5_LEASE_INHERITED|S5_SETUP_GRANT code=0 S5X_ lines=0 S6_LEASE_INHERITED lines=5
+launch-s6-setup-exclusion.v1.sh: S5_LEASE_INHERITED|S5_SETUP_GRANT code=0 S5X_ lines=3 S6_LEASE_INHERITED lines=1
+launch-s6-c6-exclusion.v1.sh: S5_LEASE_INHERITED|S5_SETUP_GRANT code=0 S5X_ lines=3 S6_LEASE_INHERITED lines=1
+--- consumer EX/LOGS/LOCK constants (unchanged in runners) vs launcher CANON_EX/INNER_LOGS/LOGS
+57:EX=/home/user/workspace/execution/s6-diagnostic
+58:LOGS=$EX/logs/setup-v3
+59:LOCK=/home/user/workspace/execution/test-validation.lock
+60:EXIT_RECORD=$LOGS/setup.EXIT_RECORD
+103:LOGS=/home/user/workspace/execution/op88/s6-c6-prep/logs/c6
+104:LOCK=/home/user/workspace/execution/test-validation.lock
+105:EXIT_RECORD=$LOGS/c6.EXIT_RECORD
+121:EX=/home/user/workspace/execution/op88/s6-c6-prep   # quarantine marker root (primary $EX/QUARANTINE; fallback $LOGS/QUARANTINE)
+launch-s6-setup-exclusion.v1.sh:43:CANON_LOCK=/home/user/workspace/execution/test-validation.lock; CANON_EX=/home/user/workspace/execution/s6-diagnost
+launch-s6-setup-exclusion.v1.sh:48:LOGS=$EX/logs/s6-setup-exclusion; mkdir -p "$LOGS" || exit 74; LOG=$LOGS/launcher.EXIT_RECORD; ts() { date -u +%Y-%
+launch-s6-setup-exclusion.v1.sh:191:INNER_LOGS=$EX/logs/setup-v3   # S6 H-L1: the runner's own LOGS (records + attempts/), unchanged in the runner
+launch-s6-c6-exclusion.v1.sh:43:CANON_LOCK=/home/user/workspace/execution/test-validation.lock; CANON_EX=/home/user/workspace/execution/op88/s6-c6-pre
+launch-s6-c6-exclusion.v1.sh:48:LOGS=$EX/logs/c6-exclusion; mkdir -p "$LOGS" || exit 74; LOG=$LOGS/launcher.EXIT_RECORD; ts() { date -u +%Y-%m-%dT%H:%
+launch-s6-c6-exclusion.v1.sh:191:INNER_LOGS=$EX/logs/c6   # S6 H-L1: the runner's own LOGS (records + attempts/), unchanged in the runner
+--- H-L2 gate once per launcher, before exec 9>; four marker paths = setup EX/QUARANTINE, setup LOGS/QUARANTINE, C6 EX/QUARANTINE, C6 LOGS/QUARANTINE
+launch-s6-setup-exclusion.v1.sh: gate line 166, exec 9> line 169, gate<exec=yes, marker paths=/home/user/workspace/execution/s6-diagnostic/QUARANTINE /home/user/workspace/execution/s6-diagnostic/logs/setup-v3/QUARANTINE /home/user/workspace/execution/op88/s6-c6-prep/QUARANTINE /home/user/workspace/execution/op88/s6-c6-prep/logs/c6/QUARANTINE 
+launch-s6-c6-exclusion.v1.sh: gate line 166, exec 9> line 169, gate<exec=yes, marker paths=/home/user/workspace/execution/s6-diagnostic/QUARANTINE /home/user/workspace/execution/s6-diagnostic/logs/setup-v3/QUARANTINE /home/user/workspace/execution/op88/s6-c6-prep/QUARANTINE /home/user/workspace/execution/op88/s6-c6-prep/logs/c6/QUARANTINE 
+--- launchers differ ONLY in consumer constants: 28 changed lines (7 header + grant + CANON_EX + RUNNER/bounds + LOGS + PIN_RUNNER + INNER_LOGS + record + spawn env = 14 per side)
