@@ -152,7 +152,22 @@ Both independent final reviews are individually/cumulatively T4: trusted validat
 
 Acceptance frozen before review: exact attempt binding, closure of P1 acknowledgement race, retained ten assertions plus the finding-specific P3c negative, unchanged primitive applicability and raw/ownership truth; separate source closure and one-shot private grantability from canonical setup/T0/S6/product claims. Read/hash/diff only, no runtime, syntax execution, probe, lock, signals or source changes. Prior-round V31 findings are allowed inputs, current peer output is not. No new hypothetical family, primitive reaudit or C-only cycle.
 
-A finished with seal `9bbb8a268efa32050e6cbdc97fcbd96b27cd93b1bab8b7864b90f33a821778b5`: source CLOSED, one private run grantable, no A/B blocker. C qualification: FAIL diagnostic is a post-evaluation snapshot, not contemporaneous operand truth; record and continue. B remains active. After dual closure, the purchased decision is one existing 180-second private proof when the shared runtime slot is available, not another source review.
+A finished with seal `9bbb8a268efa32050e6cbdc97fcbd96b27cd93b1bab8b7864b90f33a821778b5`; B finished with seal `5a85d3e13729da62efff3790a746ebea2c6987e38726f5c16c3400518471b6af`. Both source CLOSED, one private run grantable, no A/B blocker. C qualifications are recorded in `S5_V32_DUAL_CLOSURE_AND_RUNTIME_QUEUE.md`, not new cycles. The private proof is now activated by `S5_V32_PRIVATE_ACTIVATION.md` after S2 returned runtime.
+
+## Current real-result and integration transitions
+
+Fresh S2 setup7f1a68c0 was accepted directly. Real proof result seal `bbde4b0b862332dda9c112d1dffd39dc6e3d99dd68f4f8679c5b6b7ae9d4be98` is frozen at `execution/6c2a68ac/s2-real-composition-result` (103 entries). Actual raw0, guard72/72, composition68/68 and discriminator48/48 with expected refusals64/64, publication OK and scoped ownership returned are evidence inputs, not an independent verdict.
+
+### S1S2-REAL-A and S1S2-REAL-B
+
+- Each individual/cumulative T4: database/tenancy validation, proof applicability and recovery; T3 lifecycle/composed-contract triggers; bounded T1 NO.
+- Nonbuilder/nonexecutor A `audit_s5_failure_lens_a_mue9osec` inherits parent; B `audit_s5_failure_lens_b_mue9oser` requests Claude Fable5/High. Parent owner EXEC-6c2a68ac.
+- Sole writes: `execution/6c2a68ac/audits/s1s2-real-a/**` or `s1s2-real-b/**`.
+- Frozen acceptance: exact command/candidate/real-mode binding, actual guard/refusal/fixture/composition/discriminator statuses, publication, source preservation, cleanup/ownership and S1/S2 applicability to the S3 integration decision.
+- Use existing S1R4 source reviews only for named applicability questions. Explicitly retain or narrow the NOINHERIT-fixture versus INHERIT-membership boundary; do not invent a broader proof. Evaluate disclosed empty runner self-hash against the actual immediate manifest/preflight binding, not an automatic cosmetic-fix rule.
+- Read/hash/diff only; no runtime, probe, lock, signals, recovery, install or source edits. No current peer or parent conclusion as evidence. No re-audit of unchanged controls/source, new hypothesis family or framework. Stop only on concrete A/B defects or missing consequential evidence; C records and continues.
+
+Purchased decision: S3 PREP2 local integration, not production or universal-importer acceptance. Exact conditional downstream grants already prepared: `S3_PREP2_INTEGRATION_GRANT.md` and `S6_EXCLUSION_SUCCESSOR_BUILD_GRANT.md`; neither is activated by these reviews alone.
 
 ## Baseline pins
 

@@ -1,0 +1,63 @@
+--- postrun observation utc=2026-09-23T16:25:02Z
+caller procs alive (pgrep caller.sh|run-composition-r57|timeout --foreground -k 60 2100): []
+survivors census (pgrep -fa pg17/dist/bin/postgres|s1-disposable-pg17|s1s2-composition|s1-r4-truncate|s1-harness-guard|psql|prisma/build/index.js|s2r57-step-leader): []
+listener_54353=0 git wrapper helpers (pgrep -fa 'sleep 1'): []
+canonical lock file: present size=0 mode=644; open-by (read-only /proc fd scan, no flock): []
+runner output dir: execution/op88/s2-v57/composition-r57/20260923T162230Z
+  total 108
+  drwxr-xr-x   5 user user  4096 Sep 23 16:24 .
+  drwxr-xr-x   3 user user  4096 Sep 23 16:22 ..
+  drwxr-xr-x   2 user user  4096 Sep 23 16:24 .pgid
+  -rw-r--r--   1 user user  7233 Sep 23 16:22 10-guard-spec.log
+  -rw-r--r--   1 user user   154 Sep 23 16:22 20-refusal-hosted.log
+  -rw-r--r--   1 user user   263 Sep 23 16:22 21-refusal-noconfirm.log
+  -rw-r--r--   1 user user   254 Sep 23 16:22 30-fixture-init.log
+  -rw-r--r--   1 user user   233 Sep 23 16:22 31-fixture-start.log
+  -rw-r--r--   1 user user   116 Sep 23 16:22 32-fixture-status.log
+  -rw-r--r--   1 user user 12864 Sep 23 16:23 40-composition.log
+  -rw-r--r--   1 user user     8 Sep 23 16:24 50-fixture-stop.log
+  -rw-r--r--   1 user user    26 Sep 23 16:24 51-fixture-status-after-stop.log
+  -rw-r--r--   1 user user   298 Sep 23 16:24 PUBLICATION.txt
+  -rw-r--r--   1 user user   229 Sep 23 16:24 RECEIPT.txt
+  -rw-r--r--   1 user user  8785 Sep 23 16:24 SHA256SUMS
+  -rw-r--r--   1 user user   155 Sep 23 16:24 SHA256SUMS.outer
+  -rw-r--r--   1 user user   226 Sep 23 16:24 exit-codes.txt
+  drwxr-xr-x  12 user user  4096 Sep 23 16:23 harness
+  drwxr-xr-x   2 user user  4096 Sep 23 16:23 s1-r4
+  -rw-r--r--   1 user user  6251 Sep 23 16:24 stamp.txt
+exit-codes.txt:
+  final=0 first_exit=0 cleanup_exit=0 signal=none reap=ok cleanup_seconds=0.56 deadline_exceeded=no guard_spec=0 refusal_hosted=64 refusal_noconfirm=64 fixture=0 composition=0 s1_r4_discriminator=0 fixture_stop=0 survivors=none
+RECEIPT.txt:
+  receipt_status=ok
+  final_exit=0 first_exit=0 cleanup_exit=0
+  cleanup_seconds_total=0.68 deadline_exceeded=no hash_rc=0 inner_manifest_sha256=ae04aaba30bd630b009dab14e7592f860884b2b31e385bdfa2dbf8d6362c4822
+  utc=2026-09-23T16:24:05Z
+PUBLICATION.txt:
+  publication_status=ok deadline_exceeded_at_publication=no
+  process_exit=0 receipt_final_exit=0
+  rule: process exit == RECEIPT.txt final_exit unless publication_status!=ok or deadline_exceeded_at_publication=yes or this file could not be written, in which case a 0 becomes 71
+  utc=2026-09-23T16:24:06Z
+inner manifest verify: OK 90 entries; outer verify: OK
+unlisted files in runner output (not in SHA256SUMS, expected only SHA256SUMS*, RECEIPT.txt, PUBLICATION.txt): PUBLICATION.txt RECEIPT.txt SHA256SUMS SHA256SUMS.outer 
+QUARANTINE.txt=absent dirty.txt=absent preexisting-tmp-LISTING=absent
+step lines from stamp.txt:
+  10 guard-spec exit=0 == 72 passed, 0 failed (guard spec, offline, head d5cd9b8)
+  20 refusal-hosted exit=64 (expect 64) S1-GUARD REFUSED URL_HOST: S1_PG_SUPER_URL host must be the literal loopback address 127.0.0.1 (no hostnames, localhost, IPv6, sockets, remote endpoints)
+  21 refusal-noconfirm exit=64 (expect 64) S1-GUARD REFUSED CONFIRM: S1_PG_DISPOSABLE_CONFIRM is unset; this harness DROPS databases 's1_rls_s2comp_r53' and 's1_rls_s2comp_r53_lock' on 127.0.0.1:54353 a
+  30 precheck: clusters/s2comp-r53 absent, no 54353 listener, no fixture postgres
+  30 precheck: no pre-existing release.sh /tmp scratch files
+  30 fixture-init exit=0 lock: /home/user/workspace/execution/test-validation.lock inherited fd9 from caller pid=13172
+  31 fixture-start exit=0 PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit | cluster=s1-disposable-pg17 | datadir=/home/user/pg17/clusters/s2comp-r53 |
+  32 fixture-status: pg_ctl: server is running (PID: 13230)
+  40 composition exit=0 end_utc=2026-09-23T16:23:58Z == 68 passed, 0 failed (server 17.6, head d5cd9b8, end_utc=2026-09-23T16:23:56Z)
+  45 s1-r4-discriminator exit=0 == 48 passed, 0 failed (server 17.6, head d5cd9b8 scoped_status=clean)
+  50 fixture-stop exit=0 (124=stop bound 20s exceeded; nominal 20s) stopped
+  51 fixture-status-after-stop: pg_ctl: no server running
+harness summary: == 68 passed, 0 failed (server 17.6, head d5cd9b8, end_utc=2026-09-23T16:23:56Z); harness FAIL lines=0; discriminator: == 48 passed, 0 failed (server 17.6, head d5cd9b8 scoped_status=clean); guard-spec: == 72 passed, 0 failed (guard spec, offline, head d5cd9b8)
+source unchanged: WT HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c porcelain=0 prisma_cli=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0 V61 PRE-OK 20/20 setup-prep PRE-OK 37/37 op88/s2-v57 PRE-OK 15/15 fixture=9fcc3696a48627b4ed10544cc6c8911e9f13d95fc7acf7ff324770363c24b881
+fixture state left in place (no destroy, per grant): /home/user/pg17/clusters/s2comp-r53 /home/user/pg17/clusters/s2comp-r53.log  postmaster.pid=absent run_dir=0 entries; pg17 dist untouched: postgres=23cd174849b27306
+release /tmp scratch after: (none expected: harness captures/cleans its own)
+outside-root: /home/user/node_modules entries=209 prisma_outside=absent package.json=absent
+resources after: 8.4G free; mem_avail_MB=7718
+runner_sha256 self-stamp note: stamp.txt shows 'runner_sha256=' EMPTY with stderr 'sha256sum: run-composition-r57-v5.7-when-granted.sh: No such file or directory' because the runner hashes $0 (relative, as invoked by the grant block) after cd $WT; runner identity is instead established by the block's sha256sum -c SHA256SUMS.outer (PRE-OK 20/20, V61 manifest ed241342…) and the preflight hash efa273c7…; runner behaviour unchanged, not a stop
+utc_end=2026-09-23T16:25:02Z

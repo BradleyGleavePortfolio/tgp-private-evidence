@@ -1,0 +1,66 @@
+== S1 R4 TRUNCATE discriminator on 127.0.0.1:54353 db=s1_rls_s2comp_r53 (log: /home/user/workspace/execution/op88/s2-v57/composition-r57/20260923T162230Z/s1-r4/s1-r4-discriminator.detail.log)
+start_utc=2026-09-23T16:23:58Z
+head=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c tree=c0ab87d4dc584b2a7ccad53db16fa551b93fe359 branch=HEAD
+scoped_status=clean (prisma/migrations/20261224000000_rls_close_public_exposure + test/db; 'clean' or sha256-16 of porcelain)
+verify_sql_sha256=266e62e9ed6def7491e886c1f9648ce31dd95d62931c839fb84db2b3140a9448
+controls_sha256=6a88a98cd199910115bdc044f6169c6175721014b62e2d2d2bbff8a5c741a65c
+guard_sha256=6f66e43624fd7ad4337b9b4b67e108fc2192230e8b6e8cc4287b193fe997a8ec
+discriminator_sha256=82da49b26cb2db3dc8ff3a4f387a4320289c556245a00930adc5ae3c39669921
+prisma_cli=/home/user/workspace/worktrees/s2-runner53/node_modules/prisma/build/index.js sha256=c2a77456b70e8ba1e640e122824ed694433828a7c0d76ff3db7fc376b4b0e1a0
+prisma_version=Prisma schema loaded from prisma/schema.prisma prisma                  : 6.19.3 @prisma/client          : 6.19.3 Computed binaryTarget   : debian-openssl-3.0.x Operating System        : linux Architecture            : x64 Node.js                 : v20.20.1 TypeScript              : 5.9.3 Query Engine (Node-API) : libquery-engine c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node) PSL                     : @prisma/prisma-schema-wasm 7.1.1-3.c2990dca591cba766e3b7ef5d9e8a84796e47ab7 Schema Engine           : schema-engine-cli c2990dca591cba766e3b7ef5d9e8a84796e47ab7 (at node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x) Default Engines Hash    : c2990dca591cba766e3b7ef5d9e8a84796e47ab7 Studio                  : 0.511.0 
+node_version=v20.20.1 psql_version=psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)
+S1_PG_PORT=54353 S1_PG_SUPER_URL=postgresql://<redacted>@127.0.0.1:54353/postgres S1_PG_DISPOSABLE_CONFIRM=DESTROY-127.0.0.1:54353/s1_rls_s2comp_r53,s1_rls_s2comp_r53_lock
+lock=held by caller: run-composition-r57-v5.7 pid=11149 fd9=/home/user/workspace/execution/test-validation.lock (asserted, not re-acquired)
+guard=offline+preflight accepted before any non-guard connection
+PASS  precondition: target database s1_rls_s2comp_r53 exists on the guarded cluster
+PASS  precondition: fixture owner role connects (postgres, BYPASSRLS, non-superuser) and PG 17.x
+PASS  precondition: authenticator connects and can SET ROLE anon
+server_version=17.6
+PASS  precondition: CURRENT verify.sql passes on the target (protected state; psql route)
+PASS  precondition (S2 gate route): prisma db execute --file verify.sql exits ZERO on the target
+PASS  predecessor control: frozen b7d7fe59 verify.sql extracted from history matches its pinned sha256
+PASS  current verifier differs from the predecessor (a changed verifier is under test)
+note: control table was empty; inserted one synthetic marker row (removed at the end)
+PASS  R4 TRUNCATE C0: control table "MuxProcessedEvent" is seeded (>=1 row) so a destructive probe is observable
+PASS  R4 TRUNCATE C0: no foreign key references the control table (TRUNCATE would otherwise need CASCADE)
+PASS  R4 TRUNCATE C0: protected state — anon effective S,I,U,D,T all false
+PASS  R4 TRUNCATE C0: protected state — authenticated effective S,I,U,D,T all false
+PASS  R4 TRUNCATE C0: CURRENT verify.sql passes on the protected state (psql route)
+PASS  R4 TRUNCATE C0: PREDECESSOR (b7d7fe59) verify.sql also passes on the protected state (psql route; both agree on the positive)
+PASS  R4 TRUNCATE C4: baseline — SET ROLE anon TRUNCATE is refused 42501 without the privilege (rollback-only txn)
+PASS  R4 TRUNCATE C4: seeded rows intact after the refused probe
+PASS  R4 TRUNCATE C1: after direct grant, anon effective privileges are S,I,U,D=f and TRUNCATE=t
+PASS  R4 TRUNCATE C1: authenticated unaffected by the anon grant
+PASS  R4 TRUNCATE C1: RLS invariants unchanged (enabled+forced, 3 policies) — only the privilege drifted
+PASS  R4 TRUNCATE C1 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with anon holding TRUNCATE (psql route; the S1-R3-A-01 false green)
+PASS  R4 TRUNCATE C1 DISCRIMINATOR: CURRENT verify.sql exits NON-ZERO (psql route)
+PASS  R4 TRUNCATE C1: classified EXPOSURE — '1 exposure problem(s); 0 allowed-path problem(s)'
+PASS  R4 TRUNCATE C1: message is exactly the quoted relation, role and privilege — 'EXPOSURE: "MuxProcessedEvent": anon still holds TRUNCATE'
+PASS  R4 TRUNCATE C1: message does NOT name authenticated
+PASS  R4 TRUNCATE C1 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO with anon holding TRUNCATE
+PASS  R4 TRUNCATE C1 behaviour (rollback-only): SET ROLE anon CAN TRUNCATE the FORCE-RLS deny-all table (00000) and the table is empty inside the txn
+PASS  R4 TRUNCATE C1 behaviour: after ROLLBACK the owner still sees every seeded row (no destruction committed)
+PASS  R4 TRUNCATE C1 restore: anon effective privileges back to all false
+PASS  R4 TRUNCATE C1 restore: CURRENT verify.sql passes again (psql route)
+PASS  R4 TRUNCATE C2: after direct grant, authenticated effective TRUNCATE=t
+PASS  R4 TRUNCATE C2: CURRENT verify.sql exits NON-ZERO
+PASS  R4 TRUNCATE C2: classified EXPOSURE — '1 exposure problem(s); 0 allowed-path problem(s)'
+PASS  R4 TRUNCATE C2: message is exactly the quoted relation, authenticated and TRUNCATE — 'EXPOSURE: "MuxProcessedEvent": authenticated still holds TRUNCATE'
+PASS  R4 TRUNCATE C2: message does NOT name anon
+PASS  R4 TRUNCATE C2 restore: CURRENT verify.sql passes again
+PASS  R4 TRUNCATE C3: PUBLIC grant leaves NO direct anon/authenticated ACL entry (effective-only case)
+PASS  R4 TRUNCATE C3: anon effective TRUNCATE=t via PUBLIC
+PASS  R4 TRUNCATE C3: authenticated effective TRUNCATE=t via PUBLIC
+PASS  R4 TRUNCATE C3 DISCRIMINATOR: PREDECESSOR (b7d7fe59) verify.sql exits ZERO with PUBLIC holding TRUNCATE (psql route)
+PASS  R4 TRUNCATE C3 DISCRIMINATOR: CURRENT verify.sql exits NON-ZERO (psql route)
+PASS  R4 TRUNCATE C3: classified EXPOSURE with one problem per API role — '2 exposure problem(s); 0 allowed-path problem(s)'
+PASS  R4 TRUNCATE C3: message names both quoted-relation problems — '"MuxProcessedEvent": anon still holds TRUNCATE' and '"MuxProcessedEvent": authenticated still holds TRUNCATE'
+PASS  R4 TRUNCATE C3 (S2 gate route): prisma db execute --file verify.sql exits NON-ZERO on the PUBLIC-only grant
+PASS  R4 TRUNCATE C3 restore: anon and authenticated effective privileges back to all false
+PASS  R4 TRUNCATE C3 restore: CURRENT verify.sql passes again (psql route)
+PASS  R4 TRUNCATE C3 restore (S2 gate route): prisma db execute --file verify.sql exits ZERO again
+PASS  R4 TRUNCATE restore: seeded rows intact at the end of the controls
+PASS  cleanup: synthetic marker row removed
+PASS  final: CURRENT verify.sql passes on the target after all controls (psql route)
+end_utc=2026-09-23T16:24:04Z
+== 48 passed, 0 failed (server 17.6, head d5cd9b8 scoped_status=clean)

@@ -1,0 +1,70 @@
+[release] ────────────────────────────────────────────────────────────
+[release] starting release_command
+[release]   machine_id   = local-1790180619
+[release]   git_sha      = d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c
+[release]   release_ver  = s1s2-composition-C7
+[release]   node_version = v20.20.1
+[release]   prisma_cli   = prisma 6.19.3
+[release] ────────────────────────────────────────────────────────────
+[release] step 0: verifier contract preflight (no database contact)...
+[release]   verifiers_discovered = 1
+[release]   required verifier present: prisma/migrations/20261224000000_rls_close_public_exposure/verify.sql
+[release]   verifiers_required = 1 (all present)
+[release] step 1: checking migration status...
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r53_lock", schema "public" at "127.0.0.1:54353"
+
+165 migrations found in prisma/migrations
+Following migration have not yet been applied:
+20261224000000_rls_close_public_exposure
+
+To apply migrations in development run prisma migrate dev.
+To apply migrations in production run prisma migrate deploy.
+[release]   pending_migrations_detected = 1
+[release] step 2: applying pending migrations (prisma migrate deploy)...
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r53_lock", schema "public" at "127.0.0.1:54353"
+
+165 migrations found in prisma/migrations
+
+Applying migration `20261224000000_rls_close_public_exposure`
+Error: P3018
+
+A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+
+Migration name: 20261224000000_rls_close_public_exposure
+
+Database error code: 55P03
+
+Database error:
+ERROR: canceling statement due to lock timeout
+
+DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E55P03), message: "canceling statement due to lock timeout", detail: None, hint: None, position: None, where_: Some("SQL statement \"ALTER TABLE public.community_messages_2027_01 ENABLE ROW LEVEL SECURITY\"\nPL/pgSQL function community_messages_protect_partition(regclass) line 20 at EXECUTE\nSQL statement \"SELECT public.community_messages_protect_partition(part)\"\nPL/pgSQL function inline_code_block line 10 at PERFORM"), schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("postgres.c"), line: Some(3400), routine: Some("ProcessInterrupts") }
+
+
+[release] ❌ FAIL at line 249 (exit=1)
+[release] ─── last prisma output ─────────────────────────────────
+Prisma schema loaded from prisma/schema.prisma
+Datasource "db": PostgreSQL database "s1_rls_s2comp_r53_lock", schema "public" at "127.0.0.1:54353"
+
+165 migrations found in prisma/migrations
+
+Applying migration `20261224000000_rls_close_public_exposure`
+Error: P3018
+
+A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+
+Migration name: 20261224000000_rls_close_public_exposure
+
+Database error code: 55P03
+
+Database error:
+ERROR: canceling statement due to lock timeout
+
+DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E55P03), message: "canceling statement due to lock timeout", detail: None, hint: None, position: None, where_: Some("SQL statement \"ALTER TABLE public.community_messages_2027_01 ENABLE ROW LEVEL SECURITY\"\nPL/pgSQL function community_messages_protect_partition(regclass) line 20 at EXECUTE\nSQL statement \"SELECT public.community_messages_protect_partition(part)\"\nPL/pgSQL function inline_code_block line 10 at PERFORM"), schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("postgres.c"), line: Some(3400), routine: Some("ProcessInterrupts") }
+
+
+[release] ────────────────────────────────────────────────────────
+[release] Deploy ABORTED by release_command. Fly does not roll out the new image.
+[release] Machines keep the previous image; if step 2 (migrate deploy) already ran,
+[release] the DATABASE may have changed — see docs/deploy-runbook.md §11.4 (stage-specific recovery).
