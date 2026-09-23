@@ -1,0 +1,58 @@
+{
+  "audit": "OP88-S5-SETUP-EXCLUSION v3 exact-delta review B",
+  "tier": "T4",
+  "reviewer": "B (independent, passive, source-only; nothing executed; no bash -n; current v3 peer/state/takeover not read)",
+  "status": "REVIEW COMPLETE - not a grant",
+  "exact_input": {
+    "packet": "execution/e8d546f9/s5-setup-exclusion-v3",
+    "manifest": "SHA256SUMS.s5-setup-exclusion-v3",
+    "manifest_sha256": "8b128b4dbef5f26ca11a26480bc07bdaf6bcc40c9c381c7da0c47e34109841c9",
+    "entries_ok": "13/13",
+    "launcher_v3": "a10c615fedbac7c24bb1f6c4a4d18172342a1ba612727eef280c5fd70f451a17",
+    "launcher_v2_input": "b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09",
+    "runner_v101x_copy": "81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a (byte-identical to frozen v2 runner; PIN_RUNNER unchanged)",
+    "own_block_v101": "4aebf96f6b7c8962b7a4b10dfc25acb7a793a24744bc0e79de77675031b1c6c5 (byte-identical embedded in v3 launcher and runner copy)",
+    "prior_reports_read": ["audits/s5-setup-v2-a (manifest fa876aa6...)", "audits/s5-setup-v2-b (manifest 8b1b53a7...)"]
+  },
+  "delta_verification": {
+    "recomputed_diff_equals_shipped": true,
+    "added_removed": "+20/-7, v2 223 -> v3 236 lines",
+    "touched_lines_v3": "2-6, 152-155, 161, 170-175, 178-179, 185-188, 199",
+    "confinement": "primitive/runner byte-identical; observer/controls/fake not in packet (v2's unchanged); counts of kill/trap/rm/flock/own_signal/own_group_signal/own_reap_all/exit identical; RECOVERY_ACCEPT non-comment 0; inner sids census-only (L190-191)"
+  },
+  "closure": {
+    "S5SV2-A-01": {"status": "SOURCE_CLOSED_UNEXECUTED", "lines": "173-175, 178, 185-186, 188", "residual": "R1 Low: per-attempt subdirectory search permission not typed (covered by L187 fallback except adoption->L246 window)"},
+    "S5SV2-A-02": {"status": "SOURCE_CLOSED_UNEXECUTED", "lines": "199 -> callers 205, 211, 232", "residual": "R2 Low: stale publication=ok receipt remains on disk during hold; misleading only if the holder dies (no EXIT trap, parent decision)"},
+    "V2-B-01": {"status": "SOURCE_CLOSED_UNEXECUTED for stale/foreign records; introduces V3-B-01", "lines": "179, 188"},
+    "V2-B-02": {"status": "SOURCE_CLOSED_UNEXECUTED", "lines": "152-155", "prior_live_refusal": "omission parent-accepted; agreed"}
+  },
+  "findings": [
+    {
+      "id": "V3-B-01",
+      "severity": "Medium (canonical-only; safe direction for exclusion; operability and record truth)",
+      "title": "Adopted runner exiting before its L212 binding line yields an unrecoverable unknown hold",
+      "lines": "launcher v3 L179, L188; runner v101x L206-L212 (die paths L207, L209-L211 precede the binding line; npm launch L240 follows it)",
+      "scenario": "gate adopted (RSTATE=released) -> runner dies at precondition/stamp/lease checks -> EXIT_RECORD has START but no ' lease INHERITED ... token=$TOKEN ' -> not-this-attempt -> L188 unknown -> SELF-HOLD; absent/unreadable/unbound all map to unknown; no truthful out-of-band file change releases; recovery only by fabricated runner line or parent kill of holder (lock freed, no RELEASE record)",
+      "exclusion_impact": "none (no npm can exist in this branch)",
+      "smallest_alternative": "one token in L179: also accept a record whose START line has ' START pid=[0-9]* pgid=$SESSION ' (runner L206); sound because adopted npm is independently censused via self_sid-bound IDENTITY (runner L245 before adoption) and EXIT_RECORD facts only ever add unknown; OR parent explicitly accepts with named recovery",
+      "builder_disclosed": true
+    },
+    {
+      "id": "V3-B-02",
+      "severity": "Medium (proof-plan accuracy; not a launcher defect)",
+      "title": "Every v2 fake scenario (not only X5) is incompatible with v3; v2 driver must never target v3 bytes",
+      "lines": "launcher v3 L178, L188; fake v2 L8-L11 (normal, normal-slow, descendant, overrun write no EXIT_RECORD), L12-L18 (subsession-90 record lacks binding line)",
+      "scenario": "RSTATE=released + exit_record=absent -> unknown -> indefinite SELF-HOLD at X1; X5 -> not-this-attempt -> unknown; a v2 11-check run against v3 leaves a stuck private holder",
+      "correction": "FINDINGS_MAP_AND_REQUEST_V3.md section 4 'at minimum X5' understates: a v3 fake must write '<ts> lease INHERITED fd=9 path=$S5X_LOCK token=$S5_LEASE_INHERITED ...' in every scenario"
+    }
+  ],
+  "residuals_low": ["R1 attempt-subdir search permission", "R2 stale receipt on disk during A-02 hold", "R3 retained INNER_KNOWN sids never dropped; pid-number reuse extends hold (safe direction)", "R4 deleted IDENTITY + rewritten token-bound EXIT_RECORD indistinguishable (builder-stated boundary, agreed)", "preserve_prior->HELD publication window shows NO_HOLDER_RECORD for ms"],
+  "v101_consumer_applicability": "explicit, positive, established for v3 by B: no new primitive call, no call in a new context, retained inner sids only to own_group_current, never signalled/registered",
+  "grantability": {
+    "v2_fake_11_check": "v2 bytes only (unchanged from V2 review B); NOT a v3 proof; must not be run against v3",
+    "v3_private_proof": "requires new v3 fake writing bound EXIT_RECORD in every scenario + v3 driver pinned a10c615f...; smallest justified set: N (normal + B-02 preseed), U (A-01 chmod a-rx attempts, retained sid, release after restore), S (B-01 stale foreign record + X4-type never-adopted -> not-this-attempt -> release 90); builder case 2 (A-02) not deterministically constructible - accept by reading; no 'adopted runner dies before L212' case (unrecoverable holder)",
+    "canonical_staging": "v3 bytes source-acceptable subject to parent disposition of V3-B-01 (accept with named recovery, or one-token v4 with dual exact re-review); canonical use remains a separate grant with fresh prerequisites; no inherited blanket clearance"
+  },
+  "truth": "No launcher/runner/control/observer/syntax checker executed by B; builder SYNTAX_CHECKS.txt is a builder claim; V2 fake 11-check is queued, not executed, and not adopted as evidence",
+  "requested_policy": "Fable 5 / High requested by parent (policy; not observable by B)"
+}

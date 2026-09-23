@@ -1,0 +1,59 @@
+utc=2026-09-23T02:16:20Z X6 RECOVERY (one-time) grant=/tgp-private-evidence/execution/e8d546f9/S5_V2_X6_RECOVERY_GRANT.md sha256=1c54c032204b428bc8c3f4f8fc774a51aa85afcfb8dd2fc53546256f8b880de6 (private HEAD 9e317831a17d742b623f5956b362a595d21000d5; grant file UNTRACKED in the private repo at read time — disclosed) parent verify 02:12:50Z
+=== REVALIDATE
+OK   alive S
+OK   starttime 519891
+OK   sid 26214
+OK   pgid 26214
+OK   euid 2000
+OK   cmdline bash /home/user/workspace/execution/e8d546f9/s5-setup-exclusion-v2/launch-s5-setup-exclusion.v2.sh
+OK   fd9 /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/private.lock
+OK   launcher_sha b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09
+OK   holder_token token=20260923T020634Z-26214-18852
+OK   holder_pid holder_pid=26214
+OK   holder_start start_time=519891
+OK   holder_state state=SELF-HOLD
+OK   selfhold_token token=20260923T020634Z-26214-18852
+OK   workload_sid_26278_members 0
+OK   workload_leader_absent absent
+holder session members:  5143 26214 S 1 sleep;26214 1 Ss 586 bash;
+OK   holder_session_shape bash,sleep,
+launcher latest census: 2026-09-23T02:16:19Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+OK   launcher_census census=empty detail=[26278:empty]
+fd links to private.lock (readable procs): 26214:bash 5143:sleep ; unreadable=63
+=== PRE snapshot (copies; hashes of copies)
+78b7c03fb4e9d0b99b44de6719519e0d73d0717b3ae8c883853b040a8d057aeb  LEASE_HOLDER
+9866e629ab777c4c922aba1454bb4b616e8e71b492edf428fedb396637bda7ef  LEASE_RELEASE.tmp.26214
+2a94dcd4b4253940d29016b23d5161607892e70ddabd108c8476194721e090b2  SELF_HOLD
+d79522eaffc1ba556e9f094c52096bbf1b85a5c2b8897a595c936441a0f124f5  launcher.EXIT_RECORD
+EXIT_RECORD lines pre=578
+=== OBSTACLE pre-check
+type=directory symlink=no mode=755 parent_mode=755 entries=[LEASE_RELEASE.tmp.26214,]
+  entry LEASE_RELEASE.tmp.26214 type=regular file symlink=no
+REVALIDATION_RESULT=ALL_OK
+=== REPAIR utc=2026-09-23T02:16:21Z
+attempt 1 utc=2026-09-23T02:16:21.99491905Z removed /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/LEASE_RELEASE/LEASE_RELEASE.tmp.26214
+REPAIRED utc=2026-09-23T02:16:21.103499737Z rmdir /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/LEASE_RELEASE (removed only LEASE_RELEASE.tmp.26214) attempts=1
+REPAIR_STATUS=0
+=== OBSERVE native release (<=30 s; read-only kill -0 / /proc / files; no signals, no lock probe)
+holder_gone utc=2026-09-23T02:16:21.609454496Z after ~500ms /proc/26214=absent
+=== POST utc=2026-09-23T02:16:21Z
+LEASE_RELEASE type=regular file
+--- LEASE_RELEASE:
+token=20260923T020634Z-26214-18852 holder_pid=26214 start_time=519891 released_at=2026-09-23T02:16:21Z how=self-hold-then-empty raw=observed 0 cleanup=verified-empty publication=release-record-failed recovery=none session=26278 inner=[none] census=[26278:empty] runner=[exit_record=absent] final_rc=90
+--- LEASE_HOLDER:
+token=20260923T020634Z-26214-18852 holder_pid=26214 holder_sid=26214 holder_pgid=26214 start_time=519891 state=RELEASED(self-hold-then-empty) since=2026-09-23T02:16:21Z lock=/home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/private.lock launcher_sha256=b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09 runner_sha256=5c18e3b320f6be15053a0a6667009cf14cbfe29f337090ae5a966962ffdbee0f
+--- SELF_HOLD:
+token=20260923T020634Z-26214-18852 holder_pid=26214 start_time=519891 since=2026-09-23T02:06:39Z reason=[release publication failed (normal; session empty)] raw=observed 0 cleanup=verified-empty publication=release-record-failed session=26278 inner=[none] census=[26278:empty] runner=[exit_record=absent] (lease fd 9 retained until the exact outer and inner sessions are observed empty; no handoff exists; parent recovery is out of band)
+--- EXIT_RECORD tail (lines=579):
+2026-09-23T02:16:17Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:16:19Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:16:19Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:16:21Z LEASE_RELEASED how=self-hold-then-empty raw=observed 0 cleanup=verified-empty publication=release-record-failed recovery=none inner=[none] final_rc=90
+holder session sid 26214 members now: 0; workload sid 26278 members: 0; fd links to private.lock: (end) unreadable=63; canonical lock links=0
+EXIT STATUS TRUTH: the original driver (parent of 26214, wait()er) exited 02:06:39Z; 26214 was reparented to ppid 1 — no wait-observed exit status is available to this executor; only recorded intended final status (launcher's own LEASE_RELEASE/EXIT_RECORD lines) and process disappearance are observable.
+06a9fa71afc64ffa42123e362b88bc2688f40f09075b05ab2659a6b1f30f40d7  LEASE_HOLDER
+db2956fc895fd26a4fa2381a2fed2ae259601548f6544b95fbbdb978723f3c2d  LEASE_RELEASE
+2a94dcd4b4253940d29016b23d5161607892e70ddabd108c8476194721e090b2  SELF_HOLD
+ecf74d7b7d2ef06c0498e6fdf1120b558e3dcd569fe6c54a400440122654bd7d  launcher.EXIT_RECORD
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  launcher.out
+utc_end=2026-09-23T02:16:21Z

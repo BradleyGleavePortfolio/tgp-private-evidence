@@ -1,0 +1,19 @@
+--- ctl-v31.sh
++++ ctl-v31.v2.sh
+@@ -1,4 +1,7 @@
+ #!/usr/bin/env bash
++# ctl-v31 successor v2 (of frozen ctl-v31.sh 18a743e4, packet 19529fa7): ONE additive change - P2 waits (bounded) for THIS attempt's SELF_HOLD reason record before the unchanged
++# P2.corrective_rewrite_failure_holds conjunction (the V2 X6 run showed RELEASE_RECORD_*FAILED is logged inside release() before self_hold publishes; acknowledging only that line
++# races the record the check reads). On timeout the existing predicate is evaluated unchanged and fails on its own terms (no weakening). Fake, launcher pin, cases, checks unchanged.
+ # OP88-S5-SETUP-EXCLUSION deterministic PRIVATE fault controls v3.1 (NOT EXECUTED by the builder; separate single private grant after two exact control reviews and the
+ # v3.1 source closure). Runs the exact launcher v3.1 bytes (pinned) with S5X_PRIVATE=1 against a private lock/EX tree and fake-runner.v31.sh. Helper mechanics are those of
+ # ctl-exclusion.v2.sh 62a7233f (log/check/lock_free/launch/wait_*/rel/REL/pid_gone/repair_marker_dir/finish) with launch() extended by an optional PATH prefix (P3a) and a
+@@ -79,6 +82,8 @@
+ check P2.first_receipt_published_ok "$( grep -Eq 'how=normal raw=observed 0 cleanup=verified-empty publication=ok .* final_rc=0$' "$EXD/LEASE_RELEASE.first-receipt" && kill -0 "$LPID" 2>/dev/null && ! XR 'LEASE_RELEASED'; echo $? )" "the first receipt says publication=ok final_rc=0 (this is the stale receipt v2 exited 0 behind); the launcher is still alive and has not logged LEASE_RELEASED"
+ timeout 10 cat "$FIFO" > "$EXD/P2.holder-update-attempt.txt" 2>/dev/null; log "P2 fifo read rc=$? content=[$(head -c 160 "$EXD/P2.holder-update-attempt.txt" 2>/dev/null)]"
+ wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" 'RELEASE_RECORD_REWRITE_FAILED' 15 || log "P2 note: RELEASE_RECORD_REWRITE_FAILED not seen within 15 s"
++TOK=$(sed -n 's/^token=\([^ ]*\) .*/\1/p' "$EXD/LEASE_HOLDER.at-running" 2>/dev/null | head -1)   # this attempt's token (from its own RUNNING holder record preserved by the fixture)
++wait_text "$EXD/SELF_HOLD" "^token=${TOK:-NO-TOKEN} .*reason=\[release publication failed \(normal" 10 || log "P2 note: this attempt's SELF_HOLD reason record (token=${TOK:-none}) not seen within 10 s; evaluating the unchanged predicate anyway"   # v2: acknowledged point = the record the check reads (self_hold publishes AFTER release() logs the failure)
+ check P2.corrective_rewrite_failure_holds "$( XR 'HOLDER_UPDATE_FAILED state=RELEASED\(normal\)' && XR 'RELEASE_RECORD_REWRITE_FAILED' && ! XR 'LEASE_RELEASED' && kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'reason=\[release publication failed (normal' "$EXD/SELF_HOLD" && grep -q 'raw=observed 0 ' "$EXD/SELF_HOLD" && grep -q 'state=RELEASED(normal)' "$EXD/P2.holder-update-attempt.txt" && [ -e "$EXD/LEASE_RELEASE/LEASE_RELEASE.tmp.$LPID" ]; echo $? )" "holder update failed, corrective receipt rewrite failed (deposit inside the directory obstacle), launcher did NOT exit: SELF-HOLD with busy lock, raw=observed 0 kept separate"
+ sleep 3   # one heartbeat retry against the still-obstructed receipt path (accumulates release-record-failed)
+ repair_marker_dir "$EXD/LEASE_RELEASE" LEASE_RELEASE && repair_marker_dir "$EXD/LEASE_HOLDER" LEASE_HOLDER; RR=$?; wait_launcher 12; wait "$LPID"; RC=$?

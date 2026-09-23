@@ -1,0 +1,9 @@
+SYNTAX CHECKS 2026-09-23T02:12:14Z (syntax/hash/diff only; NOTHING executed: no launcher/fake/driver run, no lock, no process, no fifo/chmod fixture applied, no probe)
+bash -n ctl-v31.sh: OK
+bash -n fake-runner.v31.sh: OK
+PIN_L in ctl-v31.sh = d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630 == frozen v3.1 launcher d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630: MATCH
+driver signal set: lines containing 'kill ' that are not 'kill -0' = 8 total / 0 non-liveness (expected 0); pkill/pgrep/killall = 0
+driver deletes: rm occurrences = rm -f "$t"  (only the launcher's own tmp deposit inside a directory obstacle); rmdir only on emptied obstacle dirs
+fake binding line uses launcher's own LOCK string and token: 1 line(s); v3.1 fixed-string expects ' lease INHERITED fd=9 path=$LOCK token=$TOKEN ' where LOCK=$S5X_LOCK, TOKEN=S5_LEASE_INHERITED
+fake START line format vs v101x L206 / v3.1 runner_bound regex: fake='$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=...' ; regex requires '^YYYY-MM-DDTHH:MM:SSZ START pid=N pgid=$SESSION ' -> 1 match
+check assertions: 10 (+ fixture_installed guard)

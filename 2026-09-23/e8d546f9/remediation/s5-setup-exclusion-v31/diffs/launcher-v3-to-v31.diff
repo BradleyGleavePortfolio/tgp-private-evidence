@@ -1,0 +1,48 @@
+--- launch-s5-setup-exclusion.v3.sh
++++ launch-s5-setup-exclusion.v31.sh
+@@ -1,5 +1,9 @@
+ #!/usr/bin/env bash
+-# OP88-S5-SETUP-EXCLUSION outer launcher v3 (successor of v2 b32cc20d; NOT LAUNCHED). v3 closes ONLY audits/s5-setup-v2-a S5SV2-A-01 (inner evidence unavailable was reclassified as
++# OP88-S5-SETUP-EXCLUSION outer launcher v3.1 (successor of v3 a10c615f; NOT LAUNCHED). v3.1 closes ONLY audits/s5-setup-v3-b V3-B-01: an adopted runner that exits before its
++# INHERITED binding line (v101x L212) left a truncated current record that v3 classified not-this-attempt -> unrecoverable unknown hold. v3.1 also accepts the runner's own START
++# line when it is bound to THIS attempt: pgid=$SESSION (the outer session we created) AND stamped not before this holder's spawn (a stale record predates it). Markers `v3.1 (V3-B-01)`
++# in runner_bound / runner_truth, state line (SPAWN_TS) and the spawn line. Everything else is byte-identical to v3; v3 header follows.
++# [v3 header, retained] OP88-S5-SETUP-EXCLUSION outer launcher v3 (successor of v2 b32cc20d; NOT LAUNCHED). v3 closes ONLY audits/s5-setup-v2-a S5SV2-A-01 (inner evidence unavailable was reclassified as
+ # no inner work; inner sids were re-discovered and replaced each census) and S5SV2-A-02 (a failed corrective LEASE_RELEASE rewrite still exited with the stale receipt), plus
+ # audits/s5-setup-v2-b V2-B-01 (shared setup.EXIT_RECORD read without binding to this attempt's token) and V2-B-02 (prior LEASE_HOLDER / fallback SELF_HOLD overwritten, not preserved):
+ # see the `v3 (...)` markers in preserve_prior / inner_sids / runner_truth / session_state / release and the state line INNER_KNOWN/RSTATE. Everything else is byte-identical to v2; v2 header follows.
+@@ -158,7 +162,7 @@
+ own_record "$EX/LEASE_HOLDER" "$(holder_line HELD)" || { say "HOLDER_PUBLICATION_FAILED $EX/LEASE_HOLDER: lease released (nothing launched)"; exit 74; }
+ STATE=HELD; say "LEASE_HELD token=$TOKEN fd=9 holder published"
+ RAW=none; RAW_RC=""; CLEANUP=none; PUBLICATION=ok; RECOVERY=none; SESSION=""; ESCALATED=0; PID=""; INNER=""; RUNNER_NOTE=none; CENSUS=unknown; CENSUS_DETAIL=""
+-INNER_KNOWN=""; RSTATE=never-released   # v3 (S5SV2-A-01): inner sids once established are RETAINED here (census-only) until each is positively observed empty; RSTATE initialised before any census can run
++INNER_KNOWN=""; RSTATE=never-released; SPAWN_TS=""   # v3.1 (V3-B-01): SPAWN_TS = UTC second stamp taken immediately before the spawn (provenance floor for a START-bound record). v3 (S5SV2-A-01): inner sids once established are RETAINED here (census-only) until each is positively observed empty; RSTATE initialised before any census can run
+ pub_add() { case "$PUBLICATION" in ok) PUBLICATION=$1;; *"$1"*) ;; *) PUBLICATION="$PUBLICATION+$1";; esac; }   # v2 (S5X-A-07): causes accumulate, never replace
+ publish_state() { own_record "$EX/LEASE_HOLDER" "$(holder_line "$1")" && return 0; pub_add holder-update-failed; say "HOLDER_UPDATE_FAILED state=$1"; return 1; }
+ record_or_fallback() { # <name> <content>: primary $EX, fallback $LOGS, last resort stderr; accumulates PUBLICATION
+@@ -173,10 +177,16 @@
+   [ -e "$INNER_LOGS/attempts" ] && { [ -r "$INNER_LOGS/attempts" ] && [ -x "$INNER_LOGS/attempts" ] || return 2; }
+   for f in "$INNER_LOGS"/attempts/*/IDENTITY; do [ -e "$f" ] || continue; [ -r "$f" ] || { rc=2; continue; }; grep -q " self_sid=$SESSION " "$f" 2>/dev/null; case $? in 0) ;; 1) continue;; *) rc=2; continue;; esac
+     p=$(sed -n 's/^pid=\([0-9][0-9]*\) .*/\1/p' "$f" 2>/dev/null | head -1); if [ -n "$p" ]; then echo "$p"; else rc=2; fi; done; return $rc; }
++runner_bound() { # <record>: rc0 only when the shared record is THIS attempt's runner's. (a) its INHERITED line carries our token (v101x L212); or (b) v3.1 (V3-B-01): its first START line
++  # (v101x L206, written at runner start, before L212) is bound to the outer session we created (pgid=$SESSION) AND its UTC stamp is not before SPAWN_TS: a stale record from an earlier
++  # attempt predates this spawn, so number reuse alone cannot bind it. Neither form imports facts by itself; runner_truth still reads only this attempt's record.
++  grep -qF -- " lease INHERITED fd=9 path=$LOCK token=$TOKEN " "$1" 2>/dev/null && return 0
++  [ -n "$SESSION" ] && [ -n "$SPAWN_TS" ] || return 1; local st; st=$(sed -n "s/^\([0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z\) START pid=[0-9][0-9]* pgid=$SESSION .*/\1/p" "$1" 2>/dev/null | head -1)
++  [ -n "$st" ] || return 1; st=${st//-/}; st=${st//:/}; [ "$st" \< "$SPAWN_TS" ] && return 1; return 0; }
+ runner_truth() { # the runner's own EXIT_RECORD, evidence only (no release path is derived from it): sets RUNNER_NOTE
+   local r=$INNER_LOGS/setup.EXIT_RECORD rel=0 fin=none unp=0 cf=none
+   [ -e "$r" ] || { RUNNER_NOTE="exit_record=absent"; return 0; }; [ -r "$r" ] || { RUNNER_NOTE="exit_record=unreadable"; return 0; }   # v3 (S5SV2-A-01): unreadable is not absent
+-  grep -qF -- " lease INHERITED fd=9 path=$LOCK token=$TOKEN " "$r" 2>/dev/null || { RUNNER_NOTE="exit_record=not-this-attempt"; return 0; }   # v3 (V2-B-01): the shared record counts only when the runner bound it to THIS token (v101x L212); no inherited attempt facts
++  runner_bound "$r" || { RUNNER_NOTE="exit_record=not-this-attempt"; return 0; }   # v3 (V2-B-01) / v3.1 (V3-B-01): the shared record counts only when bound to THIS attempt (token line, or START bound to our session and not before our spawn); no inherited attempt facts
+   grep -q 'npm-ci IDENTITY .* state=released' "$r" 2>/dev/null && rel=1; grep -q 'EXCLUSION_UNPRESERVED' "$r" 2>/dev/null && unp=1
+   fin=$(sed -n 's/^FINAL rc=\([0-9]*\).*/\1/p' "$r" 2>/dev/null | tail -1); cf=$(sed -n 's/.*CLEANUP_FAILURES=\([0-9]*\).*/\1/p' "$r" 2>/dev/null | tail -1)
+   RUNNER_NOTE="released=$rel final=${fin:-none} unpreserved=$unp cleanup_failures=${cf:-none}"; }
+@@ -214,6 +224,7 @@
+ OWN_ROOT="$LOGS/attempts"; mkdir -p "$OWN_ROOT" || { say "ATTEMPTS_DIR_FAILED"; release "nothing-launched" 74; say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74; }
+ ATT=$(own_attempt) || { say "ATTEMPT_PATH_FAILED"; release "nothing-launched" 74; say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74; }
+ STATE=LAUNCHING; publish_state LAUNCHING
++SPAWN_TS=$(date -u +%Y%m%dT%H%M%SZ)   # v3.1 (V3-B-01): provenance floor taken immediately before the spawn; a runner START stamped earlier cannot be this attempt's
+ own_spawn_begin
+ ( exec setsid bash -c "$OWN_GATE" own-gate "$ATT" $$ env S5_LEASE_INHERITED="$TOKEN" S5_SETUP_GRANT="$S5_SETUP_GRANT" timeout -k "$INNER_KILL" "$INNER_BOUND" bash "$RUNNER" ) > "$LOGS/runner.out" 2>&1 < /dev/null &
+ PID=$!; own_register "$PID"; SESSION=$PID

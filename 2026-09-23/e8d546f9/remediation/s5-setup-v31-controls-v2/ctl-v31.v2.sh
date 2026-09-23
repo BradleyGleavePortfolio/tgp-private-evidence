@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# ctl-v31 successor v2 (of frozen ctl-v31.sh 18a743e4, packet 19529fa7): ONE additive change - P2 waits (bounded) for THIS attempt's SELF_HOLD reason record before the unchanged
+# P2.corrective_rewrite_failure_holds conjunction (the V2 X6 run showed RELEASE_RECORD_*FAILED is logged inside release() before self_hold publishes; acknowledging only that line
+# races the record the check reads). On timeout the existing predicate is evaluated unchanged and fails on its own terms (no weakening). Fake, launcher pin, cases, checks unchanged.
+# OP88-S5-SETUP-EXCLUSION deterministic PRIVATE fault controls v3.1 (NOT EXECUTED by the builder; separate single private grant after two exact control reviews and the
+# v3.1 source closure). Runs the exact launcher v3.1 bytes (pinned) with S5X_PRIVATE=1 against a private lock/EX tree and fake-runner.v31.sh. Helper mechanics are those of
+# ctl-exclusion.v2.sh 62a7233f (log/check/lock_free/launch/wait_*/rel/REL/pid_gone/repair_marker_dir/finish) with launch() extended by an optional PATH prefix (P3a) and a
+# pre-launch fixture directory (records must exist BEFORE the launcher starts).
+# Cases (smallest set for the four v3 closures + the v3.1 closure; runtime cases are lifecycle cases, each ending in a recorded release of the fixture holder):
+#   P1  S5SV2-A-01 + V2-B-02: prior LEASE_HOLDER / fallback SELF_HOLD seeded; bound fake with an inner setsid session outliving its exit 90; after an ACKNOWLEDGED census that
+#       contains the inner sid, the inner evidence subtree is made unlistable (chmod) -> typed unknown with the SAME retained sid across heartbeats, lock busy, no release even after
+#       the inner session ends; restore ONLY that permission -> release self-hold-then-empty 90 with <sid>:empty and raw 90 separate. Prior records byte-preserved under prior/.
+#   P2  S5SV2-A-02 (deterministic by BLOCKING, not by timing): at the acknowledged RUNNING point the driver turns $EX/LEASE_HOLDER into a directory and pre-creates the launcher's
+#       own holder tmp path $EX/LEASE_HOLDER.tmp.<launcher pid> as a FIFO. The launcher's release() publishes the first receipt (LEASE_RELEASE, publication=ok), then publish_state's
+#       own_record opens that FIFO for writing and BLOCKS until the driver reads it: the launcher cannot pass the point between the first receipt and the holder update. While it is
+#       blocked the driver preserves the first receipt (mv) and turns $EX/LEASE_RELEASE into a directory, then reads the FIFO. The holder update then fails (fifo moved into the
+#       directory; readback fails) and the corrective receipt rewrite fails (deposit into the directory; readback fails) -> v3 return 1 -> SELF-HOLD (v2 exited 0 here with the stale
+#       publication=ok receipt). Repair removes ONLY the launcher's own deposits + the two empty directories -> release self-hold-then-empty 90, raw=observed 0 retained.
+#   P3a V2-B-01 stale record + never-adopted gate: a foreign-token bound stale setup.EXIT_RECORD is seeded; the launcher process (only) sees a PATH shim `setsid` that execs its
+#       argv WITHOUT creating a session, so the primitive's own_confirm positively refuses the gate (pgid == launcher pgid: decoy, rc2) -> RSTATE=never-released -> the existing
+#       refusal path TERMs the unadopted gate -> exceptional -> census; v3.1 must report exit_record=not-this-attempt (v2 would have entered the stale released-but-no-IDENTITY hold)
+#       and release runner-not-released(never-released)-then-empty 90. The shim is attributable in LAUNCHER_START's own_stamp (setsid=[setsid SHIM-P3a ...]). The stale file is untouched.
+#   P3b V3-B-01 closure: adopted fake writes the v101x-format START line and exits 75 BEFORE the INHERITED line (v3 would dead-end in unknown); v3.1 binds via START pgid=SESSION +
+#       spawn-time floor -> released=0 final=75 -> release normal, final_rc=75 = raw. Run LAST: if the START binding did not hold on this platform the holder stays in SELF-HOLD and is
+#       REPORTED (never killed) - that outcome is itself the answer to B's pgid assumption.
+# Not included (static-only, see REQUEST_V31_CONTROLS.md): nothing else. Bounds: driver <= ~90 s (HEARTBEAT 2, INNER_BOUND 20, NORMAL_BOUND 25); request timeout --foreground -k 10 180.
+# Signal set of this driver: NONE (the launcher signals only its own unadopted gate in P3a). Writes: only under $OUT. No network/install/canonical lock. STOP on first failure.
+set -uo pipefail; HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; L="${S5X_LAUNCHER:-$HERE/../s5-setup-exclusion-v31/launch-s5-setup-exclusion.v31.sh}"
+[ "${S5_CTL_GRANT:-}" = "granted-by-parent" ] || { echo "REFUSE: S5_CTL_GRANT=granted-by-parent not set"; exit 2; }
+PIN_L=d5d9b2b8552a6b3f26fcb89a33892135f4954f4c898b985c021378ccc501c630; [ "$(sha256sum "$L" | cut -c1-64)" = "$PIN_L" ] || { echo "REFUSE launcher hash ($L)"; exit 2; }
+[ -n "${S5X_OUT:-}" ] && [ "${S5X_OUT#/}" != "$S5X_OUT" ] || { echo "REFUSE: S5X_OUT must be an absolute fresh noncanonical directory"; exit 2; }
+case "$S5X_OUT" in *execution/test-validation.lock*|*execution/s5-r4*) echo "REFUSE canonical path"; exit 2;; esac
+OUT="$S5X_OUT/$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$OUT" || exit 74; LOG="$OUT/ctl.log"; PASS=0; FAIL=0; LPID=""; EXD=""; REAL_SETSID=$(command -v setsid) || exit 2
+log() { echo "$(date -u +%FT%TZ) $*" | tee -a "$LOG"; }
+log "CTL_START driver_sha256=$(sha256sum "$0" | cut -c1-64) launcher_sha256=$PIN_L launcher=$L fake_sha256=$(sha256sum "$HERE/fake-runner.v31.sh" | cut -c1-64) real_setsid=$REAL_SETSID out=$OUT"
+check() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); log "PASS $1 $3"; else FAIL=$((FAIL+1)); log "FAIL $1 $3"; log "STOP_ON_FIRST_FAILURE $1"; exit 1; fi; }
+lock_free() { ( exec 8>"$1"; flock -n 8 ) 2>/dev/null; }   # PRIVATE lock only
+prepare() { EXD="$OUT/$1"; mkdir -p "$EXD/logs/setup-exclusion" "$EXD/logs/setup-v1" || exit 74; }   # fixture directory BEFORE launch (seeded records live here)
+launch() { # <case> <scenario> [path-prefix] -> LPID; launcher detached in its own session (REAL setsid), unbounded as in canonical use; optional PATH prefix applies to the launcher only
+  export S5X_PRIVATE=1 S5X_LOCK="$EXD/private.lock" S5X_EX="$EXD" S5X_RUNNER="$HERE/fake-runner.v31.sh" S5X_SCENARIO=$2 S5X_INNER_BOUND=20 S5X_INNER_KILL=2 S5X_NORMAL_BOUND=25 S5X_HEARTBEAT=2 S5_SETUP_GRANT=granted-by-parent
+  if [ -n "${3:-}" ]; then PATH="$3:$PATH" "$REAL_SETSID" bash "$L" > "$EXD/launcher.out" 2>&1 < /dev/null & else "$REAL_SETSID" bash "$L" > "$EXD/launcher.out" 2>&1 < /dev/null & fi
+  LPID=$!; log "LAUNCH $1 scenario=$2 lpid=$LPID path_prefix=[${3:-none}]"; }
+wait_launcher() { local i=0; while kill -0 "$LPID" 2>/dev/null && [ $i -lt $(( $1 * 10 )) ]; do sleep 0.1; i=$((i+1)); done; ! kill -0 "$LPID" 2>/dev/null; }
+wait_state() { local i=0; until grep -q "state=$1 " "$EXD/LEASE_HOLDER" 2>/dev/null; do kill -0 "$LPID" 2>/dev/null || return 1; [ $i -ge $(( $2 * 10 )) ] && return 1; sleep 0.1; i=$((i+1)); done; }
+wait_text() { local i=0; until grep -Eq "$2" "$1" 2>/dev/null; do [ $i -ge $(( $3 * 10 )) ] && return 1; sleep 0.1; i=$((i+1)); done; }
+wait_path() { local i=0; until [ -e "$1" ]; do [ $i -ge $(( $2 * 10 )) ] && return 1; sleep 0.1; i=$((i+1)); done; }
+rel() { grep -q "how=$2 " "$EXD/LEASE_RELEASE" 2>/dev/null; }
+REL() { grep -Eq "$1" "$EXD/LEASE_RELEASE" 2>/dev/null; }
+XR() { grep -Eq "$1" "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" 2>/dev/null; }
+pid_gone() { [ -n "$1" ] || return 1; [ -d "/proc/$1" ] || return 0; [ "$(awk '{print $3}' "/proc/$1/stat" 2>/dev/null)" = Z ]; }
+repair_marker_dir() { # <dir> <name>: remove ONLY the launcher's own <name>.tmp.<launcher pid> deposit inside the directory obstacle, then rmdir. Never recursive.
+  local d=$1 n=$2 t="$1/$2.tmp.$LPID" k=0; [ -d "$d" ] || { log "REPAIR_SKIP not-a-directory $d"; return 0; }
+  while :; do [ -e "$t" ] && { rm -f "$t" || { log "REPAIR_FAILED rm $t"; return 1; }; }
+    rmdir "$d" 2>/dev/null && { log "REPAIRED $d (removed only $n.tmp.$LPID)"; return 0; }
+    k=$((k+1)); [ $k -ge 5 ] && { log "REPAIR_FAILED rmdir $d contents=[$(ls -A "$d" 2>/dev/null | tr '\n' ',')] (unexpected contents: not deleted)"; return 1; }; sleep 0.3; done; }
+finish() { [ -n "${FIFO:-}" ] && [ -p "$FIFO" ] && { log "FINISH draining fixture fifo $FIFO"; timeout 3 cat "$FIFO" > /dev/null 2>&1; }
+  [ -n "$LPID" ] && kill -0 "$LPID" 2>/dev/null && log "UNRESOLVED launcher pid=$LPID ex=$EXD still holding (not killed: parent boundary; token in $EXD/LEASE_HOLDER)"; log "SUMMARY pass=$PASS fail=$FAIL"; }
+trap finish EXIT
+# ---- P1: prior-record preservation (V2-B-02) + retained inner sid across evidence loss (S5SV2-A-01)
+prepare P1
+printf '%s\n' "token=PRIOR-HOLDER-P1 holder_pid=1 holder_sid=1 holder_pgid=1 start_time=0 state=SELF-HOLD since=1970-01-01T00:00:00Z lock=seeded launcher_sha256=seeded runner_sha256=seeded (P1 fixture: prior holder that ended without RELEASE)" > "$EXD/LEASE_HOLDER"
+printf '%s\n' "token=PRIOR-FALLBACK-P1 holder_pid=1 start_time=0 since=1970-01-01T00:00:00Z reason=[seeded fallback record] (P1 fixture: prior fallback SELF_HOLD)" > "$EXD/logs/setup-exclusion/SELF_HOLD"
+cp "$EXD/LEASE_HOLDER" "$OUT/P1.seed.LEASE_HOLDER"; cp "$EXD/logs/setup-exclusion/SELF_HOLD" "$OUT/P1.seed.SELF_HOLD.fallback"
+export S5X_SUB_SLEEP=16; launch P1 bound-subsession-90; wait_state SELF-HOLD 20; SH=$?; wait_text "$EXD/SELF_HOLD" 'reason=' 5; SP=$(cat "$EXD/SUB_READY" 2>/dev/null); P=$(sed -n 's/.*RUNNER_LAUNCH pid=\([0-9]*\) .*/\1/p' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" | head -1)
+check P1.prior_records_preserved "$( set -- "$EXD"/logs/setup-exclusion/prior/PRIOR-HOLDER-P1.LEASE_HOLDER.*; H=$1; set -- "$EXD"/logs/setup-exclusion/prior/PRIOR-FALLBACK-P1.SELF_HOLD.fallback.*; F=$1
+  [ -f "$H" ] && cmp -s "$H" "$OUT/P1.seed.LEASE_HOLDER" && [ -f "$F" ] && cmp -s "$F" "$OUT/P1.seed.SELF_HOLD.fallback" && XR 'PRIOR_RECORD_PRESERVED LEASE_HOLDER token=PRIOR-HOLDER-P1' && XR 'PRIOR_RECORD_PRESERVED SELF_HOLD.fallback token=PRIOR-FALLBACK-P1' && ! grep -q PRIOR-HOLDER-P1 "$EXD/LEASE_HOLDER"; echo $? )" "prior LEASE_HOLDER and fallback SELF_HOLD moved by their tokens under prior/ byte-identical to the seeds (nothing deleted); current holder record is the new token"
+check P1.inner_live_hold "$( [ "$SH" = 0 ] && kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && [ -n "$SP" ] && [ -n "$P" ] && [ -d "/proc/$SP" ] && grep -q "inner=\[$SP\]" "$EXD/SELF_HOLD" && grep -q "$SP:live" "$EXD/SELF_HOLD" && grep -q 'released=1 final=90 unpreserved=1' "$EXD/SELF_HOLD" && XR "HEARTBEAT state=SELF-HOLD census=live detail=\[$P:empty $SP:live\]"; echo $? )" "bound fake exited 90; its IDENTITY bound inner sid=$SP; holder in SELF-HOLD with busy lock; an acknowledged heartbeat census contains $SP (retention baseline)"
+chmod a-rwx "$EXD/logs/setup-v1/attempts"; log "FIXTURE P1 chmod a-rwx $EXD/logs/setup-v1/attempts (inner evidence subtree unlistable; nothing deleted)"
+wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" "census=unknown detail=\[inner:evidence-unavailable $P:empty $SP:live\]" 8 || log "P1 note: unknown+retained-live heartbeat not seen within 8 s"
+check P1.evidence_loss_keeps_retained_sid "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && XR "census=unknown detail=\[inner:evidence-unavailable $P:empty $SP:live\]" && [ ! -e "$EXD/LEASE_RELEASE" ]; echo $? )" "with the IDENTITY subtree unlistable the census is typed unknown AND still names the retained inner sid $SP (v2 would have read no inner sid: census empty -> release while $SP lived)"
+i=0; until pid_gone "$SP" || [ $i -ge 250 ]; do sleep 0.1; i=$((i+1)); done; log "P1 inner sleep gone=$(pid_gone "$SP" && echo yes || echo no)"
+wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" "census=unknown detail=\[inner:evidence-unavailable $P:empty $SP:empty\]" 8 || log "P1 note: unknown+retained-empty heartbeat not seen within 8 s"
+check P1.no_release_on_unavailable_evidence "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && XR "census=unknown detail=\[inner:evidence-unavailable $P:empty $SP:empty\]" && [ ! -e "$EXD/LEASE_RELEASE" ]; echo $? )" "inner session ended but the evidence subtree is still unavailable: hold retained (unknown != empty), no RELEASE"
+chmod u+rwx "$EXD/logs/setup-v1/attempts"; log "REPAIR P1 chmod u+rwx (permission restored; no file touched)"; wait_launcher 12; wait "$LPID"; RC=$?
+check P1.release_after_evidence_restored "$( [ "$RC" = 90 ] && rel P1 self-hold-then-empty && REL "inner=\[$SP\]" && REL "$SP:empty" && ! REL 'evidence-unavailable' && REL 'raw=observed 90 ' && REL 'released=1 final=90 unpreserved=1' && ! REL 'cleanup=verified-empty' && lock_free "$EXD/private.lock"; echo $? )" "after restoring only the permission: readable evidence, $SP positively empty, released self-hold-then-empty rc 90; raw 90 separate; no verified-empty claim; lock free"
+# ---- P2: failed corrective receipt (S5SV2-A-02), deterministic by blocking on the launcher's own holder tmp path
+prepare P2; export S5X_SLOW=6; launch P2 bound-normal-slow; wait_state RUNNING 15 || log "P2 note: state=RUNNING not observed"
+FIFO="$EXD/LEASE_HOLDER.tmp.$LPID"; mv -f "$EXD/LEASE_HOLDER" "$EXD/LEASE_HOLDER.at-running" && mkdir "$EXD/LEASE_HOLDER" && mkfifo "$FIFO" || check P2.fixture_installed 1 "fixture install failed"
+log "FIXTURE P2 LEASE_HOLDER -> directory (record preserved as LEASE_HOLDER.at-running); fifo at $FIFO (the launcher's next holder update blocks here until the driver reads)"
+wait_path "$EXD/LEASE_RELEASE" 20 || log "P2 note: first receipt not seen within 20 s"; sleep 3; log "P2 launcher wchan=[$(cat /proc/$LPID/wchan 2>/dev/null)] state=[$(awk '{print $3}' /proc/$LPID/stat 2>/dev/null)] (blocked at the fifo open: it cannot pass the holder update without a reader)"
+mv -f "$EXD/LEASE_RELEASE" "$EXD/LEASE_RELEASE.first-receipt" && mkdir "$EXD/LEASE_RELEASE"; log "FIXTURE P2 first receipt preserved as LEASE_RELEASE.first-receipt; LEASE_RELEASE -> directory"
+check P2.first_receipt_published_ok "$( grep -Eq 'how=normal raw=observed 0 cleanup=verified-empty publication=ok .* final_rc=0$' "$EXD/LEASE_RELEASE.first-receipt" && kill -0 "$LPID" 2>/dev/null && ! XR 'LEASE_RELEASED'; echo $? )" "the first receipt says publication=ok final_rc=0 (this is the stale receipt v2 exited 0 behind); the launcher is still alive and has not logged LEASE_RELEASED"
+timeout 10 cat "$FIFO" > "$EXD/P2.holder-update-attempt.txt" 2>/dev/null; log "P2 fifo read rc=$? content=[$(head -c 160 "$EXD/P2.holder-update-attempt.txt" 2>/dev/null)]"
+wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" 'RELEASE_RECORD_REWRITE_FAILED' 15 || log "P2 note: RELEASE_RECORD_REWRITE_FAILED not seen within 15 s"
+TOK=$(sed -n 's/^token=\([^ ]*\) .*/\1/p' "$EXD/LEASE_HOLDER.at-running" 2>/dev/null | head -1)   # this attempt's token (from its own RUNNING holder record preserved by the fixture)
+wait_text "$EXD/SELF_HOLD" "^token=${TOK:-NO-TOKEN} .*reason=\[release publication failed \(normal" 10 || log "P2 note: this attempt's SELF_HOLD reason record (token=${TOK:-none}) not seen within 10 s; evaluating the unchanged predicate anyway"   # v2: acknowledged point = the record the check reads (self_hold publishes AFTER release() logs the failure)
+check P2.corrective_rewrite_failure_holds "$( XR 'HOLDER_UPDATE_FAILED state=RELEASED\(normal\)' && XR 'RELEASE_RECORD_REWRITE_FAILED' && ! XR 'LEASE_RELEASED' && kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'reason=\[release publication failed (normal' "$EXD/SELF_HOLD" && grep -q 'raw=observed 0 ' "$EXD/SELF_HOLD" && grep -q 'state=RELEASED(normal)' "$EXD/P2.holder-update-attempt.txt" && [ -e "$EXD/LEASE_RELEASE/LEASE_RELEASE.tmp.$LPID" ]; echo $? )" "holder update failed, corrective receipt rewrite failed (deposit inside the directory obstacle), launcher did NOT exit: SELF-HOLD with busy lock, raw=observed 0 kept separate"
+sleep 3   # one heartbeat retry against the still-obstructed receipt path (accumulates release-record-failed)
+repair_marker_dir "$EXD/LEASE_RELEASE" LEASE_RELEASE && repair_marker_dir "$EXD/LEASE_HOLDER" LEASE_HOLDER; RR=$?; wait_launcher 12; wait "$LPID"; RC=$?
+check P2.release_after_exact_repair "$( [ "$RR" = 0 ] && [ "$RC" = 90 ] && rel P2 self-hold-then-empty && REL 'raw=observed 0 ' && REL 'publication=holder-update-failed\+release-record-rewrite-failed(\+release-record-failed)? ' && REL 'final_rc=90$' && grep -q 'state=RELEASED' "$EXD/LEASE_HOLDER" && lock_free "$EXD/private.lock"; echo $? )" "after removing only the launcher's own deposits + empty directories: checked receipt with both causes, final_rc=90 while raw 0 is retained separately, holder RELEASED, lock free"
+# ---- P3a: stale foreign-token record + never-adopted gate (V2-B-01)
+prepare P3a; SHIM="$OUT/P3a-shim"; mkdir -p "$SHIM"
+printf '%s\n' '#!/usr/bin/env bash' '# P3a control shim: seen ONLY by the launcher process via PATH. Does NOT create a session: execs argv unchanged, so the primitive'"'"'s own_confirm sees the gate in the launcher'"'"'s own process group (decoy) and refuses adoption.' 'case "${1:-}" in --version) echo "setsid SHIM-P3a (control fault: no new session; argv exec unchanged)"; exit 0;; esac; exec "$@"' > "$SHIM/setsid"; chmod 755 "$SHIM/setsid"
+{ echo "2026-01-01T00:00:00Z START pid=99999 pgid=99999 ppid=1 runner_sha256=stale (P3a fixture: stale record of an earlier attempt)"; echo "2026-01-01T00:00:01Z lease INHERITED fd=9 path=$EXD/private.lock token=STALE-TOKEN-P3a holder_pid=1 (stale)"; echo "2026-01-01T00:00:02Z npm-ci IDENTITY attempt=attempt-stale identity_rc=0 adoption=published state=released"; echo "2026-01-01T00:00:03Z EXCLUSION_UNPRESERVED after 0s: stale"; echo "2026-01-01T00:00:03Z CLEANUP_FAILURES=1"; echo "FINAL rc=90 (stale)"; } > "$EXD/logs/setup-v1/setup.EXIT_RECORD"; STALE=$(sha256sum "$EXD/logs/setup-v1/setup.EXIT_RECORD" | cut -c1-64)
+launch P3a never-runs "$SHIM"; wait_launcher 25; wait "$LPID"; RC=$?
+check P3a.never_adopted_stale_not_imported "$( [ "$RC" = 90 ] && rel P3a 'runner-not-released(never-released)-then-empty' && REL 'runner=\[exit_record=not-this-attempt\]' && REL 'raw=observed 143 ' && REL 'inner=\[none\]' && XR 'RUNNER_LAUNCH pid=[0-9]+ confirm_rc=[23] adoption=not-attempted state=never-released' && XR 'LAUNCHER_START .*setsid=\[setsid SHIM-P3a' && ! XR 'released-but-no-IDENTITY' && [ ! -e "$EXD/SELF_HOLD" ] && [ "$(sha256sum "$EXD/logs/setup-v1/setup.EXIT_RECORD" | cut -c1-64)" = "$STALE" ] && lock_free "$EXD/private.lock"; echo $? )" "gate positively refused (identity unconfirmed, attributable shim in own_stamp), unadopted gate ended by the existing refusal path (raw 143), stale record classified not-this-attempt and left untouched, no stale-derived hold, released rc 90, lock free"
+# ---- P3b: adopted runner exits before its INHERITED line (V3-B-01 closure on v3.1) - LAST: an unresolved holder here is reported, never killed
+prepare P3b; cp "$OUT/P3a/logs/setup-v1/setup.EXIT_RECORD" "$EXD/logs/setup-v1/setup.EXIT_RECORD"   # same stale record first; the fake's START truncates it exactly as v101x L206 does
+launch P3b early-death-75; wait_launcher 25; wait "$LPID"; RC=$?; P=$(sed -n 's/.*RUNNER_LAUNCH pid=\([0-9]*\) .*/\1/p' "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" | head -1)
+check P3b.early_adopted_death_released "$( [ "$RC" = 75 ] && rel P3b normal && REL 'raw=observed 75 ' && REL 'final_rc=75$' && REL 'runner=\[released=0 final=75 unpreserved=0 cleanup_failures=none\]' && REL 'cleanup=verified-empty' && REL 'inner=\[none\]' && XR 'adoption=published state=released' && grep -Eq "^[0-9T:Z-]+ START pid=[0-9]+ pgid=$P " "$EXD/logs/setup-v1/setup.EXIT_RECORD" && ! grep -q 'lease INHERITED' "$EXD/logs/setup-v1/setup.EXIT_RECORD" && [ ! -e "$EXD/SELF_HOLD" ] && lock_free "$EXD/private.lock"; echo $? )" "adopted fake wrote only START (pgid=$P = outer session) and died 75 before the binding line: v3.1 binds this attempt's record, released normal with final_rc=75 = raw, no dead-end hold (v3 would have held unknown), lock free"
+LPID=""; log "ALL_CASES_DONE pass=$PASS fail=$FAIL (static expectation 10 checks; not evidence until executed under grant)"

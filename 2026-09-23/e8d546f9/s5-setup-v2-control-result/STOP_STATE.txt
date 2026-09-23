@@ -1,0 +1,82 @@
+utc=2026-09-23T02:07:07Z STOP_STATE read-only accounting (no signal, no kill, no lock open; private lock only)
+--- driver X6 check definition (ctl-exclusion.v2.sh)
+63:# ---- X6 normal-path RELEASE publication failure -> SELF-HOLD (not exit) -> exact repair -> release
+64-launch X6 normal-slow; wait_state RUNNING 15 || log "X6 note: state=RUNNING not observed"; mkdir -p "$EXD/LEASE_RELEASE"
+65-wait_text "$EXD/logs/setup-exclusion/launcher.EXIT_RECORD" 'RELEASE_RECORD_FAILED' 30 || log "X6 note: RELEASE_RECORD_FAILED not seen within 30 s"
+66-check X6.normal_release_failure_holds "$( kill -0 "$LPID" 2>/dev/null && ! lock_free "$EXD/private.lock" && grep -q 'state=SELF-HOLD' "$EXD/LEASE_HOLDER" && grep -q 'reason=\[release publication failed (normal' "$EXD/SELF_HOLD"; echo $? )" "normal completion with unpublishable RELEASE: holder stays alive in recorded SELF-HOLD with busy lock (v1 exited here)"
+--- ctl.log X6 lines (full)
+2026-09-23T02:06:34Z LAUNCH X6 scenario=normal-slow lpid=26214
+2026-09-23T02:06:39Z FAIL X6.normal_release_failure_holds normal completion with unpublishable RELEASE: holder stays alive in recorded SELF-HOLD with busy lock (v1 exited here)
+2026-09-23T02:06:39Z STOP_ON_FIRST_FAILURE X6.normal_release_failure_holds
+2026-09-23T02:06:39Z UNRESOLVED launcher pid=26214 ex=/home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6 still holding (not killed: parent boundary; token in /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/LEASE_HOLDER)
+2026-09-23T02:06:39Z SUMMARY pass=8 fail=1
+--- X6 dir
+total 24
+drwxr-xr-x   4 user user 4096 Sep 23 02:07 .
+drwxr-xr-x   8 user user 4096 Sep 23 02:06 ..
+-rw-r--r--   1 user user  418 Sep 23 02:07 LEASE_HOLDER
+drwxr-xr-x   2 user user 4096 Sep 23 02:07 LEASE_RELEASE
+-rw-r--r--   1 user user  438 Sep 23 02:06 SELF_HOLD
+-rw-r--r--   1 user user    0 Sep 23 02:06 launcher.out
+drwxr-xr-x   3 user user 4096 Sep 23 02:06 logs
+-rw-r--r--   1 user user    0 Sep 23 02:06 private.lock
+total 24
+drwxr-xr-x   4 user user 4096 Sep 23 02:06 .
+drwxr-xr-x   3 user user 4096 Sep 23 02:06 ..
+drwxr-xr-x   3 user user 4096 Sep 23 02:06 attempts
+-rw-r--r--   1 user user 4238 Sep 23 02:07 launcher.EXIT_RECORD
+drwxr-xr-x   2 user user 4096 Sep 23 02:06 prior
+-rw-r--r--   1 user user    0 Sep 23 02:06 runner.out
+--- LEASE_HOLDER
+token=20260923T020634Z-26214-18852 holder_pid=26214 holder_sid=26214 holder_pgid=26214 start_time=519891 state=SELF-HOLD since=2026-09-23T02:07:05Z lock=/home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/private.lock launcher_sha256=b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09 runner_sha256=5c18e3b320f6be15053a0a6667009cf14cbfe29f337090ae5a966962ffdbee0f
+--- SELF_HOLD
+token=20260923T020634Z-26214-18852 holder_pid=26214 start_time=519891 since=2026-09-23T02:06:39Z reason=[release publication failed (normal; session empty)] raw=observed 0 cleanup=verified-empty publication=release-record-failed session=26278 inner=[none] census=[26278:empty] runner=[exit_record=absent] (lease fd 9 retained until the exact outer and inner sessions are observed empty; no handoff exists; parent recovery is out of band)
+--- LEASE_RELEASE
+(LEASE_RELEASE is a DIRECTORY: LEASE_RELEASE.tmp.26214 )
+--- launcher.out
+--- launcher.EXIT_RECORD tail
+2026-09-23T02:06:59Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:06:59Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:07:01Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:07:01Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:07:03Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:07:03Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:07:05Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:07:05Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+--- live holder identity (read-only /proc)
+pid=26214 alive state=S starttime=519891 sid=26214 pgid=26214 ppid=1 cmdline=bash /home/user/workspace/execution/e8d546f9/s5-setup-exclusion-v2/launch-s5-setup-exclusion.v2.sh 
+  fd 9 -> /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/private.lock
+--- processes in holder's session (ps -s, read-only)
+26214     1 26214 26214 Ss        32 bash            bash /home/user/workspace/execution/e8d546f9/s5-setup-exclusion-v2/launch-s5-setup-exclusion.v2.sh
+27207 26214 26214 26214 S          1 sleep           sleep 2
+--- other fd links to X6/private.lock across readable procs
+  /proc/26214/fd/9
+  /proc/27207/fd/9
+--- canonical lock untouched: fd links to execution/test-validation.lock=0; execution/s5-r4=absent
+--- other cases' launchers gone? X1..X5 lpids: 14131:gone 14318:gone 19249:gone 19801:gone 25424:gone 
+utc_end=2026-09-23T02:07:07Z
+utc=2026-09-23T02:07:27Z X6 timing characterization (read-only; bounded to X6 records)
+--- launcher.EXIT_RECORD head (first 14 lines)
+2026-09-23T02:06:34Z LAUNCHER_START pid=26214 stamp=[monitor=off bash=5.3.9(1)-release setsid=[setsid from util-linux 2.41.3] timeout=[timeout (uutils coreutils) 0.8.0] ps=[ps from procps-ng 4.0.4]] launcher_sha256=b32cc20d0dbfa24
+2026-09-23T02:06:34Z LEASE_HELD token=20260923T020634Z-26214-18852 fd=9 holder published
+2026-09-23T02:06:35Z RUNNER_LAUNCH pid=26278 confirm_rc=0 adoption=published state=released
+2026-09-23T02:06:39Z RUNNER_RAW observed rc=0 (separate from cleanup/publication/recovery)
+2026-09-23T02:06:39Z SESSION_CENSUS census=empty detail=[26278:empty] inner=[none] runner=[exit_record=absent]
+2026-09-23T02:06:39Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:06:39Z SELF_HOLD published /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/SELF_HOLD
+2026-09-23T02:06:39Z SELF_HOLD reason=[release publication failed (normal; session empty)] (heartbeat every 2s; no self-imposed bound; no handoff)
+2026-09-23T02:06:39Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:06:39Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:06:41Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:06:41Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+2026-09-23T02:06:43Z RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of releasing
+2026-09-23T02:06:43Z HEARTBEAT state=SELF-HOLD census=empty detail=[26278:empty] publication=release-record-failed
+--- file mtimes: SELF_HOLD=02:06:39 (since= in content 02:06:39) LEASE_HOLDER=02:07:26 (rewritten per heartbeat)
+--- driver check timestamp: FAIL logged 02:06:39Z; the wait_text on 'RELEASE_RECORD_FAILED' returned at the first such line; check requires simultaneously: launcher alive, private lock busy, LEASE_HOLDER 'state=SELF-HOLD', SELF_HOLD 'reason=[release publication failed (normal'
+--- where launcher writes SELF-HOLD state vs RELEASE_RECORD_FAILED line (launcher v2 source, line numbers only):
+185:  local how=$1 rc=$2; REL_AT=$(ts); own_record "$EX/LEASE_RELEASE" "$(release_line "$how" "$rc")" || { pub_add release-record-failed; say "RELEASE_RECORD_FAILED: holding (SELF-HOLD) instead of rel
+193:    say "HEARTBEAT state=SELF-HOLD census=$CENSUS detail=[$CENSUS_DETAIL] publication=$PUBLICATION"; publish_state SELF-HOLD >/dev/null; sleep "$HEARTBEAT"; done; }
+201:OWN_ROOT="$LOGS/attempts"; mkdir -p "$OWN_ROOT" || { say "ATTEMPTS_DIR_FAILED"; release "nothing-launched" 74; say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74
+202:ATT=$(own_attempt) || { say "ATTEMPT_PATH_FAILED"; release "nothing-launched" 74; say "RELEASE_RECORD_FAILED nothing launched: exit 74 (no owned work exists)"; exit 74; }
+--- private lock fd 9 also inherited by heartbeat child: pid 27207 'sleep 2' (transient, ppid 26214) — observed fact, not interpreted
+utc_end=2026-09-23T02:07:27Z

@@ -1,0 +1,21 @@
+# X6 retained-holder recovery — one-time fixture repair (additive evidence; original failed result unchanged)
+
+Executor `restore_upstream_proof_inputs_muddwjad`, 2026-09-23T02:16:20Z–02:16:21Z. Grant `tgp-private-evidence/execution/e8d546f9/S5_V2_X6_RECOVERY_GRANT.md` sha256 **`1c54c032204b428bc8c3f4f8fc774a51aa85afcfb8dd2fc53546256f8b880de6`** (read in full; private repo HEAD `9e317831a17d742b623f5956b362a595d21000d5`; the grant file was **untracked** (`??`) in the private repo at read time — disclosed, not a blocker per parent's explicit ACTIVATE mail). Parent identity verification 02:12:50Z.
+
+## Unchanged truth
+Driver raw **1**, `SUMMARY pass=8 fail=1`, stopped at `X6.normal_release_failure_holds`; `X6.release_after_exact_repair` and X7 **NOT RUN**. Original manifest `SHA256SUMS.s5-setup-v2-control-result` `3c3fc4e2…` left byte-identical; it was a point-in-time inventory and now differs in exactly three entries: `X6/LEASE_HOLDER` (heartbeat-rewritten, then RELEASED), `X6/logs/setup-exclusion/launcher.EXIT_RECORD` (heartbeat-appended: 202 → 579 lines), and `X6/LEASE_RELEASE/LEASE_RELEASE.tmp.26214` (gone — the repaired deposit; `LEASE_RELEASE` is now a regular file). Pre-recovery copies remain in `pre-recovery-snapshot/` (immutable) and `x6-recovery/pre/`.
+
+## Revalidation immediately before repair (`RECOVERY_LOG.txt`) — 17/17 OK
+pid 26214 alive S, starttime 519891, sid/pgid 26214, EUID 2000, cmdline exact launcher (sha `b32cc20d…`), **fd 9 → `X6/private.lock`**; `LEASE_HOLDER` token `20260923T020634Z-26214-18852` / pid / start / `state=SELF-HOLD`; `SELF_HOLD` same token; **workload session 26278: 0 members, leader absent (EMPTY)**; holder session = `bash` 26214 + one `sleep` (5143) only; launcher's own last census `census=empty detail=[26278:empty]`; fd links to the private lock among readable processes: 26214 and its sleep child only (63 processes unreadable — unknown boundary, as before). Obstacle: `X6/LEASE_RELEASE` real non-symlink directory mode 755 (parent 755, writable — no chmod needed or performed), sole entry `LEASE_RELEASE.tmp.26214` regular non-symlink file.
+
+## Repair (exact, one attempt)
+02:16:21Z: contents check passed → `rm -f …/X6/LEASE_RELEASE/LEASE_RELEASE.tmp.26214` → `rmdir …/X6/LEASE_RELEASE` succeeded on attempt 1 of 5 (`REPAIR_STATUS=0`). Nothing else touched; no signal, no lock open/probe, no chmod, no source/worktree/canonical action.
+
+## Natural release observed (read-only, ≤30 s budget; took ~0.5 s)
+- `/proc/26214` **absent** at 02:16:21.609Z (process disappearance).
+- Launcher's own records (recorded intended final status): `EXIT_RECORD` line 579 `LEASE_RELEASED how=self-hold-then-empty raw=observed 0 cleanup=verified-empty publication=release-record-failed recovery=none inner=[none] final_rc=90`; `LEASE_RELEASE` regular file with the same fields, `released_at=02:16:21Z`, `final_rc=90`; `LEASE_HOLDER` `state=RELEASED(self-hold-then-empty) since=02:16:21Z`; `SELF_HOLD` unchanged from 02:06:39Z (sha `2a94dcd4…`, identical pre/post). Matches the grant's expected release shape exactly.
+- **Exit-status distinction:** the process's wait()er was the driver, which exited 02:06:39Z; 26214 ran reparented to pid 1. There is therefore **no wait-observed exit status** and no attributable exit receipt; "90" is the launcher's *recorded intended* final status (source branch and its own `final_rc=90`), corroborated only by process disappearance — not a reaped 90.
+- Post: holder session 26214 members 0; workload session 26278 members 0; fd links to `X6/private.lock` in readable processes: **none** (63 unreadable); canonical lock links 0. `X6/LEASE_HOLDER` and `EXIT_RECORD` hashes stable across a 3 s recheck (quiescent).
+
+## Evidence in this directory
+`RECOVERY_LOG.txt` (full command/output/status incl. every heartbeat line), `pre/` (LEASE_HOLDER, SELF_HOLD, EXIT_RECORD @578 lines, the deposit `LEASE_RELEASE.tmp.26214` `9866e629…`), `post/` (LEASE_HOLDER `06a9fa71…`, LEASE_RELEASE `db2956fc…`, SELF_HOLD `2a94dcd4…`, EXIT_RECORD `ecf74d7b…`, launcher.out empty), `POST_RECOVERY_MANIFEST.sha256` (additive, non-self-including; covers this directory + the now-quiescent live `X6/` files by absolute-relative path). No other runtime started; all lanes remain paused pending parent closure acceptance.

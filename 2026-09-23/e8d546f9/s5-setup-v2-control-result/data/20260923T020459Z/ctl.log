@@ -1,0 +1,22 @@
+2026-09-23T02:04:59Z CTL_START driver_sha256=62a7233fc1c3405b0ed6874c0ebdc8ff64eaa210691db59b6190f2d16df1fd3c launcher_sha256=b32cc20d0dbfa2490fad1d642f1044791f73c9f377ec8a9958d8471699df1c09 fake_sha256=5c18e3b320f6be15053a0a6667009cf14cbfe29f337090ae5a966962ffdbee0f out=/home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z
+2026-09-23T02:04:59Z LAUNCH X1 scenario=normal lpid=14131
+2026-09-23T02:04:59Z PASS X1.normal_release holder published before launch, IDENTITY (launcher OWN_ROOT) before ADOPT, raw 0 observed, outer session verified empty, no inner session, RELEASE published, lock free, exit 0
+2026-09-23T02:05:00Z LAUNCH X2 scenario=descendant lpid=14318
+2026-09-23T02:05:36Z PASS X2.descendant_escalated descendant pid=14432 escalated once inside the owned outer session, raw 0 kept separate, verified empty, released rc 90, descendant gone (typed /proc state)
+2026-09-23T02:05:36Z LAUNCH X3 scenario=overrun lpid=19249
+2026-09-23T02:05:41Z PASS X3.inner_timeout overrunning runner ended by the inner timeout; recorded raw status equals the actual launcher exit (rc=124); released after verified empty
+2026-09-23T02:05:41Z LAUNCH X4 scenario=descendant lpid=19801
+2026-09-23T02:06:17Z PASS X4.self_hold_observable with RELEASE/SELF_HOLD markers unpublishable the launcher retains the lock alive (state=SELF-HOLD, busy lock, stderr, RELEASE_RECORD_FAILED reason), no forced exit
+2026-09-23T02:06:22Z PASS X4.hold_persists_no_handoff hold persists across heartbeats; no handoff path exists or is logged
+2026-09-23T02:06:22Z REPAIRED /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X4/SELF_HOLD (removed only SELF_HOLD.tmp.19801)
+2026-09-23T02:06:22Z REPAIRED /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X4/logs/setup-exclusion/SELF_HOLD (removed only SELF_HOLD.tmp.19801)
+2026-09-23T02:06:22Z REPAIRED /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X4/LEASE_RELEASE (removed only LEASE_RELEASE.tmp.19801)
+2026-09-23T02:06:24Z PASS X4.release_after_exact_repair after removing ONLY the launcher's own tmp deposits + empty directories, the holder republishes SELF_HOLD, releases self-hold-then-empty with accumulated publication truth (release-record-failed+SELF_HOLD-failed), recovery=none, rc 90, lock free
+2026-09-23T02:06:24Z LAUNCH X5 scenario=subsession-90 lpid=25424
+2026-09-23T02:06:24Z PASS X5.inner_session_holds runner exited 90 with EXCLUSION_UNPRESERVED; its own IDENTITY bound the inner sid=25553; holder in SELF-HOLD with busy lock while that session lives (census live, runner truth recorded)
+2026-09-23T02:06:34Z PASS X5.release_only_after_inner_empty release happened only after the inner sid was positively observed empty (raw 90 separate; no verified-empty claim); lock free; sub-session gone
+2026-09-23T02:06:34Z LAUNCH X6 scenario=normal-slow lpid=26214
+2026-09-23T02:06:39Z FAIL X6.normal_release_failure_holds normal completion with unpublishable RELEASE: holder stays alive in recorded SELF-HOLD with busy lock (v1 exited here)
+2026-09-23T02:06:39Z STOP_ON_FIRST_FAILURE X6.normal_release_failure_holds
+2026-09-23T02:06:39Z UNRESOLVED launcher pid=26214 ex=/home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6 still holding (not killed: parent boundary; token in /home/user/workspace/execution/e8d546f9/s5-setup-v2-control-result/data/20260923T020459Z/X6/LEASE_HOLDER)
+2026-09-23T02:06:39Z SUMMARY pass=8 fail=1
