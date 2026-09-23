@@ -12,6 +12,10 @@ Independent A source packet 0266ff530ea2db2864975d01ebb0dee97e916cdacbe28c54b3cd
 
 The second reviewer is still assessing original P1 independently. Do not send A findings to that reviewer before its source findings freeze. The builder may begin these demonstrated corrections now in separate isolated source; any later B findings require explicit parent disposition. Do not turn C qualifications into changes.
 
+## Subsequent independent B disposition
+
+B's original source verdict is now frozen603a129328cac373f932fb7d663c16ff5015fcd15eb486330936ad77e6dfe86f: SOURCE CLOSED/GRANTABLE, no A/B, fourteen C. Preserve both original verdicts; do not rewrite either or decide by majority. Parent retains A01 because its source trace names actual biometric/day1 gate-unmount paths and the orphan persistence consequence; B C4 acknowledges the same continuation mechanism. Parent retains A02 because completed logout is the scoped privacy boundary, not merely the later gate-null end state; B C1 acknowledges that intervening write window. A03 is a concrete proof issue tied to pinned asynchronous RNTL operations and fixture assertions. This is disposition of the separately evidenced A/B findings, not permission to work on B's other C qualifications. No third audit or new control is created. Both existing reviewers receive the exact P2 delta and frozen prior findings for independent scoped follow-up.
+
 ## Builder and owned paths
 
 After sealing and returning S6 preparation, `s6_frozen_source_recovery_muei56l7` may become the sole P2 builder. Original `worktrees/s6-diagnostic` and frozen P1/shared inputs remain read-only for both reviewers.
