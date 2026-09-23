@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists in this sandbox. S5's full attempt refused at the old-root remaining-process check before DB initialization; it released20:24:03Z. S6 owns the slot for dual-granted P3 validation00–09 only, under S6_P3_VALIDATION_ACTIVATION.md. Commit20–23 remains gated on actual results. S5 correction is source-only under S5_RUNNER_CORRECTION.md; no candidate/fixture/helper change. Missing S6 setup wrapper status remains C, no installation rerun.
+One heavy runtime slot exists. S6 P3 validation stopped after03raw124 with4/4 assertions but hang-after-results; released20:37Z. S5 now owns the slot for one existingfull under S5_REV72_ACTIVATION.md, with dual-granted runner16c763f4 and unchanged candidate/fixture/helper. S6 is source-only minimum observed test correction and exact rootnav-handle diagnosis; no speculative fix/runtime/new control. Its commit remains gated. Missing setup wrapper receipt stays C, no reinstall.
 
 ## Individually graded work
 
@@ -51,8 +51,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Continue unaffected S6 steps03–09 despite preserved01/02 failures, then prepare only observed fixture/type fixes per S6_OBSERVED_TEST_FIXES.md. Actual success gates ordinary commit.
-2. In parallel, close only S5 runner7.1's owned-group clear-before-drain defect, then obtain the same reviewers' tiny-delta grant.
-3. Transfer runtime explicitly for existing S5 fresh51; preserve the failed prior attempt and no fabricated live result.
+1. Complete the one activated S5 full attempt with rev7.2; preserve actual result, then same-review final attestation.
+2. In parallel, prepare only S6's observed fixture/type fixes and identify the actual rootnav handle from source if possible. Do not combine an unknown-cause speculative fix.
+3. After narrow delta closure and runtime transfer, prove affected S6 boundaries and execute still-unrun04–09. No passed applicable evidence is automatically repurchased.
 4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
 5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
