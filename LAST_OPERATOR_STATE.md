@@ -1,82 +1,44 @@
 # LAST OPERATOR STATE
 
-Updated 2026-09-23 after fresh executive takeover and targeted GitHub verification. Parent session `6c2a68ac-77b8-4d08-86d5-680d240e58f3` (EXEC-6c2a68ac). Recon CLOSED at 15:27 UTC; execution active.
+Updated 2026-09-23 by EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde. Bradley issued EXECUTE at 12:31 PDT. Prior durable intake: cc62002bfd08c3cb677025b651965d36e6a1aaec; no newer S5/S6 result existed at activation. This is current telemetry, not a replacement for immutable evidence.
 
 ## Mission and authority
 
-Build TGP's AI-assisted, autonomous, site-agnostic, browser-agnostic, self-learning migration engine. An authorized source, including a previously unseen platform, must flow observe → understand → induce/revalidate a reusable data-only `PlatformBlueprint` → acquire accessible data → normalize → reconstruct native TGP entities and relationships → reconcile → truthful terminal result. Permanent test: `NEW SOURCE → CORE DIFF = 0`.
+AI-assisted, autonomous, site-agnostic, browser-agnostic, self-learning acquisition through data-only PlatformBlueprint induction/revalidation, then deterministic native TGP entities, relationships, reconciliation and truthful terminals. NEW SOURCE → CORE DIFF = 0. Three distinct sites, two hosts sharing the kernel, unseen-site induction and real customer acceptance remain mission requirements. TrueCoach is one proof target.
 
-TrueCoach and another real platform are conformance targets, not the product boundary. Completion also requires unseen-site autonomous induction, no executable per-brand core diff, at least three distinct sites, at least two browser/driver hosts using the same kernel, completeness accounting, deterministic replay, native relationships and honest adverse terminals.
+Live G01–G22, current T0–T4 routing, EXECUTE, canonical mission and the owner amendment at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md` govern. T4 builder: Claude Fable 5 / High requested, not observed runtime identity. Parent only orchestrates and publishes private evidence; builders implement; two independent nonbuilders attest T4. A blocks affected product path; B blocks affected proof; C records/qualifies/continues.
 
-EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
+No product remote push/merge, deployment, hosted/security setting, production/customer enablement, real source-account access, destructive action, external communication or new spending is authorized. Routine local continuation and private telemetry publication are authorized. Backend main still auto-deploys.
 
-Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. S5 formatting is corrected, but actual pre-commit refused five baseline unused bindings, result9d47c0dc/28; no commit. Exactly five binding aliases and a normal hooked commit are now authorized, without reinstall/generate/T0 repetition or hook bypass. T0 is accepted driver0/sixPASS with expected predecessorJest1. Setup installed12/12 but returned exceptional launcher90; substrate/closure accepted, not normal setup PASS. S3 exact local integration is ACCEPTED with both final reviews closed. S6 candidate is frozen for two independent reviews and disjoint validation preparation.
+## Exact baseline and retained acceptance
 
-## Verified GitHub baseline
+Live mains reconciled 2026-09-23 19:09 UTC: backend `c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7`; mobile `a5933fd6de5616493de75f0db907098b149b955c`; extension `0111be661922234d670bbf23e23d270eec1b4a4e`; context `1ebbed76188e33c970fc17c1e7b252f535d040d0`. Targeted relevant PR heads are unchanged from the intake grade register. Local candidates below are not product-repository remote heads.
 
-Observed 2026-09-23 15:27 UTC.
-
-| Repository | Exact main |
-|---|---|
-| Backend | `c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7` |
-| Mobile | `a5933fd6de5616493de75f0db907098b149b955c` |
-| Extension | `0111be661922234d670bbf23e23d270eec1b4a4e` |
-| Context | `1ebbed76188e33c970fc17c1e7b252f535d040d0` |
-| Private intake | `41aa9ddd03525f987231472a7b18edaa4dcc93da` |
-
-All 64 open PR head/base/name records match `execution/pr-grades/PUBLIC_PR_GRADES.json`; every open PR has an explicit individual T0–T4 grade. Relevant preserved stacks are unchanged:
-
-- Backend #524→#525; #526 C1 and #528→#529 G2 depend on #525; #527 policy donor; #522 overlapping identity patch blocked. Each T4; cumulative T4.
-- Mobile #289–#292 each T4, cumulative T4. #290 reported base is not final #289 head. Roman #293 T1 and #294 T2 remain inactive presentation work.
-- Extension #21→#23→#24→#25 each T4, cumulative T4. #26 content incorporated, not ancestry. #20 provisional T4 inactive; #19 T4 acceptance amendment retained.
-- Context #31/#33/#34 provisional T4 historical/planning artifacts, not current telemetry.
-
-Backend, mobile, context and private main are unprotected; extension main is protected. Backend main push still triggers Fly deployment. A product landing is therefore not implied by local proof.
-
-## Active slices and exact candidates
-
-| Lane | Individual / cumulative tier | Exact product candidate | Current transition |
+| Lane | Tier | Exact candidate | State |
 |---|---|---|---|
-| S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Actual discriminator48/48 at composed d5cd, guard72/72; dual final applicability accepted, membership path remains unobserved. |
-| S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
-| S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration; targeted31/825 and composed0/72/68/48. Final A6bb8ab6c/B49e9a3e4 closed, no A/B. No remote landing or customer claim. |
-| S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
-| S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, stagedtree756a0d79 | T0 accepted;06F format passed. Real pre-commit STOP07 on five baseline unused-binding warnings; tsc/Prettier/R75 passed. Result9d47c0dc/28, no commit. Exact five-binding correction and normal07R–10 now authorized; no realPG proof yet. |
-| S6 P1 | T4 / T4 | baseline `d51a191098f483cea9abec6cc7e9f3beffd18c06` plus patch20c6594c | Product candidate FROZEN698cf631/15, nine authorized files; two independent exact-source reviews ACTIVE. C6 diagnostic failure/closure retained; no corrected runtime result or hooked head yet. |
+| S1 | T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | ACCEPTED at frozen boundary; guard72/discriminator48, inherited-membership unobserved |
+| S2 | T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | ACCEPTED real PG17 composition68, resultbbde4b0b, dual applicability closed |
+| S3 | T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration;31 suites/825 tests, composed72/68/48, dual final6bb8ab6c/49e9a3e4 |
+| S4 | T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | ACCEPTED exact technical proof;1742 full/105 focused, no rerun |
+| S5 | T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus stagedtree`756a0d7966c9125749339abbcfd681eb7e713ede` | Fresh exact recovery and five-binding/normal hooked continuation ACTIVE; no new head or realPG proof yet |
+| S6 | T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` plus patch`20c6594c200d38c9946f4f62d2c778f634bcacbe26b430b05e8291cc5f571cbd` | Frozen698cf631/15; recovery/preparation and two independent source reviews ACTIVE; no new runtime |
 
-## Current ownership
+S1–S4 are CLOSED, not reopened by takeover. Exact S3 acceptance remains `execution/6c2a68ac/S3_FINAL_INTEGRATION_ACCEPTANCE.md`. All original failed evidence remains preserved at intake, not relabelled.
 
-Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
+## Ownership and runtime
 
-S5 executor `restore_s5_source_mue9wsph` returned runtime/mutation ownership18:30Z after real hook refusal, then receives the minimum five-binding correction and07R–10 under `S5_LINT_DISPOSITION_AND_COMMIT_ACTIVATION.md`. No commit yet; original failures preserved and all true hooks remain mandatory. Setup launcher90 remains qualified. S3 final A/B and exact integration are CLOSED/ACCEPTED; no repeated work. S6 builder has frozen698cf631/15 and only validation-preparation output ownership. Independent reviewers `audit_s5_v31_lens_a_mue9eid4` and `audit_s5_v31_lens_b_mue9eidl` own separate audit outputs under `S6_P1_EXACT_CANDIDATE_REVIEW_SCOPE.md`; no S6 runtime.
+Current scope: `execution/e7d2385c/SCOPE.md`; actual assignments: `execution/DISPATCHES.md`. Previous parent/session liveness is UNKNOWN because session access is denied. Previous worker grants/PIDs/installations are not active authority in this sandbox. This sandbox has no inherited product installations; minimum fresh environment recovery is allowed where needed, without rebuying accepted proof.
 
-## DAG
+S5 builder `s5_exact_candidate_continuation_muei56lb` owns `worktrees/s5-r4` and its fresh output, and the only heavy runtime slot for required new-environment setup and genuine hooks. S6 preparer `s6_frozen_source_recovery_muei56l7` owns exact restoration and source-only validation preparation. Independent S6 A `s6_independent_privacy_review_muei56ks` and B `s6_independent_lifecycle_review_muei56lg` own separate audit outputs and do not read peer conclusions. No S6 runtime is active. S1 schema/generator remains unassigned.
 
-S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [allraw0,31 suites/825 tests PASS] → composed-lock release proof [COMPLETE raw0/72/68/48] → dual final-head attestations [CLOSED] → exact local integration ACCEPTED.
+## Current constraint and next execution
 
-In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 exclusion successor/dual review [all CLOSED/ACCEPTED] → actual S6 setup [qualified substrate only] → C6-only [outcome i, CONSUMED] → P1 product correction [source ACTIVE] → exact review/validation/hooked head. S5 canonical setup [qualified] → T0 [accepted] → hooked candidate [STOP06] → minimum pinned formatting/remaining07–10 [authorized] → dual exact review/fresh51. S6 source work remains independent.
+S5 exact recovery → five authorized aliases/pinned formatting → true-hooked head → two independent exact-head/runner reviews → existing fresh51 real proof. In parallel, frozen S6 source → independent source closure → bounded actual validation/true-hooked head → final attestations in those same reviews. No accepted controls, T0 or C6 baseline diagnostic is repeated.
 
-Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R → N/Q1 → C → C1/lifecycle/forward-2.x → compatible mobile/extension/native writers → relationships/reconciliation → integrated host/device → real platforms and unseen-site induction → measured pilot → universal importer acceptance → retained TGP V1.
+S5's hook refusal is an existing execution prerequisite, not a newly invented product/proof defect. S6's reproduced identity/privacy hazards remain Class A; the observed teardown hang remains the scoped lifecycle/proof boundary. C qualifications include launcher90 versus normal setup, S1 membership scope, S3 negative-path WARN/ERROR output, and unknown S6 transient member; none creates another cycle.
 
-## Proven, unproven and blockers
+After foundation closure: reuse G2 E → T/Q0 → B/drain → R → N/Q1 → C and C1/forward-2.x lifecycle work for S7, then deterministic native writers (S8), relationships/reconciliation (S9), unseen-source induction (S10), complete customer/multi-host journey (S11), real acceptance/pilot (S12). Do not invent another substrate wave.
 
-Proven at exact scope: current mains/PR identities and grades; six candidate identities; S1 ancestry in S2; prior S2 setup receipt; S4 Stage1 and exact native/package/browser proof; S5 V10.1 private primitive diagnostic; S5 V2 failed-result preservation and accountable slot recovery. S4 result included launcher0/observer0/SUCCESS, full 1742/1742 and focused 105/105 including 19 target cases, with recorded hook/log/visibility qualifications.
+Unproven: S5/S6 final acceptance; C1/G2 generated-contract integration; native destinations/relationships/reconciliation; autonomous induction; second host; three-site and customer/pilot proof; release/production acceptance. Mobile #290's reported base4be69b9 differs from final #289 head2235498; reconcile before composed consumer acceptance. Unprotected mains and backend auto-deploy block later landing, not independent local work.
 
-New accepted evidence: S1/S2 actual real run at d5cd, guard72/72, composition68/68, discriminator48/48, raw0 and scoped cleanup/publication, with both final applicability attestations. Empty runner self-hash is compensated by immediate manifest/preflight identity; direct/PUBLIC TRUNCATE observed, inherited-membership unobserved. S5 private V32 actual11/11PASS/raw0 includes stale-token rejection and current-platform pgid/status propagation; no canonical setup/product claim.
-
-Unproven: broader S1 membership applicability beyond the actual fixture; S5 hooked final candidate, dual final attestations and real fresh51 proof; normal setup launcher0; corrected S6 privacy/lifecycle behavior; native lifecycle/writers/relationships/reconciliation; autonomous blueprint induction; second host; zero-core-diff unseen-source onboarding; real multi-platform acceptance; pilot; merge/deploy/enablement/customer acceptance/production proof.
-
-Material blockers: S6 P1 privacy hazards reproduced and product correction now required, with query-lifecycle hang qualification; S5 canonical execution outstanding; C1/G2 generated-contract collision; incomplete native-family destinations and relationship accounting; no universal-importer proof beyond current TrueCoach/Chrome-heavy evidence; unsafe landing boundary due unprotected mains and backend auto-deploy. S3 is no longer a local integration blocker.
-
-## Failed evidence preserved
-
-Original failures and all qualifications remain immutable under the intake commit and frozen packets: S2 B1/B2 and V59 K3 placement failure; S4 earlier browser aborts and incomplete negative evidence; S5 B2 compile/install failure, non-fresh B3, and V2 raw1/8PASS1FAIL at X6; S6 C1 corruption, C2–C4 hangs/timeout and C5 causal limits. The V2 initial inventory is point-in-time with disclosed heartbeat/recovery drift, not a false immutable snapshot. Recovery never turns a failure into a pass. Original V10 provider-blocked B review remains no-verdict and is not bypassed.
-
-## Next executable slices
-
-1. T4 apply only the five authorized ESLint-safe binding aliases, pinned formatting and normal S5 commit07R–10. Preserve original06/07 failures; no repeat install/generate/T0 or standalone checks. Two independent exact-head/runner reviews and separately granted real fresh51 proof follow.
-2. Preserve S3 composed real result and ten-case release comparison without another run.
-3. Preserve accepted S3 as the exact local backend foundation for later explicitly scoped integration; no new S3 audit or proof.
-4. T4 finish the two independent S6 exact-source reviews of frozen698cf631/15, then bounded actual validation/true-hooked head and final evidence closure in those same reviews.
-
-Bradley decision required: NO. C6 is not rerun or relabelled; actual launcher90 and unknown transient member are retained independently of its causal evidence. Targeted Jest had14 Nest WARN and2 ERROR messages in passing negative-path cases, so it is not described as warning-free. See the active reactivation02 and P1 source-build grant for current execution scope.
+BRADLEY DECISION REQUIRED: NO for the current local continuation.
