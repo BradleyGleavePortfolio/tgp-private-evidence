@@ -1,6 +1,6 @@
 # S5 T0 acceptance and hooked-candidate activation
 
-Parent EXEC-6c2a68ac, 2026-09-23. ACCEPT bounded T0 diagnostic evidence. ACTIVATE the exact local hooked-candidate continuation once. Runtime and enumerated S5 worktree mutation ownership pass from `repair_s5_binding_mue9vjso` to `restore_s5_source_mue9wsph`, requested Claude Fable5/High. Each child/cumulative integration T4; generated-client/fixture/provenance and lifecycle triggers, boundedT1 NO.
+Parent EXEC-6c2a68ac, 2026-09-23. CONSUMED with clean STOP at06; result492f7104/16 preserves raw1, no commit. Steps00–05 completed and substrate is retained. The bounded T0 diagnostic remains ACCEPTED. Follow-on authority is exclusively `S5_FORMATTER_DISPOSITION_AND_CONTINUATION.md`; this historical activation does not authorize a retry. Each child/cumulative integration T4; generated-client/fixture/provenance and lifecycle triggers, boundedT1 NO.
 
 ## T0 disposition
 

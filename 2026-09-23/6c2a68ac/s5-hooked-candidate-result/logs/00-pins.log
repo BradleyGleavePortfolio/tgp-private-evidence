@@ -1,0 +1,64 @@
+label=pins head=143d451ead6ccdbebd92ca3031ba7a89867d6cfc write_tree=d0e122d35022377196908b7d132fc34c1af2fc6b status_pin= M test/rls-g2-pg17-etq0.spec.ts; M test/utils/g2-pg17-bootstrap.sh; node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='true' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' GIT_OPTIONAL_LOCKS='0' cwd=/home/user/workspace/worktrees/s5-r4 T=60 loadavg='0.00 0.22 0.89 1/117 29646' mem_avail_mb=7688 utc=2026-09-23T18:12:25Z
+cmd: source $P/steps/chk.sh
+eq "HEAD" 143d451ead6ccdbebd92ca3031ba7a89867d6cfc "$(git rev-parse HEAD)"
+eq "committed tree" d0e122d35022377196908b7d132fc34c1af2fc6b "$(git rev-parse HEAD^{tree})"
+eq "index == HEAD (write-tree)" d0e122d35022377196908b7d132fc34c1af2fc6b "$(git write-tree)"
+eq "status pin" $' M test/rls-g2-pg17-etq0.spec.ts\n M test/utils/g2-pg17-bootstrap.sh' "$(git status --porcelain)"
+eq "untracked-files=all beyond ignored" 0 "$(git status --porcelain --untracked-files=all | grep -c '^??')"
+eq "dirty fingerprint (runner formula)" 6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0 "$({ git diff HEAD; printf '%s\n' "$(git status --porcelain --untracked-files=all)"; } | sha256sum | cut -c1-64)"
+eq "git diff HEAD == frozen patch" c36258b39d0c92f0b760f11982a61427c6e7cce963eecffe2554f447346c5491 "$(git diff HEAD | sha256sum | cut -c1-64)"
+eq "lock blob" 354de3dae19449970497da6e4d87f0a1225a8f43 "$(git ls-files -s package-lock.json | awk '{print $2}')"
+eq "core.abbrev" 8 "$(git config --local --get core.abbrev)"
+eq "user.name unset" "" "$(git config --local --get user.name)"; eq "user.email unset" "" "$(git config --local --get user.email)"
+eq "hooks active" 0 "$(ls .git/hooks | grep -vc '\.sample$')"; eq "core.hooksPath unset" "" "$(git config --get core.hooksPath)"
+eq "lefthook.yml" 54d037490460fcddf2523ce05801bae9860489ff "$(git rev-parse HEAD:lefthook.yml)"
+chk "node_modules present (setup receipt 94584aa8)" test -d node_modules
+eq "installed npm record .package-lock.json sha256 prefix" 05bc530a "$(sha256sum node_modules/.package-lock.json | cut -c1-8)"
+chk "generated client absent" test ! -e node_modules/.prisma/client
+chk "prettier not in app graph" test ! -e node_modules/.bin/prettier
+chk "lefthook CLI present" test -f node_modules/lefthook/bin/index.js
+chk "prisma CLI present" test -f node_modules/prisma/build/index.js
+eq "@prisma/client version (direct file read)" 6.19.3 "$(node -p "JSON.parse(require('fs').readFileSync('node_modules/@prisma/client/package.json','utf8')).version")"
+eq "prisma version (direct file read)" 6.19.3 "$(node -p "JSON.parse(require('fs').readFileSync('node_modules/prisma/package.json','utf8')).version")"
+eq "lefthook version (direct file read)" 2.1.9 "$(node -p "JSON.parse(require('fs').readFileSync('node_modules/lefthook/package.json','utf8')).version")"
+chk "no quarantine" test ! -e /home/user/workspace/execution/s5-r4/QUARANTINE
+chk "no ancestor package.json" test ! -e /home/user/package.json
+chk "setup receipt seal verifies" bash -c "cd /home/user/workspace/execution/6c2a68ac/s5-canonical-setup-result && sha256sum -c --quiet SHA256SUMS.s5-canonical-setup-result && [ \"\$(sha256sum SHA256SUMS.s5-canonical-setup-result | cut -c1-64)\" = 94584aa85ed55c1e1dba94f9f0f97db8a1b09e93a5a986f51e54e350d6e9d2f0 ]"
+chk "T0 result packet present (parent-accepted; path only)" test -d /home/user/workspace/execution/6c2a68ac/s5-t0-result
+echo "prisma engine cache: $(ls -la --time-style=+%FT%TZ /home/user/.cache/prisma/master/c2990dca591cba766e3b7ef5d9e8a84796e47ab7/debian-openssl-3.0.x/ 2>&1 | tr '\n' ';')"
+echo "PRISMA_ENGINES_MIRROR=${PRISMA_ENGINES_MIRROR-unset} S5X_vars=[$(env | grep -E '^(S5X_|S5_LEASE_INHERITED|LEFTHOOK)' | tr '\n' ' ')] (must be empty)"
+eq "no S5X_/LEFTHOOK env" "" "$(env | grep -E '^(S5X_|S5_LEASE_INHERITED|LEFTHOOK)')"
+exit $FAIL
+postcheck: HEAD rc=0 | 143d451ead6ccdbebd92ca3031ba7a89867d6cfc
+postcheck: committed tree rc=0 | d0e122d35022377196908b7d132fc34c1af2fc6b
+postcheck: index == HEAD (write-tree) rc=0 | d0e122d35022377196908b7d132fc34c1af2fc6b
+postcheck: status pin rc=0 |  M test/rls-g2-pg17-etq0.spec.ts
+ M test/utils/g2-pg17-bootstrap.sh
+postcheck: untracked-files=all beyond ignored rc=0 | 0
+postcheck: dirty fingerprint (runner formula) rc=0 | 6850b32ef19436abe5b02f96c770f4c36ca8bea070e0c759310f17234c616aa0
+postcheck: git diff HEAD == frozen patch rc=0 | c36258b39d0c92f0b760f11982a61427c6e7cce963eecffe2554f447346c5491
+postcheck: lock blob rc=0 | 354de3dae19449970497da6e4d87f0a1225a8f43
+postcheck: core.abbrev rc=0 | 8
+postcheck: user.name unset rc=0 | 
+postcheck: user.email unset rc=0 | 
+postcheck: hooks active rc=0 | 0
+postcheck: core.hooksPath unset rc=0 | 
+postcheck: lefthook.yml rc=0 | 54d037490460fcddf2523ce05801bae9860489ff
+postcheck: node_modules present (setup receipt 94584aa8) rc=0 |  
+postcheck: installed npm record .package-lock.json sha256 prefix rc=0 | 05bc530a
+postcheck: generated client absent rc=0 |  
+postcheck: prettier not in app graph rc=0 |  
+postcheck: lefthook CLI present rc=0 |  
+postcheck: prisma CLI present rc=0 |  
+postcheck: @prisma/client version (direct file read) rc=0 | 6.19.3
+postcheck: prisma version (direct file read) rc=0 | 6.19.3
+postcheck: lefthook version (direct file read) rc=0 | 2.1.9
+postcheck: no quarantine rc=0 |  
+postcheck: no ancestor package.json rc=0 |  
+postcheck: setup receipt seal verifies rc=0 |  
+postcheck: T0 result packet present (parent-accepted; path only) rc=0 |  
+prisma engine cache: total 36336;drwxr-xr-x 2 user user     4096 2026-09-23T16:15:18Z .;drwxr-xr-x 3 user user     4096 2026-09-23T16:15:13Z ..;-rwxr-xr-x 1 user user 17547808 2026-09-23T16:44:27Z libquery-engine;-rw-r--r-- 1 user user       64 2026-09-23T16:15:18Z libquery-engine.gz.sha256;-rw-r--r-- 1 user user       64 2026-09-23T16:15:18Z libquery-engine.sha256;-rwxr-xr-x 1 user user 19631784 2026-09-23T16:44:25Z schema-engine;-rw-r--r-- 1 user user       64 2026-09-23T16:15:18Z schema-engine.gz.sha256;-rw-r--r-- 1 user user       64 2026-09-23T16:15:18Z schema-engine.sha256;
+PRISMA_ENGINES_MIRROR=unset S5X_vars=[] (must be empty)
+postcheck: no S5X_/LEFTHOOK env rc=0 | 
+exit=0 (124=timeout,137=killed) utc=2026-09-23T18:12:26Z write_tree_after=d0e122d35022377196908b7d132fc34c1af2fc6b
+step_status=0 utc=2026-09-23T18:12:26Z

@@ -1,0 +1,45 @@
+label=hook-resolution-offline-proof head=143d451ead6ccdbebd92ca3031ba7a89867d6cfc write_tree=3d30aeb08c58d47b53837dfe22b60f8dbef37871 status_pin=M  test/rls-g2-pg17-etq0.spec.ts;M  test/utils/g2-pg17-bootstrap.sh; node=v20.20.1 npm=10.8.2 NODE_OPTIONS='--max-old-space-size=4096' npm_config_offline='true' CHECKPOINT_DISABLE='1' PRISMA_GENERATE_SKIP_AUTOINSTALL='unset' GIT_OPTIONAL_LOCKS='0' cwd=/home/user/workspace/worktrees/s5-r4 T=60 loadavg='0.47 0.31 0.91 1/134 30956' mem_avail_mb=7672 utc=2026-09-23T18:12:36Z
+cmd: source $P/steps/chk.sh
+export npm_config_offline=true
+N0=$(ls -d "$HOME/.npm/_npx"/* 2>/dev/null | wc -l); echo "npx cache dirs before=$N0"
+eq "readlink -f node_modules/.bin/prettier" "$TOOL/node_modules/prettier/bin/prettier.cjs" "$(readlink -f node_modules/.bin/prettier)"
+eq "sha256 of resolved prettier" 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e "$(sha256sum "$(readlink -f node_modules/.bin/prettier)" | cut -d' ' -f1)"
+eq "npx --no-install prettier --version" 3.9.6 "$(npx --no-install prettier --version 2>&1)"
+OUT=$(npx prettier --version 2>&1); eq "npx prettier --version (hook form)" 3.9.6 "$OUT"
+chk "no 'Need to install' prompt" bash -c "! printf '%s' \"$OUT\" | grep -qi 'need to install'"
+eq "npx cache dirs unchanged" "$N0" "$(ls -d "$HOME/.npm/_npx"/* 2>/dev/null | wc -l)"
+eq "npx --no-install tsc --version" "Version 5.9.3" "$(npx --no-install tsc --version 2>&1)"
+eq "npx --no-install eslint --version" "v10.5.0" "$(npx --no-install eslint --version 2>&1)"
+echo "which eslint on npx path: $(readlink -f node_modules/.bin/eslint) (platform /home/user/node_modules/.bin/eslint is shadowed — W1)"
+chk "checker present" test -f scripts/check-r75.js; chk "policy present" test -f .github/r75-policy.json
+node scripts/check-r75.js --mode=staged; r=$?; echo "staged-mode exit=$r"; eq "check-r75 staged exit" 0 "$r"
+npx prettier --check test/rls-g2-pg17-etq0.spec.ts; p=$?; echo "prettier --check (hook's exact command on the only staged file matching its glob) exit=$p"; eq "prettier --check staged spec" 0 "$p"
+eq "CHECKPOINT_DISABLE" 1 "${CHECKPOINT_DISABLE-unset}"
+eq "write-tree" 3d30aeb08c58d47b53837dfe22b60f8dbef37871 "$(git write-tree)"
+exit $FAIL
+npx cache dirs before=0
+postcheck: readlink -f node_modules/.bin/prettier rc=0 | /home/user/workspace/execution/s3-composition-prep/tooling/prettier-3.9.6/node_modules/prettier/bin/prettier.cjs
+postcheck: sha256 of resolved prettier rc=0 | 6e922134a3c76fd4de202959bb6aef50bde0c994148075003a15569b7197906e
+postcheck: npx --no-install prettier --version rc=0 | 3.9.6
+postcheck: npx prettier --version (hook form) rc=0 | 3.9.6
+postcheck: no 'Need to install' prompt rc=0 |  
+postcheck: npx cache dirs unchanged rc=0 | 0
+postcheck: npx --no-install tsc --version rc=0 | Version 5.9.3
+postcheck: npx --no-install eslint --version rc=0 | v10.5.0
+which eslint on npx path: /home/user/workspace/worktrees/s5-r4/node_modules/eslint/bin/eslint.js (platform /home/user/node_modules/.bin/eslint is shadowed — W1)
+postcheck: checker present rc=0 |  
+postcheck: policy present rc=0 |  
+R75 --cached; policy=:.github/r75-policy.json
+Counts are whole-file after (+) and before (-); net is the per-class change.
+OK — no positive token change
+staged-mode exit=0
+postcheck: check-r75 staged exit rc=0 | 0
+Checking formatting...
+[warn] test/rls-g2-pg17-etq0.spec.ts
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+prettier --check (hook's exact command on the only staged file matching its glob) exit=1
+postcheck: prettier --check staged spec rc=1 | expected=0 actual=1
+postcheck: CHECKPOINT_DISABLE rc=0 | 1
+postcheck: write-tree rc=0 | 3d30aeb08c58d47b53837dfe22b60f8dbef37871
+exit=1 (124=timeout,137=killed) utc=2026-09-23T18:12:39Z write_tree_after=3d30aeb08c58d47b53837dfe22b60f8dbef37871
+step_status=1 utc=2026-09-23T18:12:39Z

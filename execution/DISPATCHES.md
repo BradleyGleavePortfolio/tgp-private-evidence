@@ -2,7 +2,7 @@
 
 Updated 2026-09-23 for EXEC-6c2a68ac. Current contract: `execution/6c2a68ac/SCOPE.md`. All listed children are individually T4; cumulative S2/S5/S6 integrations are T4. Canonical T4 builder is Claude Fable 5 / High. Parent alone publishes private state and performs evidence disposition.
 
-Owner Safety ROI amendment at 08:56 PDT applies: A/B/C classification, C never blocks or creates cycles, no recursive validation or duplicate evidence. Bottleneck: active S3 integration after accepted S1/S2 proof. S6 source work is independently active; S5 canonical runtime queues without blocking either.
+Owner Safety ROI amendment at 08:56 PDT applies: A/B/C classification, C never blocks or creates cycles, no recursive validation or duplicate evidence. S3 exact local integration is accepted. Active work is S5 minimum formatter correction/remaining true-hooked commit steps and independent S6 source repair.
 
 | Slice | Worker ID | Requested model | Sole writes | State |
 |---|---|---|---|---|
@@ -44,8 +44,9 @@ Owner Safety ROI amendment at 08:56 PDT applies: A/B/C classification, C never b
 | S5 canonical setup | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | exact setup grant write set; fresh `execution/6c2a68ac/s5-canonical-setup-result/**` | CONSUMED94584aa8/27; npm/runner0,12/12, launcher actual90; qualified substrate/closure accepted, no normalPASS |
 | S5 T0 | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | exact four staged inputs, retained synthetic root and fresh `execution/6c2a68ac/s5-t0-result/**` | COMPLETE/ACCEPTED0b50d653/31, driver0/sixPASS, predecessorJest1expected; runtime/source reads relinquished |
 | S5 hooked-candidate preparation | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | fresh `execution/6c2a68ac/s5-hooked-candidate-prep/**` only | COMPLETE FROZENe9f4a5d5/21, exact steps00–10 and fresh51 boundary |
-| S5 hooked-candidate execution | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | exact generated-client/hooks/Git metadata paths and fresh `execution/6c2a68ac/s5-hooked-candidate-result/**` | ACTIVE sole runtime; exact two-file local commit, no source/format change or realPG |
+| S5 hooked-candidate execution | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | original exact generated-client/hooks/Git metadata paths and `execution/6c2a68ac/s5-hooked-candidate-result/**` | STOP06 formatter raw1, result492f7104/16;00–05 succeeded, no commit; runtime returned18:16Z |
+| S5 formatter and remaining commit steps | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | exact spec format338defe8, original remaining07–10 Git metadata; fresh `execution/6c2a68ac/s5-hooked-candidate-continuation/**` | ACTIVE one-shot under formatter disposition; no reinstall/generate/T0/retry/bypass or realPG |
 
 Prior e8d546f9 dispatches, installations, PIDs, slots and grants are preserved historical evidence only. S4 native proof is accepted and closed. S2 controls/setup/real proof and S5 private proof are consumed and closed. S3 prior stopped waves remain frozen; exact hooked be0ba827 is preserved. S6 dual source review is complete. S1 schema/generator ownership remains reserved and unassigned.
 
-S3 exact local integration is ACCEPTED and both final review lanes CLOSED. S5 true-hooked candidate execution owns runtime after qualified setup and accepted T0; former T0 owner has no remaining worktree reads/writes. S6 P1 source-only product work runs independently. No browser, remote product, production/customer or new spending is active. Bradley decision required: NO.
+S3 exact local integration is ACCEPTED and both final review lanes CLOSED. S5 formatter-only continuation owns runtime after the original06 stop; former T0 owner has no remaining worktree reads/writes. S6 P1 source-only product work runs independently. No browser, remote product, production/customer or new spending is active. Bradley decision required: NO.

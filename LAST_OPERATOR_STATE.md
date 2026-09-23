@@ -10,7 +10,7 @@ TrueCoach and another real platform are conformance targets, not the product bou
 
 EXECUTE is active. Parent orchestrates, grades, assigns, disposes evidence and publishes private state; builders build; independent auditors attest. Live G01–G22 governs. T4 canonical builder is Claude Fable 5 / High under the current owner amendment. Requested model/settings are not runtime telemetry. No product merge, deployment, flag, hosted setting, production/customer action, real source access or new spending is granted in the current local wave.
 
-Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. Current runtime is S5 true-hooked candidate execution. T0 is accepted driver0/sixPASS with expected predecessorJest1. Setup installed12/12 but returned exceptional launcher90; substrate/closure accepted, not normal setup PASS. S3 exact local integration is ACCEPTED with both final reviews closed. S6 P1 product source correction is independent. No repeat restoration, baseline diagnostic, V2 rerun, setup audit or recursive validator.
+Owner Safety ROI amendment (08:56 PDT) is active at `execution/6c2a68ac/OWNER_SAFETY_ROI_AND_EXECUTION_DOCTRINE.md`: A blocks affected product path, B only affected proof, C records/qualifies/continues. S5 original hooked-candidate attempt stopped06 on baseline-wide formatter nonconformance, result492f7104/16; no commit. A pinned one-file formatting correction and remaining07–10 are now authorized, without reinstall/generate/T0 repetition or hook bypass. T0 is accepted driver0/sixPASS with expected predecessorJest1. Setup installed12/12 but returned exceptional launcher90; substrate/closure accepted, not normal setup PASS. S3 exact local integration is ACCEPTED with both final reviews closed. S6 P1 product source correction is independent.
 
 ## Verified GitHub baseline
 
@@ -41,20 +41,20 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | Real PG17 composition68/68, runner0/cleanup0/publicationOK; resultbbde4b0b/103 entries ACCEPTED with A448a8b60/Bab50754d. Runtime released. |
 | S3 PREP2 | T4 / T4 | `be0ba8274e486dee77f15d18fe367a13ff08ecf5` | ACCEPTED exact local integration; targeted31/825 and composed0/72/68/48. Final A6bb8ab6c/B49e9a3e4 closed, no A/B. No remote landing or customer claim. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
-| S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` plus frozen patchc36258b3 | T0 ACCEPTED0b50d653/31, driver0/sixPASS/Jest1expected. Exact hooked-candidate continuation ACTIVE from prepe9f4a5d5/21; expectedtree3d30aeb0. No realPG proof yet; setup90 and V2 failure retained. |
+| S5/V32 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc`, stagedtree3d30aeb0 before authorized format | T0 ACCEPTED0b50d653/31. Hooked attempt STOP06 raw1, result492f7104/16, no commit. One-file pinned format338defe8 and remaining07–10 authorized; no realPG proof yet. Setup90 and V2 failure retained. |
 | S6 P1 | T4 / T4 | baseline `d51a191098f483cea9abec6cc7e9f3beffd18c06` | C6 complete64a99289/31: six hazard assertions pass, two residual600000ms timers, C/runner143, launcher waited90, runtime closed. P1 identity-cache/lifecycle product source build ACTIVE; no runtime. |
 
 ## Current ownership
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S5 executor `restore_s5_source_mue9wsph` owns sole runtime and enumerated generated-client/hooks/Git metadata writes for exact frozen steps00–10 under `S5_T0_ACCEPTANCE_AND_HOOKED_CANDIDATE_ACTIVATION.md`. T0 owner returned runtime18:07:29Z and explicitly relinquished all worktree reads/writes; no repeat. Setup launcher90 remains qualified. S3 final A/B and exact integration are CLOSED/ACCEPTED; no repeated work. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant.
+S5 executor `restore_s5_source_mue9wsph` returned original runtime/mutation ownership18:16Z. `S5_FORMATTER_DISPOSITION_AND_CONTINUATION.md` now assigns the sole S5 runtime and exact one-file formatting plus original remaining07–10; successful00–05 and T0 are not repeated. No commit yet, no true-hook outcome yet. Setup launcher90 remains qualified. S3 final A/B and exact integration are CLOSED/ACCEPTED; no repeated work. S6 builder owns only enumerated product source/test files and `s6-p1-product-build` under the active P1 grant.
 
 ## DAG
 
 S2 restore → V61 controls → fresh setup → S1/S2 real PostgreSQL composition/discriminator → dual applicability [all ACCEPTED] → S3 install/generate [raw0] → step03 recording correction [review CLOSED] → 03R/04–07 [raw0, hooked commitbe0ba827] → step08 extra observation [raw127; existing08D accepted] → original09–14 [allraw0,31 suites/825 tests PASS] → composed-lock release proof [COMPLETE raw0/72/68/48] → dual final-head attestations [CLOSED] → exact local integration ACCEPTED.
 
-In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 exclusion successor/dual review [all CLOSED/ACCEPTED] → actual S6 setup [qualified substrate only] → C6-only [outcome i, CONSUMED] → P1 product correction [source ACTIVE] → exact review/validation/hooked head. S5 canonical setup/T0 remain queued without blocking S3 or S6 source work.
+In parallel: S5 V31 findings → V32 successor → dual final-byte review → one private control → S6 exclusion successor/dual review [all CLOSED/ACCEPTED] → actual S6 setup [qualified substrate only] → C6-only [outcome i, CONSUMED] → P1 product correction [source ACTIVE] → exact review/validation/hooked head. S5 canonical setup [qualified] → T0 [accepted] → hooked candidate [STOP06] → minimum pinned formatting/remaining07–10 [authorized] → dual exact review/fresh51. S6 source work remains independent.
 
 Product sequence remains backend foundation → G2 E → T/Q0 → B/drain → R → N/Q1 → C → C1/lifecycle/forward-2.x → compatible mobile/extension/native writers → relationships/reconciliation → integrated host/device → real platforms and unseen-site induction → measured pilot → universal importer acceptance → retained TGP V1.
 
@@ -74,7 +74,7 @@ Original failures and all qualifications remain immutable under the intake commi
 
 ## Next executable slices
 
-1. T4 finish active S5 true-hooked two-file candidate continuation, then two independent exact-head/runner reviews and separately granted real fresh51 proof.
+1. T4 apply the authorized one-file pinned formatting-only correction, then original S5 steps07–10 with true hooks. Preserve original06 failure; no repeat install/generate/T0. Two independent exact-head/runner reviews and separately granted real fresh51 proof follow.
 2. Preserve S3 composed real result and ten-case release comparison without another run.
 3. Preserve accepted S3 as the exact local backend foundation for later explicitly scoped integration; no new S3 audit or proof.
 4. T4 build and freeze bounded S6 P1 product correction, then two independent exact-source reviews and actual validation/true-hooked head.
