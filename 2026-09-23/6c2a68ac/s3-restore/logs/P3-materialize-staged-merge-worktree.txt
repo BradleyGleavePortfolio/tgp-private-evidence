@@ -1,0 +1,56 @@
+utc=2026-09-23T15:48:53Z
+-- step a: detached checkout of parent 1 (populates worktree at c0ab87d4; the copied index described an uncopied tree, so --force is required as in prior lanes)
+HEAD is now at d5cd9b8 test(release): C0 builds the S2-only tree from the candidate HEAD minus S1-owned paths (B2 root cause)
+HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c symbolic=detached porcelain=0 index_tree=c0ab87d4dc584b2a7ccad53db16fa551b93fe359
+-- step b: set index AND worktree to a584a1b9 (read-tree --reset -u; HEAD unchanged)
+read-tree ok
+-- step c: record MERGE_HEAD = 5c7b (the recorded PREP2 in-progress merge state)
+-- refs for later reference
+== final state
+HEAD=d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c (detached: yes)
+MERGE_HEAD=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 rev-parse MERGE_HEAD=5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06
+index write-tree=a584a1b95423f95dae8daabf673ef3776604acbb MATCH
+unmerged entries=0
+worktree vs index (git diff --quiet): identical; diff-files lines=0
+untracked/ignored-not-tracked (status --porcelain --untracked-files=all, lines starting with ??): 0
+porcelain total lines=48
+committed=NO (HEAD still d5cd; no commit object created: 0 commits ahead)
+tracked files=2116 worktree files=2116
+node_modules present: no; hooks non-sample: 0; core.hooksPath=unset
+MERGE_MSG present: no; MERGE_MODE present: no (not recorded in packet; not created)
+-- porcelain vs recorded 05-post-state.txt listing
+recorded lines=48 observed lines=48 identical: YES
+-- six formatted files on disk vs archived after/
+src/filters/throttler-exception.filter.ts SAME 1712cd53e8d51b3c7d6e769428eb31db16c8358982afbcbfa38713ab65107de6
+src/observability/README.md SAME 33ae2353538609b0045ae551e62bb7512ebc02c6c7ae749329d3e6c2eac656ee
+src/observability/logging.interceptor.ts SAME 4217faf810be738295c889f8bd3a3e42299f48195352c8c0c6ec09abb0bcd174
+src/prisma.service.ts SAME f2ea43670f4f1f5397cef38565b014564280f0228dc0ac91ed53b935ed0ce1a2
+src/scout/scout.service.ts SAME 344a48374f691e1c2ea0bc70d8449ecc897e21807383ec635ea538958a8416c7
+test/health-readiness-bounded.spec.ts SAME 9d515dc6f598b9f92f94475c34dfeca8efa9c6d0d71cff27bd79650fb33b6aa8
+-- diff --check on staged vs HEAD
+diff --check clean
+-- executable-bit sanity (100755 entries in tree a584a1b9 vs on-disk +x)
+ok +x scripts/ci/assert-prod-sbom.sh
+ok +x scripts/ci/check-relrowsecurity.sh
+ok +x scripts/ci/filter-machines.sh
+ok +x scripts/ci/migration-delta.sh
+ok +x scripts/ci/release-evidence-gate.sh
+ok +x scripts/ci/verify-fly-release.sh
+ok +x scripts/preflight.sh
+ok +x scripts/release.sh
+ok +x scripts/sentry-upload-sourcemaps.sh
+ok +x scripts/setup-branch-protection.sh
+ok +x test/ci/fixtures/fake-gh.sh
+ok +x test/db/s1-harness-guard.spec.sh
+ok +x test/db/s1-r4-truncate-discriminator.sh
+ok +x test/db/s1-r4-truncate-message-spec.sh
+ok +x test/db/s1-rls-close-public-exposure.sh
+ok +x test/release/s1s2-composition.sh
+-- worktree file modes summary (writable by owner, default umask; no chmod applied)
+owner-writable files=2116
+c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7 commit	refs/heads/main
+5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06 commit	refs/restored/execute/20260920-s3-backend
+d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c commit	refs/restored/execute/20260921-s2-composition-r2
+78a4f0e8c22e9b9e902bbaae0b9f5623b9fbfa69 tree	refs/restored/prep1-tree
+a584a1b95423f95dae8daabf673ef3776604acbb tree	refs/restored/prep2-tree
+loose=24 packs=3

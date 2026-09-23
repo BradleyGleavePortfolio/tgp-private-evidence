@@ -15,7 +15,7 @@ Updated 2026-09-23 for EXEC-6c2a68ac. Current contract: `execution/6c2a68ac/SCOP
 | S6 exact substrate restore | `restore_s6_substrate_mue9osen` | Claude Fable 5 / High | restored paths in SCOPE | COMPLETE; d51a/tree62bf67b8, packet19/19/subset11/11; no runtime |
 | S5 V32 narrow binding repair | `repair_s5_binding_mue9vjso` | Claude Fable 5 / High | `execution/6c2a68ac/s5-v32-builder` | ACTIVE; exact binding A-01, P1 wait B-01, narrow failed-operand diagnostics |
 | S5 product substrate restore | `restore_s5_source_mue9wsph` | Claude Fable 5 / High | `worktrees/s5-r4`, `execution/6c2a68ac/s5-source-restore` | COMPLETE and accepted; head143d + patchc36258b3, exact6850b32e fingerprint; no runtime |
-| S3 PREP2 substrate restore | `restore_s3_candidate_mue9wspd` | Claude Fable 5 / High | `worktrees/s3-prep2`, `execution/6c2a68ac/s3-restore` | ACTIVE; exact staged tree only, no integration/test/commit |
+| S3 PREP2 substrate restore | `restore_s3_candidate_mue9wspd` | Claude Fable 5 / High | `worktrees/s3-prep2`, `execution/6c2a68ac/s3-restore` | COMPLETE and accepted; a584a1b9 from both parents, receiptbd9e6cd8; no integration/test/commit |
 
 Prior e8d546f9 dispatches, installations, PIDs, slots and grants are preserved historical evidence only. S4 native proof is accepted and closed. S2 V61 is activated by `execution/6c2a68ac/S2_RESTORATION_ACCEPTANCE_AND_ACTIVATION.md`. S5 runtime is blocked by material exact-binding finding S5-V31-A-01; the second independent review continues. S6 implementation/runtime are held. S1 schema/generator ownership remains reserved and unassigned.
 

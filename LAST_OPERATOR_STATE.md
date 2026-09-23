@@ -37,7 +37,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 |---|---|---|---|
 | S1 R4 | T4 / T4 | `56fb0d227558c86fe824f9fb1bc15e222411504f` | Preserved; real dynamic discriminator after S2 controls. |
 | S2 V6.1 | T4 / T4 | `d5cd9b8b0690a2e6f2c3fd8ff320a1ceb13d650c` | V61 `ed241342…` executed once; five raw0, result `d0a1e406…`/621 entries frozen. Independent result A/B active; setup/proof held. |
-| S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Exact staged tree `a584a1b95423f95dae8daabf673ef3776604acbb` being restored source-only; runtime integration gated on S1/S2. |
+| S3 PREP2 | T4 / T4 | `5c7b42b3ea5be84e4c740fa5d7e42a94d5230d06` | Exact staged tree `a584a1b95423f95dae8daabf673ef3776604acbb` restored from both parents, receiptbd9e6cd8; uncommitted, runtime integration gated on S1/S2. |
 | S4 R6/V6.1 | T4 / T4 | `91990ae9aec72f47a67591892ac09fa1f59d2f16` | Exact native technical proof accepted; no rerun. |
 | S5/V10.1 | T4 / T4 | `143d451ead6ccdbebd92ca3031ba7a89867d6cfc` | V2 failure/recovery dual review closed with qualifications. V31 A exact-binding and B P1-acknowledgement findings routed to one active V32 successor; runtime held. |
 | S6 C6 | T4 / T4 | `d51a191098f483cea9abec6cc7e9f3beffd18c06` | Fresh exact source/C6 packet restored, receipt `b5e8b500…`; unsafe intermediate `6b2be238…` remains held for S5 closure and narrow correction. |
@@ -46,7 +46,7 @@ Backend, mobile, context and private main are unprotected; extension main is pro
 
 Exact current dispatches are in `execution/DISPATCHES.md` and `execution/6c2a68ac/SCOPE.md`. Prior worker IDs, PIDs, installations, slots and grants are historical. Parent is sole private publisher. S1 schema/generator remains reserved with no mutation owner. Current independent auditors do not read each other's conclusions.
 
-S2 controls completed and slot returned with scoped empty ownership accounting; two independent result reviews are active. S5 V32 repairs concrete findings; S3 restores exact source. S5 source restoration is accepted under receipt64611811 at head143d + patchc36258b3 and exact dirty fingerprint6850b32e, with core.abbrev8. V31 A/B and historical V2 result A/B are complete. No runtime currently active; fresh S2 setup remains conditional. S6 implementation remains held.
+S2 controls completed and slot returned with scoped empty ownership accounting; two independent result reviews are active. S5 V32 repairs concrete findings. S3 source restoration is accepted under receiptbd9e6cd8, with both-parent tree reproduction, all86 preservation rows, six formatting blobs and exact48-line staged status; no merge commit. S5 source restoration is accepted under receipt64611811 at head143d + patchc36258b3 and exact dirty fingerprint6850b32e, with core.abbrev8. V31 A/B and historical V2 result A/B are complete. No runtime currently active; fresh S2 setup remains conditional. S6 implementation remains held.
 
 ## DAG
 
