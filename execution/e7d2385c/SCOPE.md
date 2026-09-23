@@ -16,7 +16,7 @@ The previous parent session cannot be read here. Its worker liveness is UNKNOWN.
 
 Recover named immutable source and evidence, never reimplement recoverable work. Fresh checkout/tooling required because the environment is absent is not a repeat acceptance test. Do not execute archived scripts merely to discover their effects. Do not copy old machine process assumptions or revive old launch grants.
 
-One heavy runtime slot exists in this sandbox. Initially it is reserved to the S5 builder for minimum dependency/tooling restoration and the authorized normal hooked commit. S6 recovery, source review and validation preparation are source-only and disjoint. No S6 install, tests, hooks or runtime until explicit transfer by parent.
+One heavy runtime slot exists in this sandbox. S5 recovery, genuine commit and exact runner/PG17.6 prerequisite restoration are complete; prerequisite runtime released20:07:25Z. The slot is currently assigned to S6 builder for one minimum npm ci setup in worktrees/s6-p2, not tests/typecheck/commit. S5 fresh51 is next after explicit release/transfer. Source-only P3 correction uses a separate packet and cannot mutate the live S6 worktree during setup or independent source reads.
 
 ## Individually graded work
 
@@ -30,6 +30,9 @@ One heavy runtime slot exists in this sandbox. Initially it is reserved to the S
 | S5 exact-head/runner review A | T4 | Independent nonbuilder, parent inheritance; bounded T1 NO | Exact hooked98d39610, original correction and narrow alias/format delta, one fresh51 grantability; later same-review actual result |
 | S5 exact-head/runner review B | T4 | Independent nonbuilder, Claude Fable 5 / High; bounded T1 NO | Independent complete candidate/database-proof judgment; no current peer conclusions; later same-review actual result |
 | S5 proof prerequisite recovery | T4 | Existing runner/PG17.6 recovery; Claude Fable 5 / High; bounded T1 NO | Restore exact prior runner/fixture/launcher; minimum absent PG tooling only; no DB proof until dual source closure |
+| S5 exact fresh51 execution | T4 | Existing real-PG proof; same builder/executor; bounded T1 NO | One execution under S5_FRESH51_ACTIVATION.md after runtime transfer; dual same-review actual-result attestations |
+| S6 minimum fresh setup | T4 | Install exact unchanged lock for sensitive identity proof; same builder; bounded T1 NO | One bounded npm ci, disclosed prerequisites, no source change/test/typecheck/commit |
+| S6 P3 identity-test correction | T4 | Remaining Class B04 proof defect; same builder; bounded T1 NO | S6_P3_TEST_CORRECTION.md: one test file only, eight P2 files unchanged, independent delta closure then existing validation |
 
 Cumulative integration remains T4. All workers stop only the affected scope for missing exact source, ownership collision, actual A/B consequence, provider restriction or necessary scope expansion. No silent model downgrade. All manual code edits use apply_patch.
 
@@ -45,8 +48,8 @@ Reviewers may read relevant frozen prior findings and attributable existing test
 
 ## Current next transitions
 
-1. Recover exact S5 source, make the already-authorized five-binding correction, perform the minimum new-environment setup and genuine hooked commit.
-2. Concurrently recover S6 exact source and complete both independent source reviews.
-3. S5 actual hooked head goes to two independent exact-head/runner reviews, then the existing fresh51 real proof.
-4. S6 source closure unlocks bounded actual validation and true-hooked head, followed by final attestations in the same two review lanes.
-5. Record foundation closure and immediately advance the actual importer constraint; do not invent another substrate wave.
+1. Finish the one already-active S6 setup and release its runtime slot.
+2. Activate existing S5 fresh51 on dual-granted exact head98d39610; preserve raw results for same-review final attestations.
+3. In parallel, finish S6 B's independent P2 conclusion and isolate the one-file P3 correction. A01/A02 source closure remains applicable; B04 blocks only identity proof.
+4. S6 narrow delta closure unlocks existing bounded validation and normal no-bypass commit. The mobile repo has no configured hooks; do not describe invented hook execution.
+5. Accept each lane at its exact boundary and advance the mapped S3+S5 composition, missing C1 delta, then B/drain. Foundation closure is not importer completion.
