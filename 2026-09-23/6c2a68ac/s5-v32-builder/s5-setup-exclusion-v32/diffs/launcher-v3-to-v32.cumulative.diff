@@ -1,0 +1,57 @@
+--- launch-s5-setup-exclusion.v3.sh
++++ launch-s5-setup-exclusion.v32.sh
+@@ -1,5 +1,14 @@
+ #!/usr/bin/env bash
+-# OP88-S5-SETUP-EXCLUSION outer launcher v3 (successor of v2 b32cc20d; NOT LAUNCHED). v3 closes ONLY audits/s5-setup-v2-a S5SV2-A-01 (inner evidence unavailable was reclassified as
++# OP88-S5-SETUP-EXCLUSION outer launcher v3.2 (successor of v3.1 d5d9b2b8; NOT LAUNCHED). v3.2 closes ONLY audits/s5-v31-a S5-V31-A-01: v3.1's START fallback bound the shared runner
++# record by pgid=$SESSION plus a one-second UTC stamp floor (SPAWN_TS), i.e. number/time correlation that an equal-second or future-dated stale record with a reused session number could
++# satisfy. v3.2 binds by EXACT identity: the runner (v101y, PIN_RUNNER updated) now publishes token=<inherited lease token> in its START line, and runner_bound accepts a START line only
++# when it carries pgid=$SESSION AND token=$TOKEN; the stamp floor and SPAWN_TS are removed (no stamp is read). Markers `v3.2 (S5-V31-A-01)` in runner_bound / runner_truth, the RUNNER
++# path/pin and the state line. Everything else is byte-identical to v3.1; v3.1 header follows.
++# [v3.1 header, retained] OP88-S5-SETUP-EXCLUSION outer launcher v3.1 (successor of v3 a10c615f; NOT LAUNCHED). v3.1 closes ONLY audits/s5-setup-v3-b V3-B-01: an adopted runner that exits before its
++# INHERITED binding line (v101x L212) left a truncated current record that v3 classified not-this-attempt -> unrecoverable unknown hold. v3.1 also accepts the runner's own START
++# line when it is bound to THIS attempt: pgid=$SESSION (the outer session we created) AND stamped not before this holder's spawn (a stale record predates it). Markers `v3.1 (V3-B-01)`
++# in runner_bound / runner_truth, state line (SPAWN_TS) and the spawn line. Everything else is byte-identical to v3; v3 header follows.
++# [v3 header, retained] OP88-S5-SETUP-EXCLUSION outer launcher v3 (successor of v2 b32cc20d; NOT LAUNCHED). v3 closes ONLY audits/s5-setup-v2-a S5SV2-A-01 (inner evidence unavailable was reclassified as
+ # no inner work; inner sids were re-discovered and replaced each census) and S5SV2-A-02 (a failed corrective LEASE_RELEASE rewrite still exited with the stale receipt), plus
+ # audits/s5-setup-v2-b V2-B-01 (shared setup.EXIT_RECORD read without binding to this attempt's token) and V2-B-02 (prior LEASE_HOLDER / fallback SELF_HOLD overwritten, not preserved):
+ # see the `v3 (...)` markers in preserve_prior / inner_sids / runner_truth / session_state / release and the state line INNER_KNOWN/RSTATE. Everything else is byte-identical to v2; v2 header follows.
+@@ -26,10 +35,10 @@
+ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ if [ "${S5X_PRIVATE:-0}" = 1 ]; then LOCK=${S5X_LOCK:?}; EX=${S5X_EX:?}; RUNNER=${S5X_RUNNER:?}; INNER_BOUND=${S5X_INNER_BOUND:-1290}; INNER_KILL=${S5X_INNER_KILL:-30}; NORMAL_BOUND=${S5X_NORMAL_BOUND:-1380}; HEARTBEAT=${S5X_HEARTBEAT:-30}
+   case "$LOCK$EX" in *"$CANON_LOCK"*|*"$CANON_EX"*) echo "REFUSE: private mode may not touch canonical paths"; exit 2;; esac
+-else LOCK=$CANON_LOCK; EX=$CANON_EX; RUNNER="$HERE/run-s5-setup-npm-ci.v101x.sh"; INNER_BOUND=1290; INNER_KILL=30; NORMAL_BOUND=1380; HEARTBEAT=30; fi
++else LOCK=$CANON_LOCK; EX=$CANON_EX; RUNNER="$HERE/run-s5-setup-npm-ci.v101y.sh"; INNER_BOUND=1290; INNER_KILL=30; NORMAL_BOUND=1380; HEARTBEAT=30; fi
+ LOGS=$EX/logs/setup-exclusion; mkdir -p "$LOGS" || exit 74; LOG=$LOGS/launcher.EXIT_RECORD; ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+ say() { echo "$(ts) $*" >> "$LOG" || { echo "LAUNCHER_LOG_WRITE_FAILED $*" >&2; return 1; }; }
+-PIN_RUNNER=81ff20b0f62ab91d81b0af00d7688910bf8b223d7463aecd43a1595a66c3742a; [ "${S5X_PRIVATE:-0}" = 1 ] || { [ "$(sha256sum "$RUNNER" | cut -c1-64)" = "$PIN_RUNNER" ] || { echo "REFUSE: runner hash != $PIN_RUNNER"; exit 2; }; }
++PIN_RUNNER=61b565e48fa4c14f765fe223bfc3a8baac27ca2867763c91e6a57135fc4ea1b3; [ "${S5X_PRIVATE:-0}" = 1 ] || { [ "$(sha256sum "$RUNNER" | cut -c1-64)" = "$PIN_RUNNER" ] || { echo "REFUSE: runner hash != $PIN_RUNNER"; exit 2; }; }   # v3.2 (S5-V31-A-01): pin = runner v101y (START publishes the inherited token); v101x was 81ff20b0
+ # >>> OWN-BLOCK v10.1 (successor of v10 df200b52 per audits/owned-launch-v10-a OWN-V10-A02 ONLY: leader collection is separated from session authority.
+ # own_finish collects the leader at the actual `wait` (pid leaves OWN_PIDS, enters OWN_RETIRED evidence; a pid is never waited twice, so no fabricated
+ # non-child 127 can appear as a COLLECTED rc); SESSION authority (the confirmed pgid in OWN_PGIDS) is removed by own_retire ONLY on a positively
+@@ -158,7 +167,7 @@
+ own_record "$EX/LEASE_HOLDER" "$(holder_line HELD)" || { say "HOLDER_PUBLICATION_FAILED $EX/LEASE_HOLDER: lease released (nothing launched)"; exit 74; }
+ STATE=HELD; say "LEASE_HELD token=$TOKEN fd=9 holder published"
+ RAW=none; RAW_RC=""; CLEANUP=none; PUBLICATION=ok; RECOVERY=none; SESSION=""; ESCALATED=0; PID=""; INNER=""; RUNNER_NOTE=none; CENSUS=unknown; CENSUS_DETAIL=""
+-INNER_KNOWN=""; RSTATE=never-released   # v3 (S5SV2-A-01): inner sids once established are RETAINED here (census-only) until each is positively observed empty; RSTATE initialised before any census can run
++INNER_KNOWN=""; RSTATE=never-released   # v3.2 (S5-V31-A-01): v3.1's SPAWN_TS stamp floor removed (binding is by token, no stamp is read). v3 (S5SV2-A-01): inner sids once established are RETAINED here (census-only) until each is positively observed empty; RSTATE initialised before any census can run
+ pub_add() { case "$PUBLICATION" in ok) PUBLICATION=$1;; *"$1"*) ;; *) PUBLICATION="$PUBLICATION+$1";; esac; }   # v2 (S5X-A-07): causes accumulate, never replace
+ publish_state() { own_record "$EX/LEASE_HOLDER" "$(holder_line "$1")" && return 0; pub_add holder-update-failed; say "HOLDER_UPDATE_FAILED state=$1"; return 1; }
+ record_or_fallback() { # <name> <content>: primary $EX, fallback $LOGS, last resort stderr; accumulates PUBLICATION
+@@ -173,10 +182,15 @@
+   [ -e "$INNER_LOGS/attempts" ] && { [ -r "$INNER_LOGS/attempts" ] && [ -x "$INNER_LOGS/attempts" ] || return 2; }
+   for f in "$INNER_LOGS"/attempts/*/IDENTITY; do [ -e "$f" ] || continue; [ -r "$f" ] || { rc=2; continue; }; grep -q " self_sid=$SESSION " "$f" 2>/dev/null; case $? in 0) ;; 1) continue;; *) rc=2; continue;; esac
+     p=$(sed -n 's/^pid=\([0-9][0-9]*\) .*/\1/p' "$f" 2>/dev/null | head -1); if [ -n "$p" ]; then echo "$p"; else rc=2; fi; done; return $rc; }
++runner_bound() { # <record>: rc0 only when the shared record is THIS attempt's runner's. (a) its INHERITED line carries our token (v101y L216); or (b) v3.2 (S5-V31-A-01): a START line
++  # (v101y L210, the runner's first and truncating write, before L216) carries BOTH pgid=$SESSION (the outer session we created) AND token=$TOKEN (the inherited lease token that only this
++  # attempt's runner received). No stamp or number correlation is used: a stale record cannot carry this token whatever its stamp or session number. Neither form imports facts by itself.
++  grep -qF -- " lease INHERITED fd=9 path=$LOCK token=$TOKEN " "$1" 2>/dev/null && return 0
++  [ -n "$SESSION" ] || return 1; grep -q "^[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z START pid=[0-9][0-9]* pgid=$SESSION ppid=[0-9][0-9]* token=$TOKEN " "$1" 2>/dev/null; }
+ runner_truth() { # the runner's own EXIT_RECORD, evidence only (no release path is derived from it): sets RUNNER_NOTE
+   local r=$INNER_LOGS/setup.EXIT_RECORD rel=0 fin=none unp=0 cf=none
+   [ -e "$r" ] || { RUNNER_NOTE="exit_record=absent"; return 0; }; [ -r "$r" ] || { RUNNER_NOTE="exit_record=unreadable"; return 0; }   # v3 (S5SV2-A-01): unreadable is not absent
+-  grep -qF -- " lease INHERITED fd=9 path=$LOCK token=$TOKEN " "$r" 2>/dev/null || { RUNNER_NOTE="exit_record=not-this-attempt"; return 0; }   # v3 (V2-B-01): the shared record counts only when the runner bound it to THIS token (v101x L212); no inherited attempt facts
++  runner_bound "$r" || { RUNNER_NOTE="exit_record=not-this-attempt"; return 0; }   # v3 (V2-B-01) / v3.2 (S5-V31-A-01): the shared record counts only when bound to THIS attempt by our token (INHERITED line, or START line with our session AND our token); no inherited attempt facts
+   grep -q 'npm-ci IDENTITY .* state=released' "$r" 2>/dev/null && rel=1; grep -q 'EXCLUSION_UNPRESERVED' "$r" 2>/dev/null && unp=1
+   fin=$(sed -n 's/^FINAL rc=\([0-9]*\).*/\1/p' "$r" 2>/dev/null | tail -1); cf=$(sed -n 's/.*CLEANUP_FAILURES=\([0-9]*\).*/\1/p' "$r" 2>/dev/null | tail -1)
+   RUNNER_NOTE="released=$rel final=${fin:-none} unpreserved=$unp cleanup_failures=${cf:-none}"; }

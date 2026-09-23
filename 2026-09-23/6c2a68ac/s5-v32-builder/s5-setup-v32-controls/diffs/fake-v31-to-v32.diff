@@ -1,0 +1,18 @@
+--- fake-runner.v31.sh
++++ fake-runner.v32.sh
+@@ -1,11 +1,13 @@
+ #!/usr/bin/env bash
+-# Private fake runner v3.1 for the S5 setup-exclusion v3.1 controls (no npm, no canonical paths). Successor of fake v2 5c18e3b3 (which is INCOMPATIBLE with v3/v3.1 in EVERY
++# Private fake runner v3.2 (successor of fake v3.1 4e7858a2; for the S5 setup-exclusion v3.2 controls). ONLY delta (S5-V31-A-01): start_line publishes token=${S5_LEASE_INHERITED:-none}
++# after ppid=, exactly where runner v101y L210 publishes it, so the launcher v3.2 START binding (pgid=$SESSION AND token=$TOKEN) is exercised by the early-death shape. v3.1 header follows.
++# [v3.1 header, retained] Private fake runner v3.1 for the S5 setup-exclusion v3.1 controls (no npm, no canonical paths). Successor of fake v2 5c18e3b3 (which is INCOMPATIBLE with v3/v3.1 in EVERY
+ # scenario: it never writes a current-attempt-bound setup.EXIT_RECORD, so any adopted v2 fake is classified absent/not-this-attempt after launch -> unknown -> indefinite hold; V3-B-02).
+ # Every adopted scenario here first writes the runner's own EXIT_RECORD exactly as v101x does at its start: truncating START line (L206 format) and, unless the scenario models an
+ # exit BEFORE that point, the INHERITED binding line (L212 format: " lease INHERITED fd=9 path=$S5X_LOCK token=$S5_LEASE_INHERITED " with the launcher's own LOCK string and token).
+ # Children are bounded (sleep) and fd 9 is closed for any sub-session child (canonical shape). Nothing here signals anything.
+ set -u; IL=${S5X_EX:?}/logs/setup-v1; R=$IL/setup.EXIT_RECORD; ts() { date -u +%FT%TZ; }; mkdir -p "$IL" || exit 74
+-start_line() { echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID sid=$(ps -o sid= $$ | tr -d ' ') fake_sha256=$(sha256sum "$0" | cut -c1-64) scenario=${S5X_SCENARIO:-}" > "$R" || exit 74; }
++start_line() { echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID token=${S5_LEASE_INHERITED:-none} sid=$(ps -o sid= $$ | tr -d ' ') fake_sha256=$(sha256sum "$0" | cut -c1-64) scenario=${S5X_SCENARIO:-}" > "$R" || exit 74; }   # v3.2: token= as in v101y L210
+ bind_line() { echo "$(ts) lease INHERITED fd=9 path=${S5X_LOCK:?} token=${S5_LEASE_INHERITED:?} holder_pid=fake (fake: same fixed-string form as v101x L212)" >> "$R" || exit 74; }
+ case "${S5X_SCENARIO:?}" in
+   early-death-75) # V3-B-01 closure shape: adopted runner writes START (L206) and exits BEFORE the L212 binding line (models die lease-holder-record-mismatch 75); no children, no npm

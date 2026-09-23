@@ -138,6 +138,22 @@ Mechanical source restoration only. Existing backend baseline read-only. No netw
 
 Read only the archived upstream §2, named PREP2 packet and named bundles. Backend baseline and S2 live worktree read-only; use isolated local object storage. No network, authored code, merge commit, hooks, install, runtime, DB, canonical lock or process actions. S3 integration acceptance still depends on S1/S2 real proof.
 
+## S5-V32 final review transition
+
+The V32 builder is COMPLETE, ownership released, no runtime executed. Frozen local root `execution/6c2a68ac/s5-v32-builder` and identical dated private archive are the final review inputs:
+
+- Top seal `1f23abdcf2ca328f23371fa6018ceb1753553e8e21c65e8765881f814d0e0691` (34 entries).
+- Source seal `addc713d7297796cc98fccfb7c05bde770bedf341322a17a38850ed0cd25adba` (18 entries).
+- Controls seal `b99771a79d80e768a710475cd772e0fd1ccc37ca504fbfc723acabed039f036e` (11 entries).
+- Launcher `55acc00fe9b04d0e015f37bbdac90e582925c4b4564f7aaaa55c21a13304cf0a`; real runner `61b565e48fa4c14f765fe223bfc3a8baac27ca2867763c91e6a57135fc4ea1b3`.
+- Driver `4323dc41953f321394e0ee98ffa7c2186943b83067b2cb6886a03aafbca35a3c`; fake `045d5284993217e98b85932bb33d6ba6e9a272097070ffd1f3c0f42a7b02f838`.
+
+Both independent final reviews are individually/cumulatively T4: trusted validation/recovery, process lifecycle authority; bounded T1 NO. Nonbuilder A `audit_s5_v31_lens_a_mue9eid4` (parent inheritance) writes only `execution/6c2a68ac/audits/s5-v32-a`; nonbuilder B `audit_s5_v31_lens_b_mue9eidl` (Claude Fable 5 / High requested) writes only `execution/6c2a68ac/audits/s5-v32-b`. Parent owner EXEC-6c2a68ac.
+
+Acceptance frozen before review: exact attempt binding, closure of P1 acknowledgement race, retained ten assertions plus the finding-specific P3c negative, unchanged primitive applicability and raw/ownership truth; separate source closure and one-shot private grantability from canonical setup/T0/S6/product claims. Read/hash/diff only, no runtime, syntax execution, probe, lock, signals or source changes. Prior-round V31 findings are allowed inputs, current peer output is not. No new hypothetical family, primitive reaudit or C-only cycle.
+
+A finished with seal `9bbb8a268efa32050e6cbdc97fcbd96b27cd93b1bab8b7864b90f33a821778b5`: source CLOSED, one private run grantable, no A/B blocker. C qualification: FAIL diagnostic is a post-evaluation snapshot, not contemporaneous operand truth; record and continue. B remains active. After dual closure, the purchased decision is one existing 180-second private proof when the shared runtime slot is available, not another source review.
+
 ## Baseline pins
 
 Backend c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7; mobile a5933fd6de5616493de75f0db907098b149b955c; extension 0111be661922234d670bbf23e23d270eec1b4a4e; context 1ebbed76188e33c970fc17c1e7b252f535d040d0; private intake 41aa9ddd03525f987231472a7b18edaa4dcc93da. All 64 open PR head/base/name records match the retained explicit grade register. No product main changed.

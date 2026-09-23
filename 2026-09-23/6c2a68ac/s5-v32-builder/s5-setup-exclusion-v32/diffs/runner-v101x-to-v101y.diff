@@ -1,0 +1,22 @@
+--- run-s5-setup-npm-ci.v101x.sh
++++ run-s5-setup-npm-ci.v101y.sh
+@@ -1,5 +1,9 @@
+ #!/usr/bin/env bash
+-# OP88-S5-SETUP-EXCLUSION runner variant v101x of frozen V10.1 setup 5f94783b (V10.1 immutable; NOT LAUNCHED). Same ONLY delta as v10x 3a7b57d1 over V10 (setup-v10-to-v10x.diff): the canonical
++# OP88-S5-SETUP-EXCLUSION runner variant v101y (successor of v101x 81ff20b0; NOT LAUNCHED). ONLY delta, closing audits/s5-v31-a S5-V31-A-01: the START line (the runner's FIRST write,
++# which truncates $EXIT_RECORD) additionally publishes token=${S5_LEASE_INHERITED:-none}, i.e. the inherited lease token that only THIS attempt's runner received from the outer launcher,
++# so the launcher can bind the shared record to this attempt by exact identity from the earliest checked publication on (before the INHERITED line, which is unchanged). Nothing else
++# changed: OWN-BLOCK v10.1 4aebf96f byte-identical; INHERITED verification, npm ci argv/env/pins/lock fd, gates, die/quarantine/finish and every other line are the v101x bytes. v101x header follows.
++# [v101x header, retained] OP88-S5-SETUP-EXCLUSION runner variant v101x of frozen V10.1 setup 5f94783b (V10.1 immutable; NOT LAUNCHED). Same ONLY delta as v10x 3a7b57d1 over V10 (setup-v10-to-v10x.diff): the canonical
+ # lease may be INHERITED from the explicitly owned outer launcher (launch-s5-setup-exclusion.v2.sh) instead of acquired here. When S5_LEASE_INHERITED=<token> is set the runner verifies
+ # that fd 9 is already open on $LOCK (readlink /proc/$$/fd/9), that $EX/LEASE_HOLDER names the same token and a live holder, and does NOT call flock (the outer open-file-description keeps
+ # the lease after this runner exits; the child still gets 9>&-). Without S5_LEASE_INHERITED the V10.1 behaviour (own flock) is unchanged. Everything else is the V10.1 bytes (embedded
+@@ -203,7 +207,7 @@
+   rec "$1" "$2" "${3:-}"; echo "STOP_FIRST_FAILURE step=$1 rc=$2" >> "$EXIT_RECORD"; [ -n "$FIRST_EXIT" ] || FIRST_EXIT="$1 rc=$2 how=exited"; echo "FIRST_EXIT $FIRST_EXIT" >> "$EXIT_RECORD"; finish "$2"; }
+ 
+ mkdir -p "$LOGS/npm-logs"
+-echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"
++echo "$(ts) START pid=$$ pgid=$(ps -o pgid= $$ | tr -d ' ') ppid=$PPID token=${S5_LEASE_INHERITED:-none} runner_sha256=$(sha256sum "$0" | cut -c1-64)" > "$EXIT_RECORD"   # v101y (S5-V31-A-01): exact current-attempt identity in the earliest publication
+ echo "$(ts) OWN_STAMP $(own_stamp)" >> "$EXIT_RECORD" || { echo STAMP_WRITE_FAILED >&2; exit 74; }; own_precondition || die precondition-job-control-or-tools 2 "set -m active or setsid/pgrep/ps missing"
+ if [ -n "${S5_LEASE_INHERITED:-}" ]; then   # v10x: lease owned by the outer launcher; verify, never re-acquire, never release here
+   [ "$(readlink /proc/$$/fd/9 2>/dev/null)" = "$LOCK" ] || die lease-fd-not-inherited 75 "S5_LEASE_INHERITED set but fd 9 is not open on $LOCK"

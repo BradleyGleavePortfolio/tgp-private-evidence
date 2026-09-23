@@ -1,0 +1,7 @@
+SYNTAX_CHECKS s5-setup-v32-controls (parse-only; NOTHING executed) 2026-09-23T15:58:09Z bash 5.3.9(1)-release
+bash -n ctl-v32.sh: OK (rc 0)
+bash -n fake-runner.v32.sh: OK (rc 0)
+patch(1) on mktemp copies of ctl-v31.v2.sh / fake-runner.v31.sh with diffs/*.diff reproduces candidates byte-for-byte: YES (cmp -s)
+10 predecessor 'check ' statements byte-identical (diff of grep '^check ' minus P3c: empty); total check statements: 11
+driver occurrence counts v31.v2 -> v32: 'kill ' 9->12 (all three new are 'kill -0' liveness reads in diag/P3c predicate context), 'trap ' 1->1, 'rm ' 5->5, flock 1->1, 'exit ' 10->13 (exactly the P3c shim text: exit 0 after --version, exit 74 x2 on fixture write failure; diag has no exit), setsid 12->17 (P3c shim text)
+fake occurrence counts unchanged: kill 0 trap 0 rm 1 flock 0 exit 17 setsid 2
