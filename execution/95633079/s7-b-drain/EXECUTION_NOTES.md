@@ -28,3 +28,10 @@ distinct-schema fixture dependency; no candidate regenerate, no predecessor asse
 ## State
 - `fixture-proposal/` (16 files, `PROPOSAL.sha256`) and `frozen-v2/` unchanged since handoff.
 - No install/copy/hooks/commit/PG action taken. Waiting for reviewer findings / next scoped grant.
+
+## 2026-09-24 ~07:55Z — v3 source closure composed and frozen (consolidated minimum source closure grant)
+Edits confined to the 7 untracked v2 paths + 4 new adapter paths in worktrees/s7-b-drain (tracked files untouched,
+index clean, no hooks, no node_modules). Prettier 3.9.6 (sha verified) --check/--write under flock -n: 2 files
+reflowed format-only, 8/8 TS conformant. v3 tree 00b105ffe362c27808a38c44c6db1f733134f074 via temp index (no
+commit). Packets: frozen-v3/ (PACKET.v3.sha256), fixture-proposal-v3/ (PROPOSAL.v3.sha256). v1/v2/fixture-proposal
+unchanged (PROPOSAL.sha256 and PACKET.v2.sha256 re-verified). No install/copy/hooks/tsc/eslint/jest/commit/PG/probe.

@@ -1,0 +1,54 @@
+--- fixture-proposal/binding/b-pg-proof.sh	2026-09-24 07:23:09.696630514 +0000
++++ fixture-proposal-v3/binding/b-pg-proof.sh	2026-09-24 07:47:49.920630514 +0000
+@@ -1,14 +1,22 @@
+ #!/usr/bin/env bash
+-# S7-3' B/drain real-PG proof — PROPOSED minimal execution binding (SOURCE ONLY; NOT RUN; NOT GRANTED).
++# S7-3' B/drain real-PG proof — PROPOSED minimal execution binding, revision v3 (SOURCE ONLY; NOT RUN; NOT GRANTED).
+ # Derived from the accepted C1 binding execution/95633079/c1-pg/c1-pg-proof.sh (sha256 50506175…) with the
+ # three B-specific fixture steps the new proof needs (old-root checkout, B bootstrap, B identity) inserted.
+ # Runs the NEW spec test/rls-g2-b-drain.spec.ts exactly once via the existing repo jest + jest.rls.config.js.
+ # No new test framework, no retry, no inherited-proof replay (etq0 / fresh51 / C1 suites are never invoked).
+-# Single canonical lock holder; first nonzero stops (bounded fixture stop is the only cleanup so no postmaster
+-# survives); every raw exit is recorded as observed. Data directory RETAINED after stop (destroy = separate grant).
+-# Usage (later, under a runtime grant): timeout -k 30 2400 bash .../binding/b-pg-proof.sh
++# Single canonical lock holder; first nonzero stops; the only cleanup attempted is a bounded fixture stop when
++# this run started the postmaster. No autonomous cleanup is GUARANTEED: if the outer timeout kills bash, the
++# stop does not run. What governs is the observed terminal evidence — the sentinel/log lines, `pgrep -cx postgres`,
++# the port listener count and any survivor pid the stop reports — not this header. Data dir RETAINED after
++# stop (destroy = separate marker-gated grant).
++# Inner stage bounds: init 60 + start 60 + old-root 180 + bootstrap 900 + identity 4x15 + jest 1500 + stop 75 = 2835 s soft sum.
++# Usage (later, under a runtime grant): timeout -k 30 3600 bash .../binding/b-pg-proof.sh   (outer > soft sum + kill graces + cleanup)
++# Pre-steps (each its own receipt, in this order, BEFORE pins are filled): isolated copy of the accepted C1
++# node_modules + verify → ./node_modules/.bin/lefthook install (real hooks) → affected gates (tsc, eslint, prettier
++# --check, check-r75, DB-free jest incl. test/scout/g2-b-drain-db-guard.spec.ts) → ordinary Bradley-authored hooked
++# commit → fill EXPECT_* from the committed head → separate PG grant for this script.
+ set -uo pipefail
+-D=/home/user/workspace/execution/95633079/s7-b-drain/fixture-proposal/binding
++D=/home/user/workspace/execution/95633079/s7-b-drain/fixture-proposal-v3/binding
+ RT=/home/user/workspace/execution/95633079/s7-b-drain/runtime          # ALL runtime artefacts of the B lane live here
+ W=/home/user/workspace/worktrees/s7-b-drain
+ R=$RT/run; LOG=$R/b-pg-proof.log; SENT=$R/b-pg-proof.sentinel; JLOG=$R/jest.log
+@@ -61,6 +69,14 @@
+ [ "$(git -C "$W" rev-parse HEAD:test/utils/g2-b-drain-bootstrap.sh)" = "$EXPECT_BOOTSTRAP_BLOB" ] || { log "PRECONDITION_FAIL bootstrap blob mismatch"; fail 70; }
+ [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] || { log "PRECONDITION_FAIL worktree not clean"; fail 70; }
+ [ ! -e "$W/.git/MERGE_HEAD" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; fail 70; }
++# the committed head must have been produced through the tracked lefthook hooks (installed from the isolated tree)
++grep -q lefthook "$W/.git/hooks/pre-commit" 2>/dev/null && grep -q lefthook "$W/.git/hooks/commit-msg" 2>/dev/null \
++  || { log "PRECONDITION_FAIL .git/hooks/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }
++# accepted S5 donor files must be byte-identical at the committed head (machine check of "S5 files unchanged")
++for pin in "test/utils/g2-pg17-db.ts 0e73d76d8f06328872d09c6a76db20715547ebe0" "test/utils/g2-pg17-harness.ts ab9aaab4ba3e2c55671f66d5f2ee7a23674337be" \
++           "test/utils/g2-pg17-bootstrap.sh 85a636ba75607604032cef7af1d285cb198ca263" "test/scout/g2-pg17-db-guard.spec.ts 4fed8bcd57218b6f1bb174948f1adc6e0e3252ba" \
++           "test/utils/g2-pg17-old-root.sh b9080538b4ba4838db89d03d90e2cc206b3860b7"; do set -- $pin
++  [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL accepted S5 file $1 changed"; fail 70; }; done
+ # dependency tree: an ISOLATED copy of the accepted C1 tree (not a symlink into s7-c1, not a fresh npm ci)
+ [ -d "$W/node_modules" ] && [ ! -L "$W/node_modules" ] || { log "PRECONDITION_FAIL $W/node_modules absent or a symlink (isolated copy required)"; fail 70; }
+ case "$(readlink -f "$W/node_modules")" in "$W"/*) ;; *) log "PRECONDITION_FAIL node_modules resolves outside $W"; fail 70;; esac
+@@ -74,7 +90,7 @@
+ [ -x /usr/bin/psql ] || { log "PRECONDITION_FAIL /usr/bin/psql absent"; fail 70; }
+ [ "$(readlink -f "$PG17_HOME")" = "$PG17_HOME" ] || { log "PRECONDITION_FAIL $PG17_HOME is not a real path"; fail 70; }
+ git -C "$W" merge-base --is-ancestor 925780e0a1906593e5383c618311b6b17364b8dc HEAD || { log "PRECONDITION_FAIL O 925780e0 not an ancestor (old-root fixture impossible)"; fail 70; }
+-log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$(/usr/bin/psql --version)' jest=$(cd "$W" && ./node_modules/.bin/jest --version)"
++log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$(/usr/bin/psql --version)' jest=$(cd "$W" && ./node_modules/.bin/jest --version) pg17_provenance='$(grep -E '^(postgres_sha256|result)=' "$PG17_HOME/PROVENANCE.txt" 2>/dev/null | tr '\n' ' ')'"
+ # ---- step 1 preflight (read-only): B lane absent; S5 absent recorded as-is; retained C1 cluster hashed, never started
+ STAGE=preflight
+ [ ! -e "$BDIR" ] || { log "PREFLIGHT_FAIL $BDIR exists (fresh init only; never adopt)"; fail 71; }

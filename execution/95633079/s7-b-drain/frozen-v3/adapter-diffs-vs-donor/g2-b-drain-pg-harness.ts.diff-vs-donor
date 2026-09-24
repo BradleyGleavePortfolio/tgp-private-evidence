@@ -1,0 +1,110 @@
+--- test/utils/g2-pg17-harness.ts	2026-09-24 06:50:53.896630514 +0000
++++ test/utils/g2-b-drain-pg-harness.ts	2026-09-24 07:45:44.576630514 +0000
+@@ -1,37 +1,39 @@
+ /**
+- * S5 G2 shared live-proof helpers for the isolated PostgreSQL 17 lane.
+- * Real psql, real generated Prisma clients in separate OS processes
+- * (test/utils/g2-tq0-worker.cjs), no transaction or query mocks.
+- * Only the explicitly guarded root `rls-g2-pg17-*.spec.ts` files import this.
++ * S7-3' G2 B/drain live-proof helpers: derived by substitution from the accepted S5 harness
++ * test/utils/g2-pg17-harness.ts (blob ab9aaab4), which stays byte-identical. Same real psql,
++ * same real generated Prisma clients in separate OS processes (test/utils/g2-tq0-worker.cjs,
++ * shared unchanged), no transaction or query mocks; bound to the B-only identity guard
++ * test/utils/g2-b-drain-db.ts and the G2_B_* environment. Only test/rls-g2-b-drain.spec.ts
++ * (via test/utils/g2-b-drain-harness.ts) imports this.
+  */
+ import { execFileSync, fork, spawn } from 'child_process';
+ import { readFileSync } from 'fs';
+ import { resolve } from 'path';
+ import {
+-  G2_PG17_ADMIN_ROLE,
+-  G2_PG17_MIGRATION_ROLE,
+-  G2_PG17_RUNTIME_ROLE,
+-  g2Pg17TestTarget,
++  G2_B_ADMIN_ROLE,
++  G2_B_MIGRATION_ROLE,
++  G2_B_RUNTIME_ROLE,
++  g2BDrainTestTarget,
+   withFixturePassword,
+-} from './g2-pg17-db';
++} from './g2-b-drain-db';
+ 
+ export const root = resolve(__dirname, '..', '..');
+ export const OLD_HEAD = '925780e0a1906593e5383c618311b6b17364b8dc';
+ export const E_MIGRATION = '20270118000000_scout_ledger_platform_expand';
+ 
+-const raw = process.env.G2_PG17_DATABASE_URL;
+-const password = process.env.G2_PG17_PASSWORD;
+-export const psql = process.env.G2_PG17_PSQL;
+-export const oldRoot = process.env.G2_PG17_OLD_ROOT;
+-export const oldClient = process.env.G2_PG17_OLD_CLIENT;
+-export const directory = process.env.G2_PG17_DATA_DIRECTORY;
+-export const expectedVersion = Number(process.env.G2_PG17_SERVER_VERSION ?? '170006');
++const raw = process.env.G2_B_DATABASE_URL;
++const password = process.env.G2_B_PASSWORD;
++export const psql = process.env.G2_B_PSQL;
++export const oldRoot = process.env.G2_B_OLD_ROOT;
++export const oldClient = process.env.G2_B_OLD_CLIENT;
++export const directory = process.env.G2_B_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_B_SERVER_VERSION ?? '170006');
+ if (!raw || !password || !psql || !oldRoot || !oldClient || !directory) {
+   throw new Error(
+-    'S5 G2 proof requires explicit database, password, psql, data directory, old source and old client',
++    'B/drain G2 proof requires explicit database, password, psql, data directory, old source and old client',
+   );
+ }
+-export const target = g2Pg17TestTarget(raw, process.env.G2_PG17_CONFIRM);
++export const target = g2BDrainTestTarget(raw, process.env.G2_B_CONFIRM);
+ const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
+ /** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
+ const asRole = (role: string) => {
+@@ -40,9 +42,9 @@
+   return u.toString();
+ };
+ /** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
+-export const migrationUrl = asRole(G2_PG17_MIGRATION_ROLE);
++export const migrationUrl = asRole(G2_B_MIGRATION_ROLE);
+ /** Cluster superuser: lock-wait observation in pg_stat_activity only. */
+-const adminUrl = asRole(G2_PG17_ADMIN_ROLE);
++const adminUrl = asRole(G2_B_ADMIN_ROLE);
+ 
+ const psqlRun = (url: string, args: string[], input?: string) =>
+   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+@@ -171,8 +173,8 @@
+ export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
+ let sequence = 0;
+ export function worker(options: Record<string, unknown> = {}, old = false) {
+-  const name = `g2p17_${++sequence}`;
+-  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_PG17_RUNTIME_ROLE));
++  const name = `g2b_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_B_RUNTIME_ROLE));
+   service.searchParams.set('application_name', name);
+   const config = {
+     root: old ? oldRoot : root,
+@@ -280,7 +282,7 @@
+   throw new Error('expected observed PostgreSQL lock wait');
+ }
+ /** A psql session (default: runtime role service_role) holding an open transaction until released. */
+-export function holdTransaction(statements: string, role: string = G2_PG17_RUNTIME_ROLE) {
++export function holdTransaction(statements: string, role: string = G2_B_RUNTIME_ROLE) {
+   const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
+     stdio: ['pipe', 'pipe', 'pipe'],
+     env: psqlEnv,
+@@ -301,7 +303,7 @@
+   return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
+ }
+ export const holdAdvisory = (key: number) =>
+-  holdTransaction(`SELECT pg_advisory_xact_lock(${key})`, G2_PG17_MIGRATION_ROLE);
++  holdTransaction(`SELECT pg_advisory_xact_lock(${key})`, G2_B_MIGRATION_ROLE);
+ export const encoded = (s: string) => Buffer.from(s).toString('base64url');
+ export const legacyEntityCursor = (family: string, s: string) =>
+   encoded(
+@@ -335,7 +337,7 @@
+   execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
+ /** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
+ export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
+-  const url = withFixturePassword(target.prismaUrl, password, G2_PG17_MIGRATION_ROLE);
++  const url = withFixturePassword(target.prismaUrl, password, G2_B_MIGRATION_ROLE);
+   try {
+     const output = execFileSync(
+       resolve(root, 'node_modules/.bin/prisma'),

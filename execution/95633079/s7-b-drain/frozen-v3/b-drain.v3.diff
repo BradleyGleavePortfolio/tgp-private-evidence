@@ -1,0 +1,2386 @@
+diff --git a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+new file mode 100644
+index 0000000..91e646d
+--- /dev/null
++++ b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+@@ -0,0 +1,74 @@
++-- Reverse of 20270119000000_scout_ledger_obsolete_writer_fence (G2-B).
++-- Removes ONLY the fence trigger and its function. The nullable E column, every
++-- ledger row and every assigned provenance value are retained; nothing is
++-- derived, deleted or reset. Re-admitting platform-unaware writers voids any
++-- completed drain evidence: a backfill "drained" report predates this down and
++-- must be re-established after a later re-apply before R is considered.
++-- Refuses when the fence is absent or not exactly as shipped (raw reruns fail).
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-B unexpected identity prerequisite';
++    END IF;
++  END LOOP;
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND a.attname = 'source_platform' AND NOT a.attisdropped
++      AND a.atttypid = 'text'::regtype AND NOT a.attnotnull
++  ) THEN
++    RAISE EXCEPTION 'G2-B unexpected platform column prerequisite';
++  END IF;
++  -- Structural identity, independent of the session search_path (pg_get_triggerdef drops the
++  -- function's schema whenever search_path makes it visible, so its text is not compared):
++  -- exact table + trigger name, function public.scout_ledger_platform_fence() with zero
++  -- arguments, BEFORE INSERT FOR EACH ROW (tgtype 7), no WHEN clause, no column list, no
++  -- arguments, not a constraint trigger, not SECURITY DEFINER. to_regprocedure is NULL when the
++  -- function is absent, so a genuinely absent fence reaches the RAISE below without an error.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_trigger t
++    JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid
++    WHERE t.tgrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND t.tgname = 'ScoutReconstructionLedger_platform_fence'
++      AND NOT t.tgisinternal
++      AND p.oid = to_regprocedure('public.scout_ledger_platform_fence()')
++      AND p.pronargs = 0
++      AND NOT p.prosecdef
++      AND t.tgtype = 7
++      AND t.tgqual IS NULL
++      AND t.tgattr::int2[] = '{}'::int2[]
++      AND t.tgnargs = 0
++      AND t.tgconstraint = 0
++  ) THEN
++    RAISE EXCEPTION 'G2-B fence absent';
++  END IF;
++END $$;
++
++DROP TRIGGER "ScoutReconstructionLedger_platform_fence" ON public."ScoutReconstructionLedger";
++DROP FUNCTION public.scout_ledger_platform_fence();
++COMMIT;
+diff --git a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+new file mode 100644
+index 0000000..55c8590
+--- /dev/null
++++ b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+@@ -0,0 +1,92 @@
++-- G2-B only: fence obsolete (platform-unaware) ledger writers. NOT a backfill,
++-- NOT NULL, a CHECK, wide identity or any writer/reader/policy change.
++-- Entry gate (operator-owned, not provable here): T is the only deployed ledger
++-- writer image and no O image is restart-eligible. The fence makes a stray O
++-- restart or direct maintenance writer fail loudly on its first NULL-provenance
++-- INSERT instead of silently re-creating NULL rows after the bounded backfill,
++-- so the later "zero remaining NULL" sweep is durable evidence for R.
++--
++-- Insert-only on purpose: UPDATEs are not fenced, so the accepted T claim of an
++-- existing NULL row (upsert update path, then the transactional claim) and O's
++-- update of already-present rows keep their accepted semantics. Both narrow
++-- unique indexes, RLS and the nullable E column are prerequisites and untouched.
++-- The bounded resumable backfill is src/scout/scout-ledger-backfill.ts.
++-- Separate release artifact from E/T and from R/N/C. Raw reruns fail atomically.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        -- ::name honors PostgreSQL's identifier truncation for the ledger key.
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-B unexpected identity prerequisite';
++    END IF;
++  END LOOP;
++  -- E must be present exactly as shipped: nullable TEXT, no default, no constraint.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND a.attname = 'source_platform' AND NOT a.attisdropped
++      AND a.atttypid = 'text'::regtype AND a.atttypmod = -1
++      AND NOT a.attnotnull AND NOT a.atthasdef AND a.attgenerated = '' AND a.attidentity = ''
++      AND NOT EXISTS (
++        SELECT 1 FROM pg_catalog.pg_constraint c
++        WHERE c.conrelid = a.attrelid AND a.attnum = ANY(c.conkey)
++      )
++  ) THEN
++    RAISE EXCEPTION 'G2-B unexpected platform column prerequisite';
++  END IF;
++  IF EXISTS (
++    SELECT 1 FROM pg_catalog.pg_trigger
++    WHERE tgrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND tgname = 'ScoutReconstructionLedger_platform_fence'
++  ) OR to_regprocedure('public.scout_ledger_platform_fence()') IS NOT NULL THEN
++    RAISE EXCEPTION 'G2-B fence already present';
++  END IF;
++END $$;
++
++-- Refuses, never derives: no default, lookup, or "unknown" substitute.
++CREATE FUNCTION public.scout_ledger_platform_fence() RETURNS trigger
++LANGUAGE plpgsql
++SET search_path = ''
++AS $$
++BEGIN
++  IF NEW.source_platform IS NULL THEN
++    RAISE EXCEPTION 'G2-B obsolete writer fenced: ScoutReconstructionLedger.source_platform is required'
++      USING ERRCODE = 'check_violation';
++  END IF;
++  RETURN NEW;
++END $$;
++-- Not SECURITY DEFINER; trigger firing needs no EXECUTE grant, so nothing is callable.
++REVOKE ALL ON FUNCTION public.scout_ledger_platform_fence() FROM PUBLIC;
++COMMENT ON FUNCTION public.scout_ledger_platform_fence() IS
++  'G2-B: refuses INSERT of a ScoutReconstructionLedger row without source_platform (obsolete-writer fence). Removed by 20270119000000 down.sql only.';
++
++CREATE TRIGGER "ScoutReconstructionLedger_platform_fence"
++  BEFORE INSERT ON public."ScoutReconstructionLedger"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence();
++COMMENT ON TRIGGER "ScoutReconstructionLedger_platform_fence" ON public."ScoutReconstructionLedger" IS
++  'G2-B obsolete-writer fence: platform-unaware (O) ledger INSERTs fail with check_violation. UPDATEs are not fenced.';
++COMMIT;
+diff --git a/src/scout/scout-ledger-backfill.cli.ts b/src/scout/scout-ledger-backfill.cli.ts
+new file mode 100644
+index 0000000..bcc0657
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.cli.ts
+@@ -0,0 +1,58 @@
++import { PrismaClient } from '@prisma/client';
++import {
++  backfillLedgerPlatform,
++  exitCodeFor,
++  type BackfillClient,
++  type BackfillOptions,
++} from './scout-ledger-backfill';
++
++/**
++ * G2-B operator entry (not wired into the HTTP app or any module):
++ *   DATABASE_URL=<service role url> npx ts-node src/scout/scout-ledger-backfill.cli.ts \
++ *     [--batch=500] [--passes=3] [--lock-retries=2]
++ * Prints one JSON report (counts only: no identifiers, payloads or platform values)
++ * and exits 0 only for `drained`; 4 complete but unfenced, 2 unresolved, 3 stalled,
++ * 1 on any other failure. Rerunning is safe at any point.
++ */
++export function parseBackfillArgs(argv: string[]): BackfillOptions {
++  const options: BackfillOptions = {};
++  for (const arg of argv) {
++    const match = /^--(batch|passes|lock-retries)=(\d{1,5})$/.exec(arg);
++    if (!match) throw new RangeError(`G2-B backfill: unsupported argument ${arg}`);
++    const value = Number(match[2]);
++    if (match[1] === 'batch') options.batch = value;
++    else if (match[1] === 'passes') options.maxPasses = value;
++    else options.lockRetries = value;
++  }
++  return options;
++}
++
++async function main(): Promise<number> {
++  const options = parseBackfillArgs(process.argv.slice(2));
++  const prisma: BackfillClient & { $disconnect(): Promise<void> } = new PrismaClient();
++  try {
++    const report = await backfillLedgerPlatform(prisma, options);
++    process.stdout.write(`${JSON.stringify(report)}\n`);
++    return exitCodeFor(report.outcome);
++  } finally {
++    await prisma.$disconnect();
++  }
++}
++
++if (require.main === module) {
++  main().then(
++    (code) => process.exit(code),
++    (err) => {
++      // Class only for database failures (a raw error can carry identifiers);
++      // usage and integrity errors are operator-facing and identifier-free.
++      const detail =
++        err instanceof RangeError || (err instanceof Error && err.name === 'BackfillIntegrityError')
++          ? err.message
++          : err instanceof Error
++            ? err.name
++            : 'unknown';
++      console.error(`G2-B backfill failed: ${detail}`);
++      process.exit(1);
++    },
++  );
++}
+diff --git a/src/scout/scout-ledger-backfill.spec.ts b/src/scout/scout-ledger-backfill.spec.ts
+new file mode 100644
+index 0000000..3a97093
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.spec.ts
+@@ -0,0 +1,320 @@
++import {
++  BackfillIntegrityError,
++  backfillLedgerPlatform,
++  classify,
++  decideOutcome,
++  exitCodeFor,
++  isLockOrStatementTimeout,
++  type BackfillClient,
++  type BackfillTx,
++  type Candidate,
++} from './scout-ledger-backfill';
++import { parseBackfillArgs } from './scout-ledger-backfill.cli';
++
++// DB-free proof of the G2-B runner's control flow: classification, chunk cursor
++// and pass termination, lock-retry bounds, integrity refusal and the drain
++// verdict. The SQL itself, locking and real PostgreSQL behaviour are proven only
++// by the guarded live spec test/rls-g2-b-drain.spec.ts; nothing here mocks a
++// database result that the live proof does not also establish.
++
++type LedgerRow = { id: string; platform: string | null; matches: number; staged: string | null };
++
++/** In-memory ledger obeying the runner's SQL contract, with per-chunk fault injection. */
++class FakeLedger implements BackfillClient {
++  readonly statements: string[] = [];
++  transactions = 0;
++  rollbacks = 0;
++  fenced = false;
++  locked = new Set<string>();
++  faults: Array<'lock' | 'other' | null> = [];
++  mismatchOnce = false;
++
++  constructor(readonly rows: LedgerRow[]) {}
++
++  async $transaction<T>(fn: (tx: BackfillTx) => Promise<T>): Promise<T> {
++    this.transactions += 1;
++    const fault = this.faults.shift() ?? null;
++    if (fault === 'lock') {
++      this.rollbacks += 1;
++      throw new Error(
++        'Raw query failed. Code: `55P03`. Message: canceling statement due to lock timeout',
++      );
++    }
++    if (fault === 'other') {
++      this.rollbacks += 1;
++      throw new Error('Raw query failed. Code: `42P01`. Message: relation does not exist');
++    }
++    const snapshot = this.rows.map((r) => ({ ...r }));
++    try {
++      return await fn(this);
++    } catch (err) {
++      this.rows.splice(0, this.rows.length, ...snapshot);
++      this.rollbacks += 1;
++      throw err;
++    }
++  }
++
++  async $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number> {
++    const text = query.join('?');
++    this.statements.push(text.trim().split(/\s+/).slice(0, 3).join(' '));
++    if (!text.includes('UPDATE')) return 0;
++    const ids = idsOf(values[0]);
++    let updated = 0;
++    for (const row of this.rows) {
++      if (ids.has(row.id) && row.platform === null && row.staged !== null && row.matches === 1) {
++        row.platform = row.staged;
++        updated += 1;
++      }
++    }
++    if (this.mismatchOnce) {
++      this.mismatchOnce = false;
++      return updated - 1;
++    }
++    return updated;
++  }
++
++  async $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<any> {
++    const text = query.join('?');
++    this.statements.push(text.trim().split(/\s+/).slice(0, 3).join(' '));
++    if (text.includes('FOR UPDATE SKIP LOCKED')) {
++      const [after, limit] = values as [string, number];
++      const candidates: Candidate[] = this.rows
++        .filter((r) => r.platform === null && r.id > after && !this.locked.has(r.id))
++        .sort((a, b) => (a.id < b.id ? -1 : 1))
++        .slice(0, limit)
++        .map((r) => ({ id: r.id, matches: r.matches, platform: r.staged }));
++      return candidates;
++    }
++    if (text.includes('FILTER (WHERE source_platform IS NULL)')) {
++      return [
++        { total: this.rows.length, nulls: this.rows.filter((r) => r.platform === null).length },
++      ];
++    }
++    if (text.includes('AS mismatch')) {
++      return [
++        {
++          mismatch: this.rows.filter(
++            (r) => r.platform !== null && r.staged !== null && r.platform !== r.staged,
++          ).length,
++        },
++      ];
++    }
++    if (text.includes('pg_trigger')) return [{ fences: this.fenced ? 1 : 0 }];
++    throw new Error(`unexpected query: ${text}`);
++  }
++}
++
++/** Prisma.join(ids) arrives as a Sql object whose values are the ids. */
++function idsOf(joined: unknown): Set<string> {
++  const values = (joined as { values?: unknown[] }).values ?? [];
++  return new Set(values.map(String));
++}
++
++const row = (id: string, staged: string | null = 'truecoach', matches = 1): LedgerRow => ({
++  id,
++  platform: null,
++  matches,
++  staged,
++});
++const claimed = (id: string, platform: string): LedgerRow => ({
++  id,
++  platform,
++  matches: 1,
++  staged: 'truecoach',
++});
++
++describe('G2-B classify', () => {
++  it('resolves exactly one canonical staged match and classifies every other case', () => {
++    expect(
++      classify([
++        { id: 'a', matches: 1, platform: 'truecoach' },
++        { id: 'b', matches: 0, platform: null },
++        { id: 'c', matches: 2, platform: 'truecoach' },
++        { id: 'd', matches: 1, platform: 'Bad Platform' },
++        { id: 'e', matches: 1, platform: '' },
++        { id: 'f', matches: 1, platform: 'unknown' },
++        { id: 'g', matches: 1, platform: null },
++      ]),
++    ).toEqual({ resolvable: ['a', 'f'], orphan: 1, ambiguous: 1, invalid: 3 });
++  });
++});
++
++describe('G2-B decideOutcome / exit codes', () => {
++  const none = { orphan: 0, invalid: 0, ambiguous: 0 };
++  it('is drained only with zero NULL and the fence installed', () => {
++    expect(decideOutcome(0, true, none)).toBe('drained');
++    expect(decideOutcome(0, false, none)).toBe('complete_unfenced');
++  });
++  it('separates fully explained remainders from unexplained (locked/unprocessed) ones', () => {
++    expect(decideOutcome(3, true, { orphan: 2, invalid: 1, ambiguous: 0 })).toBe('unresolved');
++    expect(decideOutcome(4, true, { orphan: 2, invalid: 1, ambiguous: 0 })).toBe('stalled');
++    expect(decideOutcome(1, true, none)).toBe('stalled');
++  });
++  it('exits 0 only for drained', () => {
++    expect(exitCodeFor('drained')).toBe(0);
++    expect(exitCodeFor('unresolved')).toBe(2);
++    expect(exitCodeFor('stalled')).toBe(3);
++    expect(exitCodeFor('complete_unfenced')).toBe(4);
++  });
++  it('recognises lock and statement timeouts only', () => {
++    expect(isLockOrStatementTimeout(new Error('Code: `55P03`'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('due to statement timeout'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('Code: `57014`'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('Code: `23505`'))).toBe(false);
++    expect(isLockOrStatementTimeout('string failure')).toBe(false);
++  });
++});
++
++describe('G2-B backfillLedgerPlatform control flow', () => {
++  it('walks NULL rows in id order in bounded chunks, resumes past unresolvable rows, and stops honestly', async () => {
++    const rows: LedgerRow[] = [];
++    for (let n = 1; n <= 7; n++) rows.push(row(`r${n}`));
++    rows.push(row('o1', null, 0), row('i1', 'Bad Platform'), claimed('k1', 'truecoach'));
++    rows.push(claimed('m1', 'different'));
++    const db = new FakeLedger(rows);
++    db.fenced = true;
++    const report = await backfillLedgerPlatform(db, { batch: 3 });
++    // Pass 1: chunks i1+o1+r1, r2-r4, r5-r7, then an empty chunk past r7 (a full chunk cannot
++    // prove the end): 9 examined, 7 updated. Pass 2: i1+o1 only, nothing updated -> stop.
++    // Claimed and mismatching rows are never candidates or updates.
++    expect(report.passes.map((p) => [p.chunks, p.examined, p.updated])).toEqual([
++      [4, 9, 7],
++      [1, 2, 0],
++    ]);
++    expect(report).toMatchObject({
++      batch: 3,
++      ledgerTotal: 11,
++      nullBefore: 9,
++      nullAfter: 2,
++      mismatch: 1,
++      fenced: true,
++      unresolved: { orphan: 1, invalid: 1, ambiguous: 0 },
++      outcome: 'unresolved',
++    });
++    expect(rows.filter((r) => r.id.startsWith('r')).every((r) => r.platform === 'truecoach')).toBe(
++      true,
++    );
++    expect(rows.find((r) => r.id === 'm1')?.platform).toBe('different');
++    expect(rows.find((r) => r.id === 'o1')?.platform).toBeNull();
++    // Every chunk transaction sets both budgets and takes the staging SHARE lock before selecting.
++    expect(db.statements.filter((s) => s.startsWith('SET LOCAL lock_timeout'))).toHaveLength(5);
++    expect(db.statements.filter((s) => s.startsWith('SET LOCAL statement_timeout'))).toHaveLength(
++      5,
++    );
++    expect(db.statements.filter((s) => s.startsWith('LOCK TABLE'))).toHaveLength(5);
++    expect(db.statements.filter((s) => s.startsWith('UPDATE'))).toHaveLength(3);
++    expect(db.rollbacks).toBe(0);
++    // Rerun is idempotent: one chunk, nothing to update, same verdict.
++    const again = await backfillLedgerPlatform(db, { batch: 3 });
++    expect(again.passes).toHaveLength(1);
++    expect(again.passes[0]).toMatchObject({ examined: 2, updated: 0 });
++    expect(again.outcome).toBe('unresolved');
++  });
++
++  it('reports completion without the fence as complete_unfenced, never drained', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    const report = await backfillLedgerPlatform(db, { batch: 500 });
++    expect(report).toMatchObject({ nullAfter: 0, fenced: false, outcome: 'complete_unfenced' });
++    // A productive pass is followed by one confirming pass that finds nothing.
++    expect(report.passes.map((p) => p.examined)).toEqual([2, 0]);
++  });
++
++  it('skips locked rows without waiting, revisits them on the next pass, and reports a stall', async () => {
++    const db = new FakeLedger([row('a'), row('b'), row('c')]);
++    db.fenced = true;
++    db.locked.add('b');
++    const stalled = await backfillLedgerPlatform(db, { batch: 500, maxPasses: 3 });
++    expect(stalled.passes.map((p) => [p.examined, p.updated])).toEqual([
++      [2, 2],
++      [0, 0],
++    ]);
++    expect(stalled).toMatchObject({
++      nullAfter: 1,
++      unresolved: { orphan: 0, invalid: 0, ambiguous: 0 },
++      outcome: 'stalled',
++    });
++    db.locked.clear();
++    const drained = await backfillLedgerPlatform(db, { batch: 500 });
++    expect(drained.passes.map((p) => [p.examined, p.updated])).toEqual([
++      [1, 1],
++      [0, 0],
++    ]);
++    expect(drained.outcome).toBe('drained');
++  });
++
++  it('retries a chunk only for lock/statement timeouts, within the bound, then stalls', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    db.fenced = true;
++    db.faults = ['lock', 'lock', 'lock'];
++    const report = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 2 });
++    expect(report.passes).toEqual([
++      expect.objectContaining({
++        chunks: 0,
++        examined: 0,
++        updated: 0,
++        lockFailures: 3,
++        stalledByLocks: true,
++      }),
++    ]);
++    expect(report.outcome).toBe('stalled');
++    expect(db.transactions).toBe(3);
++    // A recovered lock on the last permitted attempt completes the chunk normally.
++    db.faults = ['lock'];
++    const recovered = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 1 });
++    expect(recovered.passes[0]).toMatchObject({
++      lockFailures: 1,
++      updated: 2,
++      stalledByLocks: false,
++    });
++    expect(recovered.outcome).toBe('drained');
++    // Zero retries is a legal bound: exactly one attempt, then an honest stall.
++    db.faults = ['lock'];
++    const once = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 0 });
++    expect(once.passes).toEqual([
++      expect.objectContaining({ chunks: 0, lockFailures: 1, stalledByLocks: true }),
++    ]);
++    expect(once.outcome).toBe('stalled');
++    expect(db.transactions).toBe(1);
++  });
++
++  it('propagates any non-timeout database failure instead of retrying or inventing a verdict', async () => {
++    const db = new FakeLedger([row('a')]);
++    db.faults = ['other'];
++    await expect(backfillLedgerPlatform(db, { batch: 500 })).rejects.toThrow('42P01');
++    expect(db.transactions).toBe(1);
++  });
++
++  it('refuses a chunk whose update count differs from the locked resolvable set and rolls it back', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    db.mismatchOnce = true;
++    await expect(backfillLedgerPlatform(db, { batch: 500 })).rejects.toBeInstanceOf(
++      BackfillIntegrityError,
++    );
++    expect(db.rollbacks).toBe(1);
++    expect(db.rows.every((r) => r.platform === null)).toBe(true);
++  });
++
++  it('bounds batch, passes and retries before touching the database', async () => {
++    const db = new FakeLedger([row('a')]);
++    const invalid = [{ batch: 0 }, { batch: 2001 }, { maxPasses: 11 }, { lockRetries: -1 }];
++    for (const options of [...invalid, { batch: 1.5 }]) {
++      await expect(backfillLedgerPlatform(db, options)).rejects.toBeInstanceOf(RangeError);
++    }
++    expect(db.transactions).toBe(0);
++    expect(db.statements).toHaveLength(0);
++  });
++});
++
++describe('G2-B operator argument parsing', () => {
++  it('accepts only the three bounded numeric flags', () => {
++    expect(parseBackfillArgs(['--batch=250', '--passes=2', '--lock-retries=1'])).toEqual({
++      batch: 250,
++      maxPasses: 2,
++      lockRetries: 1,
++    });
++    expect(parseBackfillArgs([])).toEqual({});
++    for (const bad of ['--batch', '--batch=abc', '--force', 'positional', '--batch=-1']) {
++      expect(() => parseBackfillArgs([bad])).toThrow(RangeError);
++    }
++  });
++});
+diff --git a/src/scout/scout-ledger-backfill.ts b/src/scout/scout-ledger-backfill.ts
+new file mode 100644
+index 0000000..957fb8c
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.ts
+@@ -0,0 +1,306 @@
++import { Prisma } from '@prisma/client';
++import { isCanonicalPlatform } from './scout-platform';
++
++/**
++ * G2-B — bounded, resumable, unambiguous backfill of ScoutReconstructionLedger
++ * .source_platform (nullable since E) from the exact staging row, plus the drain
++ * verdict that R depends on. Operator-invoked only (see the .cli.ts entry); not
++ * an HTTP endpoint, not SECURITY DEFINER, no trigger-side inference.
++ *
++ * Contract (recovered from the accepted rollout design, RECOVERY_SEQUENCING /
++ * CYCLE3 B stage):
++ *  - Resolve ONLY an exact coach_id + intent_id + entity_type + source_id match
++ *    with exactly one staging row whose platform token is canonical. The narrow
++ *    staging key guarantees at most one match, never that one exists.
++ *  - Update NULL provenance only. Never touch a populated value, never derive a
++ *    default, never write "unknown" that was not literally staged, never delete
++ *    or re-status a row. A populated value that disagrees with staging is
++ *    counted (`mismatch`) and left alone.
++ *  - Bounded: each chunk is one transaction with lock_timeout/statement_timeout,
++ *    a SHARE lock on staging (freezes source mutation for that chunk only) and
++ *    `ORDER BY id LIMIT n FOR UPDATE SKIP LOCKED` on the NULL candidates.
++ *  - Resumable: a pass walks the id order once; a run repeats passes until a pass
++ *    updates nothing, so a row skipped while locked is revisited rather than
++ *    permanently missed. Interrupting between chunks loses nothing; rerunning is
++ *    idempotent.
++ *  - Honest: zero updated rows with NULL rows remaining is STOP, not completion.
++ *    `drained` is reported only when no NULL remains AND the obsolete-writer
++ *    fence (migration 20270119000000) is installed; without the fence an O
++ *    restart can re-create NULL rows, so completion is `complete_unfenced`.
++ */
++export const BACKFILL_DEFAULT_BATCH = 500;
++export const BACKFILL_MAX_BATCH = 2000;
++export const BACKFILL_DEFAULT_PASSES = 3;
++export const BACKFILL_MAX_PASSES = 10;
++export const BACKFILL_DEFAULT_LOCK_RETRIES = 2;
++export const BACKFILL_CHUNK_TIMEOUT_MS = 45_000;
++/**
++ * Canonical rendering of the fence trigger under an EMPTY search_path. `pg_get_triggerdef` omits
++ * the function's schema whenever the session search_path makes it visible, so this literal is
++ * documentation and a test oracle (rendered with `search_path = ''`), never the runtime detector.
++ */
++export const FENCE_TRIGGER_DEFINITION =
++  'CREATE TRIGGER "ScoutReconstructionLedger_platform_fence" BEFORE INSERT ON public."ScoutReconstructionLedger" FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence()';
++/** pg_trigger.tgtype bits ROW (1) | BEFORE (2) | INSERT (4): the only shape the fence may have. */
++export const FENCE_TRIGGER_TYPE = 7;
++
++/** Minimal raw-SQL surface; PrismaClient and its interactive transaction client satisfy it. */
++export interface BackfillTx {
++  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
++  $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
++}
++export interface BackfillClient extends BackfillTx {
++  $transaction<T>(
++    fn: (tx: BackfillTx) => Promise<T>,
++    options?: { maxWait?: number; timeout?: number },
++  ): Promise<T>;
++}
++
++export type BackfillOptions = { batch?: number; maxPasses?: number; lockRetries?: number };
++export type Candidate = { id: string; matches: number; platform: string | null };
++export type Classified = {
++  resolvable: string[];
++  orphan: number;
++  invalid: number;
++  ambiguous: number;
++};
++export type PassReport = {
++  chunks: number;
++  examined: number;
++  updated: number;
++  orphan: number;
++  invalid: number;
++  ambiguous: number;
++  lockFailures: number;
++  stalledByLocks: boolean;
++};
++export type Outcome = 'drained' | 'complete_unfenced' | 'unresolved' | 'stalled';
++export type BackfillReport = {
++  batch: number;
++  ledgerTotal: number;
++  nullBefore: number;
++  nullAfter: number;
++  mismatch: number;
++  fenced: boolean;
++  passes: PassReport[];
++  unresolved: { orphan: number; invalid: number; ambiguous: number };
++  outcome: Outcome;
++};
++
++/** Chunk integrity: the locked resolvable set and the updated set must be identical. */
++export class BackfillIntegrityError extends Error {
++  constructor(expected: number, updated: number) {
++    super(`G2-B backfill chunk integrity failure: expected ${expected} updates, got ${updated}`);
++    this.name = 'BackfillIntegrityError';
++  }
++}
++
++export function classify(candidates: Candidate[]): Classified {
++  const result: Classified = { resolvable: [], orphan: 0, invalid: 0, ambiguous: 0 };
++  for (const c of candidates) {
++    if (c.matches === 0) result.orphan += 1;
++    else if (c.matches > 1) result.ambiguous += 1;
++    else if (!isCanonicalPlatform(c.platform)) result.invalid += 1;
++    else result.resolvable.push(c.id);
++  }
++  return result;
++}
++
++export function decideOutcome(
++  nullAfter: number,
++  fenced: boolean,
++  unresolved: { orphan: number; invalid: number; ambiguous: number },
++): Outcome {
++  if (nullAfter === 0) return fenced ? 'drained' : 'complete_unfenced';
++  const explained = unresolved.orphan + unresolved.invalid + unresolved.ambiguous;
++  return nullAfter === explained ? 'unresolved' : 'stalled';
++}
++
++/** lock_not_available (55P03) or query_canceled (57014) surfaced through Prisma's raw error. */
++export function isLockOrStatementTimeout(err: unknown): boolean {
++  const message = err instanceof Error ? err.message : String(err);
++  return /55P03|57014|lock timeout|statement timeout/i.test(message);
++}
++
++function bounded(value: number | undefined, fallback: number, max: number, min = 1): number {
++  if (value === undefined) return fallback;
++  if (!Number.isInteger(value) || value < min || value > max) {
++    throw new RangeError(`G2-B backfill option out of range (${min}..${max})`);
++  }
++  return value;
++}
++
++async function runChunk(
++  prisma: BackfillClient,
++  after: string,
++  batch: number,
++): Promise<{ candidates: Candidate[]; classified: Classified; updated: number }> {
++  return prisma.$transaction(
++    async (tx) => {
++      await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
++      await tx.$executeRaw`SET LOCAL statement_timeout = '30s'`;
++      // Freeze staging mutation for this chunk so the exact join cannot change under us.
++      await tx.$executeRaw`LOCK TABLE public."ScoutIngestEntity" IN SHARE MODE`;
++      const candidates = await tx.$queryRaw<Candidate[]>`
++        SELECT l.id, s.matches, s.platform
++        FROM (
++          SELECT id, coach_id, intent_id, entity_type, source_id
++          FROM public."ScoutReconstructionLedger"
++          WHERE source_platform IS NULL AND id > ${after}
++          ORDER BY id
++          LIMIT ${batch}::int
++          FOR UPDATE SKIP LOCKED
++        ) l
++        CROSS JOIN LATERAL (
++          SELECT count(*)::int AS matches, min(s.source_platform) AS platform
++          FROM public."ScoutIngestEntity" s
++          WHERE s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++            AND s.entity_type = l.entity_type AND s.source_id = l.source_id
++        ) s
++        ORDER BY l.id`;
++      const classified = classify(candidates);
++      let updated = 0;
++      if (classified.resolvable.length > 0) {
++        // Re-join to staging under the same SHARE lock: the written value is exactly
++        // the staged value, never a client-side copy. NULL-only, id-bounded.
++        updated = await tx.$executeRaw`
++          UPDATE public."ScoutReconstructionLedger" l
++          SET source_platform = s.source_platform
++          FROM public."ScoutIngestEntity" s
++          WHERE l.id IN (${Prisma.join(classified.resolvable)})
++            AND l.source_platform IS NULL
++            AND s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++            AND s.entity_type = l.entity_type AND s.source_id = l.source_id`;
++        if (updated !== classified.resolvable.length) {
++          throw new BackfillIntegrityError(classified.resolvable.length, updated);
++        }
++      }
++      return { candidates, classified, updated };
++    },
++    { maxWait: 10_000, timeout: BACKFILL_CHUNK_TIMEOUT_MS },
++  );
++}
++
++async function runPass(
++  prisma: BackfillClient,
++  batch: number,
++  lockRetries: number,
++): Promise<PassReport> {
++  const pass: PassReport = {
++    chunks: 0,
++    examined: 0,
++    updated: 0,
++    orphan: 0,
++    invalid: 0,
++    ambiguous: 0,
++    lockFailures: 0,
++    stalledByLocks: false,
++  };
++  let after = '';
++  for (;;) {
++    let chunk: Awaited<ReturnType<typeof runChunk>> | undefined;
++    for (let attempt = 0; attempt <= lockRetries && chunk === undefined; attempt++) {
++      try {
++        chunk = await runChunk(prisma, after, batch);
++      } catch (err) {
++        if (!isLockOrStatementTimeout(err)) throw err;
++        pass.lockFailures += 1;
++      }
++    }
++    if (chunk === undefined) {
++      pass.stalledByLocks = true;
++      return pass;
++    }
++    pass.chunks += 1;
++    pass.examined += chunk.candidates.length;
++    pass.updated += chunk.updated;
++    pass.orphan += chunk.classified.orphan;
++    pass.invalid += chunk.classified.invalid;
++    pass.ambiguous += chunk.classified.ambiguous;
++    if (chunk.candidates.length < batch) return pass;
++    after = chunk.candidates[chunk.candidates.length - 1].id;
++  }
++}
++
++type Counts = { total: number; nulls: number };
++
++export async function readDrainState(
++  prisma: BackfillTx,
++): Promise<{ ledgerTotal: number; nulls: number; mismatch: number; fenced: boolean }> {
++  const [counts] = await prisma.$queryRaw<Counts[]>`
++    SELECT count(*)::int AS total,
++           count(*) FILTER (WHERE source_platform IS NULL)::int AS nulls
++    FROM public."ScoutReconstructionLedger"`;
++  const [{ mismatch }] = await prisma.$queryRaw<{ mismatch: number }[]>`
++    SELECT count(*)::int AS mismatch
++    FROM public."ScoutReconstructionLedger" l
++    JOIN public."ScoutIngestEntity" s
++      ON s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++     AND s.entity_type = l.entity_type AND s.source_id = l.source_id
++    WHERE l.source_platform IS NOT NULL AND l.source_platform <> s.source_platform`;
++  // Structural, search_path-independent identity: exact table, trigger name, function
++  // (public.scout_ledger_platform_fence(), zero arguments), BEFORE INSERT FOR EACH ROW, no WHEN
++  // clause, no column list, no arguments, not a constraint trigger, not disabled. A genuinely
++  // absent fence yields 0 (plain joins; nothing throws before B exists).
++  const [{ fences }] = await prisma.$queryRaw<{ fences: number }[]>`
++    SELECT count(*)::int AS fences
++    FROM pg_catalog.pg_trigger t
++    JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid
++    JOIN pg_catalog.pg_namespace cn ON cn.oid = c.relnamespace
++    JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid
++    JOIN pg_catalog.pg_namespace pn ON pn.oid = p.pronamespace
++    WHERE cn.nspname = 'public' AND c.relname = 'ScoutReconstructionLedger'
++      AND t.tgname = 'ScoutReconstructionLedger_platform_fence'
++      AND pn.nspname = 'public' AND p.proname = 'scout_ledger_platform_fence' AND p.pronargs = 0
++      AND NOT t.tgisinternal AND t.tgenabled <> 'D'
++      AND t.tgtype = ${FENCE_TRIGGER_TYPE}::int2 AND t.tgqual IS NULL
++      AND t.tgattr::int2[] = '{}'::int2[] AND t.tgnargs = 0 AND t.tgconstraint = 0`;
++  return { ledgerTotal: counts.total, nulls: counts.nulls, mismatch, fenced: fences === 1 };
++}
++
++export async function backfillLedgerPlatform(
++  prisma: BackfillClient,
++  options: BackfillOptions = {},
++): Promise<BackfillReport> {
++  const batch = bounded(options.batch, BACKFILL_DEFAULT_BATCH, BACKFILL_MAX_BATCH);
++  const maxPasses = bounded(options.maxPasses, BACKFILL_DEFAULT_PASSES, BACKFILL_MAX_PASSES);
++  const lockRetries = bounded(options.lockRetries, BACKFILL_DEFAULT_LOCK_RETRIES, 10, 0);
++
++  const before = await readDrainState(prisma);
++  const passes: PassReport[] = [];
++  let unresolved = { orphan: 0, invalid: 0, ambiguous: 0 };
++  for (let n = 0; n < maxPasses; n++) {
++    const pass = await runPass(prisma, batch, lockRetries);
++    passes.push(pass);
++    unresolved = { orphan: pass.orphan, invalid: pass.invalid, ambiguous: pass.ambiguous };
++    // No progress means STOP: every remaining NULL row is either unresolvable
++    // (reported) or locked (stalled). Another identical pass would prove nothing.
++    if (pass.stalledByLocks || pass.examined === 0 || pass.updated === 0) break;
++  }
++  const after = await readDrainState(prisma);
++  return {
++    batch,
++    ledgerTotal: after.ledgerTotal,
++    nullBefore: before.nulls,
++    nullAfter: after.nulls,
++    mismatch: after.mismatch,
++    fenced: after.fenced,
++    passes,
++    unresolved,
++    outcome: decideOutcome(after.nulls, after.fenced, unresolved),
++  };
++}
++
++/** Process exit code for the operator entry: only a fenced, NULL-free ledger is 0. */
++export function exitCodeFor(outcome: Outcome): number {
++  switch (outcome) {
++    case 'drained':
++      return 0;
++    case 'complete_unfenced':
++      return 4;
++    case 'unresolved':
++      return 2;
++    case 'stalled':
++      return 3;
++  }
++}
+diff --git a/test/rls-g2-b-drain.spec.ts b/test/rls-g2-b-drain.spec.ts
+new file mode 100644
+index 0000000..9b31fd1
+--- /dev/null
++++ b/test/rls-g2-b-drain.spec.ts
+@@ -0,0 +1,603 @@
++// S7-3′ G2 B/drain proof on the isolated PostgreSQL 17 lane (S1-provisioned,
++// synthetic data only). Ordered stages in ONE file, run with --runInBand, on a
++// FRESH S5-shaped bootstrap (164 migrations, no E). Establishes only what is new
++// in B: the bounded/resumable/unambiguous NULL→platform backfill, the obsolete-
++// writer fence migration (deploy, refusal, down/up), their coexistence with the
++// accepted O/T writers and readers, and the drain verdict semantics.
++//   1. identity + O legacy rows on narrow and on E;  2. backfill on E without the
++//   fence (completion is not drain);  3. B through `prisma migrate deploy`;
++//   4. fence vs O/T/RLS;  5. bounded fixture: unresolvable classes, cursor,
++//   untouched columns, idempotence, provenance recovery → drained;
++//   6. concurrency (row locks, T barriers, staging writer);  7. down/up.
++// Accepted E/T-Q0 proof (test/rls-g2-pg17-etq0.spec.ts) is neither rerun nor
++// restated. A "drained" verdict here is a property of THIS disposable fixture and
++// says nothing about production writers; R remains unimplemented and unclaimed.
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  appliedMigrations,
++  blocked,
++  catalog,
++  directory,
++  E_MIGRATION,
++  expectedVersion,
++  gitShow,
++  hasColumn,
++  holdTransaction,
++  json,
++  legacy,
++  OLD_HEAD,
++  oldClient,
++  oldRoot,
++  prisma,
++  prismaMigrateDeploy,
++  quote,
++  records,
++  refused,
++  resetData,
++  root,
++  run,
++  settle,
++  sql,
++  sqlAdmin,
++  sqlFile,
++  stage,
++  stageMany,
++  target,
++  targets,
++  upFile,
++  worker,
++} from './utils/g2-b-drain-pg-harness';
++import { G2_B_CLUSTER_MARKER, G2_B_DATABASE_MARKER } from './utils/g2-b-drain-db';
++import {
++  acceptedUpFile,
++  appliedSince,
++  B_MIGRATION,
++  bDownFile,
++  bUpFile,
++  C1_MIGRATION,
++  disagreeing,
++  fence,
++  ledgerCount,
++  ledgerIds,
++  ledgerWithoutPlatform,
++  nullCount,
++  nullify,
++  platformOf,
++  runtimeClient,
++  S1_MIGRATION,
++  stagingSnapshot,
++} from './utils/g2-b-drain-harness';
++import {
++  backfillLedgerPlatform,
++  FENCE_TRIGGER_DEFINITION,
++  FENCE_TRIGGER_TYPE,
++  type BackfillOptions,
++  type BackfillReport,
++} from '../src/scout/scout-ledger-backfill';
++
++jest.setTimeout(240000);
++const FENCED = 'G2-B obsolete writer fenced';
++const nullInsert = (id: string, role?: string) =>
++  `${role ? `SET ROLE ${role}; ` : ''}INSERT INTO public."ScoutReconstructionLedger"
++  (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++  VALUES (${quote(id)},'coach','intent','clients',${quote(id)},NULL,'skipped')`;
++
++// Teardown authority (S5-R3-A-01), unchanged from the accepted proof: no mutating cleanup
++// against a fixture whose identity this proof never accepted.
++let teardownAuthorized = false;
++/** Recorded migrations on the fresh fixture; every later count is relative to it. */
++let base = 0;
++const clients: Array<{ client: { $disconnect(): Promise<void> } }> = [];
++async function backfill(name: string, options: BackfillOptions = {}) {
++  const runtime = runtimeClient(name);
++  clients.push(runtime);
++  try {
++    const report = await backfillLedgerPlatform(runtime.client, options);
++    // Counts and shapes only; the report carries no identifiers by construction.
++    console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
++    return { report, queries: runtime.queries };
++  } finally {
++    await runtime.client.$disconnect();
++  }
++}
++const selects = (queries: string[]) => queries.filter((q) => /FOR UPDATE SKIP LOCKED/.test(q));
++const updates = (queries: string[]) =>
++  queries.filter((q) => /^\s*UPDATE public\."ScoutReconstructionLedger"/.test(q));
++
++beforeAll(() => {
++  const identity =
++    json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
++    'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
++    'version',current_setting('server_version_num'),'user',current_user,'super',
++    (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
++    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
++    (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
++  expect(identity).toMatchObject({
++    database: 'g2_b_drain_disposable',
++    address: '127.0.0.1',
++    port: target.port,
++    directory,
++    user: 'postgres',
++    super: false,
++    bypassrls: true,
++    owner: 'postgres',
++  });
++  expect(Number(identity.version)).toBe(expectedVersion);
++  expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
++  expect(Number(identity.version)).toBeLessThan(180000);
++  expect(directory).toMatch(/\/pg17\/clusters\/b-drain\/pg-data$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_B_CLUSTER_MARKER);
++  expect(
++    sql(
++      `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++    ),
++  ).toBe(G2_B_DATABASE_MARKER);
++  console.warn('PG17_DATABASE', JSON.stringify(identity));
++  // Fresh S5-shaped bootstrap: the O root's full history (164 recorded), none of the
++  // accepted S1/C1/E predecessors this root tracks, no B, no fence.
++  base = Number(appliedMigrations());
++  expect(base).toBe(164);
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations"
++    WHERE migration_name IN (${quote(S1_MIGRATION)},${quote(C1_MIGRATION)},${quote(E_MIGRATION)},${quote(B_MIGRATION)})`),
++  ).toBe('0');
++  expect(hasColumn()).toBe('0');
++  expect(fence()).toEqual({ triggers: [], function: null });
++  // Accepted E is the shipped file; B is this packet's file; the O source is byte-identical to
++  // the preserved head. The T client in this root carries the nullable provenance column.
++  expect(readFileSync(upFile, 'utf8')).toBe(
++    gitShow(`HEAD:prisma/migrations/${E_MIGRATION}/migration.sql`),
++  );
++  expect(readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8')).not.toMatch(
++    /model ScoutReconstructionLedger \{[^}]*source_platform/,
++  );
++  expect(readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8')).toMatch(
++    /model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/,
++  );
++  expect(readFileSync(resolve(oldRoot!, 'src/scout/scout-reconstruct.service.ts'), 'utf8')).toBe(
++    gitShow(`${OLD_HEAD}:src/scout/scout-reconstruct.service.ts`),
++  );
++  expect(
++    sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
++    FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`),
++  ).toBe('false:false,false:false,false:true');
++  // Read-only gates passed; authorize teardown, then the accepted setup mutations.
++  teardownAuthorized = true;
++  sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
++    GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
++      public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
++  resetData();
++});
++afterAll(async () => {
++  for (const c of clients) await c.client.$disconnect();
++  if (!teardownAuthorized) {
++    console.warn(
++      'PG17_TEARDOWN_SKIPPED',
++      JSON.stringify({ reason: 'setup refused before first mutation; no DDL/DML issued' }),
++    );
++    return;
++  }
++  resetData();
++  sql('DELETE FROM "ScoutImport"');
++});
++
++describe('stage 1: legacy rows from the actual O binary, on narrow and on E', () => {
++  it('O on the narrow base, then E, then O on E: 430 rows without provenance', async () => {
++    stageMany(400, 'clients');
++    expect((await run({}, true)).result).toMatchObject({ reconstructed: 400 });
++    expect(ledgerCount()).toBe(400);
++    // Accepted S1 and C1 are fixture history only: this root tracks them, the O root does not,
++    // so they are applied from their shipped files and recorded (the path E takes next) purely
++    // so that `migrate deploy` in stage 3 has exactly B pending. Nothing about them is proven.
++    for (const name of [S1_MIGRATION, C1_MIGRATION]) {
++      sqlFile(acceptedUpFile(name));
++      expect(prisma(root, ['migrate', 'resolve', '--applied', name]).ok).toBe(true);
++    }
++    expect(appliedMigrations()).toBe(String(base + 2));
++    expect(hasColumn()).toBe('0');
++    // E exactly as the accepted proof applies it, then recorded so `migrate deploy` later
++    // applies precisely B (E's own deploy path is accepted elsewhere and not re-proven).
++    sqlFile(upFile);
++    expect(prisma(root, ['migrate', 'resolve', '--applied', E_MIGRATION]).ok).toBe(true);
++    expect(appliedMigrations()).toBe(String(base + 3));
++    expect(hasColumn()).toBe('1');
++    stageMany(30, 'workouts', 'truecoach', 'coach', 'intent', 0, 'w');
++    expect((await run({ family: 'workouts' }, true)).result).toMatchObject({ reconstructed: 30 });
++    expect(nullCount()).toBe(430);
++    // T on a second intent writes provenance; those rows are never backfill candidates.
++    settle('coach', 'i2');
++    stageMany(10, 'clients', 'truecoach', 'coach', 'i2');
++    expect((await run({ intent: 'i2' })).result).toMatchObject({ reconstructed: 10 });
++    expect(ledgerCount()).toBe(440);
++    expect(nullCount()).toBe(430);
++  });
++});
++
++describe('stage 2: backfill on E without the fence — completion is not drain', () => {
++  it('assigns exactly the staged platform to every NULL row and touches nothing else', async () => {
++    const ledgerBefore = ledgerWithoutPlatform();
++    const stagingBefore = stagingSnapshot();
++    const { report, queries } = await backfill('g2b_stage2', { batch: 200 });
++    expect(report).toMatchObject({
++      batch: 200,
++      ledgerTotal: 440,
++      nullBefore: 430,
++      nullAfter: 0,
++      mismatch: 0,
++      fenced: false,
++      unresolved: { orphan: 0, invalid: 0, ambiguous: 0 },
++      outcome: 'complete_unfenced',
++    });
++    // 200 + 200 + 30 (short chunk ends the pass), then one confirming pass with nothing left.
++    expect(report.passes.map((p) => [p.chunks, p.examined, p.updated])).toEqual([
++      [3, 430, 430],
++      [1, 0, 0],
++    ]);
++    expect(selects(queries)).toHaveLength(4);
++    expect(updates(queries)).toHaveLength(3);
++    expect(disagreeing()).toBe(0);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++    expect(stagingSnapshot()).toEqual(stagingBefore);
++    expect(
++      sql(`SELECT string_agg(DISTINCT source_platform,',') FROM "ScoutReconstructionLedger"`),
++    ).toBe('truecoach');
++  });
++  it('an O restart re-creates NULL rows after completion, so unfenced completion is not drain', async () => {
++    stage('w-late', 'workouts');
++    expect((await run({ family: 'workouts' }, true)).result).toMatchObject({ reconstructed: 31 });
++    expect(nullCount()).toBe(1);
++    const { report } = await backfill('g2b_stage2_again', { batch: 200 });
++    expect(report).toMatchObject({ nullBefore: 1, nullAfter: 0, outcome: 'complete_unfenced' });
++    expect(report.passes[0]).toMatchObject({ chunks: 1, examined: 1, updated: 1 });
++  });
++});
++
++describe('stage 3: B through the release mechanism', () => {
++  let beforeCatalog: string;
++  it('prisma migrate deploy applies exactly B; identity, RLS and indexes are untouched', () => {
++    beforeCatalog = catalog();
++    const start = sql('SELECT now()');
++    const output = prismaMigrateDeploy(root);
++    expect(output).toContain(B_MIGRATION);
++    expect(output).not.toContain(E_MIGRATION);
++    // Exactly one migration recorded by this deploy, and it is B.
++    expect(appliedSince(start)).toEqual([B_MIGRATION]);
++    expect(appliedMigrations()).toBe(String(base + 4));
++    expect(catalog()).toBe(beforeCatalog);
++    expect(hasColumn()).toBe('1');
++    expect(nullCount()).toBe(0);
++    const installed = fence();
++    // Rendered under search_path = '' (canonical text) and structurally BEFORE INSERT ROW.
++    expect(installed.triggers).toEqual([
++      [
++        'ScoutReconstructionLedger_platform_fence',
++        'O',
++        FENCE_TRIGGER_TYPE,
++        FENCE_TRIGGER_DEFINITION,
++      ],
++    ]);
++    expect(installed.function).toMatchObject({
++      proname: 'scout_ledger_platform_fence',
++      prosecdef: false,
++      proconfig: [expect.stringMatching(/^search_path=("")?$/)],
++    });
++    // The fixture (like Supabase) grants EXECUTE on new functions to the API roles through
++    // ALTER DEFAULT PRIVILEGES, which a REVOKE FROM PUBLIC does not touch. The boundary B
++    // ships is therefore: PUBLIC holds no EXECUTE (ACL is explicit, not the NULL default), and a
++    // trigger function is not directly callable by any role at all.
++    expect(installed.function.proacl).not.toBeNull();
++    expect(
++      sql(`SELECT count(*) FROM pg_proc p, aclexplode(p.proacl) a
++      WHERE p.oid=to_regprocedure('public.scout_ledger_platform_fence()')
++        AND a.grantee=0 AND a.privilege_type='EXECUTE'`),
++    ).toBe('0');
++    for (const role of ['postgres', 'anon', 'authenticated', 'service_role']) {
++      refused(
++        `${role === 'postgres' ? '' : `SET ROLE ${role}; `}SELECT public.scout_ledger_platform_fence()`,
++        'trigger functions can only be called as triggers',
++      );
++    }
++    console.warn('PG17_FENCE', JSON.stringify(installed));
++  });
++  it('a raw rerun of B is refused atomically and changes nothing', () => {
++    const before = fence();
++    expect(() => sqlFile(bUpFile)).toThrow(/G2-B fence already present/);
++    expect(fence()).toEqual(before);
++    expect(catalog()).toBe(beforeCatalog);
++    expect(appliedMigrations()).toBe(String(base + 4));
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++  });
++});
++
++describe('stage 4: the fence against O, T, direct writers and the API roles', () => {
++  it('refuses a NULL-provenance INSERT from the owner and from the runtime role', () => {
++    refused(nullInsert('direct-null'), FENCED);
++    refused(nullInsert('direct-null', 'service_role'), FENCED);
++    expect(ledgerIds(`id='direct-null'`)).toEqual([]);
++    // Provenance present: admitted (then removed) — the fence is not a write block.
++    sql(`INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++      VALUES ('direct-ok','coach','intent','clients','direct-ok','truecoach','skipped')`);
++    expect(platformOf('direct-ok')).toBe('truecoach');
++    sql(`DELETE FROM "ScoutReconstructionLedger" WHERE id='direct-ok'`);
++  });
++  it('the actual O binary fails closed on a new staged row: 500, no ledger row, no target', async () => {
++    const before = { ledger: ledgerCount(), targets: targets() };
++    stage('w-fenced', 'workouts');
++    const old = await run({ family: 'workouts' }, true);
++    expect(old.result).toBeUndefined();
++    expect(old.failure).toMatchObject({ status: 500, message: 'Internal server error' });
++    expect(ledgerCount()).toBe(before.ledger);
++    expect(targets()).toEqual(before.targets);
++    expect(nullCount()).toBe(0);
++    // O readers are unaffected by an INSERT trigger.
++    expect((await run({ action: 'roster', limit: 5 }, true)).result.persons).toHaveLength(5);
++    expect(
++      (await run({ action: 'entities', family: 'workouts', limit: 5 }, true)).result.entities,
++    ).toHaveLength(5);
++  });
++  it('API roles are still denied by policy (with provenance, so the policy, not the fence, answers)', () => {
++    for (const role of ['anon', 'authenticated']) {
++      refused(
++        `SET ROLE ${role}; INSERT INTO public."ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++        VALUES ('bad','coach','intent','clients','bad','truecoach','skipped')`,
++        'row-level security',
++      );
++      // BEFORE ROW triggers run before WITH CHECK policies, so a NULL row from an API role is
++      // expected to meet the fence first; whichever answers, it is refused and never exists.
++      let error: unknown;
++      try {
++        sql(nullInsert('bad', role));
++      } catch (e) {
++        error = e;
++      }
++      expect(String(error)).toMatch(/G2-B obsolete writer fenced|row-level security/);
++    }
++    expect(ledgerIds(`id='bad'`)).toEqual([]);
++  });
++  it('T creates with provenance and claims a re-opened NULL row through the fence; replay identical', async () => {
++    // The fence rejected O's row for w-fenced; T reconstructs it (create path, provenance set)
++    // and claims one legacy row whose provenance is re-opened (update path, not fenced).
++    const reopened = ledgerIds(
++      `intent_id='intent' AND entity_type='workouts' AND source_id='w00001'`,
++    );
++    expect(nullify(`id=${quote(reopened[0])}`)).toBe(1);
++    const first = await run({ family: 'workouts' });
++    expect(first.result).toMatchObject({ reconstructed: 32 });
++    expect(platformOf(reopened[0])).toBe('truecoach');
++    expect(nullCount()).toBe(0);
++    const rows = records('coach', 'intent', 'workouts');
++    const replay = await run({ family: 'workouts' });
++    expect(replay.result).toEqual(first.result);
++    expect(records('coach', 'intent', 'workouts')).toEqual(rows);
++  });
++});
++
++describe('stage 5: bounded fixture — unresolvable classes, cursor, idempotence, recovery', () => {
++  let report: BackfillReport;
++  let queries: string[];
++  let ledgerBefore: unknown;
++  let stagingBefore: unknown;
++  it('builds 1238 NULL rows: 1230 resolvable, 5 orphans, 3 invalid; 2 mismatching and 10 claimed stay', async () => {
++    resetData();
++    stageMany(1244, 'clients');
++    expect((await run()).result).toMatchObject({ reconstructed: 1244 });
++    expect(nullCount()).toBe(0);
++    // Two populated rows disagree with staging (never overwritten); ten keep their claim.
++    expect(
++      Number(
++        sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform='other-platform'
++        WHERE source_id IN ('s01243','s01244') RETURNING id) SELECT count(*) FROM c`),
++      ),
++    ).toBe(2);
++    expect(nullify(`source_id NOT BETWEEN 's01233' AND 's01244'`)).toBe(1232);
++    // Erased staging: two NULL rows whose exact staging match no longer exists.
++    sql(`DELETE FROM "ScoutIngestEntity" WHERE source_id IN ('s01231','s01232')`);
++    // Cross-tenant: staged under coach 'c2' would not match; here nothing is staged for c2.
++    settle('c2');
++    for (const s of ['x1', 'x2']) {
++      legacy('skipped', 'truecoach', s, 'clients', 'c2');
++      nullify(`coach_id='c2' AND source_id=${quote(s)}`);
++    }
++    // Wrong family: a workouts ledger row with no staging at all.
++    legacy('skipped', 'truecoach', 'w1', 'workouts');
++    nullify(`source_id='w1'`);
++    // Invalid: staging carries a non-canonical token; the backfill must not copy it.
++    for (const s of ['b1', 'b2', 'b3']) {
++      stage(s, 'clients', 'Bad Platform');
++      legacy('skipped', 'Bad Platform', s);
++      nullify(`source_id=${quote(s)}`);
++    }
++    expect(ledgerCount()).toBe(1250);
++    expect(nullCount()).toBe(1238);
++    ledgerBefore = ledgerWithoutPlatform();
++    stagingBefore = stagingSnapshot();
++  });
++  it('resolves exactly the 1230 in three chunks, reports the 8 remaining by class, stops honestly', async () => {
++    ({ report, queries } = await backfill('g2b_stage5'));
++    expect(report).toMatchObject({
++      batch: 500,
++      ledgerTotal: 1250,
++      nullBefore: 1238,
++      nullAfter: 8,
++      mismatch: 2,
++      fenced: true,
++      unresolved: { orphan: 5, invalid: 3, ambiguous: 0 },
++      outcome: 'unresolved',
++    });
++    expect(
++      report.passes.map((p) => [p.chunks, p.examined, p.updated, p.orphan, p.invalid]),
++    ).toEqual([
++      [3, 1238, 1230, 5, 3],
++      [1, 8, 0, 5, 3],
++    ]);
++    expect(report.passes.every((p) => p.lockFailures === 0 && !p.stalledByLocks)).toBe(true);
++    expect(selects(queries)).toHaveLength(4);
++    expect(updates(queries)).toHaveLength(3);
++    // The written values are the staged values; nothing non-NULL changed; staging untouched.
++    // Disagreeing = 2 mismatching + 3 invalid (NULL vs non-canonical staging); orphans have no join.
++    expect(disagreeing()).toBe(5);
++    expect(
++      sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='Bad Platform'`),
++    ).toBe('0');
++    expect(
++      sql(
++        `SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='other-platform'`,
++      ),
++    ).toBe('2');
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++    expect(stagingSnapshot()).toEqual(stagingBefore);
++    expect(ledgerIds(`source_platform IS NULL`).sort()).toEqual(
++      ledgerIds(`source_id IN ('s01231','s01232','x1','x2','w1','b1','b2','b3')`).sort(),
++    );
++  });
++  it('rerun is idempotent: one short chunk, nothing written, same verdict', async () => {
++    const again = await backfill('g2b_stage5_again');
++    expect(again.report.passes).toEqual([
++      expect.objectContaining({ chunks: 1, examined: 8, updated: 0 }),
++    ]);
++    expect(again.report).toMatchObject({ nullAfter: 8, outcome: 'unresolved' });
++    expect(updates(again.queries)).toHaveLength(0);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++  });
++  it('forward provenance recovery (staging repaired, not ledger edited) drains under the fence', async () => {
++    // Re-stage the erased/missing sources and correct the invalid token at the source of truth.
++    stageMany(2, 'clients', 'truecoach', 'coach', 'intent', 0, 'r');
++    sql(`UPDATE "ScoutIngestEntity" SET source_id=CASE id WHEN 'coach-intent-r00001' THEN 's01231' ELSE 's01232' END
++      WHERE id IN ('coach-intent-r00001','coach-intent-r00002')`);
++    stage('x1', 'clients', 'truecoach', 'Synthetic X1', 'c2', 'intent');
++    stage('x2', 'clients', 'truecoach', 'Synthetic X2', 'c2', 'intent');
++    stage('w1', 'workouts');
++    sql(
++      `UPDATE "ScoutIngestEntity" SET source_platform='truecoach' WHERE source_platform='Bad Platform'`,
++    );
++    const drained = await backfill('g2b_stage5_drain');
++    expect(drained.report).toMatchObject({
++      nullBefore: 8,
++      nullAfter: 0,
++      mismatch: 2,
++      fenced: true,
++      outcome: 'drained',
++    });
++    expect(drained.report.passes[0]).toMatchObject({ chunks: 1, examined: 8, updated: 8 });
++    expect(disagreeing()).toBe(2);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++  });
++});
++
++describe('stage 6: concurrency — locked rows, T barriers, a staging writer', () => {
++  it('skips a row locked by another transaction, stalls honestly, drains after release', async () => {
++    expect(nullify(`source_id IN ('s00001','s00002','s00003')`)).toBe(3);
++    const [held] = ledgerIds(`source_id='s00002'`);
++    const holder = holdTransaction(
++      `SELECT id FROM public."ScoutReconstructionLedger" WHERE id=${quote(held)} FOR UPDATE`,
++    );
++    await holder.held;
++    try {
++      const stalled = await backfill('g2b_stage6_locked', { lockRetries: 0 });
++      expect(stalled.report.passes.map((p) => [p.examined, p.updated, p.lockFailures])).toEqual([
++        [2, 2, 0],
++        [0, 0, 0],
++      ]);
++      expect(stalled.report).toMatchObject({ nullAfter: 1, outcome: 'stalled' });
++      expect(platformOf(held)).toBe('<NULL>');
++    } finally {
++      holder.release();
++    }
++    const drained = await backfill('g2b_stage6_released');
++    expect(drained.report.passes[0]).toMatchObject({ examined: 1, updated: 1 });
++    expect(drained.report.outcome).toBe('drained');
++  });
++  it('T paused after reading staging: the backfill completes; T then claims identically', async () => {
++    settle('coach', 'i3');
++    stageMany(20, 'clients', 'truecoach', 'coach', 'i3');
++    expect(nullify(`source_id IN ('s00004','s00005')`)).toBe(2);
++    const paused = worker({ intent: 'i3', pause: 'staged' });
++    await paused.ready;
++    const during = await backfill('g2b_stage6_t_staged');
++    expect(during.report).toMatchObject({ nullAfter: 0, outcome: 'drained' });
++    paused.release();
++    expect((await paused.done).result).toMatchObject({ staged: 20, reconstructed: 20 });
++    expect(records('coach', 'i3').every((r: any) => r.source_platform === 'truecoach')).toBe(true);
++  });
++  it('T paused inside its claim: the backfill skips that row without waiting', async () => {
++    // Every i3 row is re-opened so that whichever row T claims first is the locked one.
++    expect(nullify(`intent_id='i3'`)).toBe(20);
++    expect(nullify(`intent_id='intent' AND source_id='s00006'`)).toBe(1);
++    const paused = worker({ intent: 'i3', pause: 'claimed', txTimeout: 60000 });
++    await paused.ready;
++    const during = await backfill('g2b_stage6_t_claimed', { lockRetries: 0 });
++    // The uncommitted claim is invisible and locked: skipped without a lock wait, reported as an
++    // unexplained remainder. Completing before release is the non-blocking evidence.
++    expect(during.report).toMatchObject({ nullBefore: 21, nullAfter: 1, outcome: 'stalled' });
++    expect(during.report.passes[0]).toMatchObject({ examined: 20, updated: 20, lockFailures: 0 });
++    paused.release();
++    expect((await paused.done).result).toMatchObject({ reconstructed: 20 });
++    expect(nullCount()).toBe(0);
++    expect(records('coach', 'i3').every((r: any) => r.source_platform === 'truecoach')).toBe(true);
++    const after = await backfill('g2b_stage6_t_claimed_after');
++    expect(after.report).toMatchObject({ nullBefore: 0, nullAfter: 0, outcome: 'drained' });
++    expect(after.report.passes).toEqual([expect.objectContaining({ examined: 0, updated: 0 })]);
++  });
++  it('a concurrent staging writer makes the chunk wait, hit lock_timeout, and write nothing', async () => {
++    expect(nullify(`intent_id='intent' AND source_id='s00007'`)).toBe(1);
++    const holder = holdTransaction(
++      `UPDATE public."ScoutIngestEntity" SET payload=payload WHERE id='coach-intent-s00007'`,
++    );
++    await holder.held;
++    try {
++      const name = 'g2b_stage6_staging_writer';
++      const pending = backfill(name, { lockRetries: 0 });
++      await blocked(name);
++      const { report, queries } = await pending;
++      expect(report.passes).toEqual([
++        expect.objectContaining({
++          chunks: 0,
++          examined: 0,
++          updated: 0,
++          lockFailures: 1,
++          stalledByLocks: true,
++        }),
++      ]);
++      expect(report).toMatchObject({ nullBefore: 1, nullAfter: 1, outcome: 'stalled' });
++      expect(selects(queries)).toHaveLength(0);
++      expect(updates(queries)).toHaveLength(0);
++    } finally {
++      holder.release();
++    }
++    const drained = await backfill('g2b_stage6_staging_released');
++    expect(drained.report).toMatchObject({ nullAfter: 0, outcome: 'drained' });
++  });
++});
++
++describe('stage 7: down removes only the fence; up restores it', () => {
++  let installed: unknown;
++  let installedCatalog: string;
++  it('down keeps column, rows and history; NULL inserts are admitted again', () => {
++    installed = fence();
++    installedCatalog = catalog();
++    const ledger = ledgerWithoutPlatform();
++    const nulls = nullCount();
++    sqlFile(bDownFile);
++    expect(fence()).toEqual({ triggers: [], function: null });
++    expect(hasColumn()).toBe('1');
++    expect(ledgerWithoutPlatform()).toEqual(ledger);
++    expect(nullCount()).toBe(nulls);
++    expect(catalog()).toBe(installedCatalog);
++    // History is not rewritten by down (S1-owned recovery semantics, recorded not judged):
++    // B stays applied and deploy has nothing pending, so the fence is absent while recorded.
++    expect(appliedMigrations()).toBe(String(base + 4));
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    sql(nullInsert('after-down'));
++    expect(platformOf('after-down')).toBe('<NULL>');
++    sql(`DELETE FROM "ScoutReconstructionLedger" WHERE id='after-down'`);
++    expect(() => sqlFile(bDownFile)).toThrow(/G2-B fence absent/);
++  });
++  it('re-applying the file restores the identical fence', () => {
++    sqlFile(bUpFile);
++    expect(fence()).toEqual(installed);
++    expect(catalog()).toBe(installedCatalog);
++    refused(nullInsert('after-up'), FENCED);
++    expect(appliedMigrations()).toBe(String(base + 4));
++  });
++});
+diff --git a/test/scout/g2-b-drain-db-guard.spec.ts b/test/scout/g2-b-drain-db-guard.spec.ts
+new file mode 100644
+index 0000000..4e1ed6f
+--- /dev/null
++++ b/test/scout/g2-b-drain-db-guard.spec.ts
+@@ -0,0 +1,90 @@
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_B_CLUSTER_MARKER,
++  G2_B_DATABASE_MARKER,
++  g2BDrainTestTarget,
++  withFixturePassword,
++} from '../utils/g2-b-drain-db';
++
++const base = 'postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable';
++const ack = 'g2_b_drain_disposable:55461';
++
++describe('S7-3 B/drain PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2BDrainTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://b_super@127.0.0.1:55461/postgres?connect_timeout=5`,
++      port: 55461,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55461', '5432'),
++    base.replace('55461', '6543'),
++    base.replace('55461', '55439'),
++    base.replace('55461', '70000'),
++    base.replace('g2_b_drain_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_b_drain_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55461', '54325'),
++    base.replace('g2_b_drain_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_b_drain_disposable', 'postgres'),
++    base.replace('b_super@', 'service_role@'),
++    base.replace('b_super@', 'b_super:secret@'),
++    base.replace('b_super@', 'postgres@'),
++    base.replace('55461', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2BDrainTestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2BDrainTestTarget(base)).toThrow();
++    expect(() => g2BDrainTestTarget(base, 'g2_b_drain_disposable')).toThrow();
++    expect(() => g2BDrainTestTarget(base, 'g2_b_drain_disposable:55462')).toThrow();
++    expect(() => g2BDrainTestTarget(base, 'g2_tq0_disposable:55461')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_B_CLUSTER_MARKER).toBe('b-disposable-pg17');
++    expect(G2_B_DATABASE_MARKER).toBe('b-g2-drain-synthetic-disposable-fixture-safe-to-drop');
++    for (const marker of [G2_B_CLUSTER_MARKER, G2_B_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^b-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-b-drain-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_B_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_B_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://b_super:local_fixture@127.0.0.1:55461/g2_b_drain_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55461/g2_b_drain_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55461/g2_b_drain_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of ['anon', 'authenticated', 'authenticator', 'user', 'g2_ledger_owner', '']) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++});
+diff --git a/test/utils/g2-b-drain-bootstrap.sh b/test/utils/g2-b-drain-bootstrap.sh
+new file mode 100755
+index 0000000..b4503ee
+--- /dev/null
++++ b/test/utils/g2-b-drain-bootstrap.sh
+@@ -0,0 +1,223 @@
++#!/usr/bin/env bash
++# S7-3' G2 B/drain proof bootstrap, derived by substitution from the accepted S5 bootstrap
++# test/utils/g2-pg17-bootstrap.sh (blob 85a636ba, unchanged) for the B-only disposable cluster/database. Validation harness only: it never touches a hosted or
++# application database, never edits schema/migration/generator sources, and
++# stops on the first unexpected state instead of repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_B_DATABASE_URL  postgresql://b_super@127.0.0.1:<port>/g2_b_drain_disposable?schema=public&connection_limit=2
++#   G2_B_CONFIRM       g2_b_drain_disposable:<port>
++#   G2_B_PASSWORD      disposable local fixture password shared by b_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_B_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_B_OLD_ROOT      DETACHED Git checkout of the preserved O source 925780e0; create/verify it
++#                         offline with test/utils/g2-pg17-old-root.sh (a `git archive` extraction is
++#                         not a repository and cannot pass step 4 below)
++#   G2_B_OLD_CLIENT    directory that receives the independently generated O Prisma client
++# Optional:
++#   G2_B_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++OLD_HEAD=925780e0a1906593e5383c618311b6b17364b8dc
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++EXPECTED_VERSION="${G2_B_SERVER_VERSION:-170006}"
++# Distinctive B fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-pg17-db.ts G2_B_CLUSTER_MARKER / G2_B_DATABASE_MARKER, kept identical by
++# test/scout/g2-b-drain-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 'b-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=b-disposable-pg17
++DB_MARKER=b-g2-drain-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_B_DATABASE_URL G2_B_CONFIRM G2_B_PASSWORD G2_B_PSQL G2_B_OLD_ROOT G2_B_OLD_CLIENT; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++[[ -x "$G2_B_PSQL" ]] || { echo "psql binary not executable: $G2_B_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted C1 dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: `prisma generate` must never auto-install anything (B2 finding:
++# an output directory outside a package root made the CLI run `npm i` silently). The O client is
++# generated INSIDE the O checkout, whose node_modules is the shared symlink to the pinned npm-ci tree,
++# and @prisma/client must resolve from there to exactly $ROOT/node_modules/@prisma/client.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++[[ "$G2_B_OLD_CLIENT" == "$G2_B_OLD_ROOT"/* ]] \
++  || { echo "G2_B_OLD_CLIENT must live inside G2_B_OLD_ROOT (pinned package root); got $G2_B_OLD_CLIENT" >&2; exit 2; }
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2BDrainTestTarget } = require("./test/utils/g2-b-drain-db");
++  const t = g2BDrainTestTarget(process.env.G2_B_DATABASE_URL, process.env.G2_B_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  const { withFixturePassword } = require("./test/utils/g2-b-drain-db");
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_B_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_B_PASSWORD"
++
++psql_maint() { "$G2_B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|generate-only) ;; *) echo "usage: g2-pg17-bootstrap.sh [bootstrap|generate-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the B lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the B fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_B_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_b_drain_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_b_drain_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_b_drain_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_b_drain_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_b_drain_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_b_drain_disposable exists without the B disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_b_drain_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_b_drain_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the 164-migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. Preserved O source: exact head, shared dependency tree, 164 base migrations.
++[[ "$(git -C "$G2_B_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_B_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between O and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -e "$G2_B_OLD_ROOT/node_modules" ]] || ln -s "$ROOT/node_modules" "$G2_B_OLD_ROOT/node_modules"
++[[ ! -d "$G2_B_OLD_ROOT/prisma/migrations/$E_MIGRATION" ]] || { echo "old root unexpectedly contains E" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_B_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "164" ]] || { echo "old root has $OLD_COUNT migrations, expected 164" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full base history through the real release mechanism on the O schema.
++#    Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the cluster superuser.
++(cd "$G2_B_OLD_ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "164" ]] || { echo "base history applied $APPLIED migrations, expected 164" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='source_platform' AND NOT attisdropped")" == "0" ]] \
++  || { echo "ledger already has source_platform before E" >&2; exit 5; }
++
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative (S5-R3-A-05 / S5-R3B-02): a missing file is a
++# refusal (exit 6), not an empty field nested inside an echo.
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++# The runtime a generated client actually executes. The default-output candidate client requires
++# `@prisma/client/runtime/library.js` from the pinned package (it has no runtime/ copy of its own);
++# a custom-output client (the O client) receives a copy under <output>/runtime/.
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Independent O client generated from the O schema into its own directory.
++mkdir -p "$G2_B_OLD_CLIENT"
++PINNED_CLIENT_PKG="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
++RESOLVED_CLIENT_PKG="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_B_OLD_CLIENT")"
++[[ "$RESOLVED_CLIENT_PKG" == "$PINNED_CLIENT_PKG" ]] \
++  || { echo "@prisma/client does not resolve from $G2_B_OLD_CLIENT to the pinned tree ($RESOLVED_CLIENT_PKG != $PINNED_CLIENT_PKG); refusing to generate" >&2; exit 6; }
++echo "O_CLIENT_RESOLUTION pinned=$PINNED_CLIENT_PKG version=$(node -p 'require(process.argv[1]).version' "$PINNED_CLIENT_PKG") skip_autoinstall=$PRISMA_GENERATE_SKIP_AUTOINSTALL"
++OLD_SCHEMA_COPY="$G2_B_OLD_CLIENT/.schema-for-generate.prisma"
++sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$G2_B_OLD_CLIENT\"|" \
++  "$G2_B_OLD_ROOT/prisma/schema.prisma" > "$OLD_SCHEMA_COPY"
++(cd "$G2_B_OLD_ROOT" && "$ROOT/node_modules/.bin/prisma" generate --schema "$OLD_SCHEMA_COPY" >/dev/null)
++grep -q 'model ScoutReconstructionLedger' "$G2_B_OLD_CLIENT/schema.prisma"
++O_ENGINE_SHA="$(hash_required 'generated O client engine' "$G2_B_OLD_CLIENT/$ENGINE")"
++[[ "$O_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated O client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The O client's copied runtime must be the pinned package runtime: identical bytes, or the pinned
++# bytes preceded only by the generator's header (observed 130 B for prisma 6.19.3). Any other
++# difference is a refusal; a false refusal here fails closed and is reported, never skipped.
++O_RUNTIME="$G2_B_OLD_CLIENT/runtime/library.js"
++O_RUNTIME_SHA="$(hash_required 'generated O client runtime' "$O_RUNTIME")"
++PINNED_RUNTIME_SIZE="$(stat -c %s "$PINNED_RUNTIME")"
++O_RUNTIME_SIZE="$(stat -c %s "$O_RUNTIME")"
++[[ "$O_RUNTIME_SIZE" -ge "$PINNED_RUNTIME_SIZE" ]] && cmp -s <(tail -c "$PINNED_RUNTIME_SIZE" "$O_RUNTIME") "$PINNED_RUNTIME" \
++  || { echo "generated O client runtime ($O_RUNTIME_SIZE B, $O_RUNTIME_SHA) does not end with the pinned @prisma/client runtime ($PINNED_RUNTIME_SIZE B, $PINNED_RUNTIME_SHA)" >&2; exit 6; }
++echo "O_CLIENT_GENERATED dir=$G2_B_OLD_CLIENT engine_sha256=$O_ENGINE_SHA runtime=$O_RUNTIME runtime_sha256=$O_RUNTIME_SHA runtime_header_bytes=$((O_RUNTIME_SIZE - PINNED_RUNTIME_SIZE)) pinned_runtime=$PINNED_RUNTIME pinned_runtime_sha256=$PINNED_RUNTIME_SHA"
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_B_OLD_CLIENT/schema.prisma" | grep -q source_platform \
++  || { echo "generated O client unexpectedly knows source_platform" >&2; exit 6; }
++
++# 7. Candidate (E/T) client in the candidate root: B REUSES the client already generated in the
++#    isolated copy of the accepted C1 dependency tree (schema unchanged by B) and only VERIFIES it;
++#    no `prisma generate` runs here.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated C1 tree not in place)" >&2; exit 7; }
++grep -q 'model ScoutReconstructionLedger' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client schema lacks ScoutReconstructionLedger; refusing (no regeneration in B)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The runtime the candidate client actually loads, resolved from the generated client directory.
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -q 'source_platform' \
++  || { echo "candidate client lacks source_platform" >&2; exit 7; }
++
++if [[ "$MODE" == generate-only ]]; then echo "G2_B_GENERATE_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_B_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-b-drain-db.ts b/test/utils/g2-b-drain-db.ts
+new file mode 100644
+index 0000000..cb60f3f
+--- /dev/null
++++ b/test/utils/g2-b-drain-db.ts
+@@ -0,0 +1,96 @@
++/**
++ * S7-3' G2 B/drain proof target guard: derived by literal substitution from the accepted
++ * S5 guard test/utils/g2-pg17-db.ts (blob 0e73d76d), which stays byte-identical and keeps
++ * governing the accepted S5 proof. One dedicated disposable database on a B-only
++ * disposable PostgreSQL 17 cluster; a FOURTH identity, separate from the E, T/Q0 and
++ * S5 targets, so no earlier proof state is reused and no S5 fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_B_DATABASE = 'g2_b_drain_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      b_super      cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy`, E up/down and all harness DDL/data
++ *  - runtime    service_role  BYPASSRLS runtime role used by the O/T writer and Q0 reader processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_B_ROLE = 'b_super';
++export const G2_B_ADMIN_ROLE = G2_B_ROLE;
++export const G2_B_MIGRATION_ROLE = 'postgres';
++export const G2_B_RUNTIME_ROLE = 'service_role';
++export const G2_B_LOGIN_ROLES = new Set([G2_B_ADMIN_ROLE, G2_B_MIGRATION_ROLE, G2_B_RUNTIME_ROLE]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_B_PASSWORD_ENV = 'G2_B_PASSWORD';
++/**
++ * Distinctive B fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 'b-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_b_drain_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-b-drain-bootstrap.sh and execution/95633079/s7-b-drain/fixture-proposal/binding/b-fixture.sh must carry the same literals.
++ */
++export const G2_B_CLUSTER_MARKER = 'b-disposable-pg17';
++export const G2_B_DATABASE_MARKER = 'b-g2-drain-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane.
++const REFUSED_PORTS = new Set(['5432', '5433', '6543', '54321', '54322', '55439', '54325']);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2BDrainTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_B_DATABASE}` ||
++    url.username !== G2_B_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_B_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'B/drain G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('B/drain G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_B_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('B/drain G2 proof requires a plain fixture password in the environment');
++  if (!G2_B_LOGIN_ROLES.has(username))
++    throw new Error('B/drain G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
+diff --git a/test/utils/g2-b-drain-harness.ts b/test/utils/g2-b-drain-harness.ts
+new file mode 100644
+index 0000000..469cbd2
+--- /dev/null
++++ b/test/utils/g2-b-drain-harness.ts
+@@ -0,0 +1,96 @@
++/**
++ * G2-B live-proof helpers layered on the B-only derivative (test/utils/g2-b-drain-pg-harness.ts)
++ * of the accepted S5 harness (test/utils/g2-pg17-harness.ts, unchanged).
++ * Adds only what the B/drain stage needs: the B migration files, the accepted predecessor
++ * migration files (fixture history only, never re-proven), fence/catalog observation,
++ * NULL-provenance fixture shaping (UPDATE only: the fence blocks NULL INSERTs by design) and an
++ * in-process runtime-role Prisma client whose query log is captured for shape assertions.
++ * Imported only by the explicitly guarded test/rls-g2-b-drain.spec.ts.
++ */
++import { PrismaClient } from '@prisma/client';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import { json, quote, root, sql, target } from './g2-b-drain-pg-harness';
++import { G2_B_RUNTIME_ROLE, withFixturePassword } from './g2-b-drain-db';
++
++export const B_MIGRATION = '20270119000000_scout_ledger_obsolete_writer_fence';
++export const bDir = resolve(root, 'prisma/migrations', B_MIGRATION);
++export const bUpFile = resolve(bDir, 'migration.sql');
++export const bDownFile = resolve(bDir, 'down.sql');
++export const bUp = readFileSync(bUpFile, 'utf8');
++export const bDown = readFileSync(bDownFile, 'utf8');
++/** Accepted S1 and C1 migrations: this candidate root tracks them, the O root does not. The
++ *  fixture applies their shipped SQL by file and records them (the same path stage 1 uses for E)
++ *  purely so that `prisma migrate deploy` later has exactly B pending; nothing about them is proven. */
++export const S1_MIGRATION = '20261224000000_rls_close_public_exposure';
++export const C1_MIGRATION = '20270117000000_durable_import_setup';
++export const acceptedUpFile = (name: string) =>
++  resolve(root, 'prisma/migrations', name, 'migration.sql');
++/** Migrations recorded as finished at or after a server timestamp (`SELECT now()`), sorted. */
++export const appliedSince = (since: string): string[] =>
++  json(`SELECT COALESCE(jsonb_agg(migration_name ORDER BY migration_name),'[]')
++  FROM "_prisma_migrations" WHERE finished_at >= ${quote(since)}::timestamptz`);
++
++/** Trigger + function catalog shape; '[]'/null when absent. Includes proconfig and ACL.
++ *  The trigger definition is rendered under an EMPTY search_path so the text is the canonical,
++ *  fully qualified form (FENCE_TRIGGER_DEFINITION) whatever the session default is; tgtype is
++ *  included so BEFORE INSERT FOR EACH ROW (7) is asserted structurally as well. */
++export const fence = () =>
++  json(`SET search_path = '';
++  SELECT jsonb_build_object(
++  'triggers',(SELECT COALESCE(jsonb_agg(jsonb_build_array(tgname,tgenabled,tgtype,pg_get_triggerdef(oid)) ORDER BY tgname),'[]')
++    FROM pg_trigger WHERE tgrelid='public."ScoutReconstructionLedger"'::regclass AND NOT tgisinternal),
++  'function',(SELECT to_jsonb(f) FROM (SELECT proname,prosecdef,proconfig,proacl::text,provolatile,
++    pg_get_functiondef(oid) def FROM pg_proc WHERE oid=to_regprocedure('public.scout_ledger_platform_fence()')) f))`);
++export const nullCount = () =>
++  Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform IS NULL`));
++export const ledgerCount = () => Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger"`));
++/** Every ledger column except provenance, deterministic order: the backfill's "untouched" proof. */
++export const ledgerWithoutPlatform = () =>
++  json(`SELECT COALESCE(jsonb_agg((to_jsonb(l) - 'source_platform')
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const stagingSnapshot = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY coach_id,intent_id,source_id,id),'[]')
++  FROM "ScoutIngestEntity" s`);
++/** Rows whose provenance differs from the exact staging match (never written by the backfill). */
++export const disagreeing = () =>
++  Number(
++    sql(`SELECT count(*) FROM "ScoutReconstructionLedger" l JOIN "ScoutIngestEntity" s
++  ON s.coach_id=l.coach_id AND s.intent_id=l.intent_id AND s.entity_type=l.entity_type AND s.source_id=l.source_id
++  WHERE l.source_platform IS DISTINCT FROM s.source_platform`),
++  );
++/** Fixture shaping only: re-open provenance on existing rows (an UPDATE; the fence is INSERT-only). */
++export const nullify = (where: string) =>
++  Number(
++    sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform=NULL WHERE ${where} RETURNING id)
++  SELECT count(*) FROM c`),
++  );
++export const ledgerIds = (where: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`,
++  );
++export const platformOf = (id: string) =>
++  sql(
++    `SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`,
++  );
++
++/**
++ * In-process runtime-role (service_role) client: the same generated T client the product ships,
++ * connected exactly like the worker processes, with an application_name so lock waits are
++ * observable through the accepted `blocked()` helper. Query text only is logged, never parameters.
++ */
++export function runtimeClient(name: string) {
++  const url = new URL(
++    withFixturePassword(target.prismaUrl, process.env.G2_B_PASSWORD, G2_B_RUNTIME_ROLE),
++  );
++  url.searchParams.set('application_name', name);
++  const queries: string[] = [];
++  const client = new PrismaClient({
++    datasources: { db: { url: url.toString() } },
++    log: [{ emit: 'event', level: 'query' }],
++  });
++  client.$on('query', (e) => {
++    queries.push(e.query);
++  });
++  return { client, queries, name };
++}
+diff --git a/test/utils/g2-b-drain-pg-harness.ts b/test/utils/g2-b-drain-pg-harness.ts
+new file mode 100644
+index 0000000..c22a72c
+--- /dev/null
++++ b/test/utils/g2-b-drain-pg-harness.ts
+@@ -0,0 +1,362 @@
++/**
++ * S7-3' G2 B/drain live-proof helpers: derived by substitution from the accepted S5 harness
++ * test/utils/g2-pg17-harness.ts (blob ab9aaab4), which stays byte-identical. Same real psql,
++ * same real generated Prisma clients in separate OS processes (test/utils/g2-tq0-worker.cjs,
++ * shared unchanged), no transaction or query mocks; bound to the B-only identity guard
++ * test/utils/g2-b-drain-db.ts and the G2_B_* environment. Only test/rls-g2-b-drain.spec.ts
++ * (via test/utils/g2-b-drain-harness.ts) imports this.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_B_ADMIN_ROLE,
++  G2_B_MIGRATION_ROLE,
++  G2_B_RUNTIME_ROLE,
++  g2BDrainTestTarget,
++  withFixturePassword,
++} from './g2-b-drain-db';
++
++export const root = resolve(__dirname, '..', '..');
++export const OLD_HEAD = '925780e0a1906593e5383c618311b6b17364b8dc';
++export const E_MIGRATION = '20270118000000_scout_ledger_platform_expand';
++
++const raw = process.env.G2_B_DATABASE_URL;
++const password = process.env.G2_B_PASSWORD;
++export const psql = process.env.G2_B_PSQL;
++export const oldRoot = process.env.G2_B_OLD_ROOT;
++export const oldClient = process.env.G2_B_OLD_CLIENT;
++export const directory = process.env.G2_B_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_B_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !oldRoot || !oldClient || !directory) {
++  throw new Error(
++    'B/drain G2 proof requires explicit database, password, psql, data directory, old source and old client',
++  );
++}
++export const target = g2BDrainTestTarget(raw, process.env.G2_B_CONFIRM);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_B_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_B_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** Operator form: `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>`. E's files carry their own
++ *  BEGIN/COMMIT, so --single-transaction is redundant there (psql only emits nested-transaction
++ *  WARNINGs); it is kept so the harness runs the same command the recovery packet documents.
++ *  Recovery semantics themselves are S1-owned; this helper asserts nothing about them. */
++export const sqlFile = (file: string): string =>
++  psqlRun(migrationUrl, ['--single-transaction', '-f', file]);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string): void {
++  let error: unknown;
++  try {
++    sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++
++export const stageSql = resolve(root, 'prisma/migrations', E_MIGRATION);
++export const upFile = resolve(stageSql, 'migration.sql');
++export const downFile = resolve(stageSql, 'down.sql');
++export const up = readFileSync(upFile, 'utf8');
++export const down = readFileSync(downFile, 'utf8');
++export const hasColumn = () =>
++  sql(`SELECT count(*) FROM pg_attribute WHERE
++  attrelid='public."ScoutReconstructionLedger"'::regclass AND attname='source_platform' AND NOT attisdropped`);
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++/** Ledger rows in a scope, ordered deterministically; provenance column optional pre-E. */
++export const records = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY entity_type,source_id,id),'[]')
++  FROM "ScoutReconstructionLedger" l WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++export const allLedger = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(l)
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const targets = (coach = 'coach') =>
++  json(`SELECT jsonb_build_object(
++  'persons',(SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY id),'[]') FROM "Person" p WHERE coach_id=${quote(coach)}),
++  'entities',(SELECT COALESCE(jsonb_agg(to_jsonb(e) ORDER BY id),'[]') FROM "ScoutReconstructedEntity" e WHERE coach_id=${quote(coach)}))`);
++export const catalog = () =>
++  sql(`SELECT jsonb_build_object(
++  'tables',(SELECT jsonb_agg(jsonb_build_array(oid,relname,relrowsecurity,relforcerowsecurity) ORDER BY relname)
++    FROM pg_class WHERE oid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'indexes',(SELECT jsonb_agg(jsonb_build_array(indexrelid,pg_get_indexdef(indexrelid)) ORDER BY indexrelid)
++    FROM pg_index WHERE indrelid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'policies',(SELECT jsonb_agg(to_jsonb(p) ORDER BY tablename,policyname) FROM pg_policies p
++    WHERE schemaname='public' AND tablename IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity')))`);
++
++export function settle(coach = 'coach', intent = 'intent') {
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},'settled','success')
++    ON CONFLICT DO NOTHING`);
++}
++export function stage(
++  source = 'a',
++  family = 'clients',
++  platform = 'truecoach',
++  name = 'Synthetic A',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  // Primary key includes family AND platform so a same-source collision can only fire on the
++  // product's narrow staging key (coach_id, intent_id, source_id), never on the harness's own id.
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify({ name, client_id: 'client-new' }))})`);
++}
++/** Bulk synthetic staging through generate_series; names are synthetic, no customer data. */
++export function stageMany(
++  count: number,
++  family = 'clients',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++  failEvery = 0,
++  prefix = 's',
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    SELECT ${quote(`${coach}-${intent}-${prefix}`)}||lpad(n::text,5,'0'),${quote(coach)},${quote(intent)},${quote(family)},
++      ${quote(prefix)}||lpad(n::text,5,'0'),${quote(platform)},
++      jsonb_build_object('name',CASE WHEN ${failEvery} > 0 AND n % ${failEvery} = 0 THEN 'FAIL' ELSE 'Synthetic '||n END,
++        'client_id','client-'||n)
++    FROM generate_series(1,${count}) n`);
++}
++export function legacy(
++  status: string,
++  platform: string | null | 'ABSENT' = null,
++  source = 'a',
++  family = 'clients',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  const withColumn = platform !== 'ABSENT';
++  sql(`INSERT INTO "ScoutReconstructionLedger"
++    (id,coach_id,intent_id,entity_type,source_id,${withColumn ? 'source_platform,' : ''}status,target_id,reason)
++    VALUES (${quote(`${coach}-${intent}-${family}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},${quote(source)},
++    ${withColumn ? `${platform === null ? 'NULL' : quote(platform)},` : ''}${quote(status)},'saved-target','saved-reason')`);
++}
++export function resetData() {
++  sql(`DELETE FROM "ScoutReconstructionLedger"; DELETE FROM "ScoutIngestEntity";
++    DELETE FROM "Person"; DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutImport";`);
++  settle();
++}
++
++export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
++let sequence = 0;
++export function worker(options: Record<string, unknown> = {}, old = false) {
++  const name = `g2b_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_B_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root: old ? oldRoot : root,
++    client: old ? oldClient : resolve(root, 'node_modules/.prisma/client'),
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    family: 'clients',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-tq0-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_TQ0_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  let readyResolve: () => void;
++  const ready = new Promise<void>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.ready) readyResolve();
++      if (message.done) result = message;
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          old,
++          options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return {
++    done,
++    ready: options.pause
++      ? Promise.race([
++          ready,
++          done.then(() => {
++            throw new Error('barrier not reached');
++          }),
++        ])
++      : Promise.resolve(),
++    release: () => child.send('continue'),
++    stop: () => child.kill(),
++    name,
++  };
++}
++export const run = (options: Record<string, unknown> = {}, old = false) =>
++  worker(options, old).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_B_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const holdAdvisory = (key: number) =>
++  holdTransaction(`SELECT pg_advisory_xact_lock(${key})`, G2_B_MIGRATION_ROLE);
++export const encoded = (s: string) => Buffer.from(s).toString('base64url');
++export const legacyEntityCursor = (family: string, s: string) =>
++  encoded(
++    JSON.stringify({
++      c: 'coach',
++      i: 'intent',
++      f: family,
++      o: 'source_id:asc',
++      s,
++    }),
++  );
++export const v2 = (
++  family: string,
++  source = 'a',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++) =>
++  `v2.${encoded(
++    JSON.stringify({
++      v: 2,
++      c: coach,
++      i: intent,
++      f: family,
++      o: 'source_id:asc,source_platform:asc',
++      s: source,
++      p: platform,
++    }),
++  )}`;
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_B_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
