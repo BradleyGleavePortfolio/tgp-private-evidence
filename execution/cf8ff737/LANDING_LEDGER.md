@@ -71,3 +71,9 @@ The landing census found that GitHub's rebase-merge rewrites the committer to `G
 | 17:44Z | backend `integration/importer` | PROD-CI-1 `c7a5fe8d` | FF from `7d2895e1` | accepted: T3 review plus #532 real-PG proof (5/5 OK) |
 
 | 18:04Z | extension `land/s4-r6` (PR #27, staged) | S4, then UX-07 `322b749a`, then S4-CQ `aa0abd83` | FF from `91990ae9` | accepted; landing on `main` awaits the owner approval required by protection |
+
+## EXEC-CE3748CB landings
+| UTC | Ref | Candidate | Method | Evidence |
+|---|---|---|---|---|
+| ~21:15Z | mobile `main` c7641cb3 → 67b646f4 | UX M1 dormant status/result views | FF | ce3748cb/UX_M1_ACCEPTANCE.md |
+| ~21:45Z | backend `integration/importer` c7a5fe8d → 7ea039f3 | N/Q1 29e60705 (merge with PROD-CI-1, disjoint) | PR #533, CI green, FF of merge | ce3748cb/NQ1_V2R_LOCAL_ACCEPTANCE.md |

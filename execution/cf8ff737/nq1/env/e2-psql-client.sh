@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# N/Q1 v2r Phase E step 2 — psql client via Ubuntu apt (setup-10-clients.sh logic; log under nq1/env).
+set -euo pipefail
+echo "== e2-psql-client start_utc=$(date -u +%FT%TZ) psql_before=$(command -v psql || echo absent)"
+if command -v psql >/dev/null && psql --version | grep -qE ' (1[7-9])\.'; then
+  echo "already present: $(psql --version) / $(pg_dump --version)"; exit 0; fi
+set +e; timeout --foreground 600 sudo -n apt-get update -qq; rc=$?; set -e; echo "apt_update_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+if apt-cache show postgresql-client-18 >/dev/null 2>&1; then PKG=postgresql-client-18
+elif apt-cache show postgresql-client-17 >/dev/null 2>&1; then PKG=postgresql-client-17
+else PKG=postgresql-client; fi
+echo "package=$PKG candidate=$(apt-cache policy "$PKG" | awk '/Candidate/{print $2}')"
+set +e; DEBIAN_FRONTEND=noninteractive timeout --foreground 900 sudo -n apt-get install -y -qq --no-install-recommends "$PKG"; rc=$?; set -e; echo "apt_install_exit=$rc"; [ $rc -eq 0 ] || exit $rc
+echo "psql=$(command -v psql) -> $(psql --version)"
+echo "pg_dump=$(command -v pg_dump) -> $(pg_dump --version)"
+psql --version | grep -qE ' (1[7-9])\.' || { echo "client major < 17; refusing"; exit 70; }
+echo "dpkg=$(dpkg-query -W -f='${Package} ${Version} ${Status}\n' "$PKG")"
+echo "psql_sha256=$(sha256sum "$(readlink -f "$(command -v psql)")" | cut -c1-64) real=$(readlink -f "$(command -v psql)")"
+echo "== e2-psql-client end_utc=$(date -u +%FT%TZ) exit=0"

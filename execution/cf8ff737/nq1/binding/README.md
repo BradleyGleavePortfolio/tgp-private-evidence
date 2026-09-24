@@ -51,3 +51,14 @@ Pins filled from the committed head (see PINS.txt): HEAD 61b93cff…, TREE 7adad
 FIXTURE 29db46ad…. Header line 2 updated to say FILLED. `nq1-pg-proof.sh` filled sha256 = `e47c9ac1bd073e2b92432bf1a4809bd2d30e4c63c61aec33fa0ccc339746a190`.
 `derive-nq1-pg-proof.py` still reproduces the substitution-only form (e14db001…); the fill is the five sed
 substitutions plus the header word change and is fully described by PINS.txt. Still NOT RUN and NOT GRANTED.
+
+## v2r refill (after the amended single commit 29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd, 2026-09-24T20:3xZ; NQ1_V2R_REBUILD_GRANT)
+Pins refilled from the v2r head: HEAD 29e60705…, TREE 511710ee…, SPEC a9338260…; BOOTSTRAP 96b7668d… and FIXTURE 29db46ad… unchanged.
+Header line 2 names the v2r head. `nq1-pg-proof.sh` v2r sha256 = `aec602521f377a2b825026b1437fa57439794236321cb617129c48dc7e134756`;
+the v1 filled runner is kept byte-exact as `nq1-pg-proof.sh.v1-61b93cff` (e47c9ac1…) with `BINDING.sha256.v1-61b93cff`.
+Runner delta vs v1: the three EXPECT_ lines + the header word only. Donor clusters (s5, c1-builder, b-drain, r-ready) are ABSENT after the
+sandbox loss; the runner's preflight already records ABSENT itself (else-branches) and requires only S5 absence, so no mechanical
+"ABSENT" edit was needed. An intermediate fill for 3f2d7a77 (superseded before attestation; see PINS.txt) is recorded, not hidden.
+Lane flags for the next PG grant (v1 leftovers, untouched): `runtime/run/nq1-pg-proof.sentinel` exists → runner refuses rc 76 until the
+parent grants the preserving rename of the v1 `runtime/` (alongside the planned `clusters/nq1` rename, which is now moot: no cluster exists).
+Still NOT RUN and NOT GRANTED.

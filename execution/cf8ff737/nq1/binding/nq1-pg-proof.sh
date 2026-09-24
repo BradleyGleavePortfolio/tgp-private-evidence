@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# S7-3' N/Q1 real-PG proof — minimal execution binding (NOT RUN; NOT GRANTED; pins FILLED from the committed N/Q1 head 61b93cff).
+# S7-3' N/Q1 real-PG proof — minimal execution binding (NOT RUN; NOT GRANTED; pins FILLED from the committed N/Q1 v2r head 29e60705; v1 61b93cff copy kept as nq1-pg-proof.sh.v1-61b93cff).
 # Derived by substitution from the accepted R binding execution/cf8ff737/r-ready/binding/r-pg-proof.sh (sha256 787d34b0…):
 # N/Q1 identity (port 55481, nq1_super, g2_nq1_disposable, cluster nq1), the N/Q1 spec/bootstrap/T-root helper, the N
 # generated-client pin, and added read-only checks: the accepted R files (and the R migration directory) are byte-identical
@@ -25,9 +25,9 @@ W=/home/user/workspace/worktrees/s7-nq1
 R=$RT/run; LOG=$R/nq1-pg-proof.log; SENT=$R/nq1-pg-proof.sentinel; JLOG=$R/jest.log
 LOCK=/home/user/workspace/execution/test-validation.lock
 # ---- pins: filled by the binding phase AFTER the N/Q1 head is committed; the script refuses placeholders.
-EXPECT_HEAD=61b93cff7900b24c17011d481fd6c31f5abb59e4
-EXPECT_TREE=7adad6965d60269046b3240343b54d7f71582d70
-EXPECT_SPEC_BLOB=8ad3af3f1f8a43d9006b929fea5e9cb3ae35a7b2                 # test/rls-g2-nq1.spec.ts at the N/Q1 head
+EXPECT_HEAD=29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd
+EXPECT_TREE=511710ee0c361a2ec68bf217c4d47f8504ef2790
+EXPECT_SPEC_BLOB=a93382605a7e8099f5fd622cf2d0a92298460bd3                 # test/rls-g2-nq1.spec.ts at the N/Q1 head
 EXPECT_BOOTSTRAP_BLOB=96b7668dff7498cee5ed17ab988aae0f38ac512d       # test/utils/g2-nq1-bootstrap.sh at the N/Q1 head
 EXPECT_FIXTURE_SHA=29db46ad3189ca12bd507e79cd2f2b87c3c375aeb454f6db76973bb467ad4bc3           # binding/nq1-fixture.sh
 EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a   # S1/S2 PG17_PROVENANCE (unchanged)

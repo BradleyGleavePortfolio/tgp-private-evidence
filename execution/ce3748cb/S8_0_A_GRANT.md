@@ -1,0 +1,12 @@
+# S8-0 + S8-A grants and D-S8-2 interim disposition
+
+Parent EXEC-CE3748CB, ~20:40Z. Planning input: `s8-prep/S8_BRIEF.md` (accepted as planning input; findings F1–F4 A-scoped as stated there, no B).
+
+## D-S8-2 (parent interim; end state reserved to Bradley)
+Interim adopted: **(b)** — S8 writes only coach-owned families natively; client-owned history is reported truthfully as `unresolved` (never silently absent, never `complete`). Option (a) (nullable `person_id` on client-owned tables, imported clients shown as "not yet joined" in the roster) changes the native client model and roster semantics — a material product-direction decision recorded for Bradley. S8-D/S8-E stay blocked on it; nothing else is.
+
+## S8-0 (T3) — native contract document
+Sole writer; worktree `/home/user/workspace/worktrees/s8-0` (branch `s8-0`) from `c7a5fe8d` (integration/importer). Owned path: `docs/decisions/2026-09-24-s8-native-contract.md` only. Content per brief §3 row S8-0 (per-family fields, units/time zones, relationships, conflicts, provenance, side-effect suppression, unresolved codes; D-S8-1..4 recorded with D-S8-2 as above). Cite schema/source lines. One ordinary hooked Bradley commit (no trailers) once node_modules hooks are available; otherwise leave staged-ready and report. No push. One independent T3 review follows.
+
+## S8-A (T3; promote to T4 if any persisted value, schema or `persist` changes)
+Sole writer; worktree `/home/user/workspace/worktrees/s8-a` (branch `s8-a`) from N/Q1 v1 `61b93cff`. Owned paths exactly brief §3 row S8-A (NOT the three C-owned fake specs). Acceptance per that row: interpreter output deep-equals every existing mapper fixture including skip reasons; a third synthetic source as JSON + test only with zero `src/**/*.ts` in that commit's diffstat; unmapped/`notes` → explicit `unresolved_family:<token>`; normalize `sourcePersonId` trimming once uniformly only if byte-equal persisted output is preserved (else STOP — T4). Source + unit now. node_modules: after `execution/cf8ff737/nq1/env/` reports the verified install, copy `worktrees/s7-nq1/node_modules` (read-only source) into the s8-a worktree; heavy slot `/home/user/workspace/execution/test-validation.lock` (flock -n, wait politely, never remove another owner's lock) for affected Jest. Commit (hooked, Bradley, no trailers) is allowed on 61b93cff as a draft head; landing waits for C (fake-spec overlap) and a rebase. No push, no PG.

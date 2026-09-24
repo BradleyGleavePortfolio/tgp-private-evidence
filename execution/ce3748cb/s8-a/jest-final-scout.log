@@ -1,0 +1,1126 @@
+lock acquired 2026-09-24T21:00:07Z
+[32m[Nest] 5794  - [39m09/24/2026, 9:00:19 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":2,"skipped":1,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:00:19 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:00:19 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":2,"skipped":1,"failed":0}[39m
+PASS test/scout/reconstruct/mapping-spec.third-source.spec.ts (10.458 s)
+  conformance_beta — registered from data alone
+    ✓ is reachable by its source_platform with no TypeScript registration (3 ms)
+    ✓ no src TypeScript mentions the new source (148 ms)
+    ✓ resolves its own step tokens and leaves `messages` explicitly unresolved (1 ms)
+  conformance_beta — family layer map()
+    ✓ maps the deep person name, falling back to the nickname path (1 ms)
+    ✓ maps entity links and labels through nested paths and fallbacks (5 ms)
+    ✓ keeps the core skip reasons
+  conformance_beta — the unmodified engine reconstructs it end to end
+    ✓ reconstructs clients and workouts with honest, replay-stable accounting (10 ms)
+
+PASS test/scout/reconstruct/mapping-spec.equivalence.spec.ts (90.11 s)
+  S8-A interpreter ≡ retired per-source mappers (deep-equal, incl. skip reasons)
+    ✓ covers a large corpus including every recorded fixture payload (5 ms)
+    ✓ registers every legacy source (and interprets each one from data) (1 ms)
+    ✓ truecoach: mapClient deep-equals the retired client mapper on every row (8507 ms)
+    ✓ truecoach: mapEntity(workouts) deep-equals the retired entity mapper on every row (8536 ms)
+    ✓ truecoach: mapEntity(client_history) deep-equals the retired entity mapper on every row (5117 ms)
+    ✓ conformance_alpha: mapClient deep-equals the retired client mapper on every row (8558 ms)
+    ✓ conformance_alpha: mapEntity(workouts) deep-equals the retired entity mapper on every row (8430 ms)
+    ✓ conformance_alpha: mapEntity(client_history) deep-equals the retired entity mapper on every row (12819 ms)
+    ✓ family layer map() for clients deep-equals the 61b93cff dispatch on every row (13759 ms)
+    ✓ family layer map() for workouts deep-equals the 61b93cff dispatch on every row (11796 ms)
+    ✓ family layer map() for client_history deep-equals the 61b93cff dispatch on every row (12057 ms)
+
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout progress flush failed for coach-1:intent-1:device-a: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mimport.complete push failed for coach coach-1: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mimport.complete push failed for coach coach-1: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [33m   WARN[39m [38;5;3m[ScoutService] [39m[33mscout settle pre-flush failed for run coach-1:intent-1: Error[39m
+[31m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [31m  ERROR[39m [38;5;3m[ScoutService] [39m[31mscout import intent-1 has an unrecognised persisted terminal_status; failing closed to 'failed'[39m
+[31m[Nest] 5794  - [39m09/24/2026, 9:01:53 PM [31m  ERROR[39m [38;5;3m[ScoutService] [39m[31mscout import intent-1 has an unrecognised persisted terminal_status; failing closed to 'failed'[39m
+PASS src/scout/scout.service.spec.ts
+  ScoutService
+    recordProgress (hot path)
+      ✓ does not write to the DB synchronously (3 ms)
+      ✓ persists the recorded snapshot on the next flush (7 ms)
+      ✓ keys the upsert by (coach_id, intent_id, device_id) (1 ms)
+      ✓ keeps two independent rows when one import is mirrored from two devices (1 ms)
+      ✓ coalesces two snapshots from the same device into one upsert
+      ✓ normalises the snapshot to the persisted entity shape
+      ✓ writes the same snapshot on the create and update branch of the upsert (1 ms)
+      ✓ defaults last_error to null when lastError is absent (1 ms)
+      ✓ propagates lastError onto last_error when present
+      ✓ coalesces repeated snapshots for one import into a single upsert
+      ✓ keeps only the latest snapshot when coalescing (1 ms)
+      ✓ separates snapshots for different imports of the same coach (1 ms)
+      ✓ separates snapshots for the same intent across different coaches
+    flush
+      ✓ is a no-op when the cache is empty (1 ms)
+      ✓ drains the cache so a second flush writes nothing
+      ✓ re-queues a snapshot when its upsert fails so progress is not lost (2 ms)
+      ✓ does not re-queue a failed snapshot if a fresher one arrived mid-flush (1 ms)
+      ✓ continues flushing remaining imports after one fails
+    flushTick / lifecycle
+      ✓ flushTick drains the cache (1 ms)
+      ✓ onModuleDestroy flushes anything still cached
+      ✓ exposes a positive flush interval constant (1 ms)
+    complete (cold path)
+      ✓ inserts a completion row on the first call (9 ms)
+      ✓ persists coach_id, intent_id, terminal_status and final_counts (1 ms)
+      ✓ returns an acknowledgement carrying the intent_id
+      ✓ flips the parent import state to the terminal_status (R-STATE-1) (1 ms)
+      ✓ owns the state flip and the ledger insert in a single transaction (1 ms)
+      ✓ flushes pending progress before settling (1 ms)
+      ✓ fires the mobile push on the first completion (1 ms)
+      ✓ emits the scout.ingest.completed analytics event on the first completion (1 ms)
+      ✓ describes successful transport as staging rather than verified migration (6 ms)
+      ✓ uses a degraded push title/body for a partial import (1 ms)
+      ✓ uses a degraded push for a failed import
+    complete idempotency
+      ✓ treats a duplicate (P2002) as a no-op and does not re-notify
+      ✓ does not re-emit analytics on a duplicate completion (3 ms)
+      ✓ never flips the parent state outside the ledger transaction on a duplicate
+      ✓ notifies exactly once across a first call and a retry (1 ms)
+      ✓ rethrows a non-P2002 Prisma error (1 ms)
+      ✓ rethrows a generic (non-Prisma) error
+    complete resilience
+      ✓ still acknowledges when the push transport fails (1 ms)
+      ✓ still emits analytics when the push transport fails (1 ms)
+      ✓ omits final_counts cleanly when the extension did not send any
+    complete pre-settle flush is best-effort (P3: no settle-wedge)
+      ✓ still settles and notifies when the pre-settle snapshot flush fails
+      ✓ leaves the failed snapshot pending and retryable after settling (9 ms)
+      ✓ read still fails closed (5xx, not 404) while the bad snapshot remains pending (1 ms)
+      ✓ does not flush an unrelated tenant/run when settling (1 ms)
+      ✓ does not raise an unhandled rejection when the pre-settle flush fails (10 ms)
+    getImportStatus (read surface)
+      ✓ throws 404 when no evidence of the intent exists anywhere
+      ✓ does not emit analytics for an unknown intent (1 ms)
+      ✓ drains in-flight progress before reading so a just-accepted run is not falsely 404d (1 ms)
+      ✓ reports running when committed entities exist but no terminal row does (1 ms)
+      ✓ never exposes completed_at while running, even if the row carries a stray one (1 ms)
+      ✓ reports running from a progress snapshot alone (no entities, no settle)
+      ✓ reflects a settled success verbatim, preferring its started_at over the snapshot (1 ms)
+      ✓ reflects a settled partial verbatim (1 ms)
+      ✓ reflects a settled failed verbatim
+      ✓ fails closed to failed (not running) on an unrecognised stored terminal_status (9 ms)
+      ✓ emits an observable RED corruption signal (no offending value) when failing closed (1 ms)
+      ✓ does not raise the corruption signal for a recognised terminal state
+      ✓ derives started_at from the earliest committed entity (stable first observation)
+      ✓ prefers the first committed entity over the import row start on a settled run
+      ✓ exposes committed counts (proof), sorted, and never an estimate field
+      ✓ scopes every read by the caller coach id (IDOR / tenant ownership) (1 ms)
+      ✓ emits a RED-signal event carrying only intent_id + status (no PII)
+      ✓ returns only the declared safe shape — no tokens, payloads, or free-text error (1 ms)
+    getImportStatus concurrency + tenant isolation (key-scoped flush)
+      ✓ does not touch an unrelated tenant/run backlog on a read (no global drain) (1 ms)
+      ✓ coalesces two concurrent reads onto one in-flight write (no double write, no false 404)
+      ✓ fails closed (propagates, not a 404) when the requested-key persist fails (1 ms)
+      ✓ recovers on retry after a requested-key persist failure (snapshot stays pending) (49 ms)
+      ✓ drops the run from the pending index once its key persists (no repeat write)
+
+PASS test/scout/scout-ingest.validation.integration.spec.ts
+  POST /api/scout/ingest through the production ValidationPipe
+    ✓ accepts a verbatim makeEntity()-shaped envelope from a coach → 202 (81 ms)
+    ✓ rejects an unknown top-level field → 400 (16 ms)
+    ✓ rejects an unknown entity field → 400 (5 ms)
+    ✓ rejects malformed JSON → 400 (9 ms)
+    ✓ rejects capturedAt: "bad" → 400 (strict ISO8601, proves FIX-2) (3 ms)
+    ✓ rejects a noncanonical sourcePlatform → 400 with a field-level message; nothing staged (G2-R D2) (25 ms)
+    ✓ accepts canonical sourcePlatform tokens at the boundary unchanged (fixtures stay valid) (28 ms)
+  ScoutEntityDto.sourcePlatform parity with isCanonicalPlatform
+    ✓ accepts exactly the values isCanonicalPlatform accepts (18 ms)
+
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":1,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":3,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":2,"skipped":0,"failed":1}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-empty","coach_id":"coach-1","staged":0,"reconstructed":0,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":5,"reconstructed":2,"skipped":2,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-A","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-B","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":1,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-success","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-partial","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-failed","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-A","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-A","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":1,"skipped":1,"failed":1}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct rejected oversized intent {"intent_id":"intent-huge","coach_id":"coach-1","staged":10001,"max":10000}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":10000,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-big","coach_id":"coach-1","staged":1001,"reconstructed":1001,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":0,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:01:55 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-7","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+PASS test/scout/reconstruct/scout-reconstruct.service.spec.ts
+  ScoutReconstructService
+    ✓ rejects noncanonical provenance without any write: "" (56 ms)
+    ✓ rejects noncanonical provenance without any write: "TrueCoach" (20 ms)
+    ✓ rejects noncanonical provenance without any write: "truecoach " (3 ms)
+    ✓ rejects noncanonical provenance without any write: " truecoach" (1 ms)
+    ✓ rejects noncanonical provenance without any write: "-bad" (1 ms)
+    ✓ rejects noncanonical provenance without any write: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" (18 ms)
+    ✓ rejects noncanonical provenance without any write: "a\n" (1 ms)
+    ✓ creates reconstructed with actual staging provenance (3 ms)
+    ✓ creates skipped with actual staging provenance (1 ms)
+    ✓ creates failed with actual staging provenance (6 ms)
+    ✓ preserves a committed success on skipped replay, including reason (no claim step) (2 ms)
+    ✓ preserves a committed success on failed replay, including reason (no claim step) (1 ms)
+    ✓ reports a narrow-key collision (same source, other platform, existing reconstructed) as 409 with nothing written (16 ms)
+    ✓ reports a narrow-key collision (same source, other platform, existing skipped) as 409 with nothing written (1 ms)
+    ✓ reports a narrow-key collision (same source, other platform, existing failed) as 409 with nothing written (1 ms)
+    ✓ addresses the ledger by the five-field identity with an empty update (no claim, no early status) (2 ms)
+    ✓ uses serialized last non-success attempt, then allows success to upgrade it (15 ms)
+    ✓ isolates a throwing mapper, sanitizes error names and continues siblings (1 ms)
+    ✓ retries P2002 once on skipped and failed ledger writes (2 ms)
+    ✓ retries P2034 once on skipped and failed ledger writes (1 ms)
+    ✓ bounds exhausted/nonretryable P2034 ledger writes (6 ms)
+    ✓ bounds exhausted/nonretryable P2003 ledger writes
+    ✓ maps a P2002 that survives the single retry to the 409 provenance conflict
+    ✓ rejects an intent that has not settled (still running) with 409 (1 ms)
+    ✓ rejects an unknown intent (no import row) with 409
+    ✓ reconstructs every mappable client and keeps honest accounting (1 ms)
+    ✓ is an idempotent no-op on replay: identical counts, no new rows (1 ms)
+    ✓ skips an unmappable row (wrong platform) with a reason and no Person (12 ms)
+    ✓ isolates a poison row to failed while its siblings still reconstruct (3 ms)
+    ✓ records a non-PII reason for a failed row (error class only, never payload)
+    ✓ handles an empty staged set with all-zero counts (1 ms)
+    ✓ emits one completion event per pass with counts and no PII (2 ms)
+    ✓ uses the stable completion event name (35 ms)
+    ✓ accounts a mixed pass (reconstruct + skip + fail) with the invariant intact (1 ms)
+    ✓ links each reconstructed ledger row to the minted Person via target_id
+    ✓ heals a previously-failed row on replay once the poison clears (failed → reconstructed) (1 ms)
+    ✓ updates the display name on replay without minting a new Person
+    ✓ keeps two coaches isolated even when they share a source_id (1 ms)
+    ✓ records the missing_source_id reason for an empty-id skip (1 ms)
+    ✓ settles for any non-null terminal status (partial/failed are still settled) (1 ms)
+    ✓ performs NO reconstruction work when the intent is rejected as unsettled
+    ✓ emits no analytics event when an unknown intent is rejected (5 ms)
+    ✓ reconstructs a mappable client with no name into a null-display_name Person (1 ms)
+    ✓ scopes the tally to the requested intent (a sibling intent does not leak in) (1 ms)
+    ✓ writes exactly one ledger row per staged row (accounting is exhaustive) (1 ms)
+    P3-1 bounded fan-out (fail-closed ceiling + deterministic paging)
+      ✓ rejects an over-ceiling intent BEFORE any read, mint, ledger write, or event (1 ms)
+      ✓ accepts an intent exactly at the ceiling (boundary is inclusive)
+      ✓ paginates a multi-page intent deterministically and reconstructs every row (33 ms)
+    P3-2 same-intent concurrency (P2002 retry converges, no double-count)
+      ✓ retries once on a lost insert race and converges to reconstructed (1 ms)
+      ✓ records failed (not a 500) when the retry also loses (1 ms)
+      ✓ a serial replay after a race is a clean idempotent no-op
+    P3-3 PII-safe failure observability
+      ✓ logs a warn (counts + correlation ids only) when a row fails, never payload
+      ✓ logs at info (not warn) on a fully clean pass (1 ms)
+    P3-5 object-level tenant scoping (coach_id on every DB access)
+      ✓ scopes count, findMany, and tally.groupBy by the token coach_id (1 ms)
+
+PASS test/scout/entities/scout-entities.service.spec.ts
+  ScoutEntitiesService.getEntities
+    ✓ 404s for an unknown intent (no ScoutImport evidence) (12 ms)
+    ✓ 404s for another tenant's intent — no existence oracle (3 ms)
+    ✓ rejects an unsupported family at the service boundary (fail closed) (4 ms)
+    ✓ returns reconstructed entities in deterministic source_id order (12 ms)
+    ✓ reports page_count as the size of THIS page — never a full-collection total (20 ms)
+    ✓ returns an empty page for a settled-but-unreconstructed intent+family (2 ms)
+    ✓ drops a cascade-erased entity from the page (erasure by absence, no Deleted state) (2 ms)
+    ✓ paginates deterministically across pages with a context-bound opaque cursor (3 ms)
+    ✓ does not double-return or skip rows across the full page walk (2 ms)
+    ✓ rejects a malformed cursor (fail closed, never a silent full scan) (1 ms)
+    ✓ rejects a cursor minted for a DIFFERENT intent (binding is checked) (23 ms)
+    ✓ rejects a cursor minted for a DIFFERENT family (binding is checked) (2 ms)
+    ✓ rejects a cursor minted for a DIFFERENT coach (binding is checked) (1 ms)
+    ✓ rejects an out-of-range limit at the service boundary (4 ms)
+    ✓ never leaks another tenant entity even if a ledger target_id points cross-tenant (1 ms)
+    ✓ never leaks a different family even if a ledger target_id points cross-family (2 ms)
+    ✓ only returns reconstructed rows — skipped/failed ledger rows never surface (2 ms)
+    ✓ returns no email or billing fields on an entity row (2 ms)
+    ✓ is site-agnostic: projects a non-TrueCoach source platform identically (1 ms)
+    ✓ emits a PII-safe analytics read signal (counts only, no labels) (2 ms)
+    ✓ holds pagination at 100x the default page size (43 ms)
+    ✓ every reviewable family is a non-person family (clients excluded) (1 ms)
+    Q1 cursor emission and legacy-boundary resolution
+      ✓ emits scoped v2 on every non-final page, each accepted back by the decoder (2 ms)
+      ✓ resolves a Q0-emitted legacy entities token to the same next page as its v2 twin (5 ms)
+      ✓ 400s an unresolvable legacy token (absent source) with no page read (9 ms)
+      ✓ resolves within the token family only: a row of another family is not a boundary (40 ms)
+      ✓ enumerates identity ties exactly once and refuses a tied legacy boundary (3 ms)
+    settled-intent gate (terminal_status must be non-null)
+      ✓ 404s for an intent that exists for the coach but has NOT settled (10 ms)
+      ✓ is indistinguishable from an unknown intent — same uniform 404, no settle oracle (10 ms)
+      ✓ reads a settled intent (any non-null terminal_status) normally (9 ms)
+    replay / idempotency (read-only, no state mutation)
+      ✓ returns the identical page for the same request replayed twice (10 ms)
+      ✓ replaying a next_cursor is deterministic — same second page every time (4 ms)
+      ✓ mutates no seed state across repeated reads (row set is stable) (1 ms)
+    single consistent snapshot (one RepeatableRead transaction)
+      ✓ runs every read inside ONE RepeatableRead $transaction (12 ms)
+      ✓ reads the gate inside the snapshot too (unsettled 404 still opens exactly one txn) (2 ms)
+      ✓ a rejected family never opens a transaction (fails before any read) (24 ms)
+
+PASS test/scout/roster/scout-roster.service.spec.ts
+  ScoutRosterService.getRoster
+    ✓ 404s for an unknown intent (no ScoutImport evidence) (3 ms)
+    ✓ 404s for another tenant's intent — no existence oracle (3 ms)
+    ✓ returns honest ledger-derived accounting (1 ms)
+    ✓ exposes a partial pass as staged > reconstructed + skipped + failed
+    ✓ returns only reconstructed persons in the roster list, in deterministic source_id order
+    ✓ returns an empty roster + zero accounting for a settled-but-unreconstructed intent (6 ms)
+    ✓ excludes deleted persons but still counts them in accounting (erasure preserved)
+    ✓ paginates deterministically across pages with an opaque cursor (5 ms)
+    ✓ does not double-return or skip rows across the full page walk (1 ms)
+    ✓ rejects a malformed cursor (fail closed, never a silent full scan)
+    ✓ rejects an out-of-range limit at the service boundary (1 ms)
+    ✓ never leaks another tenant persons even if a ledger target_id points cross-tenant
+    ✓ returns no email or billing fields on a roster row (1 ms)
+    ✓ emits a PII-safe analytics read signal (counts only, no display names) (14 ms)
+    ✓ holds accounting + pagination at 100x the default page size (50 ms)
+    Q1 cursor emission and legacy-boundary resolution
+      ✓ emits scoped v2 on every non-final page and the decoder accepts each one back (2 ms)
+      ✓ resolves a Q0-emitted legacy roster token to the same next page as its v2 twin (7 ms)
+      ✓ 400s an unresolvable legacy token (absent source) before any count or page read (1 ms)
+      ✓ never widens a roster legacy token past the requested (coach, intent, clients) scope (48 ms)
+      ✓ enumerates identity ties exactly once via (source_id, source_platform) and refuses a tied legacy boundary (6 ms)
+      ✓ does not hand out a token when the last ledger row is not encodable (1 ms)
+    settled-intent gate (terminal_status must be non-null)
+      ✓ 404s for an intent that exists for the coach but has NOT settled (1 ms)
+      ✓ is indistinguishable from an unknown intent — same uniform 404, no settle oracle
+      ✓ reads a settled intent (non-null terminal_status) normally (2 ms)
+    single consistent snapshot (one RepeatableRead transaction)
+      ✓ runs every read inside ONE RepeatableRead $transaction
+      ✓ reads the gate inside the snapshot too (unsettled 404 still opens exactly one txn) (1 ms)
+
+PASS test/scout/reconstruct/scout-reconstruct.controller.spec.ts
+  ScoutReconstructDto validation
+    ✓ accepts a well-formed body (9 ms)
+    ✓ rejects a missing intent_id (3 ms)
+    ✓ rejects an empty-string intent_id (1 ms)
+    ✓ rejects a non-string intent_id
+    ✓ rejects an intent_id past the length ceiling (1 ms)
+    ✓ accepts an intent_id at exactly the length ceiling
+    ✓ accepts an omitted entity_type (defaults to clients downstream)
+    ✓ accepts each supported entity_type family (5 ms)
+    ✓ rejects an unsupported entity_type family (fail closed at validation) (1 ms)
+  role gate on the reconstruct surface
+    ✓ declares @Roles("coach") on the route handler (12 ms)
+    ✓ rejects a non-coach principal (22 ms)
+    ✓ rejects a request with no authenticated user (6 ms)
+    ✓ admits a coach, and an owner via the hierarchy bypass
+  ScoutReconstructController
+    ✓ delegates to the service using coach_id from the token identity, not the body (1 ms)
+    ✓ forwards an explicit entity_type family to the service
+    ✓ returns the service reconciliation unchanged to the caller (1 ms)
+
+PASS test/scout/scout-diagnostics-boundary.spec.ts
+  safeDiagnostic covers every supported ORM shape
+    ✓ replaces the validation error (23 ms)
+    ✓ replaces the known request error with a valid P-code (1 ms)
+    ✓ replaces the known request error with a four-digit code at range end (1 ms)
+    ✓ replaces the known request error with a lowercase code (1 ms)
+    ✓ replaces the known request error with a three-digit code
+    ✓ replaces the known request error with a five-digit code (1 ms)
+    ✓ replaces the known request error with a non-Prisma code (10 ms)
+    ✓ replaces the unknown request error (17 ms)
+    ✓ replaces the initialization error (1 ms)
+    ✓ replaces the rust panic error (2 ms)
+    ✓ replaces the already sanitized DatabaseRequestError (1 ms)
+    ✓ replaces the ORM error behind one ordinary wrapper (1 ms)
+    ✓ replaces the ORM error behind two ordinary wrappers (1 ms)
+    ✓ sanitizes a cyclic cause chain that still reaches the ORM error
+    ✓ terminates on a cyclic non-ORM chain and returns the original error
+    ✓ returns an ordinary error unchanged
+    ✓ returns a string unchanged
+    ✓ returns zero unchanged (1 ms)
+    ✓ returns false unchanged
+    ✓ returns null unchanged (5 ms)
+    ✓ returns undefined unchanged
+    ✓ returns an array unchanged
+    ✓ returns a plain object wearing an ORM name unchanged
+  filter diagnostic sinks and request correlation
+    ✓ logs and captures only the sanitized diagnostic, with correlation tags (5 ms)
+    ✓ captures the sanitized diagnostic for a 5xx HttpException wrapping an ORM cause
+    ✓ keeps ordinary server diagnostics intact
+    ✓ does not report ordinary 4xx client errors to Sentry (7 ms)
+  Sentry beforeSend allowlists the ORM envelope
+    ✓ detects an ORM failure via the original exception hint (1 ms)
+    ✓ detects an ORM failure via the serialized exception type
+    ✓ detects an ORM failure via a serialized DatabaseRequestError type
+    ✓ keeps ordinary diagnostics and safe tags without SDK-enriched request metadata (1 ms)
+    ✓ preserves ordinary exception diagnostics without mutating the input event (6 ms)
+    ✓ preserves ordinary message diagnostics and envelope identifiers
+
+PASS test/scout/scout-ingest.service.spec.ts
+  ScoutIngestService
+    ✓ persists every entity and reports zero deduped when all rows are new (3 ms)
+    ✓ derives coach_id from the argument, never from the body (1 ms)
+    ✓ parses a valid capturedAt into a Date (1 ms)
+    ✓ persists the full payload verbatim, including extractor-specific fields
+    ✓ strips denylisted secret keys from the payload before persistence (1 ms)
+    ✓ does not derive provenance from payload keys (top-level makeEntity fields win) (1 ms)
+    ✓ emits one scout.ingest.received event per batch with the counts (1 ms)
+    ✓ uses the stable event constant name
+    ✓ always requests ON CONFLICT DO NOTHING semantics via skipDuplicates (1 ms)
+    ✓ stamps intent_id and entity_type onto every row in a multi-entity batch (1 ms)
+    ✓ preserves the per-entity source_platform rather than collapsing to one (1 ms)
+    ✓ parses a capturedAt carrying a timezone offset to the correct instant
+    ✓ reflects the deduped count in the emitted event on a full replay (1 ms)
+    ✓ does not throw when the batch has a large fan-out (1 ms)
+  ScoutIngestService payload redaction
+    ✓ strips every top-level denylisted key regardless of surrounding data
+    ✓ matches denylisted keys case-insensitively (1 ms)
+    ✓ strips denylisted keys nested inside objects
+    ✓ strips denylisted keys inside objects nested in arrays (1 ms)
+    ✓ preserves scalar array elements verbatim
+    ✓ preserves null and falsy non-sensitive values (1 ms)
+    ✓ leaves a payload with no sensitive keys byte-for-byte intact
+    ✓ does not treat a denylisted substring inside a longer key as sensitive (13 ms)
+    ✓ returns an empty object for an empty payload
+    ✓ strips denylisted keys at deep nesting levels (1 ms)
+  ScoutIngestService prototype pollution defenses
+    ✓ drops __proto__ keys and does not pollute Object.prototype
+    ✓ drops constructor and prototype keys
+    ✓ drops __proto__ recursively inside nested payload (1 ms)
+
+PASS test/scout/entities/scout-entities.contract.spec.ts
+  IMPORTER-I OpenAPI route shape
+    ✓ records the route as a bare GET tagged "scout" with a summary (3 ms)
+    ✓ requires intent_id and family, and leaves cursor + limit optional (7 ms)
+    ✓ publishes the family enum as the non-person allow-list (clients excluded) (1 ms)
+    ✓ bounds the limit parameter to 1..MAX in the published schema (1 ms)
+    ✓ documents 200/400/401/403/404/429 without an existence oracle on the 404 (17 ms)
+    ✓ returns ScoutEntitiesResult on 200 with page_count + next_cursor, no full total (1 ms)
+    ✓ advertises a PII-minimal entity row: no email/billing/coach_id fields (1 ms)
+  IMPORTER-I frozen-slice membership (R80)
+    ✓ is part of the frozen importer contract slice — the mobile consumer reads it (22 ms)
+  IMPORTER-I PR-M4 fixture consumer
+    ✓ treats page_count as the current page size, never a collection total (1 ms)
+    ✓ walks pages via next_cursor and terminates on the single null cursor (2 ms)
+    ✓ default page size is a sane bounded value the client can pre-size buffers to (7 ms)
+    ✓ every row a consumer reads is PII-minimal (no email/billing/coach_id) (1 ms)
+
+PASS src/scout/scout.controller.spec.ts
+  ScoutController
+    POST /api/scout/progress
+      ✓ delegates the snapshot to the service keyed by the token identity (13 ms)
+      ✓ returns nothing (204 has no body) (1 ms)
+      ✓ does not read any account field from the body — identity is the token
+      ✓ is registered as a POST on the `progress` sub-path
+      ✓ responds 204 No Content (1 ms)
+      ✓ is gated to coach/owner roles
+      ✓ carries a per-caller throttle budget (1 ms)
+    POST /api/scout/ingest/complete
+      ✓ delegates to the service keyed by the token identity (6 ms)
+      ✓ returns the service acknowledgement verbatim (1 ms)
+      ✓ is registered as a POST on the `ingest/complete` sub-path
+      ✓ responds 200 OK (1 ms)
+      ✓ is gated to coach/owner roles (1 ms)
+      ✓ carries a stricter per-caller throttle budget than progress
+    GET /api/scout/import/status
+      ✓ delegates to the service keyed by the TOKEN identity, not a query field (1 ms)
+      ✓ passes only the intent_id from the query — no account field is read
+      ✓ returns the service projection verbatim (1 ms)
+      ✓ is registered as a GET on the `import/status` sub-path
+      ✓ is gated to coach/owner roles (1 ms)
+      ✓ carries a per-caller throttle budget
+    feature gate
+      ✓ is mounted under the scout base path (global `api` prefix is applied by main.ts)
+
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":3,"reconstructed":3,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-conformance","staged":3,"reconstructed":3,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-a","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-conformance-1","coach_id":"coach-b","staged":6,"reconstructed":6,"skipped":0,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:02:05 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-adversarial","coach_id":"coach-conformance","staged":2,"reconstructed":0,"skipped":1,"failed":1}[39m
+PASS test/scout/reconstruct/conformance-alpha.e2e.spec.ts
+  conformance_alpha fixture — provenance + byte pin (D1 pattern)
+    ✓ matches the recorded byte length from extension PR-2b (2 ms)
+    ✓ matches the deterministic sha256 byte pin (1 ms)
+    ✓ carries the extension staging golden with the four crawl families (1 ms)
+    ✓ captures no billing/payment/card/vault instruments (D2 hard boundary)
+  conformance_alpha e2e — members reconstruct into canonical clients
+    ✓ reconstructs every member row with an honest all-accounted tally (3 ms)
+    ✓ maps nested profile.name to the canonical display name (never the email) (2 ms)
+    ✓ tolerates the extension poison rows deterministically (synthetic id → degraded, not failed) (1 ms)
+    ✓ is an idempotent no-op on replay: identical counts, no new Person rows (19 ms)
+  conformance_alpha e2e — routines/activity-log reconstruct into the generic entity
+    ✓ reconstructs routines (flat title degrades to a null label without throwing) (10 ms)
+    ✓ reconstructs activity-log rows with the same honest accounting (1 ms)
+  conformance_alpha e2e — tenant scoping (app-layer coach_id filter)
+    ✓ keeps two backend coaches importing the same fixture fully isolated (2 ms)
+  conformance_alpha e2e — fail-closed accounting stays honest under adversarial rows
+    ✓ records a foreign-platform row as skipped and a persist-throw as failed (1 ms)
+
+PASS test/scout/reconstruct/mapping-spec.spec.ts
+  parseSourceMappingSpec — strict, fail-closed validation
+    ✓ accepts a well-formed spec and freezes it (2 ms)
+    ✓ rejects a non-object spec (31 ms)
+    ✓ rejects an unknown top-level key (1 ms)
+    ✓ rejects a missing top-level key (1 ms)
+    ✓ rejects a wrong specVersion (2 ms)
+    ✓ rejects a non-canonical platform (1 ms)
+    ✓ rejects a blank platform (1 ms)
+    ✓ rejects a non-canonical family (billing)
+    ✓ rejects a step targeting a non-canonical family
+    ✓ rejects a step targeting a family the spec does not map
+    ✓ rejects an unknown field (e.g. an email field)
+    ✓ rejects a missing field (14 ms)
+    ✓ rejects empty paths (1 ms)
+    ✓ rejects an empty path (1 ms)
+    ✓ rejects a non-string key (1 ms)
+    ✓ rejects an unknown coercion (1 ms)
+  parseSourceMappingSpec — one id space per canonical family (A3)
+    ✓ rejects two steps mapping to one family without a declared shared id space (1 ms)
+    ✓ accepts the fan-in when the steps explicitly declare a shared id space (1 ms)
+    ✓ rejects a declaration that omits a step of the fan-in (1 ms)
+    ✓ rejects a declaration for a family with no multi-step fan-in (1 ms)
+    ✓ rejects malformed declarations (2 ms)
+    ✓ keeps every shipped 1:1 spec valid with no declaration (10 ms)
+  readField — first non-nullish path, then typed coercion
+    ✓ walks nested own keys and treats a non-object level as absent (1 ms)
+    ✓ does not fall through past a present-but-unusable value (?? semantics) (1 ms)
+    ✓ stringifies finite numbers only under string_or_finite_number
+    ✓ never reads an inherited prototype property (1 ms)
+  interpreter — identity guard and unresolved families
+    ✓ keys the person on the once-trimmed source_id (unchanged persisted identity) (1 ms)
+    ✓ fails a foreign platform and a blank id with the legacy reasons
+    ✓ reports a canonical family the spec does not map as unresolved_family (1 ms)
+    ✓ resolves mapped steps and reports unmapped steps as unresolved_family:<token> (1 ms)
+  repository specs — the live sources
+    ✓ TrueCoach `notes` (emitted by the live blueprint) is explicitly unresolved
+    ✓ conformance_alpha maps its own step tokens and leaves `coaches` unresolved
+    ✓ an unregistered platform stays unsupported_platform:<token> (1 ms)
+    ✓ every shipped spec parses and is keyed by its own sourcePlatform (4 ms)
+    ✓ field meaning is data: no reconstruct TypeScript names a source field key (13 ms)
+  loadSourceMappingSpecs — fail closed on the spec directory
+    ✓ throws on an empty directory instead of registering nothing (1 ms)
+    ✓ throws on a missing directory (3 ms)
+    ✓ throws on two specs claiming one sourcePlatform (1 ms)
+    ✓ throws on a malformed spec, naming the file
+    ✓ loads in byte-sorted filename order and ignores non-JSON files
+
+PASS test/scout/scout-ingest.controller.spec.ts
+  ScoutIngestDto validation
+    ✓ accepts a well-formed envelope (5 ms)
+    ✓ rejects a missing intent_id (17 ms)
+    ✓ rejects a missing entity_type (1 ms)
+    ✓ rejects a missing entities array (1 ms)
+    ✓ rejects an empty entities array
+    ✓ rejects an oversized batch above the entity ceiling (104 ms)
+    ✓ rejects an entity missing sourceId (1 ms)
+    ✓ rejects an entity missing sourcePlatform (1 ms)
+    ✓ rejects an entity missing capturedAt (9 ms)
+    ✓ rejects a capturedAt that is not an ISO8601 timestamp (1 ms)
+    ✓ rejects a capturedAt missing the strict "T" date/time separator (1 ms)
+    ✓ accepts a strict ISO8601 capturedAt (1 ms)
+    ✓ rejects an empty-string intent_id
+    ✓ rejects an empty-string entity_type (6 ms)
+    ✓ rejects a non-string intent_id (1 ms)
+    ✓ rejects a payload that is not an object
+    ✓ rejects an empty-string sourceId
+    ✓ rejects a sourceId past the length ceiling (1 ms)
+    ✓ accepts a batch of exactly the maximum allowed entities (89 ms)
+    ✓ accepts a payload carrying extra extractor-specific fields (1 ms)
+    ✓ accepts multiple valid entities in one envelope (1 ms)
+    ✓ rejects an entity_type past the length ceiling (1 ms)
+    ✓ rejects an intent_id past the length ceiling
+    ✓ rejects entities that is not an array
+  role gate on the ingest surface
+    ✓ declares @Roles("coach") on the route handler (roles-enforced governance)
+    ✓ rejects a non-coach principal (wrong auth role) (28 ms)
+    ✓ rejects a request with no authenticated user (1 ms)
+    ✓ admits a coach, and an owner via the hierarchy bypass (1 ms)
+  ScoutIngestController
+    ✓ delegates to the service using coach_id from the token identity (1 ms)
+    ✓ returns the service dedup counts unchanged to the caller (2 ms)
+
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":3,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":2,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-7","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":3,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":1,"skipped":1,"failed":0}[39m
+[33m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [33m   WARN[39m [38;5;3m[ScoutReconstructService] [39m[33mscout.reconstruct completed with failures {"intent_id":"intent-1","coach_id":"coach-1","staged":3,"reconstructed":2,"skipped":0,"failed":1}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-7","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":2,"reconstructed":2,"skipped":0,"failed":0}[39m
+[32m[Nest] 5794  - [39m09/24/2026, 9:02:07 PM [32m    LOG[39m [38;5;3m[ScoutReconstructService] [39m[32mscout.reconstruct completed {"intent_id":"intent-1","coach_id":"coach-1","staged":1,"reconstructed":1,"skipped":0,"failed":0}[39m
+PASS test/scout/reconstruct/scout-reconstruct.families.spec.ts
+  ScoutReconstructService — parametrized non-person families
+    ✓ fails closed with a 400 on an unregistered family BEFORE any read (1 ms)
+    ✓ keeps two families of the same intent separate (no cross-family double count) (1 ms)
+    ✓ carries the client link and label onto the canonical entity (1 ms)
+    family: workouts
+      ✓ reconstructs every mappable row into the generic canonical table (5 ms)
+      ✓ is an idempotent no-op on replay: identical counts, no new rows (2 ms)
+      ✓ links each reconstructed ledger row to the canonical entity via target_id (1 ms)
+      ✓ skips an unmappable row (wrong platform) with a reason and no entity (1 ms)
+      ✓ isolates a poison row to failed while its siblings still reconstruct (1 ms)
+      ✓ retries once on a lost insert race and converges to reconstructed (2 ms)
+      ✓ emits one completion event carrying the family entity_type and no PII (1 ms)
+      ✓ scopes count, findMany, and tally.groupBy by the token coach_id + family (3 ms)
+    family: client_history
+      ✓ reconstructs every mappable row into the generic canonical table (9 ms)
+      ✓ is an idempotent no-op on replay: identical counts, no new rows (2 ms)
+      ✓ links each reconstructed ledger row to the canonical entity via target_id (1 ms)
+      ✓ skips an unmappable row (wrong platform) with a reason and no entity (12 ms)
+      ✓ isolates a poison row to failed while its siblings still reconstruct (1 ms)
+      ✓ retries once on a lost insert race and converges to reconstructed (1 ms)
+      ✓ emits one completion event carrying the family entity_type and no PII
+      ✓ scopes count, findMany, and tally.groupBy by the token coach_id + family (1 ms)
+
+PASS test/scout/reconstruct/scout-reconstruct.flag.spec.ts
+  featureFlagNotFoundMiddleware — /api/scout/reconstruct (IMPORTER-F)
+    ✓ registers the reconstruct gate with its own env var (2 ms)
+    ✓ 404s when FEATURE_SCOUT_RECONSTRUCT is off even if FEATURE_SCOUT_INGEST is on (2 ms)
+    ✓ stays dark when FEATURE_SCOUT_INGEST is off regardless of the reconstruct flag (1 ms)
+    ✓ treats any non-"true" reconstruct value as OFF (1 ms)
+    ✓ passes through only when BOTH flags are exactly "true" (1 ms)
+
+PASS test/scout/entities/scout-entities.controller.spec.ts
+  ScoutEntitiesQueryDto validation
+    ✓ accepts a minimal well-formed query (5 ms)
+    ✓ accepts cursor + limit (1 ms)
+    ✓ rejects a missing intent_id (1 ms)
+    ✓ rejects a missing family (17 ms)
+    ✓ rejects the person family (served by the roster read, not this endpoint)
+    ✓ rejects an unregistered family (e.g. billing)
+    ✓ accepts every reviewable family (1 ms)
+    ✓ rejects an empty-string intent_id (1 ms)
+    ✓ rejects an intent_id past the length ceiling (1 ms)
+    ✓ rejects limit below 1 (1 ms)
+    ✓ rejects limit above the ceiling (1 ms)
+    ✓ accepts limit at exactly the ceiling
+    ✓ rejects a non-integer limit
+    ✓ coerces a numeric-string limit (query params arrive as strings)
+  role gate on the entities surface
+    ✓ declares @Roles("coach") on the route handler
+    ✓ rejects a non-coach principal (13 ms)
+    ✓ rejects a request with no authenticated user (1 ms)
+    ✓ admits a coach, and an owner via the hierarchy bypass
+  ScoutEntitiesController
+    ✓ delegates using coach_id from the token identity, not the query (1 ms)
+    ✓ returns the service result unchanged to the caller
+
+PASS test/scout/reconstruct/truecoach-entity.mapper.spec.ts
+  mapTrueCoachEntity
+    ✓ maps every real golden workout to a canonical entity shape (3 ms)
+    ✓ maps every real golden client-history record to a canonical entity shape (1 ms)
+    ✓ never reads email — no golden mapping carries an email field or value (1 ms)
+    ✓ never reads any billing/price field from the golden payloads (11 ms)
+    ✓ never surfaces a payload id or email — identity stays the opaque source_id (4 ms)
+    ✓ accepts a whitespace-padded but non-empty source_id (not skipped) (1 ms)
+    ✓ reads the client link from client_id (numeric coerced to string) (14 ms)
+    ✓ reads the client link from the camelCase clientId variant (1 ms)
+    ✓ yields a null client link when no client id is present (1 ms)
+    ✓ reads a display label from title, then name (1 ms)
+    ✓ trims a usable label and nulls an empty/whitespace/non-string one (2 ms)
+    ✓ yields a null label for the golden workout that has no title (item 503)
+    ✓ skips a non-truecoach platform with a reason
+    ✓ skips an empty / whitespace-only source_id with a reason
+    ✓ is total — it never throws on adversarial payloads (2 ms)
+
+PASS test/scout/scout-cursor.spec.ts
+  Q1 scoped v2 encoder, decoder, legacy resolution and HTTP boundary
+    ✓ accepts exact v2 clients boundary (25 ms)
+    ✓ accepts exact v2 workouts boundary (1 ms)
+    ✓ accepts exact v2 client_history boundary (1 ms)
+    ✓ emits the exact canonical v2 envelope for clients and round-trips it (71 ms)
+    ✓ emits the exact canonical v2 envelope for workouts and round-trips it (14 ms)
+    ✓ emits the exact canonical v2 envelope for client_history and round-trips it (2 ms)
+    ✓ round-trips every worst-case boundary and stays within the HTTP bound (12 ms)
+    ✓ fails closed instead of emitting an undecodable token (3 ms)
+    ✓ still decodes the distinct legacy formats to a source-only boundary (31 ms)
+    ✓ resolves a legacy boundary only through exactly one canonical ledger row in scope (2 ms)
+    ✓ passes v2 and empty boundaries through without any lookup (1 ms)
+    ✓ refuses an unresolvable legacy boundary as the documented 400: absent (forged, foreign or never reconstructed) (21 ms)
+    ✓ refuses an unresolvable legacy boundary as the documented 400: tied across platforms (40 ms)
+    ✓ refuses an unresolvable legacy boundary as the documented 400: noncanonical provenance (1 ms)
+    ✓ refuses an unresolvable legacy boundary as the documented 400: null provenance
+    ✓ rejects malformed and cross-scope clients tokens before reads (26 ms)
+    ✓ rejects malformed and cross-scope workouts tokens before reads (16 ms)
+    ✓ accepts worst-case escaped and Unicode identifiers through the real clients query pipe (45 ms)
+    ✓ accepts worst-case escaped and Unicode identifiers through the real workouts query pipe (66 ms)
+
+PASS test/scout/entities/scout-entities.rls.live.spec.ts
+  IMPORTER-I ScoutReconstructedEntity RLS posture (static)
+    ✓ ENABLEs and FORCEs row level security (2 ms)
+    ✓ grants service_role a PERMISSIVE bypass and denies anon + authenticated (RESTRICTIVE) (1 ms)
+  IMPORTER-I ScoutReconstructedEntity RLS — live enforcement
+    ○ skipped authenticated reads ZERO rows — for its own tenant AND another (no oracle, fail-closed)
+    ○ skipped anon reads ZERO rows (RESTRICTIVE deny-all)
+    ○ skipped service_role sees both tenants (tenant scoping is the app-layer coach_id filter)
+    ○ skipped authenticated cannot INSERT (WITH CHECK false) — write is denied too
+    ○ skipped an erased row is truly absent afterwards (the read can never resurrect it)
+
+PASS test/scout/roster/scout-roster.controller.spec.ts
+  ScoutRosterQueryDto validation
+    ✓ accepts a minimal well-formed query (37 ms)
+    ✓ accepts cursor + limit (1 ms)
+    ✓ rejects a missing intent_id (2 ms)
+    ✓ rejects an empty-string intent_id (6 ms)
+    ✓ rejects an intent_id past the length ceiling (1 ms)
+    ✓ rejects limit below 1 (1 ms)
+    ✓ rejects limit above the ceiling (1 ms)
+    ✓ accepts limit at exactly the ceiling (29 ms)
+    ✓ rejects a non-integer limit (1 ms)
+    ✓ coerces a numeric-string limit (query params arrive as strings) (1 ms)
+  role gate on the roster surface
+    ✓ declares @Roles("coach") on the route handler (27 ms)
+    ✓ rejects a non-coach principal (88 ms)
+    ✓ rejects a request with no authenticated user (1 ms)
+    ✓ admits a coach, and an owner via the hierarchy bypass (1 ms)
+  ScoutRosterController
+    ✓ delegates using coach_id from the token identity, not the query (15 ms)
+    ✓ returns the service result unchanged to the caller (1 ms)
+
+PASS test/scout/g2-nq1-db-guard.spec.ts
+  S7-3 N/Q1 PG17 disposable target guard
+    ✓ accepts a confirmed loopback target and strips only Prisma options for psql (53 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@localhost:55481/g2_nq1_disposable (30 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@db.supabase.co:55481/g2_nq1_disposable (27 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:5432/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:6543/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55439/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:70000/g2_nq1_disposable (11 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55461/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55471/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55481/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55481/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_tq0_disposable (29 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:54325/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/postgres (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://service_role@127.0.0.1:55481/g2_nq1_disposable (4 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super:secret@127.0.0.1:55481/g2_nq1_disposable (9 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://postgres@127.0.0.1:55481/g2_nq1_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:54321/g2_nq1_disposable
+    ✓ refuses unsafe or ambiguous target postgres://nq1_super@127.0.0.1:55481/g2_nq1_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?host=remote (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?sslmode=disable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?options=-csearch_path%3Dprivate (3 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?schema=private
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?connection_limit=0 (11 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?connection_limit=01 (16 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable?schema=public&schema=public (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable#fragment (31 ms)
+    ✓ refuses absent, mistaken or port-mismatched confirmation (28 ms)
+    ✓ pins distinctive, non-blank fixture markers that bootstrap carries verbatim (1 ms)
+    ✓ attaches the fixture password only from the environment and only in plain form (13 ms)
+
+PASS test/scout/reconstruct/conformance-alpha.mapper.spec.ts
+  conformance_alpha — registry registration
+    ✓ is reachable through the frozen seam by its source_platform (2 ms)
+  conformance_alpha — members → canonical client (nested profile)
+    ✓ walks both cursor pages in deterministic order (14 ms)
+    ✓ maps a member id + nested profile.name to the canonical client (1 ms)
+    ✓ degrades an omitted profile to a null display name (optional field) (1 ms)
+    ✓ fails the poison blank-id row closed with missing_source_id (8 ms)
+    ✓ never reads email — it is absent from every mapped client (1 ms)
+  conformance_alpha — routines/activity-log → canonical entity (nested attributes)
+    ✓ maps nested attributes.title + attributes.member_id to the canonical entity (6 ms)
+    ✓ carries an omitted member_id through as a null soft-link (1 ms)
+    ✓ degrades an omitted attributes object to null fields without throwing (1 ms)
+    ✓ coerces a numeric member_id to string through the seam (8 ms)
+    ✓ never maps the price/billing noise onto the canonical entity (1 ms)
+  conformance_alpha — fail-closed and totality at the seam
+    ✓ rejects a foreign platform with the exact unsupported_platform token (28 ms)
+    ✓ degrades a non-object (array) payload to null fields, never a throw (1 ms)
+  conformance_alpha — structurally distinct from TrueCoach (not coincidental)
+    ✓ reads the NESTED profile.name, so a TrueCoach-flat name yields null (1 ms)
+    ✓ the TrueCoach mapper cannot read the conformance nested profile (2 ms)
+  conformance_alpha — engine dispatch via the family layer (zero core change)
+    ✓ routes a conformance clients row through the SAME family map() (1 ms)
+    ✓ routes a conformance workouts row through the SAME family map() (1 ms)
+    ✓ still fails a genuinely unregistered platform closed at the family seam
+
+PASS test/scout/reconstruct/truecoach-clients.mapper.spec.ts
+  mapTrueCoachClient
+    ✓ maps every real golden client to an invite-pending roster shape (6 ms)
+    ✓ never reads email — the mapped shape carries no email field or value (2 ms)
+    ✓ uses source_id as the identity key, never any payload id/email (4 ms)
+    ✓ trims surrounding whitespace on the identity key (1 ms)
+    ✓ skips a non-truecoach platform with a reason (39 ms)
+    ✓ skips an empty / whitespace-only source_id with a reason (6 ms)
+    ✓ yields a null display name when payload has no usable name (3 ms)
+    ✓ trims a usable display name (13 ms)
+    ✓ is total — it never throws on adversarial payloads (1 ms)
+
+PASS test/scout/reconstruct/source-mapper-registry.spec.ts
+  buildSourceMapperRegistry — source_platform dispatch
+    ✓ registers truecoach plus the non-production conformance_alpha adapter (13 ms)
+    ✓ returns undefined for any unregistered platform (fail-closed at the seam)
+    ✓ routes clients through the TrueCoach client mapper (concrete fields) (9 ms)
+    ✓ routes non-person families through the TrueCoach entity mapper (concrete fields) (1 ms)
+    ✓ preserves the mapper skip reasons verbatim through the seam (1 ms)
+  family map() — registry-backed dispatch preserves behavior
+    ✓ maps a truecoach clients row to a canonical value (no regression)
+    ✓ maps a truecoach workouts row to a canonical value (no regression)
+    ✓ fails an unregistered platform closed with unsupported_platform token (clients) (1 ms)
+    ✓ fails an unregistered platform closed with unsupported_platform token (workouts) (1 ms)
+    ✓ fails an unregistered platform closed with unsupported_platform token (client_history)
+    ✓ propagates a mapper skip reason that is NOT the platform guard
+    ✓ carries an absent client link through as a null soft-link (non-person family) (1 ms)
+    ✓ coerces a numeric client_id to string through the seam (1 ms)
+    ✓ degrades a non-object payload to null fields without throwing (poison-shaped) (1 ms)
+  buildSourceMapperRegistry — instance independence
+    ✓ returns a fresh map per call with no shared mutable singleton (1 ms)
+    ✓ keys the registry by each source mapper own sourcePlatform (10 ms)
+
+PASS src/scout/scout.dto.spec.ts
+  ScoutProgressDto validation
+    ✓ accepts a well-formed status_snapshot (15 ms)
+    ✓ accepts an optional lastError string (1 ms)
+    ✓ accepts an empty progress array (nothing committed yet) (2 ms)
+    ✓ carries the deviceId through onto the transformed instance (1 ms)
+    ✓ rejects a missing deviceId (1 ms)
+    ✓ rejects an empty deviceId
+    ✓ rejects an over-long deviceId (Length max 64)
+    ✓ rejects a missing intent_id (1 ms)
+    ✓ rejects a non-string intent_id (1 ms)
+    ✓ rejects a missing progress array (1 ms)
+    ✓ rejects progress that is not an array (1 ms)
+    ✓ rejects a progress entry missing entity_type (1 ms)
+    ✓ rejects a non-integer count_committed (1 ms)
+    ✓ rejects a negative total_estimated (1 ms)
+    ✓ rejects an unknown top-level field (forbidNonWhitelisted) (1 ms)
+    ✓ rejects an unknown nested field on a progress entry (6 ms)
+    ✓ rejects an oversized progress array (ArrayMaxSize) (21 ms)
+    ✓ rejects an over-long lastError string (1 ms)
+  ScoutCompleteDto validation
+    ✓ accepts a well-formed success completion (1 ms)
+    ✓ accepts a partial completion with an error_summary (5 ms)
+    ✓ accepts a failed completion (1 ms)
+    ✓ accepts a completion without final_counts (1 ms)
+    ✓ rejects a missing intent_id (1 ms)
+    ✓ rejects a terminal_status outside the allowed set (1 ms)
+    ✓ rejects a missing terminal_status (1 ms)
+    ✓ rejects a non-object final_counts (6 ms)
+    ✓ rejects an unknown top-level field (2 ms)
+    ✓ rejects an over-long error_summary (1 ms)
+  ScoutImportStatusQueryDto validation
+    ✓ accepts a well-formed intent_id (15 ms)
+    ✓ rejects a missing intent_id (1 ms)
+    ✓ rejects an empty intent_id (Length min 1)
+    ✓ rejects a non-string intent_id
+    ✓ rejects an over-long intent_id (Length max 128) (1 ms)
+    ✓ rejects an unknown extra field (forbidNonWhitelisted) (1 ms)
+
+PASS src/scout/scout-ledger-backfill.spec.ts
+  G2-B classify
+    ✓ resolves exactly one canonical staged match and classifies every other case (5 ms)
+  G2-B decideOutcome / exit codes
+    ✓ is drained only with zero NULL and the fence installed (5 ms)
+    ✓ separates fully explained remainders from unexplained (locked/unprocessed) ones (6 ms)
+    ✓ exits 0 only for drained
+    ✓ recognises lock and statement timeouts only (2 ms)
+  G2-B backfillLedgerPlatform control flow
+    ✓ walks NULL rows in id order in bounded chunks, resumes past unresolvable rows, and stops honestly (9 ms)
+    ✓ reports completion without the fence as complete_unfenced, never drained (1 ms)
+    ✓ skips locked rows without waiting, revisits them on the next pass, and reports a stall (24 ms)
+    ✓ retries a chunk only for lock/statement timeouts, within the bound, then stalls (14 ms)
+    ✓ propagates any non-timeout database failure instead of retrying or inventing a verdict (47 ms)
+    ✓ refuses a chunk whose update count differs from the locked resolvable set and rolls it back (2 ms)
+    ✓ bounds batch, passes and retries before touching the database (1 ms)
+  G2-B operator argument parsing
+    ✓ accepts only the three bounded numeric flags (29 ms)
+
+PASS test/scout/scout-diagnostics-public-cause.spec.ts
+  public error envelope never carries ORM-derived text
+    ✓ service unavailable object body wrapping an initialization error (25 ms)
+    ✓ conflict whose error field carries ORM text (3 ms)
+    ✓ unprocessable entity whose machine code carries ORM text (17 ms)
+    ✓ not found built from a P2025 message (5 ms)
+    ✓ forbidden wrapping an unknown request error (1 ms)
+    ✓ explicit 409 object body with an array message and a rust panic cause (2 ms)
+    ✓ 500 object body with both array message and machine code (17 ms)
+    ✓ nested repository wrapper around a validation error (2 ms)
+    ✓ three-level wrapper chain around a known request error (2 ms)
+    ✓ cyclic wrapper chain that still reaches the ORM error (2 ms)
+    ✓ already sanitized DatabaseRequestError name as cause (1 ms)
+    ✓ 400 wrapping a known request error with a malformed code shape (1 ms)
+    ✓ 409 wrapping a known request error whose meta target leaked into the body (2 ms)
+    ✓ 503 string response wrapping an initialization error (1 ms)
+    ✓ 422 array message wrapping a validation error (1 ms)
+    ✓ 500 wrapping a rust panic error message (18 ms)
+
+PASS test/scout/scout-diagnostics-public.spec.ts
+  public error envelope never carries ORM-derived text
+    ✓ bare string response wrapping a validation error (39 ms)
+    ✓ internal server error built from a known request error message (10 ms)
+    ✓ bad request string wrapping a validation error (19 ms)
+    ✓ bad request array whose first element carries ORM text (5 ms)
+    ✓ bad request array whose last element carries ORM text (25 ms)
+  ordinary client errors keep their exact public contract
+    ✓ preserves a plain 4xx string message and error name (1 ms)
+    ✓ preserves a ValidationPipe message array element-for-element (1 ms)
+    ✓ preserves a machine-readable code alongside its message (1 ms)
+    ✓ preserves a 4xx message whose cause is an ordinary non-ORM error (7 ms)
+
+PASS test/scout/g2-tq0-db-guard.spec.ts
+  T/Q0 disposable target guard
+    ✓ requires its own confirmed target and strips only Prisma options for psql (2 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@localhost:55439/g2_tq0_disposable (9 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:5432/g2_tq0_disposable (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://service_role@127.0.0.1:55439/g2_tq0_disposable (2 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user:secret@127.0.0.1:55439/g2_tq0_disposable (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable?host=remote (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable?schema=private (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable?connection_limit=0 (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable?schema=public&schema=public (1 ms)
+    ✓ refuses unsafe/ambiguous target postgresql://user@127.0.0.1:55439/g2_tq0_disposable#fragment (1 ms)
+    ✓ refuses absent or mistaken confirmation (5 ms)
+
+PASS test/scout/scout-ingest.idempotency.spec.ts
+  R-IDEMP-1 idempotency key is (coach_id, intent_id, source_id)
+    ✓ declares the composite @@unique on exactly the three key columns in order (2 ms)
+    ✓ does NOT include captured_at in the unique key (captured_at is a value)
+    ✓ keeps captured_at nullable and outside the key in the model
+    ✓ creates a UNIQUE INDEX on the three key columns in the migration DDL
+    ✓ does not put captured_at into any UNIQUE INDEX in the migration DDL (6 ms)
+    ✓ documents the R-IDEMP-1 reasoning in the migration header
+
+PASS test/scout/scout-diagnostics.integrity.spec.ts
+  ORM diagnostics before every sink
+    ✓ removes ORM arguments from logs and captured exception: 0 (22 ms)
+    ✓ removes ORM arguments from logs and captured exception: 1 (29 ms)
+    ✓ removes ORM arguments from logs and captured exception: 2 (2 ms)
+    ✓ removes ORM arguments from logs and captured exception: 3 (2 ms)
+    ✓ does not discard ordinary non-ORM diagnostics (2 ms)
+    ✓ sanitizes ORM exception text, arguments and request data in beforeSend independently (1 ms)
+    ✓ does not log URL query payloads alongside a sanitized ORM exception (27 ms)
+
+PASS test/scout/reconstruct/scout-reconstructed-entity.migration.spec.ts
+  IMPORTER-H ScoutReconstructedEntity schema + migration structural guard
+    generic canonical entity model (D2 identity, family-parametrized)
+      ✓ keys the external_ref on (coach_id, source_platform, entity_type, source_id) (41 ms)
+      ✓ has NO email column — email is never stored or keyed (D2) (1 ms)
+      ✓ has NO billing/price column — billing is never reconstructed (1 ms)
+      ✓ mints NO auth/credential column (canonical entity is non-login) (1 ms)
+      ✓ carries an optional soft client link and label (19 ms)
+      ✓ creates the external_ref UNIQUE INDEX in the migration DDL (1 ms)
+      ✓ creates the (coach_id, entity_type) lookup index in the migration DDL
+    RLS posture (fail-closed, service_role only)
+      ✓ ENABLEs and FORCEs row level security on ScoutReconstructedEntity (1 ms)
+      ✓ grants a PERMISSIVE service_role bypass on ScoutReconstructedEntity
+      ✓ denies anon and authenticated via RESTRICTIVE deny-all on ScoutReconstructedEntity
+    migration ordering (applies AFTER scout_reconstruction)
+      ✓ sorts lexicographically after the reconstruction migration (1 ms)
+      ✓ declares NO foreign key to Person or any scout table (additive, self-contained) (1 ms)
+    reversibility (R82/R106)
+      ✓ wraps the migration in a single transaction (1 ms)
+      ✓ drops the table in down.sql (1 ms)
+
+PASS test/scout/g2-pg17-db-guard.spec.ts
+  S5 G2 PG17 disposable target guard
+    ✓ accepts a confirmed loopback target and strips only Prisma options for psql (6 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@localhost:55417/g2_s5_etq0_disposable (12 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@db.supabase.co:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:5432/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:6543/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55439/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:70000/g2_s5_etq0_disposable (4 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_tq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/postgres (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://service_role@127.0.0.1:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super:secret@127.0.0.1:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://postgres@127.0.0.1:55417/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:54321/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgres://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?host=remote (12 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?sslmode=disable (5 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?options=-csearch_path%3Dprivate (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?schema=private
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connection_limit=0
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connection_limit=01
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?connect_timeout=11
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable?schema=public&schema=public (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://s5_super@127.0.0.1:55417/g2_s5_etq0_disposable#fragment (1 ms)
+    ✓ refuses absent, mistaken or port-mismatched confirmation (2 ms)
+    ✓ pins distinctive, non-blank fixture markers that bootstrap carries verbatim (11 ms)
+    ✓ attaches the fixture password only from the environment and only in plain form (6 ms)
+
+PASS test/scout/entities/scout-entities.flag.spec.ts
+  featureFlagNotFoundMiddleware — /api/scout/reconstruct/entities (IMPORTER-I)
+    ✓ 404s when FEATURE_SCOUT_RECONSTRUCT is off even if FEATURE_SCOUT_INGEST is on (13 ms)
+    ✓ stays dark when FEATURE_SCOUT_INGEST is off regardless of the reconstruct flag (1 ms)
+    ✓ treats any non-"true" reconstruct value as OFF (1 ms)
+    ✓ passes through only when BOTH flags are exactly "true" (1 ms)
+
+PASS test/scout/g2-b-drain-db-guard.spec.ts
+  S7-3 B/drain PG17 disposable target guard
+    ✓ accepts a confirmed loopback target and strips only Prisma options for psql (10 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@localhost:55461/g2_b_drain_disposable (46 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@db.supabase.co:55461/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:5432/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:6543/g2_b_drain_disposable (12 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55439/g2_b_drain_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:70000/g2_b_drain_disposable (21 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_tq0_disposable (4 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:54325/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_ledger_expand_disposable (34 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/postgres (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://service_role@127.0.0.1:55461/g2_b_drain_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://b_super:secret@127.0.0.1:55461/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://postgres@127.0.0.1:55461/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:54321/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgres://b_super@127.0.0.1:55461/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?host=remote (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?sslmode=disable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?options=-csearch_path%3Dprivate (17 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?schema=private (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?connection_limit=0 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?connection_limit=01 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable?schema=public&schema=public (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55461/g2_b_drain_disposable#fragment (3 ms)
+    ✓ refuses absent, mistaken or port-mismatched confirmation (1 ms)
+    ✓ pins distinctive, non-blank fixture markers that bootstrap carries verbatim (20 ms)
+    ✓ attaches the fixture password only from the environment and only in plain form (4 ms)
+
+PASS test/scout/g2-r-ready-db-guard.spec.ts
+  S7-3 R/ready PG17 disposable target guard
+    ✓ accepts a confirmed loopback target and strips only Prisma options for psql (2 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@localhost:55471/g2_r_ready_disposable (11 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@db.supabase.co:55471/g2_r_ready_disposable (6 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:5432/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:6543/g2_r_ready_disposable (2 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55439/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:70000/g2_r_ready_disposable (3 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55461/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_b_drain_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://b_super@127.0.0.1:55471/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_tq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_s5_etq0_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:54325/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_ledger_expand_disposable (9 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/postgres (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://service_role@127.0.0.1:55471/g2_r_ready_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://r_super:secret@127.0.0.1:55471/g2_r_ready_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://postgres@127.0.0.1:55471/g2_r_ready_disposable
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:54321/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgres://r_super@127.0.0.1:55471/g2_r_ready_disposable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?host=remote (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?sslmode=disable (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?options=-csearch_path%3Dprivate (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?schema=private (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?connection_limit=0 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?connection_limit=01 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable?schema=public&schema=public (1 ms)
+    ✓ refuses unsafe or ambiguous target postgresql://r_super@127.0.0.1:55471/g2_r_ready_disposable#fragment
+    ✓ refuses absent, mistaken or port-mismatched confirmation (3 ms)
+    ✓ pins distinctive, non-blank fixture markers that bootstrap carries verbatim (9 ms)
+    ✓ attaches the fixture password only from the environment and only in plain form (15 ms)
+
+PASS test/scout/roster/scout-roster.flag.spec.ts
+  featureFlagNotFoundMiddleware — /api/scout/reconstruct/roster (IMPORTER-G)
+    ✓ 404s when FEATURE_SCOUT_RECONSTRUCT is off even if FEATURE_SCOUT_INGEST is on (7 ms)
+    ✓ stays dark when FEATURE_SCOUT_INGEST is off regardless of the reconstruct flag (1 ms)
+    ✓ treats any non-"true" reconstruct value as OFF (1 ms)
+    ✓ passes through only when BOTH flags are exactly "true" (1 ms)
+
+PASS test/scout/reconstruct/scout-reconstruct.migration.spec.ts
+  IMPORTER-F schema + migration structural guard
+    Person roster model (D2 identity)
+      ✓ keys the external_ref on (coach_id, source_platform, source_person_id) (2 ms)
+      ✓ has NO email column — email is never stored or keyed (D2)
+      ✓ mints NO auth/credential column at import (invite-pending, non-login) (1 ms)
+      ✓ defaults new roster records to the InvitePending state (1 ms)
+      ✓ declares the PersonState enum with the D2 lifecycle states (1 ms)
+      ✓ creates the external_ref UNIQUE INDEX in the migration DDL (1 ms)
+    ScoutReconstructionLedger (idempotent reconciliation)
+      ✓ keys the ledger on (coach_id, intent_id, entity_type, source_id) (1 ms)
+      ✓ carries an optional target_id and reason for non-reconstructed outcomes (1 ms)
+      ✓ creates the ledger UNIQUE INDEX in the migration DDL (1 ms)
+    RLS posture (fail-closed, service_role only)
+      ✓ ENABLEs and FORCEs row level security on Person (2 ms)
+      ✓ grants a PERMISSIVE service_role bypass on Person (1 ms)
+      ✓ denies anon and authenticated via RESTRICTIVE deny-all on Person (1 ms)
+      ✓ ENABLEs and FORCEs row level security on ScoutReconstructionLedger (1 ms)
+      ✓ grants a PERMISSIVE service_role bypass on ScoutReconstructionLedger (1 ms)
+      ✓ denies anon and authenticated via RESTRICTIVE deny-all on ScoutReconstructionLedger
+    migration ordering (P3-4: applies AFTER scout_import_state)
+      ✓ sorts lexicographically after the scout_import_state migration
+      ✓ both migration directories exist on disk (fresh-apply sequence is intact) (1 ms)
+      ✓ declares NO foreign key to ScoutImport (ordering is deploy-clarity, not structural) (1 ms)
+    reversibility (R82/R106)
+      ✓ wraps the migration in a single transaction
+      ✓ drops both tables and the enum in down.sql (8 ms)
+
+PASS test/scout/g2-ledger-target.spec.ts
+  G2-E dedicated disposable target boundary
+    ✓ refuses unsupported target before any connection: postgresql://user@prod.example.com:55439/g2_ledger_expand_disposable (10 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:5432/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/c1_setup_disposable (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user:password@127.0.0.1:55439/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://service_role@127.0.0.1:55439/g2_ledger_expand_disposable (9 ms)
+    ✓ refuses unsupported target before any connection: https://user@127.0.0.1:55439/g2_ledger_expand_disposable (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable#fragment (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?schema=private (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?host=prod.example.com (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?options=-csearch_path%3Dprivate (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?sslmode=disable (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?schema=public&schema=private (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?connect_timeout=0 (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?connect_timeout=11 (1 ms)
+    ✓ refuses unsupported target before any connection: postgresql://user@127.0.0.1:55439/g2_ledger_expand_disposable?connection_limit=01 (1 ms)
+    ✓ requires explicit matching confirmation (1 ms)
+    ✓ retains bounded timeout and strips only Prisma-only options for psql (1 ms)
+
+Test Suites: 41 passed, 41 total
+Tests:       5 skipped, 820 passed, 825 total
+Snapshots:   0 total
+Time:        134.609 s
+Ran all test suites matching test/scout|src/scout.
+jest_exit=0 2026-09-24T21:02:23Z

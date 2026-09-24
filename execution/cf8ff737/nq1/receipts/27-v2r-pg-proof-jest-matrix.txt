@@ -1,0 +1,26 @@
+    PG17_DATABASE {"port":55481,"user":"postgres","owner":"postgres","super":false,"address":"127.0.0.1","version":"170006","database":"g2_nq1_disposable","bypassrls":true,"directory":"/home/user/pg17/clusters/nq1/pg-data"}
+    PG17_N03_QUERIES {"t_after_n":19,"n_paused_then_t":[11,12],"t_rollbacks_after_waiting":0,"n_after_t":17}
+    PG17_N05_WRITER {"status":409,"message":"reconstruction provenance conflict"}
+    ✓ N01: prisma migrate deploy from the candidate has nothing pending; the catalog does not move; N writes the five-field identity (3942 ms)
+    ✓ N02: N on R, per family, matches the accepted T tally on an identical fixture; replay identical; ledger provenance is the staged provenance (8816 ms)
+    ✓ N03: mixed T and N processes on one staged row, both orders: one ledger row, one target, success dominates (16283 ms)
+    ✓ N04: a same-source, different-platform staged row against a committed ledger row is a 409 with nothing written — for N and for T (4602 ms)
+    ✓ N05 (negative control, release-order precondition): on the E+B shape (R down) the N client fails closed on a NULL-provenance row; nothing is written; R up restores the shape (14854 ms)
+    ✓ N06: rollback N→T — after N writes, T replays identically and the T/Q0 readers enumerate the same union as N/Q1 (13109 ms)
+    ✓ Q01: every non-final clients page emits the exact scoped v2 token; every page orders by (source_id, source_platform) under REPEATABLE READ (7146 ms)
+    ✓ Q01: every non-final workouts page emits the exact scoped v2 token; every page orders by (source_id, source_platform) under REPEATABLE READ (7003 ms)
+    ✓ Q02: clients tokens chain Q1→Q0→Q1 and Q0→Q1→Q0 at limit 1 without repeating or skipping a row (23822 ms)
+    ✓ Q02: workouts tokens chain Q1→Q0→Q1 and Q0→Q1→Q0 at limit 1 without repeating or skipping a row (24570 ms)
+    ✓ Q03: a legacy clients token resolves to the same page as its v2 boundary inside the scope; forged or foreign resolves to 400 before any page read (15632 ms)
+    ✓ Q03: a legacy workouts token resolves to the same page as its v2 boundary inside the scope; forged or foreign resolves to 400 before any page read (14504 ms)
+    ✓ Q04: identity ties (same source_id, several platforms) enumerate every clients row exactly once at limit 1; Q0 accepts the v2 tokens; a tied legacy token is 400 (11121 ms)
+    ✓ Q04: identity ties (same source_id, several platforms) enumerate every workouts row exactly once at limit 1; Q0 accepts the v2 tokens; a tied legacy token is 400 (11705 ms)
+    ✓ Q05: a clients token outside its (coach, intent, family) scope, or on the other endpoint, is 400 with no page read; a token-less foreign coach is 404 (20637 ms)
+    ✓ Q05: a workouts token outside its (coach, intent, family) scope, or on the other endpoint, is 400 with no page read; a token-less foreign coach is 404 (41839 ms)
+    ✓ Q06: erased or re-scoped clients targets stay hidden while the cursor still advances to a final null (7031 ms)
+    ✓ Q06: erased or re-scoped workouts targets stay hidden while the cursor still advances to a final null (9932 ms)
+    ✓ Q07: clients tokens are bounded at 8,192 characters for Q1 and Q0; every malformed shape is a 400 without reflection (44412 ms)
+    ✓ Q07: workouts tokens are bounded at 8,192 characters for Q1 and Q0; every malformed shape is a 400 without reflection (34507 ms)
+Test Suites: 1 passed, 1 total
+Tests:       20 passed, 20 total
+Time:        354.69 s
