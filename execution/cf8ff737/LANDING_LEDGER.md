@@ -77,3 +77,7 @@ The landing census found that GitHub's rebase-merge rewrites the committer to `G
 |---|---|---|---|---|
 | ~21:15Z | mobile `main` c7641cb3 → 67b646f4 | UX M1 dormant status/result views | FF | ce3748cb/UX_M1_ACCEPTANCE.md |
 | ~21:45Z | backend `integration/importer` c7a5fe8d → 7ea039f3 | N/Q1 29e60705 (merge with PROD-CI-1, disjoint) | PR #533, CI green, FF of merge | ce3748cb/NQ1_V2R_LOCAL_ACCEPTANCE.md |
+| ~22:10Z | backend `integration/importer` 7ea039f3 → bddb3bd3 | S8-0 contract e322602d | PR #534, CI green | ce3748cb/S8_0_ACCEPTANCE.md |
+| ~22:40Z | backend `integration/importer` bddb3bd3 → 5e26d131 | S7-L0 decision 7f14a304 | PR #535, CI green | ce3748cb/s7l/L0_REVIEW.md |
+| ~22:45Z | extension `land/s4-r6` aa0abd83 → 8901d5f5 (PR #27 staged) | UX E1 no-run copy | FF; CI-proof #29 green, closed | ce3748cb/ux-e1/REVIEW.md |
+| ~00:20Z | backend `integration/importer` 5e26d131 → 7325e8cb | S7-C 1b6cc661 | PR #536, CI green incl. migration dry-run/reversibility | ce3748cb/C_LOCAL_ACCEPTANCE.md |

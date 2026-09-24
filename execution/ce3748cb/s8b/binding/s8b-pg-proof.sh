@@ -1,55 +1,58 @@
 #!/usr/bin/env bash
-# S7-3' G2 C/contract real-PG proof — minimal execution binding (PHASE 2 FILLED; NOT RUN; PG NOT GRANTED; pins filled from C head 1b6cc661 (B1 closure) is committed).
-# Derived by substitution from the N/Q1 binding execution/cf8ff737/nq1/binding/nq1-pg-proof.sh (filled sha256 e47c9ac1…):
-# C identity (port 55491, c_super, g2_c_disposable, cluster c-contract), the C spec/bootstrap/old-root helper, the C
-# generated-client pin, and added read-only checks: the accepted N/Q1 files are byte-identical at the C head, the accepted
-# N/Q1 head is an ancestor (it is the OLD side of this proof: N writer + Q1 readers), the candidate's prisma/migrations differ
-# from it by exactly C's migration.sql + down.sql (no verify.sql), and the retained stopped R and N/Q1 clusters are hashed and
-# never started. The old root is a detached checkout of the N/Q1 head (test/utils/g2-c-old-root.sh), whose own
-# `prisma migrate deploy` installs the whole accepted history (169); the candidate's `prisma migrate deploy` applies exactly C
-# inside the spec (C01). Runs the NEW spec test/rls-g2-c-contract.spec.ts exactly once via the existing repo jest +
-# jest.rls.config.js. No new test framework, no retry, no inherited-proof replay (etq0 / fresh51 / C1 / B / R / N/Q1 suites are
-# never invoked). Single canonical lock holder; first nonzero stops; the only cleanup attempted is a bounded fixture stop when
-# this run started the postmaster. No autonomous cleanup is GUARANTEED: if the outer timeout kills bash, the stop does not run.
-# What governs is the observed terminal evidence — the sentinel/log lines, `pgrep -cx postgres`, the port listener count and any
+# S8-B real-PG proof — minimal execution binding (DRAFT; NOT RUN; NOT GRANTED; pins __FILL_AFTER_COMMIT__ until the S8-B head is committed).
+# Derived by substitution from the S7-L binding execution/ce3748cb/s7l/binding/s7l-pg-proof.sh (draft sha256 d351870c…):
+# S8-B identity (port 55511, s8b_super, g2_s8b_disposable, cluster s8-b), the S8-B spec/bootstrap/old-root helper, the S8-B
+# generated-client pin, and the read-only checks: the accepted S5/B/R/N/Q1 files are byte-identical at the S8-B head, OLD_HEAD
+# (the S8-B base: the accepted C head 1b6cc661) is an ancestor (it is the OLD side of this proof: the unchanged N/Q1 reconstruction writer and roster reader), the candidate's
+# prisma/migrations differ from it by exactly S8-B's migration.sql + down.sql, and the retained stopped C1/B/R/N/Q1/C/S7-L
+# clusters are hashed and never started. The old root is a detached checkout of OLD_HEAD (test/utils/g2-s8b-old-root.sh), whose
+# own `prisma migrate deploy` installs the whole accepted history; the candidate's `prisma migrate deploy` applies exactly S8-B
+# inside the spec (P01). Runs the NEW spec test/rls-g2-s8b.spec.ts exactly once via the existing repo jest + jest.rls.config.js.
+# No new test framework, no retry, no inherited-proof replay (etq0 / fresh51 / C1 / B / R / N/Q1 / C / S7-L suites are never
+# invoked). Single canonical lock holder; first nonzero stops; the only cleanup attempted is a bounded fixture stop when this run
+# started the postmaster. No autonomous cleanup is GUARANTEED: if the outer timeout kills bash, the stop does not run. What
+# governs is the observed terminal evidence — the sentinel/log lines, `pgrep -cx postgres`, the port listener count and any
 # survivor pid the stop reports — not this header. Data dir RETAINED after stop (destroy = separate marker-gated grant).
+# Order-independent of S7-L1 (20270123): this proof needs only the accepted C head as OLD_HEAD; S7-L1 may land before or after.
 # Inner stage bounds: init 60 + start 60 + old-root 180 + bootstrap 900 + identity 4x15 + jest 1500 + stop 75 = 2835 s soft sum.
-# Usage (later, under the single-run grant): timeout -k 30 3600 bash .../binding/c-pg-proof.sh
-# Pre-steps (each its own receipt, in this order, BEFORE pins are filled): isolated copy of the accepted N/Q1 node_modules +
-# verify (receipt 02) → C-only prisma generate (receipt 03; schema without the narrow @@unique) → light gates (tsc, eslint,
-# prettier --check, check-r75) → heavy gates under the relayed slot (affected + full default jest incl.
-# test/scout/g2-c-db-guard.spec.ts) → chain-harness CI dry-run on PG 15.18 (deploy → down → re-apply → byte diff) → ordinary
-# Bradley-authored hooked commit → fill EXPECT_* from the committed head → separate PG grant for this script.
+# Usage (later, under the single-run grant): timeout -k 30 3600 bash .../binding/s8b-pg-proof.sh
+# Pre-steps (each its own receipt, in this order, BEFORE pins are filled): fast-forward of s8-b onto the accepted C head 1b6cc661
+# (OLD_HEAD re-pinned here and in g2-s8b-{bootstrap,old-root}.sh / g2-s8b-pg-harness.ts / EXPECTED_HISTORY in rls-g2-s8b.spec.ts;
+# EXPECTED_MIGRATIONS 170; C file pins added) → isolated copy of the verified node_modules (receipt 01) → schema.prisma
+# ImportNativeProvenance/ScoutReconstructionLedger.target_kind/ImportIntent back-relation hunk → S8-B-only prisma generate
+# (receipt 03) → light gates (prettier --check, eslint, tsc, check-r75) → heavy gates under the canonical slot (affected default
+# jest incl. test/scout/g2-s8b-db-guard.spec.ts) → chain-harness CI dry-run on PG 15.18 (deploy → down → re-apply → byte diff;
+# deferred to the PR CI) → ordinary Bradley-authored hooked commit → fill EXPECT_* from the committed head → separate PG grant.
 set -uo pipefail
-D=/home/user/workspace/execution/cf8ff737/c/binding
-RT=/home/user/workspace/execution/cf8ff737/c/runtime                      # C proof: its own receipt/old-root root
-W=/home/user/workspace/worktrees/s7-c
-R=$RT/run; LOG=$R/c-pg-proof.log; SENT=$R/c-pg-proof.sentinel; JLOG=$R/jest.log
+D=/home/user/workspace/execution/ce3748cb/s8b/binding
+RT=/home/user/workspace/execution/ce3748cb/s8b/runtime                    # S8-B proof: its own receipt/old-root root
+W=/home/user/workspace/worktrees/s8-b
+R=$RT/run; LOG=$R/s8b-pg-proof.log; SENT=$R/s8b-pg-proof.sentinel; JLOG=$R/jest.log
 LOCK=/home/user/workspace/execution/test-validation.lock
-# ---- pins: filled by the binding phase AFTER the C head is committed; the script refuses placeholders.
-NQ1_HEAD=29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd                                            # accepted N/Q1 head = the OLD side (accepted 29e60705, tree 511710ee)
-EXPECT_HEAD=1b6cc66164b3398d573ba92f0c8f6b039494be24
-EXPECT_TREE=cea546313b1b15a2bb4ea225b0ee7fa8ce5622b5
-EXPECT_SPEC_BLOB=6c40544dc117d83df76d629ad8af9bf8d4de1c46                 # test/rls-g2-c-contract.spec.ts at the C head
-EXPECT_BOOTSTRAP_BLOB=54ad13521074b11d0604cbeeb1234b5593bb5feb       # test/utils/g2-c-bootstrap.sh at the C head
-EXPECT_FIXTURE_SHA=cf342f4b21306c677d668343fa46e4ad1c2a9a4104546a445b0d36bf3bf259b3           # binding/c-fixture.sh
+# ---- pins: filled by the binding phase AFTER the S8-B head is committed; the script refuses placeholders.
+OLD_HEAD=1b6cc66164b3398d573ba92f0c8f6b039494be24                         # S8-B base = the OLD side (accepted C head)
+EXPECT_HEAD=__FILL_AFTER_COMMIT__
+EXPECT_TREE=__FILL_AFTER_COMMIT__
+EXPECT_SPEC_BLOB=__FILL_AFTER_COMMIT__                 # test/rls-g2-s8b.spec.ts at the S8-B head
+EXPECT_BOOTSTRAP_BLOB=__FILL_AFTER_COMMIT__       # test/utils/g2-s8b-bootstrap.sh at the S8-B head
+EXPECT_FIXTURE_SHA=__FILL_AFTER_COMMIT__           # binding/s8b-fixture.sh
 EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a   # S1/S2 PG17_PROVENANCE (unchanged)
 EXPECT_INITDB_SHA=b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
-EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44      # node_modules/.package-lock.json (C1 record, unchanged through B, R, N/Q1 and C; receipt 02)
-EXPECT_NM_CLIENT_SHA=2141225d4734cb2f7dd40273da43298bfca871d07d98ae4a423a0d3aed390f00    # C node_modules/.prisma/client/index.d.ts (receipt 03; C-only generate, narrow @@unique removed)
+EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44      # node_modules/.package-lock.json (C1 record, unchanged through B, R, N/Q1, C, S7-L and S8-B; receipt 01)
+EXPECT_NM_CLIENT_SHA=__FILL_AFTER_GENERATE__    # S8-B node_modules/.prisma/client/index.d.ts (receipt 04; S8-B-only generate, ImportNativeProvenance + ledger target_kind)
 PG17_HOME=/home/user/pg17; DIST=$PG17_HOME/dist
-S5DIR=$PG17_HOME/clusters/s5; C1DIR=$PG17_HOME/clusters/c1-builder; BDIR=$PG17_HOME/clusters/b-drain; RDIR=$PG17_HOME/clusters/r-ready; NDIR=$PG17_HOME/clusters/nq1; CDIR=$PG17_HOME/clusters/c-contract
-PORT=55491; DBNAME=g2_c_disposable; ADMIN=c_super; FIXPASS=c_local_synthetic
-FIX=$D/c-fixture.sh
+S5DIR=$PG17_HOME/clusters/s5; C1DIR=$PG17_HOME/clusters/c1-builder; BDIR=$PG17_HOME/clusters/b-drain; RDIR=$PG17_HOME/clusters/r-ready; NDIR=$PG17_HOME/clusters/nq1; CDIR=$PG17_HOME/clusters/c-contract; LDIR=$PG17_HOME/clusters/s7-l; BDIR8=$PG17_HOME/clusters/s8-b
+PORT=55511; DBNAME=g2_s8b_disposable; ADMIN=s8b_super; FIXPASS=s8b_local_synthetic
+FIX=$D/s8b-fixture.sh
 export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1 NODE_OPTIONS=--max-old-space-size=4096 CHECKPOINT_DISABLE=1 \
        PRISMA_HIDE_UPDATE_MESSAGE=1 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false
-# C-only identity: exactly the G2_C_* names the derived guard/harness/bootstrap/old-root helper read. Nothing
-# G2_PG17_*, G2_B_*, G2_R_* or G2_NQ1_* is exported.
-export G2_C_DATABASE_URL="postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME?schema=public&connection_limit=4" \
-       G2_C_CONFIRM="$DBNAME:$PORT" G2_C_PASSWORD=$FIXPASS G2_C_PSQL=/usr/bin/psql \
-       G2_C_DATA_DIRECTORY=$CDIR/pg-data G2_C_SERVER_VERSION=170006 \
-       G2_C_OLD_ROOT=$RT/old-root G2_C_OLD_CLIENT=$RT/old-root/.g2-c-old-client
-export C_RUNNER_PID=$$ C_STOP_TIMEOUT=45
+# S8-B-only identity: exactly the G2_S8B_* names the derived guard/harness/bootstrap/old-root helper read. Nothing
+# G2_PG17_*, G2_B_*, G2_R_*, G2_NQ1_*, G2_C_* or G2_S7L_* is exported.
+export G2_S8B_DATABASE_URL="postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME?schema=public&connection_limit=4" \
+       G2_S8B_CONFIRM="$DBNAME:$PORT" G2_S8B_PASSWORD=$FIXPASS G2_S8B_PSQL=/usr/bin/psql \
+       G2_S8B_DATA_DIRECTORY=$BDIR8/pg-data G2_S8B_SERVER_VERSION=170006 \
+       G2_S8B_OLD_ROOT=$RT/old-root G2_S8B_OLD_CLIENT=$RT/old-root/.g2-s8b-old-client
+export S8B_RUNNER_PID=$$ S8B_STOP_TIMEOUT=45
 mkdir -p "$R"
 [ -e "$SENT" ] && { echo "REFUSED: $SENT exists; this proof runs once, no retry" >&2; exit 76; }
 exec 9>"$LOCK"; flock -n 9 || { echo "REFUSED: canonical lock busy ($LOCK)" >&2; exit 75; }
@@ -67,12 +70,12 @@ fail(){ local rc=$1; log "STOP_FIRST_FAILURE stage=$STAGE rc=$rc $(ts)"
   finish "$rc"; }
 log "START $(ts) pid=$$ head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA node=$(node --version 2>/dev/null)"
 # ---- preconditions (read-only)
-case "$NQ1_HEAD$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage)"; fail 70;; esac
+case "$OLD_HEAD$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage)"; fail 70;; esac
 [ "$(sha256sum "$FIX" | cut -c1-64)" = "$EXPECT_FIXTURE_SHA" ] || { log "PRECONDITION_FAIL fixture sha256 mismatch"; fail 70; }
 [ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL HEAD != $EXPECT_HEAD"; fail 70; }
 [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] || { log "PRECONDITION_FAIL tree mismatch"; fail 70; }
-[ "$(git -C "$W" rev-parse HEAD:test/rls-g2-c-contract.spec.ts)" = "$EXPECT_SPEC_BLOB" ] || { log "PRECONDITION_FAIL spec blob mismatch"; fail 70; }
-[ "$(git -C "$W" rev-parse HEAD:test/utils/g2-c-bootstrap.sh)" = "$EXPECT_BOOTSTRAP_BLOB" ] || { log "PRECONDITION_FAIL bootstrap blob mismatch"; fail 70; }
+[ "$(git -C "$W" rev-parse HEAD:test/rls-g2-s8b.spec.ts)" = "$EXPECT_SPEC_BLOB" ] || { log "PRECONDITION_FAIL spec blob mismatch"; fail 70; }
+[ "$(git -C "$W" rev-parse HEAD:test/utils/g2-s8b-bootstrap.sh)" = "$EXPECT_BOOTSTRAP_BLOB" ] || { log "PRECONDITION_FAIL bootstrap blob mismatch"; fail 70; }
 [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] || { log "PRECONDITION_FAIL worktree not clean"; fail 70; }
 [ ! -e "$W/.git/MERGE_HEAD" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; fail 70; }
 # the committed head must have been produced through the tracked lefthook hooks (installed from the isolated tree)
@@ -97,22 +100,36 @@ for pin in "test/utils/g2-r-ready-db.ts 6af4892adf6e24bff2d84e79d09cec10750213f9
            "test/utils/g2-tq0-worker.cjs aa35e7e2c38f8d1a990a4eac466824963ae866f4" "prisma/migrations/20270120000000_scout_identity_ready b0af7599843b9961c2b77663fe6e9b7d02efd34e"; do set -- $pin
   [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL accepted R file $1 changed"; fail 70; }; done
 git -C "$W" merge-base --is-ancestor 7d2895e1fe03ea82353e8ce0b07aacaf66af74c8 HEAD || { log "PRECONDITION_FAIL accepted R head 7d2895e1 not an ancestor"; fail 70; }
-# accepted N/Q1 files must be byte-identical at the committed head (machine check of "N/Q1 files unchanged"; blobs at 29e60705, the accepted N/Q1 head)
+# accepted N/Q1 files must be byte-identical at the committed head (machine check of "N/Q1 files unchanged"; blobs at 61b93cff)
 for pin in "test/utils/g2-nq1-db.ts dbe10bcb84b01175a54fa0c4eceb8021fc933719" "test/utils/g2-nq1-pg-harness.ts d51267f2c8a9972de4361f691f680b0792595209" \
            "test/utils/g2-nq1-harness.ts a629c5915b9a2bbebaa15accf2dff4dbc277dbf1" "test/utils/g2-nq1-bootstrap.sh 96b7668dff7498cee5ed17ab988aae0f38ac512d" \
            "test/utils/g2-nq1-old-root.sh 4569f5febd963379be106d94d8d4612c85bf0c82" "test/scout/g2-nq1-db-guard.spec.ts 9bc14800ddaa81c2148dfd5d8af64b83f45d6eca" \
            "test/rls-g2-nq1.spec.ts a93382605a7e8099f5fd622cf2d0a92298460bd3"; do set -- $pin
   [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL accepted N/Q1 file $1 changed"; fail 70; }; done
-git -C "$W" merge-base --is-ancestor "$NQ1_HEAD" HEAD || { log "PRECONDITION_FAIL accepted N/Q1 head $NQ1_HEAD not an ancestor (old-root fixture impossible)"; fail 70; }
-# the candidate ships exactly C: its migration tree differs from the N/Q1 head by migration.sql + down.sql of C and nothing else (no verify.sql)
-CM=20270121000000_scout_identity_contract
-[ "$(git -C "$W" diff --name-only "$NQ1_HEAD" HEAD -- prisma/migrations | sort | tr '\n' ' ')" = "prisma/migrations/$CM/down.sql prisma/migrations/$CM/migration.sql " ] \
-  || { log "PRECONDITION_FAIL prisma/migrations differ from the N/Q1 head by other than exactly C's two files"; fail 70; }
-# dependency tree: an ISOLATED copy of the accepted N/Q1 tree (not a symlink into s7-nq1, not a fresh npm ci); client is C's
+git -C "$W" merge-base --is-ancestor 61b93cff7900b24c17011d481fd6c31f5abb59e4 HEAD || { log "PRECONDITION_FAIL N/Q1 v1 head 61b93cff not an ancestor"; fail 70; }
+# accepted C files (and the C migration directory) must be byte-identical at the committed head (blobs at the accepted C head 1b6cc661)
+for pin in "test/utils/g2-c-db.ts 2d2820248eade4a88f13def6576ce5d952969dae" "test/utils/g2-c-pg-harness.ts 378e011018acda6830dbd9e07e0c179656d74984" \
+           "test/utils/g2-c-harness.ts 5186c35131b2dae4e06458141bfdd062629ad108" "test/utils/g2-c-bootstrap.sh 54ad13521074b11d0604cbeeb1234b5593bb5feb" \
+           "test/utils/g2-c-old-root.sh 0f7d140180e28d152860c15fae82dbd974839bb3" "test/scout/g2-c-db-guard.spec.ts 78fd72c90e0097bd1b880e98357b7dd92dd5a2ac" \
+           "test/rls-g2-c-contract.spec.ts 6c40544dc117d83df76d629ad8af9bf8d4de1c46" "prisma/migrations/20270121000000_scout_identity_contract 35a0cdab0cef2cb75397a00d5e47cba8aab270fd"; do set -- $pin
+  [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL accepted C file $1 changed"; fail 70; }; done
+git -C "$W" merge-base --is-ancestor "$OLD_HEAD" HEAD || { log "PRECONDITION_FAIL OLD head $OLD_HEAD not an ancestor (old-root fixture impossible)"; fail 70; }
+# the candidate ships exactly S8-B: its migration tree differs from OLD_HEAD by migration.sql + down.sql of S8-B and nothing else
+PM=20270122000000_scout_native_provenance_expand
+[ "$(git -C "$W" diff --name-only "$OLD_HEAD" HEAD -- prisma/migrations | sort | tr '\n' ' ')" = "prisma/migrations/$PM/down.sql prisma/migrations/$PM/migration.sql " ] \
+  || { log "PRECONDITION_FAIL prisma/migrations differ from OLD_HEAD by other than exactly S8-B's two files"; fail 70; }
+# the S8-B schema hunk is present and the draft-stage exclusions hold: schema-only (no S8-C/S8-D/S8-E writer code under src/scout/native)
+grep -q '^model ImportNativeProvenance ' "$W/prisma/schema.prisma" && awk '/model ScoutReconstructionLedger \{/,/\}/' "$W/prisma/schema.prisma" | grep -Eq '^ +target_kind +String\?' \
+  || { log "PRECONDITION_FAIL prisma/schema.prisma lacks the S8-B ImportNativeProvenance / ledger target_kind hunk"; fail 70; }
+[ ! -e "$W/src/scout/native" ] || { log "PRECONDITION_FAIL src/scout/native present (S8-C..E writers are not part of this proof)"; fail 70; }
+# the OLD-side writer/reader the mixed-version stage depends on is byte-identical at the S8-B head (N writer never names target_kind)
+for file in src/scout/scout-reconstruct.service.ts src/scout/scout-roster.service.ts src/scout/scout-entities.service.ts src/scout/reconstruct/families.ts; do
+  [ "$(git -C "$W" rev-parse "HEAD:$file")" = "$(git -C "$W" rev-parse "$OLD_HEAD:$file")" ] || { log "PRECONDITION_FAIL $file differs from OLD_HEAD (mixed-version basis broken)"; fail 70; }; done
+# dependency tree: an ISOLATED copy of the verified N/Q1 tree (not a symlink into s7-nq1, not a fresh npm ci; receipt 01); client is S8-B's
 [ -d "$W/node_modules" ] && [ ! -L "$W/node_modules" ] || { log "PRECONDITION_FAIL $W/node_modules absent or a symlink (isolated copy required)"; fail 70; }
 case "$(readlink -f "$W/node_modules")" in "$W"/*) ;; *) log "PRECONDITION_FAIL node_modules resolves outside $W"; fail 70;; esac
 [ "$(sha256sum "$W/node_modules/.package-lock.json" | cut -c1-64)" = "$EXPECT_NM_LOCK_SHA" ] || { log "PRECONDITION_FAIL node_modules/.package-lock.json != C1/B record"; fail 70; }
-[ "$(sha256sum "$W/node_modules/.prisma/client/index.d.ts" | cut -c1-64)" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client != C record"; fail 70; }
+[ "$(sha256sum "$W/node_modules/.prisma/client/index.d.ts" | cut -c1-64)" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client != S8-B record"; fail 70; }
 [ -x "$W/node_modules/.bin/jest" ] && [ -x "$W/node_modules/.bin/ts-node" ] && [ -x "$W/node_modules/.bin/prisma" ] || { log "PRECONDITION_FAIL jest/ts-node/prisma missing"; fail 70; }
 [ -x "$DIST/bin/postgres" ] && [ -x "$DIST/bin/initdb" ] && [ -x "$DIST/bin/pg_ctl" ] || { log "PRECONDITION_FAIL PG17 dist absent at $DIST"; fail 70; }
 [ "$(sha256sum "$DIST/bin/postgres" | cut -c1-64)" = "$EXPECT_POSTGRES_SHA" ] || { log "PRECONDITION_FAIL postgres binary sha256 != recorded"; fail 70; }
@@ -121,13 +138,13 @@ PGV=$(LD_LIBRARY_PATH=$DIST/lib "$DIST/bin/postgres" --version 2>/dev/null); [ "
 [ -x /usr/bin/psql ] || { log "PRECONDITION_FAIL /usr/bin/psql absent"; fail 70; }
 [ "$(readlink -f "$PG17_HOME")" = "$PG17_HOME" ] || { log "PRECONDITION_FAIL $PG17_HOME is not a real path"; fail 70; }
 log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$(/usr/bin/psql --version)' jest=$(cd "$W" && ./node_modules/.bin/jest --version) pg17_provenance='$(grep -E '^(postgres_sha256|result)=' "$PG17_HOME/PROVENANCE.txt" 2>/dev/null | tr '\n' ' ')'"
-# ---- step 1 preflight (read-only): C lane absent; S5 absent recorded as-is; retained C1, B, R and N/Q1 clusters hashed, never started
+# ---- step 1 preflight (read-only): S8-B lane absent; S5 absent recorded as-is; retained C1, B, R, N/Q1, C and S7-L clusters hashed, never started
 STAGE=preflight
-[ ! -e "$CDIR" ] || { log "PREFLIGHT_FAIL $CDIR exists (fresh init only; never adopt)"; fail 71; }
+[ ! -e "$BDIR8" ] || { log "PREFLIGHT_FAIL $BDIR8 exists (fresh init only; never adopt)"; fail 71; }
 [ ! -e "$RT/old-root" ] || { log "PREFLIGHT_FAIL $RT/old-root exists (once-only fixture; no reuse)"; fail 71; }
 L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true); [ "$L" = 0 ] || { log "PREFLIGHT_FAIL port $PORT listeners=$L"; fail 71; }
 P=$(pgrep -cx postgres || true); [ "$P" = 0 ] || { log "PREFLIGHT_FAIL postgres procs=$P"; fail 71; }
-[ ! -e "$S5DIR" ] || { log "PREFLIGHT_FAIL s5 cluster present (parent requires S5 ABSENT for the C lane)"; fail 71; }
+[ ! -e "$S5DIR" ] || { log "PREFLIGHT_FAIL s5 cluster present (parent requires S5 ABSENT for the S8-B lane)"; fail 71; }
 log "PREFLIGHT s5_cluster=ABSENT (recorded as-is, not reconstructed)"
 if [ -e "$C1DIR/pg-data" ]; then
   [ ! -e "$C1DIR/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL c1 postmaster.pid present"; fail 71; }
@@ -149,47 +166,57 @@ if [ -e "$NDIR/pg-data" ]; then
   N_CONF0=$(sha256sum "$NDIR/pg-data/postgresql.conf" | cut -c1-64); N_CTRL0=$(sha256sum "$NDIR/pg-data/global/pg_control" | cut -c1-64)
   log "PREFLIGHT nq1_cluster=PRESENT_STOPPED conf=$N_CONF0 pg_control=$N_CTRL0 (must be unchanged at end; never started)"
 else N_CONF0=ABSENT; N_CTRL0=ABSENT; log "PREFLIGHT nq1_cluster=ABSENT"; fi
+if [ -e "$CDIR/pg-data" ]; then
+  [ ! -e "$CDIR/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL c-contract postmaster.pid present"; fail 71; }
+  C_CONF0=$(sha256sum "$CDIR/pg-data/postgresql.conf" | cut -c1-64); C_CTRL0=$(sha256sum "$CDIR/pg-data/global/pg_control" | cut -c1-64)
+  log "PREFLIGHT c_cluster=PRESENT_STOPPED conf=$C_CONF0 pg_control=$C_CTRL0 (must be unchanged at end; never started)"
+else C_CONF0=ABSENT; C_CTRL0=ABSENT; log "PREFLIGHT c_cluster=ABSENT"; fi
+if [ -e "$LDIR/pg-data" ]; then
+  [ ! -e "$LDIR/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL s7-l postmaster.pid present"; fail 71; }
+  L_CONF0=$(sha256sum "$LDIR/pg-data/postgresql.conf" | cut -c1-64); L_CTRL0=$(sha256sum "$LDIR/pg-data/global/pg_control" | cut -c1-64)
+  log "PREFLIGHT s7l_cluster=PRESENT_STOPPED conf=$L_CONF0 pg_control=$L_CTRL0 (must be unchanged at end; never started)"
+else L_CONF0=ABSENT; L_CTRL0=ABSENT; log "PREFLIGHT s7l_cluster=ABSENT"; fi
 PORC0=$(git -C "$W" status --porcelain --untracked-files=all | sha256sum | cut -c1-64)
-log "PREFLIGHT_OK $(ts) cdir=absent port$PORT=free postgres_procs=0 worktree_porcelain_sha=$PORC0"
+log "PREFLIGHT_OK $(ts) bdir8=absent port$PORT=free postgres_procs=0 worktree_porcelain_sha=$PORC0"
 # ---- step 2 init (bound 60 s)
 STAGE=fixture-init; timeout -k 30 60 bash "$FIX" init >>"$LOG" 2>&1; rc=$?; log "FIXTURE_INIT rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
-grep -q "^C_FIXTURE_INIT_OK data=$CDIR/pg-data port=$PORT superuser=$ADMIN cluster_name=c-disposable-pg17" "$LOG" || { log "FIXTURE_INIT marker missing"; fail 72; }
+grep -q "^S8B_FIXTURE_INIT_OK data=$BDIR8/pg-data port=$PORT superuser=$ADMIN cluster_name=s8b-disposable-pg17" "$LOG" || { log "FIXTURE_INIT marker missing"; fail 72; }
 # ---- step 3 start (bound 60 s)
 STAGE=fixture-start; STARTED=1; timeout -k 30 60 bash "$FIX" start >>"$LOG" 2>&1; rc=$?; log "FIXTURE_START rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
-grep -q "^C_FIXTURE_START_OK pid=" "$LOG" || { log "FIXTURE_START marker missing"; fail 72; }
-# ---- step 4 OLD (accepted N/Q1 head) detached checkout OUTSIDE the candidate (derived helper committed at the C head; git only; bound 180 s)
+grep -q "^S8B_FIXTURE_START_OK pid=" "$LOG" || { log "FIXTURE_START marker missing"; fail 72; }
+# ---- step 4 OLD (OLD_HEAD) detached checkout OUTSIDE the candidate (derived helper committed at the S8-B head; git only; bound 180 s)
 STAGE=old-root
-( cd "$W" && timeout -k 30 180 bash test/utils/g2-c-old-root.sh create ) >>"$LOG" 2>&1; rc=$?
-log "OLD_ROOT rc=$rc $(ts) head=$(git -C "$G2_C_OLD_ROOT" rev-parse HEAD 2>/dev/null)"; [ $rc = 0 ] || fail $rc
-grep -q "^G2_C_OLD_ROOT_OK" "$LOG" || { log "OLD_ROOT marker missing"; fail 72; }
-[ "$(git -C "$G2_C_OLD_ROOT" rev-parse HEAD)" = "$NQ1_HEAD" ] || { log "OLD_ROOT head is not the accepted N/Q1 head"; fail 72; }
-# ---- step 5 C bootstrap (derived helper committed at the C head; roles, marked DB, shim, the whole accepted history (169)
-#      through the old root's `prisma migrate deploy` — C NOT applied here (the spec applies it through the candidate's
-#      `prisma migrate deploy`, C01) — old client generate inside the old root, the only `prisma generate` of the run; the C
-#      candidate client only VERIFIED) (bound 900 s)
+( cd "$W" && timeout -k 30 180 bash test/utils/g2-s8b-old-root.sh create ) >>"$LOG" 2>&1; rc=$?
+log "OLD_ROOT rc=$rc $(ts) head=$(git -C "$G2_S8B_OLD_ROOT" rev-parse HEAD 2>/dev/null)"; [ $rc = 0 ] || fail $rc
+grep -q "^G2_S8B_OLD_ROOT_OK" "$LOG" || { log "OLD_ROOT marker missing"; fail 72; }
+[ "$(git -C "$G2_S8B_OLD_ROOT" rev-parse HEAD)" = "$OLD_HEAD" ] || { log "OLD_ROOT head is not OLD_HEAD"; fail 72; }
+# ---- step 5 S8-B bootstrap (derived helper committed at the S8-B head; roles, marked DB, shim, the whole accepted history
+#      through the old root's `prisma migrate deploy` — S8-B NOT applied here (the spec applies it through the candidate's
+#      `prisma migrate deploy`, P01) — old client generate inside the old root, the only `prisma generate` of the run; the
+#      S8-B candidate client only VERIFIED) (bound 900 s)
 STAGE=bootstrap
-( cd "$W" && timeout -k 30 900 bash test/utils/g2-c-bootstrap.sh ) >>"$LOG" 2>&1; rc=$?; log "BOOTSTRAP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
-grep -q "^G2_C_BOOTSTRAP_OK" "$LOG" || { log "BOOTSTRAP marker missing"; fail 72; }
+( cd "$W" && timeout -k 30 900 bash test/utils/g2-s8b-bootstrap.sh ) >>"$LOG" 2>&1; rc=$?; log "BOOTSTRAP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+grep -q "^G2_S8B_BOOTSTRAP_OK" "$LOG" || { log "BOOTSTRAP marker missing"; fail 72; }
 # ---- step 6 identity (read-only, bound 15 s each; admin login with PGPASSWORD only, never a URL password)
 STAGE=identity
 psqlq(){ PGPASSWORD=$FIXPASS timeout -k 30 15 /usr/bin/psql -X -v ON_ERROR_STOP=1 -At "postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME" -c "$1" 2>>"$LOG"; }
-DD=$(psqlq 'SHOW data_directory'); [ "$DD" = "$G2_C_DATA_DIRECTORY" ] || { log "IDENTITY_FAIL data_directory='$DD'"; fail 73; }
+DD=$(psqlq 'SHOW data_directory'); [ "$DD" = "$G2_S8B_DATA_DIRECTORY" ] || { log "IDENTITY_FAIL data_directory='$DD'"; fail 73; }
 VN=$(psqlq 'SHOW server_version_num'); [ "$VN" = 170006 ] || { log "IDENTITY_FAIL server_version_num='$VN'"; fail 73; }
-CN=$(psqlq "SELECT current_setting('cluster_name')"); [ "$CN" = c-disposable-pg17 ] || { log "IDENTITY_FAIL cluster_name='$CN'"; fail 73; }
+CN=$(psqlq "SELECT current_setting('cluster_name')"); [ "$CN" = s8b-disposable-pg17 ] || { log "IDENTITY_FAIL cluster_name='$CN'"; fail 73; }
 DM=$(psqlq "SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()")
-[ "$DM" = c-g2-contract-synthetic-disposable-fixture-safe-to-drop ] || { log "IDENTITY_FAIL db marker='$DM'"; fail 73; }
+[ "$DM" = s8b-g2-provenance-synthetic-disposable-fixture-safe-to-drop ] || { log "IDENTITY_FAIL db marker='$DM'"; fail 73; }
 log "IDENTITY_OK $(ts) data_directory=$DD server_version_num=$VN cluster_name=$CN"
 # ---- step 7 the proof, exactly once (bound 1500 s); no --testTimeout/--forceExit/--detectOpenHandles/coverage
-STAGE=jest; log "JEST_START $(ts) cmd='./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-c-contract.spec.ts --runInBand --ci'"
-( cd "$W" && timeout -k 30 1500 ./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-c-contract.spec.ts --runInBand --ci ) >"$JLOG" 2>&1; JRC=$?
+STAGE=jest; log "JEST_START $(ts) cmd='./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s8b.spec.ts --runInBand --ci'"
+( cd "$W" && timeout -k 30 1500 ./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s8b.spec.ts --runInBand --ci ) >"$JLOG" 2>&1; JRC=$?
 log "JEST_END rc=$JRC $(ts)"; grep -E '^(Test Suites|Tests|Snapshots|Time):' "$JLOG" | tee -a "$LOG"
 grep -E 'requires an explicitly acknowledged|not the permitted disposable database|server identity mismatch|G2 proof requires' "$JLOG" >/dev/null && log "GUARD_REFUSAL_OBSERVED_IN_JEST_LOG"
 [ $JRC = 0 ] || fail $JRC
-# ---- step 8 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: c-fixture.sh destroy)
+# ---- step 8 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: s8b-fixture.sh destroy)
 STAGE=fixture-stop; STARTED=0; timeout -k 30 75 bash "$FIX" stop >>"$LOG" 2>&1; rc=$?; log "FIXTURE_STOP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
 P=$(pgrep -cx postgres || true); L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true)
-[ "$P" = 0 ] && [ "$L" = 0 ] && [ ! -e "$CDIR/pg-data/postmaster.pid" ] && [ -d "$CDIR/pg-data" ] || { log "STOP_STATE_FAIL postgres_procs=$P listeners=$L"; fail 74; }
-log "STOP_STATE_OK postgres_procs=0 port$PORT=free datadir_retained=$CDIR/pg-data"
+[ "$P" = 0 ] && [ "$L" = 0 ] && [ ! -e "$BDIR8/pg-data/postmaster.pid" ] && [ -d "$BDIR8/pg-data" ] || { log "STOP_STATE_FAIL postgres_procs=$P listeners=$L"; fail 74; }
+log "STOP_STATE_OK postgres_procs=0 port$PORT=free datadir_retained=$BDIR8/pg-data"
 # ---- step 9 post (read-only)
 STAGE=post
 [ ! -e "$S5DIR" ] || { log "POST_FAIL s5 cluster appeared"; fail 74; }; log "POST s5_cluster=ABSENT unchanged"
@@ -209,6 +236,14 @@ if [ "$N_CONF0" != ABSENT ]; then
   [ "$(sha256sum "$NDIR/pg-data/postgresql.conf" | cut -c1-64)" = "$N_CONF0" ] && [ "$(sha256sum "$NDIR/pg-data/global/pg_control" | cut -c1-64)" = "$N_CTRL0" ] && [ ! -e "$NDIR/pg-data/postmaster.pid" ] || { log "POST_FAIL nq1 cluster changed"; fail 74; }
   log "POST nq1_cluster unchanged conf=$N_CONF0 pg_control=$N_CTRL0"
 fi
+if [ "$C_CONF0" != ABSENT ]; then
+  [ "$(sha256sum "$CDIR/pg-data/postgresql.conf" | cut -c1-64)" = "$C_CONF0" ] && [ "$(sha256sum "$CDIR/pg-data/global/pg_control" | cut -c1-64)" = "$C_CTRL0" ] && [ ! -e "$CDIR/pg-data/postmaster.pid" ] || { log "POST_FAIL c-contract cluster changed"; fail 74; }
+  log "POST c_cluster unchanged conf=$C_CONF0 pg_control=$C_CTRL0"
+fi
+if [ "$L_CONF0" != ABSENT ]; then
+  [ "$(sha256sum "$LDIR/pg-data/postgresql.conf" | cut -c1-64)" = "$L_CONF0" ] && [ "$(sha256sum "$LDIR/pg-data/global/pg_control" | cut -c1-64)" = "$L_CTRL0" ] && [ ! -e "$LDIR/pg-data/postmaster.pid" ] || { log "POST_FAIL s7-l cluster changed"; fail 74; }
+  log "POST s7l_cluster unchanged conf=$L_CONF0 pg_control=$L_CTRL0"
+fi
 [ "$(git -C "$W" status --porcelain --untracked-files=all | sha256sum | cut -c1-64)" = "$PORC0" ] && [ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "POST_FAIL worktree changed"; fail 74; }
-( cd "$R" && sha256sum c-pg-proof.log jest.log > RECEIPTS.sha256 ); log "POST_OK $(ts) receipts=$R/RECEIPTS.sha256"
+( cd "$R" && sha256sum s8b-pg-proof.log jest.log > RECEIPTS.sha256 ); log "POST_OK $(ts) receipts=$R/RECEIPTS.sha256"
 STAGE=done; finish 0

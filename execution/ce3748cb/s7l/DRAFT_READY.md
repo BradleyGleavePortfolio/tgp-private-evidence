@@ -96,3 +96,45 @@ schema.prisma hunk; S7-L2 service/routes/DTOs; contract regen; any PG run; commi
    the relayed slot → chain-harness CI dry-run PG 15.18 (deploy → down → re-apply → byte-identical `pg_dump -s`).
 3. Hooked Bradley commit of SQL + harness → fill `binding/PINS.txt` and runner `EXPECT_*` → separate single-run PG grant for
    `s7l-pg-proof.sh` (port 55501, lane `clusters/s7-l`).
+
+## Amendment (L0 review closure) — new head 7f14a304ce8fe5d69e943b947a58da8c477f1d33
+
+Second hooked Bradley commit on `s7-l` (no amend, parent f12661af, tree 43186367): `docs(importer): bind run identity and
+fix the writer gate lock order`; receipt `05-commit-l0-amend.txt` (pre-commit 65.7 s incl. tsc, commit-msg ✔, rc=0, hooks
+not bypassed). Doc now 286 lines, sha256 `b581a30be2882ee7a88b0a91f1c8562e752a2c9f7a486413ae5416164fd017ea`
+(+94/−52 vs f12661af).
+
+Changed ranges (new-line numbers) and what each closes:
+- L7-8 middleware path (C1).
+- L42-44 mixed-version `/complete`: fails closed only for claim `success` (C3).
+- L54-57 D-S7L-1: `intent_id = import_intent_id::text` persisted (B1).
+- L67-68 arbiter step 1: `revoked` → `blocked` / `reason_code='revoked'` (C5).
+- L74-78 claim stored only when accepted; `claimed_status` null if fenced first (C8).
+- L85-90 D-S7L-3: which routes apply the lazy fence; readers/reconstruct do not (C6).
+- L96-98 D-S7L-4: `FOR NO KEY UPDATE`; writer gate is the row lock (B2).
+- L120-137 table: Start guard order owned→paired→not superseded→no terminal run→no open run; insert writes the text key;
+  new rows `/complete` on owned UUID without run → 409 `run_not_started`, `/progress` → 204 ignored; Start on terminal run
+  lists 404/`intent_not_paired`/`intent_superseded` precedence (B1).
+- L139-142 CAS predicate adds `fenced_at IS NULL`; fences take `FOR NO KEY UPDATE` (B2).
+- L144-173 §3.1 rewritten: gate = first-statement row-locking UPDATE with the open-run predicate (SQL shown); zero rows →
+  writer tx rolled back first, unlocked re-read, classify; deadline fence in its own tx only after the writer released the
+  row; no self-wait; PLAN L251 preserved (B2).
+- L181-186 invariant 2 adds `intent_id = import_intent_id::text` (B1).
+- L232-238 §7 mixed-version paragraph rewritten (C3).
+- L257-263 L8 seam: hard-delete only; live erasure tombstones `User` (`account-deletion.service.ts` L831-846) (C4).
+- L272-278 §9 L1 list adds the SQL-level gate-serialization check; L280-284 L08 gains concurrent ingest + `/progress`,
+  L10 gains the no-self-wait fence ordering (B2).
+
+Mirrored into the uncommitted L1 draft (still uncommitted, prettier/eslint clean):
+- `migration.sql` (163 lines, `7cd74eab3e06b169be056c409efb2cd3f134aaa7d6686ed18309ec08b09b62a9`): shape CHECK server branch adds
+  `AND "intent_id" = "import_intent_id"::text` + comment (L132-134, L144).
+- `test/utils/g2-s7l-harness.ts` (172 lines, `8bad01ad572dbd1c3c2c994b98aad51970a7dad9e78eb910cc3bfba0ba87e079`): expected
+  `pg_get_constraintdef` rendering adds `AND (intent_id = (import_intent_id)::text)` (rendering still UNVERIFIED, no PG).
+- `test/rls-g2-s7l.spec.ts` (562 lines, `ecb709538ce2dbf41351d1d0d41c2f1ead9339030dc9d23ea70a59b9ac5d1b60`): two B1 refusal
+  cases (text key ≠ UUID; case-changed UUID); duplicate-run case now asserts a unique-index refusal generically (with the
+  binding, both the run-per-intent unique and the narrow key fire) and count stays 1; new stage-3 test "B2 gate discipline
+  (SQL level)": two sessions running the §3.1 gate UPDATE on one open run — second observed in `Lock` wait (no 40P01), proceeds
+  after the first commits, `phase` → `transferring`; a `FOR NO KEY UPDATE` fence waits for the writer's commit then applies
+  (`epoch` 2, `fence_reason='timed_out'`); the gate then returns zero rows without waiting. Uses existing `holdTransaction` +
+  `blocked` helpers; no service code.
+- `down.sql` unchanged (drops by constraint name).

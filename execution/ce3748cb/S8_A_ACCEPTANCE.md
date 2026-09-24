@@ -1,0 +1,2 @@
+# S8-A ACCEPTANCE — 35eeb6ce (parent)
+Commits 138cc9c1 → 68be527a → 35eeb6ce on 61b93cff. Independent T3 ACCEPT (s8-a/REVIEW.md), no A/B. nest-cli.json assets line granted by parent dispatch message (recorded here as the written grant, C7). Carry-forward to S8-C/S8-G: route staged step tokens through resolveStep so A3 applies on the dispatch path (C2). Landing: after C lands; rebase all three together (138cc9c1 must not land without 35eeb6ce); delta re-check only if the rebase touches S8-A files.

@@ -1,0 +1,3 @@
+# C single PG proof grant (T4) — parent ~23:40Z
+Candidate `1b6cc66164b3398d573ba92f0c8f6b039494be24` (tree cea54631, parent 16cd67f4 → N/Q1 29e60705). Both independent attestations GO after B1 closure (c-attest-a, c-attest-b). Runner `c/binding/c-pg-proof.sh` sha `cf462851…`, BINDING.sha256 3/3.
+Exactly ONE unchanged run under the canonical flock (wait politely; never remove another owner's lock). `c/runtime` and `clusters/c-contract` absent (no PRE rename needed; if present, STOP and report). No retry on failure; failures recorded unchanged. Sole executor: `c_phase_1_re_draft_builder_mufyro8l`. Report `c/C_PG_PROOF_RESULT.md`.

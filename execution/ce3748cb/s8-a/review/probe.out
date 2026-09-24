@@ -1,0 +1,38 @@
+{
+ "ok": "ACCEPTED steps=[\"a\"]",
+ "unknownTopKey": "REJECTED: invalid source mapping spec (unknownTopKey): unknown key spec.extra",
+ "emailField": "REJECTED: invalid source mapping spec (emailField): unknown key families.workouts.email",
+ "billingFamily": "REJECTED: invalid source mapping spec (billingFamily): families.billing is not canonical",
+ "programsFamily": "REJECTED: invalid source mapping spec (programsFamily): families.programs is not canonical",
+ "badCoerce": "REJECTED: invalid source mapping spec (badCoerce): families.workouts.clientSourceId.coerce must be one of string|string_or_finite_number",
+ "emptyPaths": "REJECTED: invalid source mapping spec (emptyPaths): families.workouts.clientSourceId.paths must be a non-empty array",
+ "emptyKey": "REJECTED: invalid source mapping spec (emptyKey): families.workouts.clientSourceId.paths[0] must be a non-empty array of keys",
+ "specV2": "REJECTED: invalid source mapping spec (specV2): specVersion must be 1",
+ "platformUpper": "REJECTED: invalid source mapping spec (platformUpper): sourcePlatform must be a canonical platform token",
+ "stepToUnmappedFamily": "REJECTED: invalid source mapping spec (stepToUnmappedFamily): steps.a targets unmapped family client_history",
+ "fanInNoDecl": "REJECTED: invalid source mapping spec (fanInNoDecl): steps a, b all map to workouts without a declared shared id space",
+ "fanInDecl": "ACCEPTED steps=[\"a\",\"b\"]",
+ "fanInPartial": "REJECTED: invalid source mapping spec (fanInPartial): sharedIdSpaces.workouts must list exactly the steps mapping to it (a, b, c)",
+ "fanInExtraStep": "REJECTED: invalid source mapping spec (fanInExtraStep): sharedIdSpaces.workouts must list exactly the steps mapping to it (a, b)",
+ "staleDecl": "REJECTED: invalid source mapping spec (staleDecl): sharedIdSpaces.workouts declares no multi-step fan-in",
+ "dupDeclMembers": "REJECTED: invalid source mapping spec (dupDeclMembers): sharedIdSpaces.workouts must be an array of distinct step tokens",
+ "declNotArray": "REJECTED: invalid source mapping spec (declNotArray): sharedIdSpaces.workouts must be an array of distinct step tokens",
+ "protoDeclJSON": "REJECTED: invalid source mapping spec (protoDeclJSON): sharedIdSpaces.__proto__ is not canonical",
+ "protoStepFanInJSON": "ACCEPTED steps=[\"a\"] resolve(__proto__)={\"ok\":false,\"reason\":\"unresolved_family:__proto__\"}",
+ "notObject": "REJECTED: invalid source mapping spec (notObject): spec must be an object"
+}
+missingDir THREW: ENOENT: no such file or directory, scandir '/tmp/s8a-probe-GhbAQM/nope'
+emptyDir THREW: no source mapping specs found in /tmp/s8a-probe-GhbAQM
+duplicatePlatform THREW: duplicate source mapping spec for probe_x (b.json)
+malformedJson THREW: Expected property name or '}' in JSON at position 1
+distRegistry conformance_alpha,conformance_beta,truecoach
+tc clients {"ok":true,"mapped":{"sourcePersonId":"7","sourcePlatform":"truecoach","displayName":"Dana"}}
+tc workouts {"ok":true,"mapped":{"sourcePlatform":"truecoach","clientSourceId":"8","label":null}}
+beta hist {"ok":true,"mapped":{"sourcePlatform":"conformance_beta","clientSourceId":"a1","label":"S"}}
+unsupported {"ok":false,"reason":"unsupported_platform:trainerize"}
+blank id {"ok":false,"reason":"missing_source_id"}
+notes {"ok":false,"reason":"unresolved_family:notes"}
+asset conformance_alpha.json byte-equal
+asset conformance_beta.json byte-equal
+asset truecoach.json byte-equal
+probe_exit=0

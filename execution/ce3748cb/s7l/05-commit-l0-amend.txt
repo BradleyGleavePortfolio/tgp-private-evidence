@@ -1,0 +1,28 @@
+== commit start_utc=2026-09-24T21:16:29Z staged=docs/decisions/2026-09-24-s7l-run-lifecycle.md  parent=f12661af2a4df64e449a16d5660ae6256772bf4c
+
+R75 --cached; policy=:.github/r75-policy.json
+Counts are whole-file after (+) and before (-); net is the per-class change.
+OK — no positive token change
+
+Checking formatting...
+All matched files use Prettier code style!
+
+
+  ────────────────────────────────────
+summary: (done in 65.73 seconds)
+
+  ────────────────────────────────────
+summary: (done in 0.01 seconds)
+
+real	1m6.067s
+user	1m0.365s
+sys	0m2.702s
+commit_rc=0
+== end_utc=2026-09-24T21:17:35Z
+head=7f14a304ce8fe5d69e943b947a58da8c477f1d33 tree=431863670ee300a9c1dc99d9dde6fd5646a5c91a parent=f12661af2a4df64e449a16d5660ae6256772bf4c author=Bradley Gleave <bradley@bradleytgpcoaching.com> committer=Bradley Gleave <bradley@bradleytgpcoaching.com>
+docs(importer): bind run identity and fix the writer gate lock order
+
+Close the two review findings on the lifecycle contract: persist intent_id = import_intent_id::text for server runs, state the Start guard order and the no-run rows for /complete and /progress; make the writer gate a row-locking UPDATE (no FOR SHARE upgrade, no self-wait on the lazy deadline fence) and add the concurrent ingest + progress case to L08. Wording: middleware path, mixed-version /complete claims, revoked mapping, erasure seam.
+
+
+NOTE: the transcript above was piped through sed (ANSI strip) + grep -v (box-drawing lines); that filter also dropped lefthook's per-command "✔️ name (secs)" lines. What remains proves: pre-commit ran (R75 staged check output, prettier output, summary done in 65.73 s = tsc), commit-msg ran (second summary), and git exited 0 so no hook failed (lefthook aborts the commit on any nonzero). Hooks were not bypassed (no LEFTHOOK=0, no --no-verify).

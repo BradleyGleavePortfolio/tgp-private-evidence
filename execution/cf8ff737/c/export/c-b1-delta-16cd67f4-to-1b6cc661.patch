@@ -1,0 +1,32 @@
+From 1b6cc66164b3398d573ba92f0c8f6b039494be24 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 21:42:40 +0000
+Subject: [PATCH] test(importer): scope the narrow-key catalog helper to the
+ two real tables
+
+narrow() in the G2-C harness matched pg_index by index name only, so the
+C14c decoy index on the unrelated g2c_decoy table was reported as a
+narrow key. Restrict the match to indexes whose indrelid is
+ScoutIngestEntity or ScoutReconstructionLedger, the same relations the
+migration gates require. No other change.
+---
+ test/utils/g2-c-harness.ts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/test/utils/g2-c-harness.ts b/test/utils/g2-c-harness.ts
+index daf74010..5186c351 100644
+--- a/test/utils/g2-c-harness.ts
++++ b/test/utils/g2-c-harness.ts
+@@ -70,7 +70,8 @@ export const narrow = () =>
+   FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
+   WHERE c.relname IN ('ScoutIngestEntity_coach_id_intent_id_source_id_key',
+     'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key'::name)
+-    AND c.relnamespace='public'::regnamespace`);
++    AND c.relnamespace='public'::regnamespace
++    AND i.indrelid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass)`);
+ /** Any relation in `public` holding a narrow name (an index, or a decoy table/view): oid, kind. */
+ export const narrowNamed = () =>
+   json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(relname,oid,relkind) ORDER BY relname),'[]')
+-- 
+2.53.0
+

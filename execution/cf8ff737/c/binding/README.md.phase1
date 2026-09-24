@@ -54,14 +54,3 @@ attestations and the single-run PG grant.
 ## Observed lane state at drafting time
 Not observed: phase 1 forbids touching the clusters; `/home/user/pg17/clusters/` was not listed. The runner's own preflight
 records C1/B/R/N/Q1 presence as-is and refuses a pre-existing `clusters/c-contract`.
-
-## Phase 2 fill (2026-09-24, C head committed; PG NOT run)
-- Unfilled phase-1 copies kept beside: `c-pg-proof.sh.phase1-unfilled` (c84ffb12…), `PINS.txt.phase1`, `BINDING.sha256.phase1`, `README.md.phase1`.
-- Runner delta = `c-pg-proof.sh.diff-phase1-to-filled`: header word, the seven pin lines (`NQ1_HEAD`, `EXPECT_HEAD/TREE/SPEC_BLOB/BOOTSTRAP_BLOB/FIXTURE_SHA/NM_CLIENT_SHA`), and the two N/Q1 blob ids that moved between 61b93cff and the accepted 29e60705 (`g2-nq1-pg-harness.ts` → d51267f2…, `rls-g2-nq1.spec.ts` → a9338260…). Nothing else. `bash -n` ok.
-- `derive-c-pg-proof.py` is unchanged: it still reproduces the phase-1 unfilled form; the filled form is that output plus the recorded diff (same convention as N/Q1's `filled form e47c9ac1…`).
-- Static precondition check against the committed head (read-only, not a run): hooks lefthook ✔; all S5/B/R/N-Q1 blob pins ✔; N/Q1 head ancestor ✔; `prisma/migrations` diff vs 29e60705 = exactly C's two files ✔; node_modules a real directory inside `s7-c`, `.package-lock.json` 05bc530a… ✔, client 2141225d… ✔; jest/ts-node/prisma present ✔; `/home/user/pg17/dist/bin/postgres` present (hash not re-verified here); `clusters/nq1` present (retained, hashed by preflight), s5/c1/b/r absent (recorded as-is by preflight); `c/runtime` absent ✔; PG17 was not started.
-- Pending for the PG grant: dual attestation, then a single run of `c-pg-proof.sh` (rc 76 sentinel semantics unchanged).
-
-## B1 closure refill (2026-09-24; PG NOT run)
-- Grant `execution/ce3748cb/C_B1_CLOSURE_GRANT.md`: `narrow()` in `test/utils/g2-c-harness.ts` scoped by `i.indrelid IN (ScoutIngestEntity, ScoutReconstructionLedger)`; commit `1b6cc66164b3398d573ba92f0c8f6b039494be24` on top of 16cd67f4 (no amend).
-- Runner delta = `c-pg-proof.sh.diff-phase2-to-b1`: `EXPECT_HEAD`, `EXPECT_TREE`, header only. SPEC/BOOTSTRAP/FIXTURE/NM pins unchanged (those files did not change). Previous filled runner kept as `c-pg-proof.sh.phase2-16cd67f4` (ad6c8c53…), `BINDING.sha256.phase2-16cd67f4`.

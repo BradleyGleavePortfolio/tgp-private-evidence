@@ -1,0 +1,3444 @@
+From 16cd67f490ea363ad7ff3dc8e98246a1ad3f6d76 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 21:22:53 +0000
+Subject: [PATCH] feat(importer): contract the scout identity to the wide key
+ and refuse a lossy reverse
+
+Ship 20270121000000_scout_identity_contract: drop the two narrow unique
+indexes on ScoutIngestEntity and ScoutReconstructionLedger so the
+five-field (coach, intent, entity_type, source_platform, source_id)
+identity is the only key. One source may now exist per family and per
+platform; full-tuple replays stay deduped; the wide keys, canonical
+CHECKs, NOT NULL provenance, fence, RLS and rows are untouched.
+
+The down.sql recreates the narrow keys byte-exact only when no
+cross-family or cross-platform identity exists; on any collision it
+raises a fixed, identifier-free 23505 before either CREATE (forward
+repair only). Both directions gate on the exact catalog shape, refuse
+decoys and shadow search_path redirection, and bound locks to 5s.
+
+Remove the narrow @@unique declarations from the schema, update the
+ingest/reconstruct idempotency wording and the regenerated importer
+OpenAPI contract, pin the wide key in the structural guards, flip the
+reconstruct fakes to the wide key, and add the isolated PG17 lane proof
+(rls-g2-c-contract.spec.ts with its db/guard/harness/bootstrap/old-root
+helpers) plus the G2-C decision record and runbook.
+---
+ docs/contracts/importer-openapi.json          |    4 +-
+ .../2026-09-24-g2-identity-contract.md        |  124 ++
+ .../down.sql                                  |  117 ++
+ .../migration.sql                             |  106 ++
+ prisma/schema.prisma                          |   24 +-
+ src/scout/scout-ingest.controller.ts          |    3 +-
+ src/scout/scout-ingest.service.ts             |   24 +-
+ src/scout/scout-reconstruct.controller.ts     |    6 +-
+ src/scout/scout-reconstruct.service.ts        |   17 +-
+ test/rls-g2-c-contract.spec.ts                | 1199 +++++++++++++++++
+ test/scout/g2-c-db-guard.spec.ts              |  112 ++
+ .../reconstruct/conformance-alpha.e2e.spec.ts |   18 +-
+ .../scout-reconstruct.families.spec.ts        |   16 +-
+ .../scout-reconstruct.migration.spec.ts       |   19 +-
+ .../scout-reconstruct.service.spec.ts         |   67 +-
+ test/scout/scout-ingest.idempotency.spec.ts   |   55 +-
+ test/scout/scout-ingest.service.spec.ts       |    3 +-
+ test/utils/g2-c-bootstrap.sh                  |  279 ++++
+ test/utils/g2-c-db.ts                         |  109 ++
+ test/utils/g2-c-harness.ts                    |  246 ++++
+ test/utils/g2-c-old-root.sh                   |  105 ++
+ test/utils/g2-c-pg-harness.ts                 |  389 ++++++
+ 22 files changed, 2939 insertions(+), 103 deletions(-)
+ create mode 100644 docs/decisions/2026-09-24-g2-identity-contract.md
+ create mode 100644 prisma/migrations/20270121000000_scout_identity_contract/down.sql
+ create mode 100644 prisma/migrations/20270121000000_scout_identity_contract/migration.sql
+ create mode 100644 test/rls-g2-c-contract.spec.ts
+ create mode 100644 test/scout/g2-c-db-guard.spec.ts
+ create mode 100644 test/utils/g2-c-bootstrap.sh
+ create mode 100644 test/utils/g2-c-db.ts
+ create mode 100644 test/utils/g2-c-harness.ts
+ create mode 100644 test/utils/g2-c-old-root.sh
+ create mode 100644 test/utils/g2-c-pg-harness.ts
+
+diff --git a/docs/contracts/importer-openapi.json b/docs/contracts/importer-openapi.json
+index 88bd7c10..c0d62590 100644
+--- a/docs/contracts/importer-openapi.json
++++ b/docs/contracts/importer-openapi.json
+@@ -1613,7 +1613,7 @@
+     },
+     "/api/scout/ingest": {
+       "post": {
+-        "description": "Receives the extension crawl envelope { intent_id, entity_type, entities[] }. Idempotent on (coach_id, intent_id, sourceId). Returns 202 { received, deduped }. Returns 404 when FEATURE_SCOUT_INGEST is off.",
++        "description": "Receives the extension crawl envelope { intent_id, entity_type, entities[] }. Idempotent on (coach_id, intent_id, entity_type, sourcePlatform, sourceId). Returns 202 { received, deduped }. Returns 404 when FEATURE_SCOUT_INGEST is off.",
+         "operationId": "ScoutIngestController_ingest",
+         "parameters": [],
+         "requestBody": {
+@@ -1870,7 +1870,7 @@
+     },
+     "/api/scout/reconstruct": {
+       "post": {
+-        "description": "Reconstructs the staged entities of one settled crawl intent for the given `entity_type` family (defaults to `clients`, which mints invite-pending roster Person records; `workouts`/`client_history` mint canonical reconstructed-entity records). Idempotent on (coach_id, intent_id, entity_type, source_id). Returns 200 { staged, reconstructed, skipped, failed }. Returns 400 for an unsupported family, 409 when the intent has not settled, and 404 when FEATURE_SCOUT_RECONSTRUCT is off.",
++        "description": "Reconstructs the staged entities of one settled crawl intent for the given `entity_type` family (defaults to `clients`, which mints invite-pending roster Person records; `workouts`/`client_history` mint canonical reconstructed-entity records). Idempotent on (coach_id, intent_id, entity_type, source_platform, source_id). Returns 200 { staged, reconstructed, skipped, failed }. Returns 400 for an unsupported family, 409 when the intent has not settled, and 404 when FEATURE_SCOUT_RECONSTRUCT is off.",
+         "operationId": "ScoutReconstructController_run",
+         "parameters": [],
+         "requestBody": {
+diff --git a/docs/decisions/2026-09-24-g2-identity-contract.md b/docs/decisions/2026-09-24-g2-identity-contract.md
+new file mode 100644
+index 00000000..7e92a1de
+--- /dev/null
++++ b/docs/decisions/2026-09-24-g2-identity-contract.md
+@@ -0,0 +1,124 @@
++# G2-C: narrow-key contraction and the collision-refusing reverse
++
++Status: Tier4 local candidate, not deployment, production enablement or customer acceptance.
++
++## Scope and preserved source
++
++C is the last step of the [canonical staged rollout](https://github.com/BradleyGleavePortfolio/tgp-agent-context/blob/160928b98c57a6034cd8b7bcfba537e81c63f054/handoffs/op81/CONTINUATION_AND_ROMAN_IMPORT_PLAN.md)
++**E → T/Q0 → B/drain → R → N/Q1 → C**. It ships one migration,
++`20270121000000_scout_identity_contract`, that drops exactly the two narrow unique
++indexes (`ScoutIngestEntity_coach_id_intent_id_source_id_key` and the 63-character
++truncation of `ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key`)
++and its `down.sql`. Nothing else moves: R's wide identity keys, both canonical CHECKs,
++the ledger's NOT NULL provenance, B's fence, RLS (ENABLE+FORCE), policies, grants and
++every row are untouched, and no data is derived, deleted or rewritten. The schema
++declarations of the two narrow `@@unique`s leave `prisma/schema.prisma` in the same
++change; the wide `@@unique(..., map: "..._identity_key")` declarations stay.
++
++No runtime code changes. The real `ScoutIngestService` already writes
++`createMany({ skipDuplicates: true })` (an `ON CONFLICT DO NOTHING` naming no conflict
++target), and the accepted N writer already upserts on the wide identity: once the
++narrow indexes are gone, one `source_id` across families and across platforms is
++admitted as distinct identities, full-tuple replays stay deduped, and the Q1 readers
++already page real ties `(source_id, source_platform)`. C is the contract those
++writers and readers were built for; it activates nothing new in code.
++
++Entry gates are once-only and exact: `migration.sql` refuses (`G2-C unexpected
++identity prerequisite`) unless both narrow keys have their exact accepted definitions
++on the expected forced-RLS public tables, and refuses (`G2-C wide identity absent`)
++unless R's wide keys, CHECKs, `NOT NULL` provenance (TEXT, no default) and a NULL-free
++ledger are present. Locks are bounded to 5 seconds and statements to 30 seconds
++under `SET LOCAL`; a timeout is a failure to retry later, never permission to raise
++budgets without rehearsal. Every object reference is schema-qualified so a session
++`search_path` cannot redirect either direction.
++
++## D-C1: no seal on the ingest window (carried to S9)
++
++An ingest that lands between the writer's staged count and its page read is left
++staged and unaccounted in that run's tally; the next idempotent replay converges and
++the tally equals the ledger. C does not add a fence, seal or drain state for that
++window: it is bounded, observable (present in staging, absent from the ledger, no
++target) and self-healing under the existing replay. The row is never marked
++reconstructed by anything other than a real reconstruction. Sealing an intent's
++staging is S9 reconciliation scope and is carried forward, not silently dropped.
++
++## Rollback and the C.down refusal
++
++`down.sql` recreates both narrow keys byte-exact (schema-qualified, the same DDL as
++the accepted 20261222000000 / 20261223000200 migrations) and asserts the recreated
++shape in the same transaction. It is the ONLY reverse that can lose information, so it
++is forward-repair-only on any collision: before either `CREATE UNIQUE INDEX` it groups
++staging by `(coach_id, intent_id, source_id)` and the ledger by
++`(coach_id, intent_id, entity_type, source_id)`, and if any group has more than one
++row it raises a fixed text with `ERRCODE = 'unique_violation'` (23505). The text names
++no table, column, coach, intent, source or count, and no `DETAIL: Key (...)` is
++produced because no index is created; the tables are checked before either CREATE,
++so no half-narrow state exists. The two staging refusals and the ledger-only refusal
++leave every row and target in place. An operator who needs the narrow shape back
++with collisions present must resolve those identities forward (delete or merge the
++duplicates under the wide key, through the product, with the customer's intent), not
++edit the down.
++
++Entry to `down.sql` is guarded the same way as the forward: `G2-C contract absent`
++when either narrow name already resolves in `public` (an index or a decoy relation of
++any kind), or when R's shape is not exactly present. It does not touch history: after
++a production C.down, S1 records
++`prisma migrate resolve --rolled-back 20270121000000_scout_identity_contract` as its
++own step, and until then `prisma migrate deploy` reports nothing pending while the
++narrow keys are back (recorded here, not judged).
++
++Runbook order for a full reverse is C → R → B → E, each refusing out of order:
++
++- R.down, B.down and E.down on a database with C applied refuse with
++  `G2-R unexpected identity prerequisite`, `G2-B unexpected identity prerequisite`
++  and `G2-E unexpected identity prerequisite` respectively (their entry gates
++  require the narrow keys).
++- After C.down the accepted order applies; E.down still refuses
++  `G2-E refuses removal of assigned provenance` until the ledger holds no assigned
++  provenance, and the forward chain E.up → B.up → R.up → C.up restores the C shape
++  with staging byte-equivalent and the ledger re-derivable by the writers.
++- A held reader or an uncommitted ingest makes either C direction hit
++  `canceling statement due to lock timeout` (55P03) after its own 5-second budget
++  with nothing applied; the operator retries later rather than widening the budget.
++
++## D-C2: stepwise promotion and production preconditions
++
++C is promoted one environment at a time behind the same preconditions its migration
++enforces, plus the operational ones SQL cannot prove:
++
++1. N/Q1 accepted and deployed everywhere the database is reachable; no T/Q0 or older
++   writer remains (B's fence blocks obsolete NULL-provenance writers; C adds no fence).
++2. R's wide keys valid, both CHECKs validated, ledger `NOT NULL`, zero NULL rows.
++3. `readDrainState`'s `mismatch` is an over-count once C is applied: it joins the
++   narrow `(coach_id, intent_id, entity_type, source_id)` and counts every legitimate
++   cross-platform identity as a disagreement. It is retired with the backfill CLI (the
++   R drain is complete by precondition 2) rather than rewritten against the wide key.
++4. Rehearsed on the isolated PG17 lane (`test/rls-g2-c-contract.spec.ts`, fresh
++   N/Q1-shaped bootstrap, candidate `prisma migrate deploy`), then staging, then
++   production, each with the lock budget observed and the two-index catalog delta
++   confirmed before the next.
++
++Production enablement, canary and any customer-facing switch remain owner-reserved
++decisions; nothing in this record authorizes them.
++
++## Proof boundary
++
++The lane proof establishes only what is new in C on synthetic data: deploy exactness
++(only the two narrow indexes leave), activation of cross-family and cross-platform
++identities through the real ingest service and the N writer, retained idempotency,
++candidate/old races converging to one row and one target, the lock budgets, real Q1
++ties on both heads, security posture before and after C.down, the late-ingest window,
++the three collision refusals, decoy and shadow-`search_path` refusals, the older
++downs' refusals with C applied, and the collision-free reverse and forward chain.
++CI's migration dry-run runs PostgreSQL 15 on an empty database: it exercises entry
++gates and syntax, not the collision refusal (which needs rows) nor PG17 parity. Local
++proof is not deployment, drain of any real database, or customer acceptance.
++
++## Sources
++
++- Rollout order: https://github.com/BradleyGleavePortfolio/tgp-agent-context/blob/160928b98c57a6034cd8b7bcfba537e81c63f054/handoffs/op81/CONTINUATION_AND_ROMAN_IMPORT_PLAN.md
++- E record: docs/decisions/2026-09-18-g2-ledger-platform-expand.md
++- T/Q0 record: docs/decisions/2026-09-18-g2-transition-writer-cursors.md
++- Migrations: prisma/migrations/20270118000000_scout_ledger_platform_expand,
++  20270119000000_scout_ledger_obsolete_writer_fence, 20270120000000_scout_identity_ready,
++  20270121000000_scout_identity_contract
+diff --git a/prisma/migrations/20270121000000_scout_identity_contract/down.sql b/prisma/migrations/20270121000000_scout_identity_contract/down.sql
+new file mode 100644
+index 00000000..c57f565a
+--- /dev/null
++++ b/prisma/migrations/20270121000000_scout_identity_contract/down.sql
+@@ -0,0 +1,117 @@
++-- Reverse of 20270121000000_scout_identity_contract (G2-C).
++-- Recreates ONLY the two narrow unique indexes, byte-exact (original names, columns,
++-- schema-qualified), returning both tables to the accepted R shape: wide keys, both
++-- canonical CHECKs, the ledger NOT NULL, the B fence, every row and every assigned
++-- provenance value are retained. Nothing is derived, deleted, deduplicated or
++-- re-statused. Refuses when C is absent or not exactly as shipped (raw reruns and a
++-- pre-C database fail atomically), and REFUSES when restoring a narrow key would lose
++-- data: any duplicate (coach_id, intent_id, source_id) in staging or duplicate
++-- (coach_id, intent_id, entity_type, source_id) in the ledger is a cross-family or
++-- cross-platform identity that only the wide key can hold. That refusal is a fixed,
++-- identifier-free 23505 (never PostgreSQL's `DETAIL: Key (...)=(...)` line, which would
++-- print coach/source identifiers into release logs); both tables are checked before
++-- either CREATE, so there is never a half-narrow state. Forward repair only: keep C,
++-- fix forward with N-compatible writers. The recorded migration history is not
++-- rewritten here (S1-owned recovery semantics).
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  -- 1. C exactly as shipped: no relation in `public` holds either narrow name (a rerun, a
++  --    pre-C database or a decoy relation under the name is refused, never dropped or adopted).
++  IF to_regclass('public."ScoutIngestEntity_coach_id_intent_id_source_id_key"') IS NOT NULL
++    OR to_regclass('public."ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key"') IS NOT NULL
++  THEN
++    RAISE EXCEPTION 'G2-C contract absent';
++  END IF;
++  -- 2. R exactly as shipped: both wide unique indexes on their own tables with the exact
++  --    definition, both validated CHECK constraints keyed on source_platform alone, both
++  --    provenance columns NOT NULL. Anything else (absent, partial, decoy) is refused.
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_identity_key', 'ScoutIngestEntity_source_platform_canonical'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_identity_key', 'ScoutReconstructionLedger_source_platform_canonical')
++  ) AS shipped(table_name, index_name, check_name)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (coach_id, intent_id, entity_type, source_platform, source_id)',
++          prerequisite.index_name, prerequisite.table_name)
++    ) OR NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_constraint c
++      JOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attname = 'source_platform'
++      WHERE c.conname = prerequisite.check_name
++        AND c.conrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND c.contype = 'c' AND c.convalidated AND c.conkey = ARRAY[a.attnum]
++    ) OR NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_attribute a
++      WHERE a.attrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND a.attname = 'source_platform' AND NOT a.attisdropped
++        AND a.atttypid = 'text'::regtype AND a.attnotnull
++    ) THEN
++      RAISE EXCEPTION 'G2-C contract absent';
++    END IF;
++  END LOOP;
++  -- 3. Collision pre-check under ACCESS EXCLUSIVE (race-free), BOTH tables before ANY CREATE.
++  --    Fixed text, SQLSTATE 23505, no identifiers or values are raised.
++  IF EXISTS (
++      SELECT 1 FROM public."ScoutIngestEntity"
++      GROUP BY coach_id, intent_id, source_id HAVING count(*) > 1
++    ) OR EXISTS (
++      SELECT 1 FROM public."ScoutReconstructionLedger"
++      GROUP BY coach_id, intent_id, entity_type, source_id HAVING count(*) > 1
++    ) THEN
++    RAISE EXCEPTION 'G2-C.down refused: cross-family/cross-platform identities exist; restoring narrow keys would lose data. Forward repair only: keep C, fix forward with N-compatible writers; no deletion.'
++      USING ERRCODE = 'unique_violation';
++  END IF;
++END $$;
++
++-- Byte-exact recreation of the accepted narrow keys (20261222000000 / 20261223000200 DDL),
++-- schema-qualified so a shadow search_path cannot redirect them; the ledger name is the
++-- literal accepted text and truncates to the same 63-character stored name.
++CREATE UNIQUE INDEX "ScoutIngestEntity_coach_id_intent_id_source_id_key"
++  ON public."ScoutIngestEntity" (coach_id, intent_id, source_id);
++CREATE UNIQUE INDEX "ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key"
++  ON public."ScoutReconstructionLedger" (coach_id, intent_id, entity_type, source_id);
++
++-- Postcondition, in the same transaction: the recreated keys are exactly the accepted shape
++-- (the same predicate every older down.sql requires). A non-exact recreation refuses atomically.
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-C narrow key not restored exactly';
++    END IF;
++  END LOOP;
++END $$;
++COMMIT;
+diff --git a/prisma/migrations/20270121000000_scout_identity_contract/migration.sql b/prisma/migrations/20270121000000_scout_identity_contract/migration.sql
+new file mode 100644
+index 00000000..6fa8663d
+--- /dev/null
++++ b/prisma/migrations/20270121000000_scout_identity_contract/migration.sql
+@@ -0,0 +1,106 @@
++-- G2-C only: the identity contract. Drops the two NARROW unique indexes so that
++-- the wide keys R created (coach_id, intent_id, entity_type, source_platform,
++-- source_id) become the only arbiters of staging and ledger identity. Activation
++-- boundary: from here the same source_id may exist under several families and
++-- several platforms of one intent; the N writer and Q1 readers already address
++-- rows by the five-field identity. NOT a writer/reader/policy/data change: the
++-- wide keys, both canonical CHECKs, the ledger NOT NULL, the B fence, RLS flags
++-- and every policy stay exactly as R/B left them; zero rows are touched.
++--
++-- Entry gate (refuses, never derives, deletes or repairs): both narrow indexes
++-- exactly as accepted (a raw rerun or a decoy relation holding a narrow name is
++-- refused), R exactly as shipped (both wide keys, both validated CHECKs, ledger
++-- NOT NULL), both source_platform columns NOT NULL TEXT without default, and no
++-- NULL provenance row anywhere. B's fence is neither asserted nor touched
++-- (NOT NULL already refuses what it refuses; B.down owns it). Separate release
++-- artifact from E/T/B/R/N. The recorded migration history is not rewritten by
++-- the reverse (down.sql): after a production C.down the operator resolves it.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  -- 1. Narrow keys exactly as accepted, on both tables (the objects this file drops).
++  --    ::name honors PostgreSQL's 63-character identifier truncation for the ledger key.
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-C unexpected identity prerequisite';
++    END IF;
++  END LOOP;
++  -- 2. R exactly as shipped: both wide unique indexes on their own tables with the exact
++  --    definition, both validated CHECK constraints keyed on source_platform alone, and the
++  --    ledger column NOT NULL. Anything else (absent, partial, decoy) is refused.
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_identity_key', 'ScoutIngestEntity_source_platform_canonical'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_identity_key', 'ScoutReconstructionLedger_source_platform_canonical')
++  ) AS shipped(table_name, index_name, check_name)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (coach_id, intent_id, entity_type, source_platform, source_id)',
++          prerequisite.index_name, prerequisite.table_name)
++    ) OR NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_constraint c
++      JOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attname = 'source_platform'
++      WHERE c.conname = prerequisite.check_name
++        AND c.conrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND c.contype = 'c' AND c.convalidated AND c.conkey = ARRAY[a.attnum]
++    ) THEN
++      RAISE EXCEPTION 'G2-C wide identity absent';
++    END IF;
++  END LOOP;
++  -- 3. Both provenance columns NOT NULL TEXT, no default, not generated/identity; and no NULL
++  --    row on either table (redundant beside NOT NULL, cheap, belt-and-braces).
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity'), ('ScoutReconstructionLedger')
++  ) AS columns(table_name)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_attribute a
++      WHERE a.attrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND a.attname = 'source_platform' AND NOT a.attisdropped
++        AND a.atttypid = 'text'::regtype AND a.atttypmod = -1
++        AND a.attnotnull AND NOT a.atthasdef AND a.attgenerated = '' AND a.attidentity = ''
++    ) THEN
++      RAISE EXCEPTION 'G2-C wide identity absent';
++    END IF;
++  END LOOP;
++  IF EXISTS (SELECT 1 FROM public."ScoutReconstructionLedger" WHERE source_platform IS NULL)
++    OR EXISTS (SELECT 1 FROM public."ScoutIngestEntity" WHERE source_platform IS NULL) THEN
++    RAISE EXCEPTION 'G2-C wide identity absent';
++  END IF;
++END $$;
++
++-- Contraction: catalog-only drops inside the transaction. No CONCURRENTLY (would break the
++-- two-table atomicity), no CASCADE (any dependent object makes the drop refuse atomically),
++-- schema-qualified so a shadow search_path cannot redirect them. The ledger name is the
++-- literal accepted text; PostgreSQL truncates it to the same 63-character stored name.
++DROP INDEX public."ScoutIngestEntity_coach_id_intent_id_source_id_key";
++DROP INDEX public."ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key";
++COMMIT;
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index a53732e5..943945ce 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -6872,9 +6872,10 @@ model ScoutImport {
+ // entity; only intent_id/entity_type on the outer envelope stay snake_case.
+ //
+ // coach_id comes from the extension bearer-token identity (never a body field);
+-// the (coach_id, intent_id, source_id) unique key makes the endpoint idempotent
+-// so the extension can safely replay a batch during retry/recovery without
+-// duplicating rows.
++// the (coach_id, intent_id, entity_type, source_platform, source_id) unique key
++// (G2-C: the wide identity is the only key) makes the endpoint idempotent so the
++// extension can safely replay a batch during retry/recovery without duplicating
++// rows, while one source_id may exist per family and per platform.
+ //
+ // RLS: RESTRICTIVE deny-all to anon + authenticated — written/read only via
+ // service_role (the ingest endpoint runs server-side). Mirrors
+@@ -6890,9 +6891,8 @@ model ScoutIngestEntity {
+   payload         Json
+   created_at      DateTime  @default(now())
+ 
+-  @@unique([coach_id, intent_id, source_id])
+-  // G2-R wide identity: declared alongside the narrow key, which keeps arbitrating
+-  // duplicates (a narrow duplicate is always a wide duplicate). Not the identity itself yet.
++  // G2-C identity contract: the wide key is the identity. The narrow
++  // (coach_id, intent_id, source_id) key was dropped by 20270121000000_scout_identity_contract.
+   @@unique([coach_id, intent_id, entity_type, source_platform, source_id], map: "ScoutIngestEntity_identity_key")
+   @@index([coach_id, entity_type])
+ }
+@@ -6948,12 +6948,12 @@ model ScoutReconstructionLedger {
+   reason      String?
+   created_at  DateTime @default(now())
+ 
+-  @@unique([coach_id, intent_id, entity_type, source_id])
+-  // G2-R wide identity beside the retained narrow key (see ScoutIngestEntity). source_platform
+-  // is `String` from N on, matching the NOT NULL + canonical CHECK the database carries since
+-  // 20270120000000; the final writer upserts on this five-field identity and has no null-claim.
+-  // No migration ships with N: the column and both keys already exist. The narrow key is
+-  // retained until C.
++  // G2-C identity contract: the five-field wide identity is the only key (see ScoutIngestEntity).
++  // source_platform is `String` from N on, matching the NOT NULL + canonical CHECK the database
++  // carries since 20270120000000; the writer upserts on this identity and has no null-claim.
++  // The narrow (coach_id, intent_id, entity_type, source_id) key was dropped by
++  // 20270121000000_scout_identity_contract; its down.sql recreates it only when no
++  // cross-family/cross-platform identity exists (forward repair otherwise).
+   @@unique([coach_id, intent_id, entity_type, source_platform, source_id], map: "ScoutReconstructionLedger_identity_key")
+   @@index([coach_id, intent_id])
+ }
+diff --git a/src/scout/scout-ingest.controller.ts b/src/scout/scout-ingest.controller.ts
+index 9a9c6646..4f43f9bf 100644
+--- a/src/scout/scout-ingest.controller.ts
++++ b/src/scout/scout-ingest.controller.ts
+@@ -36,7 +36,8 @@ export class ScoutIngestController {
+     summary: 'Ingest a batch of crawled entities',
+     description:
+       'Receives the extension crawl envelope { intent_id, entity_type, entities[] }. ' +
+-      'Idempotent on (coach_id, intent_id, sourceId). Returns 202 { received, deduped }. ' +
++      'Idempotent on (coach_id, intent_id, entity_type, sourcePlatform, sourceId). ' +
++      'Returns 202 { received, deduped }. ' +
+       'Returns 404 when FEATURE_SCOUT_INGEST is off.',
+   })
+   @ApiResponse({ status: 202, description: 'Batch accepted.', type: ScoutIngestResult })
+diff --git a/src/scout/scout-ingest.service.ts b/src/scout/scout-ingest.service.ts
+index 760686cc..e5922ace 100644
+--- a/src/scout/scout-ingest.service.ts
++++ b/src/scout/scout-ingest.service.ts
+@@ -47,18 +47,22 @@ export class ScoutIngestService {
+   /**
+    * Persist a crawl batch for `coachId`, idempotently.
+    *
+-   * Idempotency is enforced by the (coach_id, intent_id, source_id) unique
+-   * index + `skipDuplicates`, which compiles to INSERT ... ON CONFLICT DO
+-   * NOTHING. A replayed batch (extension retry/recovery) inserts zero rows and
+-   * is reported as fully deduped. In-batch duplicate source_ids collapse the
+-   * same way, so `received` counts the envelope while `deduped` counts every
+-   * entity that did not produce a new row.
++   * Idempotency is enforced by the (coach_id, intent_id, entity_type,
++   * source_platform, source_id) unique index (G2-C: the wide identity is the
++   * only key) + `skipDuplicates`, which compiles to INSERT ... ON CONFLICT DO
++   * NOTHING with no conflict target, so whatever unique indexes the database
++   * carries arbitrate. A replayed batch (extension retry/recovery) inserts zero
++   * rows and is reported as fully deduped. In-batch duplicate identities
++   * collapse the same way, so `received` counts the envelope while `deduped`
++   * counts every entity that did not produce a new row. The same source_id in
++   * another family or on another platform is a distinct identity and inserts.
+    *
+    * R-IDEMP-1 (2026-07-08): capturedAt is a value, not a key. The idempotency
+-   * key is (coach_id, intent_id, source_id) — "the coach saw entity X during
+-   * crawl session Y." A coach's crawl re-observes the same source entity over
+-   * time; each re-observation within an intent must be a no-op replay, not a
+-   * new row. Putting capturedAt in the key would break this: an extension retry
++   * key is (coach_id, intent_id, entity_type, source_platform, source_id) —
++   * "the coach saw entity X of family F on platform P during crawl session Y."
++   * A coach's crawl re-observes the same source entity over time; each
++   * re-observation within an intent must be a no-op replay, not a new row.
++   * Putting capturedAt in the key would break this: an extension retry
+    * carrying a fresh timestamp would insert a duplicate, defeating replay
+    * safety. Different intent_id = a new observation series, correctly inserts.
+    */
+diff --git a/src/scout/scout-reconstruct.controller.ts b/src/scout/scout-reconstruct.controller.ts
+index 5cba97ff..8ed6771b 100644
+--- a/src/scout/scout-reconstruct.controller.ts
++++ b/src/scout/scout-reconstruct.controller.ts
+@@ -39,9 +39,9 @@ export class ScoutReconstructController {
+       'Reconstructs the staged entities of one settled crawl intent for the given `entity_type` ' +
+       'family (defaults to `clients`, which mints invite-pending roster Person records; ' +
+       '`workouts`/`client_history` mint canonical reconstructed-entity records). Idempotent on ' +
+-      '(coach_id, intent_id, entity_type, source_id). Returns 200 { staged, reconstructed, ' +
+-      'skipped, failed }. Returns 400 for an unsupported family, 409 when the intent has not ' +
+-      'settled, and 404 when FEATURE_SCOUT_RECONSTRUCT is off.',
++      '(coach_id, intent_id, entity_type, source_platform, source_id). Returns 200 { staged, ' +
++      'reconstructed, skipped, failed }. Returns 400 for an unsupported family, 409 when the ' +
++      'intent has not settled, and 404 when FEATURE_SCOUT_RECONSTRUCT is off.',
+   })
+   @ApiResponse({
+     status: 200,
+diff --git a/src/scout/scout-reconstruct.service.ts b/src/scout/scout-reconstruct.service.ts
+index 49b0cd12..133bc011 100644
+--- a/src/scout/scout-reconstruct.service.ts
++++ b/src/scout/scout-reconstruct.service.ts
+@@ -38,9 +38,9 @@ import {
+  *    and returns identical counts. A concurrent replay that loses the insert
+  *    race (unique violation) is retried once and converges, never a spurious
+  *    `failed`. A unique violation that persists after the retry cannot be the
+- *    wide identity (the retry's upsert would have matched it): it is a
+- *    provenance collision on the retained narrow key and is a 409 with nothing
+- *    written, never a fabricated ledger outcome.
++ *    wide identity (the retry's upsert would have matched it): it is an
++ *    unexpected unique violation (G2-C: no narrow key remains) and is a 409
++ *    with nothing written, never a fabricated ledger outcome.
+  *  - Poison-row isolation: each staged row is reconstructed in its own
+  *    transaction inside a try/catch; one bad row is recorded `failed` and its
+  *    siblings still reconstruct.
+@@ -82,7 +82,7 @@ export class ScoutReconstructService {
+     this.assertWithinBound(coachId, intentId, staged);
+ 
+     // Deterministic paged read (ordered by source_id, source_platform — the
+-    // staged identity, total once the narrow key is gone): bounded memory + a
++    // staged identity, total per family at G2-C): bounded memory + a
+     // bounded number of queries regardless of roster size. Each row is
+     // reconstructed idempotently, so a re-run picks up exactly where a prior
+     // pass left off without minting duplicates.
+@@ -339,10 +339,11 @@ class ProvenanceConflict extends ConflictException {
+ /**
+  * Only actual Prisma insert races / transaction conflicts, once per attempt. A
+  * unique violation that survives the retry is not a race: the wide-identity
+- * upsert would have matched a committed row of the same identity, so the row
+- * blocking the insert carries the same narrow (coach, intent, entity, source)
+- * key under a different platform. That is a provenance collision — reported as
+- * the same 409 the T writer returned for it, with nothing written.
++ * upsert would have matched a committed row of the same identity, so the
++ * violation comes from a unique key this writer does not select on (G2-C: no
++ * narrow key remains; an unexpected constraint, never the identity). It is
++ * reported as the same fail-closed 409 the T writer returned, with nothing
++ * written.
+  */
+ async function retryContention<T>(operation: () => Promise<T>): Promise<T> {
+   try {
+diff --git a/test/rls-g2-c-contract.spec.ts b/test/rls-g2-c-contract.spec.ts
+new file mode 100644
+index 00000000..6c40544d
+--- /dev/null
++++ b/test/rls-g2-c-contract.spec.ts
+@@ -0,0 +1,1199 @@
++// S7-3′ G2 C/contract proof on the isolated PostgreSQL 17 lane (S1-provisioned,
++// synthetic data only). Ordered stages in ONE file, run with --runInBand, on a
++// FRESH bootstrap whose "old" side is N/Q1: a detached checkout of the accepted
++// N/Q1 head, whose `prisma migrate deploy` installed the whole accepted history
++// (164 base + S1, C1, E, B, R = 169). C ships ONE migration
++// (20270121000000_scout_identity_contract: drop both narrow unique indexes) and
++// its reverse; the candidate's deploy must have exactly C pending.
++// Establishes only what is new in C: the contraction through the release
++// mechanism, the activation of cross-family / cross-platform identities for the
++// REAL ingest service and the N writer, retained idempotency, races, lock
++// budgets, real Q1 ties, security, late ingest (D-C1), and C.down: collision-free
++// reverse (with the whole E/B/R/C chain), the fixed identifier-free 23505 refusal
++// on any collision, entry guards/decoys/shadow, and the older downs' refusals.
++//   1. C02 negative control on the pre-C shape;  2. C14a C.down before C, C09a
++//   C.up lock budget;  3. C01 deploy exactness, C14b rerun/shadow;  4. C03/C04,
++//   C05, C06, C07, C08, C09b, C16, C17a, C18;  5. C11, C12, C13, C14c, C15;
++//   6. C10 (+C14d, C17b), N/Q1 continues on C.
++// Accepted E/T-Q0, B, R and N/Q1 proofs are neither rerun nor restated. Nothing
++// here claims deployment, drain of any real database, or customer acceptance.
++import { execFileSync } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  allLedger,
++  appliedMigrations,
++  blocked,
++  catalog,
++  directory,
++  E_MIGRATION,
++  expectedVersion,
++  gitShow,
++  hasColumn,
++  holdTransaction,
++  json,
++  legacyEntityCursor,
++  legacyRosterCursor,
++  OLD_HEAD,
++  oldClient,
++  prismaMigrateDeploy,
++  quote,
++  records,
++  refused,
++  resetData,
++  root,
++  run,
++  settle,
++  sql,
++  sqlAdmin,
++  sqlFile,
++  stage,
++  target,
++  targets,
++  upFile,
++  downFile,
++  v2,
++  worker,
++} from './utils/g2-c-pg-harness';
++import { G2_C_CLUSTER_MARKER, G2_C_DATABASE_MARKER } from './utils/g2-c-db';
++import {
++  appliedSince,
++  B_MIGRATION,
++  bDownFile,
++  bUpFile,
++  C1_MIGRATION,
++  C_DOWN_REFUSAL,
++  C_MIGRATION,
++  cDown,
++  cDownFile,
++  cUp,
++  cUpFile,
++  fence,
++  identityRows,
++  ingestClient,
++  ledgerCount,
++  ledgerIds,
++  ledgerRow,
++  narrow,
++  narrowDuplicates,
++  narrowNamed,
++  NARROW_LEDGER_DEF,
++  NARROW_LEDGER_NAME,
++  NARROW_STAGING_DEF,
++  NARROW_STAGING_NAME,
++  nullCount,
++  R_MIGRATION,
++  rDownFile,
++  rUpFile,
++  S1_MIGRATION,
++  stagedRows,
++  stagingSnapshot,
++  wide,
++} from './utils/g2-c-harness';
++
++jest.setTimeout(240000);
++const EXPECTED_HISTORY = 169;
++const FENCED = 'G2-B obsolete writer fenced';
++const R_ABSENT = { indexes: [], checks: [], ledgerNotNull: false };
++const MALFORMED = { status: 400, message: 'malformed cursor' };
++const CONTRACT_ABSENT = /G2-C contract absent/;
++const NARROW_PREREQUISITE = /G2-C unexpected identity prerequisite/;
++const LOCK_TIMEOUT = /canceling statement due to lock timeout/;
++const ids = (rows: any[]) => rows.map((r) => r.id);
++const visible = (family: string, r: any) => (family === 'clients' ? r.persons : r.entities);
++const cursorOf = (family: string, r: any) =>
++  family === 'clients' ? r.page.next_cursor : r.next_cursor;
++const actionOf = (family: string) => (family === 'clients' ? 'roster' : 'entities');
++const nextLegacy = (family: string, s: string) =>
++  family === 'clients' ? legacyRosterCursor(s) : legacyEntityCursor(family, s);
++/** A page read touched the ledger page (target_id selected) or the staged count. */
++const readPage = (queries: string[]) =>
++  queries.some(
++    (q) =>
++      (q.includes('"ScoutReconstructionLedger"') && q.includes('"target_id"')) ||
++      (q.includes('"ScoutIngestEntity"') && q.includes('COUNT')),
++  );
++const parsedCatalog = () => JSON.parse(catalog());
++/** Catalog observations with OIDs removed: what down→up must restore identically. */
++const stripParens = (s: string) => s.replace(/[()]/g, '');
++const shape = (w: any) => ({
++  indexes: w.indexes.map(([name, , unique, valid, def]: any[]) => [name, unique, valid, def]),
++  checks: w.checks.map(([name, , rel, valid, def]: any[]) => [name, rel, valid, stripParens(def)]),
++  ledgerNotNull: w.ledgerNotNull,
++});
++const indexDefs = (c: any) => c.indexes.map(([, def]: [number, string]) => def).sort();
++/** Targets without the writer's @updatedAt touch: a replay's Person/entity upsert bumps
++ *  updated_at and nothing else; identity, ids and content must be untouched. */
++const stableTargets = (t: any) => ({
++  persons: t.persons.map(({ updated_at: _u, ...p }: any) => p),
++  entities: t.entities.map(({ updated_at: _v, ...e }: any) => e),
++});
++/** Narrow observations without OIDs (C.down recreates the objects, so OIDs legitimately move). */
++const narrowDefs = () => narrow().map(([name, , def]: any[]) => [name, def]);
++const NARROW_SHAPE = [
++  [NARROW_STAGING_NAME, NARROW_STAGING_DEF],
++  [NARROW_LEDGER_NAME, NARROW_LEDGER_DEF],
++];
++const ledgerInsert = (
++  id: string,
++  platform: string | null,
++  role?: string,
++  family = 'clients',
++  source = id,
++  intent = 'intent',
++) =>
++  `${role ? `SET ROLE ${role}; ` : ''}INSERT INTO public."ScoutReconstructionLedger"
++  (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++  VALUES (${quote(id)},'coach',${quote(intent)},${quote(family)},${quote(source)},${platform === null ? 'NULL' : quote(platform)},'skipped')`;
++const stagingInsert = (
++  id: string,
++  platform: string | null,
++  role?: string,
++  source = id,
++  family = 'clients',
++  intent = 'intent',
++) =>
++  `${role ? `SET ROLE ${role}; ` : ''}INSERT INTO public."ScoutIngestEntity"
++  (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++  VALUES (${quote(id)},'coach',${quote(intent)},${quote(family)},${quote(source)},${platform === null ? 'NULL' : quote(platform)},'{}'::jsonb)`;
++/** Refusal with the SQLSTATE visible: psql prints `ERROR:  <sqlstate>:` under verbose verbosity. */
++const refusedCode = (statement: string, sqlstate: string) =>
++  refused(`\\set VERBOSITY verbose\n${statement}`, `ERROR:  ${sqlstate}:`);
++/** A migration file refused, with verbose verbosity so the SQLSTATE is in the output; returns
++ *  the whole psql output so identifier-leak assertions can run on it. */
++function refusedFile(file: string, message: RegExp | string): string {
++  let error: unknown;
++  try {
++    sql(`\\set VERBOSITY verbose\n\\i ${file}`);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error(`${file} unexpectedly succeeded`);
++  const output = String(error);
++  expect(output).toMatch(message);
++  return output;
++}
++const snapshot = () => ({
++  ledger: allLedger(),
++  staging: stagingSnapshot(),
++  applied: appliedMigrations(),
++  targets: targets(),
++  wide: wide(),
++  narrow: narrow(),
++  fence: fence(),
++  column: hasColumn(),
++});
++/** Every refusal is atomic: rows, targets, history, R's objects, the narrow keys (OIDs
++ *  included), the fence and the column are exactly what they were. */
++const expectUnchanged = (before: ReturnType<typeof snapshot>) => {
++  expect(snapshot()).toEqual(before);
++};
++/** C.down refused on a collision: the fixed text, SQLSTATE 23505, no `DETAIL: Key`, none of the
++ *  fixture identifiers in the output, everything unchanged, and no narrow relation on either
++ *  table (both tables are checked before either CREATE). */
++function expectDownRefusedCollision(identifiers: string[]) {
++  const before = snapshot();
++  expect(before.narrow).toEqual([]);
++  const output = refusedFile(cDownFile, C_DOWN_REFUSAL);
++  expect(output).toContain('ERROR:  23505:');
++  expect(output).not.toMatch(/DETAIL:\s+Key/);
++  for (const identifier of identifiers) expect(output).not.toContain(identifier);
++  expectUnchanged(before);
++  expect(narrowNamed()).toEqual([]);
++  return output;
++}
++/** Session-default search_path for the migration role: the redirection attempt (case 15). */
++const withShadowSearchPath = (fn: () => void) => {
++  sql(`CREATE SCHEMA shadow;
++    CREATE TABLE shadow."ScoutIngestEntity" (LIKE public."ScoutIngestEntity" INCLUDING DEFAULTS);
++    CREATE TABLE shadow."ScoutReconstructionLedger" (LIKE public."ScoutReconstructionLedger" INCLUDING DEFAULTS);
++    ALTER ROLE postgres SET search_path = shadow, public`);
++  try {
++    expect(sql(`SHOW search_path`)).toBe('shadow, public');
++    fn();
++    // The shadow relations never acquired anything: no indexes, no constraints.
++    expect(
++      sql(
++        `SELECT count(*) FROM pg_index WHERE indrelid IN ('shadow."ScoutIngestEntity"'::regclass,'shadow."ScoutReconstructionLedger"'::regclass)`,
++      ),
++    ).toBe('0');
++    expect(
++      sql(
++        `SELECT count(*) FROM pg_constraint WHERE conrelid IN ('shadow."ScoutIngestEntity"'::regclass,'shadow."ScoutReconstructionLedger"'::regclass)`,
++      ),
++    ).toBe('0');
++  } finally {
++    sql(`ALTER ROLE postgres RESET search_path; DROP SCHEMA shadow CASCADE`);
++  }
++};
++/** Every non-final Q1 page of `family` from `after`, one row at a time; returns visible ids. */
++async function enumerate(family: string, after?: string, old = false, limit = 1) {
++  const action = actionOf(family);
++  const union: string[] = [];
++  const tokens: (string | null)[] = [];
++  for (let guard = 0; guard < 50; guard++) {
++    const page = await run({ action, family, cursor: after, limit }, old);
++    expect(page.failure).toBeUndefined();
++    union.push(...ids(visible(family, page.result)));
++    const next = cursorOf(family, page.result);
++    tokens.push(next);
++    if (next === null) return { union, tokens };
++    after = next;
++  }
++  throw new Error('pagination did not terminate');
++}
++/** Target ids of the reconstructed rows of a scope in Q1's page order (source_id, source_platform). */
++const reconstructedTargets = (intent: string, family: string) =>
++  json(`SELECT COALESCE(jsonb_agg(target_id ORDER BY source_id,source_platform),'[]')
++  FROM "ScoutReconstructionLedger" WHERE coach_id='coach' AND intent_id=${quote(intent)}
++  AND entity_type=${quote(family)} AND status='reconstructed'`);
++/** Lock-budget refusal of a migration file against a held transaction: the file's own 5s
++ *  SET LOCAL lock_timeout, not the harness timeout, and nothing applied. */
++function expectLockTimeout(file: string) {
++  let error: unknown;
++  const started = Date.now();
++  try {
++    sqlFile(file);
++  } catch (e) {
++    error = e;
++  }
++  const elapsed = Date.now() - started;
++  expect(String(error)).toMatch(LOCK_TIMEOUT);
++  expect(elapsed).toBeGreaterThanOrEqual(4500);
++  expect(elapsed).toBeLessThan(30000);
++  console.warn(
++    'PG17_LOCK_TIMEOUT',
++    JSON.stringify({ file: file.split('/').slice(-2).join('/'), elapsed }),
++  );
++}
++async function expectTableUnlocked(table: string) {
++  for (let n = 0; n < 200; n++) {
++    const held = sqlAdmin(`SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid=l.relation
++      WHERE c.relname=${quote(table)} AND l.granted AND l.pid<>pg_backend_pid()`);
++    if (held === '0') return;
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error(`another session still holds ${table}`);
++}
++/** API roles: policy denies INSERT (42501) and hides every row from SELECT/UPDATE/DELETE. */
++function expectApiRolesDenied() {
++  for (const role of ['anon', 'authenticated']) {
++    refusedCode(ledgerInsert('api-l', 'truecoach', role), '42501');
++    refusedCode(stagingInsert('api-s', 'truecoach', role), '42501');
++    expect(
++      sql(`SET ROLE ${role}; SELECT (SELECT count(*) FROM public."ScoutReconstructionLedger")||','||
++      (SELECT count(*) FROM public."ScoutIngestEntity")`),
++    ).toBe('0,0');
++    expect(
++      sql(`SET ROLE ${role}; WITH u AS (UPDATE public."ScoutReconstructionLedger" SET status=status RETURNING 1),
++      d AS (DELETE FROM public."ScoutIngestEntity" WHERE id='none' RETURNING 1)
++      SELECT (SELECT count(*) FROM u)||','||(SELECT count(*) FROM d)`),
++    ).toBe('0,0');
++  }
++  expect(ledgerIds(`id='api-l'`)).toEqual([]);
++  expect(sql(`SELECT count(*) FROM "ScoutIngestEntity" WHERE id='api-s'`)).toBe('0');
++  // The runtime role's own rolled-back transaction leaves nothing behind.
++  sql(`SET ROLE service_role; BEGIN;
++    ${stagingInsert('rb-s', 'truecoach')}; ${ledgerInsert('rb-l', 'truecoach')};
++    ROLLBACK`);
++  expect(ledgerIds(`id='rb-l'`)).toEqual([]);
++  expect(sql(`SELECT count(*) FROM "ScoutIngestEntity" WHERE id='rb-s'`)).toBe('0');
++}
++
++// Teardown authority (S5-R3-A-01), unchanged from the accepted proofs: no mutating cleanup
++// against a fixture whose identity this proof never accepted.
++let teardownAuthorized = false;
++const disconnects: (() => Promise<void>)[] = [];
++const ingest = (name: string) => {
++  const client = ingestClient(name);
++  disconnects.push(client.disconnect);
++  return client;
++};
++
++beforeAll(() => {
++  const identity =
++    json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
++    'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
++    'version',current_setting('server_version_num'),'user',current_user,'super',
++    (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
++    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
++    (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
++  expect(identity).toMatchObject({
++    database: 'g2_c_disposable',
++    address: '127.0.0.1',
++    port: target.port,
++    directory,
++    user: 'postgres',
++    super: false,
++    bypassrls: true,
++    owner: 'postgres',
++  });
++  expect(Number(identity.version)).toBe(expectedVersion);
++  expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
++  expect(Number(identity.version)).toBeLessThan(180000);
++  expect(directory).toMatch(/\/pg17\/clusters\/c-contract\/pg-data$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_C_CLUSTER_MARKER);
++  expect(
++    sql(
++      `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++    ),
++  ).toBe(G2_C_DATABASE_MARKER);
++  console.warn('PG17_DATABASE', JSON.stringify(identity));
++  // Fresh N/Q1-shaped bootstrap: the accepted N/Q1 head's whole history through its own
++  // `prisma migrate deploy`; R's shape (column, fence, wide keys, NOT NULL) AND both narrow keys
++  // are present; C is not recorded.
++  expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name IN
++    (${[S1_MIGRATION, C1_MIGRATION, E_MIGRATION, B_MIGRATION, R_MIGRATION].map(quote).join(',')})
++    AND finished_at IS NOT NULL AND rolled_back_at IS NULL`),
++  ).toBe('5');
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(C_MIGRATION)}`),
++  ).toBe('0');
++  expect(hasColumn()).toBe('1');
++  expect(fence().triggers).toHaveLength(1);
++  const installed = wide();
++  expect(installed.indexes).toHaveLength(2);
++  expect(installed.checks).toHaveLength(2);
++  expect(installed.ledgerNotNull).toBe(true);
++  expect(narrowDefs()).toEqual(NARROW_SHAPE);
++  // C ships exactly two files on top of the accepted N/Q1 head, and those files are this packet's.
++  expect(OLD_HEAD).toMatch(/^[0-9a-f]{40}$/);
++  expect(
++    execFileSync('git', ['diff', '--name-only', OLD_HEAD, 'HEAD', '--', 'prisma/migrations'], {
++      cwd: root,
++      encoding: 'utf8',
++    })
++      .trim()
++      .split('\n')
++      .sort(),
++  ).toEqual([
++    `prisma/migrations/${C_MIGRATION}/down.sql`,
++    `prisma/migrations/${C_MIGRATION}/migration.sql`,
++  ]);
++  expect(cUp).toBe(gitShow(`HEAD:prisma/migrations/${C_MIGRATION}/migration.sql`));
++  expect(cDown).toBe(gitShow(`HEAD:prisma/migrations/${C_MIGRATION}/down.sql`));
++  expect(cDown).toContain(C_DOWN_REFUSAL);
++  expect(cDown).toContain(`USING ERRCODE = 'unique_violation'`);
++  // The candidate client is C's (required ledger provenance, both wide keys, NEITHER narrow
++  // @@unique); the old client is N's (required provenance, both wide keys, BOTH narrow @@unique).
++  const client = readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8');
++  expect(client).toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String(?!\?)/);
++  expect(client).not.toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/);
++  expect(client).toMatch(/map: "ScoutIngestEntity_identity_key"/);
++  expect(client).toMatch(/map: "ScoutReconstructionLedger_identity_key"/);
++  expect(client).not.toContain('@@unique([coach_id, intent_id, source_id])');
++  expect(client).not.toContain('@@unique([coach_id, intent_id, entity_type, source_id])');
++  const old = readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8');
++  expect(old).toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String(?!\?)/);
++  expect(old).toMatch(/map: "ScoutReconstructionLedger_identity_key"/);
++  expect(old).toContain('@@unique([coach_id, intent_id, source_id])');
++  expect(old).toContain('@@unique([coach_id, intent_id, entity_type, source_id])');
++  expect(
++    sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
++    FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`),
++  ).toBe('false:false,false:false,false:true');
++  // Read-only gates passed; authorize teardown, then the accepted setup mutations.
++  teardownAuthorized = true;
++  sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
++    GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
++      public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
++  resetData();
++});
++afterAll(async () => {
++  for (const disconnect of disconnects) {
++    try {
++      await disconnect();
++    } catch (e) {
++      console.warn('PG17_DISCONNECT_FAILED', String(e));
++    }
++  }
++  if (!teardownAuthorized) {
++    console.warn(
++      'PG17_TEARDOWN_SKIPPED',
++      JSON.stringify({ reason: 'setup refused before first mutation; no DDL/DML issued' }),
++    );
++    return;
++  }
++  sql(`ALTER ROLE postgres RESET search_path; DROP SCHEMA IF EXISTS shadow CASCADE;
++    DROP TABLE IF EXISTS public.g2c_decoy;
++    DROP TABLE IF EXISTS public."ScoutIngestEntity_coach_id_intent_id_source_id_key"`);
++  resetData();
++  sql('DELETE FROM "ScoutImport"');
++});
++
++describe('stage 1: the pre-C shape — the narrow keys still arbitrate (negative control)', () => {
++  it('C02: on R (N/Q1 head) the REAL ingest service dedupes a second family and a second platform of one source; raw inserts hit the narrow keys', async () => {
++    const service = ingest('c02');
++    expect(
++      await service.ingest('clients', [{ sourceId: 's', sourcePlatform: 'truecoach' }], 'c02'),
++    ).toEqual({ received: 1, deduped: 0 });
++    // Same source in another family: the narrow staging key (coach_id, intent_id, source_id)
++    // answers ON CONFLICT DO NOTHING → deduped, no row.
++    expect(
++      await service.ingest('workouts', [{ sourceId: 's', sourcePlatform: 'truecoach' }], 'c02'),
++    ).toEqual({ received: 1, deduped: 1 });
++    expect(
++      await service.ingest(
++        'client_history',
++        [{ sourceId: 's', sourcePlatform: 'truecoach' }],
++        'c02',
++      ),
++    ).toEqual({ received: 1, deduped: 1 });
++    // Same source on another platform: also the narrow key.
++    expect(
++      await service.ingest(
++        'clients',
++        [{ sourceId: 's', sourcePlatform: 'conformance_alpha' }],
++        'c02',
++      ),
++    ).toEqual({ received: 1, deduped: 1 });
++    expect(stagedRows('coach', 'c02').map((r: any[]) => r.slice(0, 3))).toEqual([
++      ['clients', 's', 'truecoach'],
++    ]);
++    // Raw writers: 23505 naming the narrow staging index, for a second family and a second platform.
++    refusedCode(stagingInsert('c02-raw', 'truecoach', undefined, 's', 'workouts', 'c02'), '23505');
++    refused(
++      stagingInsert('c02-raw', 'truecoach', undefined, 's', 'workouts', 'c02'),
++      NARROW_STAGING_NAME,
++    );
++    refused(
++      stagingInsert('c02-raw', 'conformance_alpha', undefined, 's', 'clients', 'c02'),
++      NARROW_STAGING_NAME,
++    );
++    // Ledger: (coach, intent, family, source) narrow key refuses a second platform of one family;
++    // a second family of the same source is a distinct narrow key and is admitted.
++    sql(ledgerInsert('c02-l1', 'truecoach', undefined, 'clients', 's', 'c02'));
++    refusedCode(
++      ledgerInsert('c02-l2', 'conformance_alpha', undefined, 'clients', 's', 'c02'),
++      '23505',
++    );
++    refused(
++      ledgerInsert('c02-l2', 'conformance_alpha', undefined, 'clients', 's', 'c02'),
++      // PostgreSQL truncates the accepted narrow key's name to 63 characters.
++      `${NARROW_LEDGER_NAME}"`,
++    );
++    sql(ledgerInsert('c02-l3', 'truecoach', undefined, 'workouts', 's', 'c02'));
++    expect(ledgerIds(`intent_id='c02'`)).toEqual(['c02-l1', 'c02-l3']);
++    expect(narrowDuplicates()).toEqual({ staging: 0, ledger: 0 });
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++    sql(
++      `DELETE FROM "ScoutReconstructionLedger" WHERE intent_id='c02'; DELETE FROM "ScoutIngestEntity" WHERE intent_id='c02'`,
++    );
++    console.warn(
++      'PG17_C02_EVENTS',
++      JSON.stringify(service.events.map((e: any) => [e[2].received, e[2].deduped])),
++    );
++  });
++});
++
++describe('stage 2: before C — the reverse refuses, the forward respects the lock budget', () => {
++  it('C14a: C.down on a pre-C database is refused atomically (contract absent)', () => {
++    const before = snapshot();
++    refusedFile(cDownFile, CONTRACT_ABSENT);
++    expectUnchanged(before);
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++  });
++  it('C09a: a held ledger read makes C.up hit lock_timeout (55P03); nothing applied; release → free', async () => {
++    const before = snapshot();
++    const holder = holdTransaction(`SELECT count(*) FROM public."ScoutReconstructionLedger"`);
++    await holder.held;
++    try {
++      expectLockTimeout(cUpFile);
++      expectUnchanged(before);
++    } finally {
++      holder.release();
++    }
++    await expectTableUnlocked('ScoutReconstructionLedger');
++  });
++});
++
++describe('stage 3: C through the release mechanism', () => {
++  let beforeCatalog: any;
++  let installedWide: unknown;
++  let installedFence: unknown;
++  it('C01: prisma migrate deploy applies exactly C; only the two narrow indexes leave; wide keys, CHECKs, NOT NULL, fence, RLS, policies and rows are untouched', () => {
++    beforeCatalog = parsedCatalog();
++    installedWide = wide();
++    installedFence = fence();
++    const ledger = allLedger();
++    const staging = stagingSnapshot();
++    const before = narrow();
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++    const start = sql('SELECT now()');
++    const output = prismaMigrateDeploy(root);
++    expect(output).toContain(C_MIGRATION);
++    expect(output).not.toContain(R_MIGRATION);
++    expect(output).not.toContain(B_MIGRATION);
++    expect(output).not.toContain(E_MIGRATION);
++    expect(appliedSince(start)).toEqual([C_MIGRATION]);
++    expect(appliedMigrations()).toBe(String(EXPECTED_HISTORY + 1));
++    // Contraction: both narrow keys gone, nothing else moved (OIDs included).
++    expect(narrow()).toEqual([]);
++    expect(narrowNamed()).toEqual([]);
++    expect(wide()).toEqual(installedWide);
++    expect(fence()).toEqual(installedFence);
++    expect(hasColumn()).toBe('1');
++    const after = parsedCatalog();
++    expect(after.tables).toEqual(beforeCatalog.tables);
++    expect(after.policies).toEqual(beforeCatalog.policies);
++    const removed = beforeCatalog.indexes.filter(
++      ([oid]: [number, string]) => !after.indexes.some(([o]: [number, string]) => o === oid),
++    );
++    expect(removed.map(([, def]: [number, string]) => def).sort()).toEqual(
++      [NARROW_STAGING_DEF, NARROW_LEDGER_DEF].sort(),
++    );
++    expect(removed.map(([oid]: [number, string]) => oid).sort()).toEqual(
++      before.map(([, oid]: any[]) => oid).sort(),
++    );
++    expect(after.indexes).toHaveLength(beforeCatalog.indexes.length - 2);
++    // Rows and values: byte-identical (C derives, deletes and rewrites nothing).
++    expect(allLedger()).toEqual(ledger);
++    expect(stagingSnapshot()).toEqual(staging);
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    console.warn('PG17_C01', JSON.stringify({ removed, applied: appliedMigrations() }));
++  });
++  it('C14b: a raw rerun of C.up is refused atomically; a shadow schema first on search_path cannot redirect it', () => {
++    const before = snapshot();
++    refusedFile(cUpFile, NARROW_PREREQUISITE);
++    expectUnchanged(before);
++    withShadowSearchPath(() => {
++      refusedFile(cUpFile, NARROW_PREREQUISITE);
++    });
++    expectUnchanged(before);
++    const after = parsedCatalog();
++    expect(after.tables).toEqual(beforeCatalog.tables);
++    expect(after.policies).toEqual(beforeCatalog.policies);
++    expect(after.indexes).toHaveLength(beforeCatalog.indexes.length - 2);
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++  });
++});
++
++describe('stage 4: on C — the wide identity is the identity for the real ingest service, the N writer and the Q1 readers', () => {
++  it('C03/C04: one source across two, then three, families inserts every row (deduped 0); the staging duplicates are narrow-key groups the wide key holds', async () => {
++    const service = ingest('c03');
++    settle('coach', 'c3');
++    expect(
++      await service.ingest('clients', [{ sourceId: 's', sourcePlatform: 'truecoach' }], 'c3'),
++    ).toEqual({ received: 1, deduped: 0 });
++    expect(
++      await service.ingest('workouts', [{ sourceId: 's', sourcePlatform: 'truecoach' }], 'c3'),
++    ).toEqual({ received: 1, deduped: 0 });
++    expect(stagedRows('coach', 'c3').map((r: any[]) => r.slice(0, 3))).toEqual([
++      ['clients', 's', 'truecoach'],
++      ['workouts', 's', 'truecoach'],
++    ]);
++    settle('coach', 'c4');
++    for (const family of ['clients', 'workouts', 'client_history']) {
++      expect(
++        await service.ingest(family, [{ sourceId: 't', sourcePlatform: 'truecoach' }], 'c4'),
++      ).toEqual({ received: 1, deduped: 0 });
++    }
++    expect(stagedRows('coach', 'c4').map((r: any[]) => r[0])).toEqual([
++      'client_history',
++      'clients',
++      'workouts',
++    ]);
++    expect(narrowDuplicates('c3')).toEqual({ staging: 1, ledger: 0 });
++    expect(narrowDuplicates('c4')).toEqual({ staging: 1, ledger: 0 });
++    expect(narrowDuplicates()).toEqual({ staging: 2, ledger: 0 });
++    // The ON CONFLICT DO NOTHING statement names no conflict target: the wide key arbitrates.
++    expect(service.queries.some((q) => /ON CONFLICT DO NOTHING/.test(q))).toBe(true);
++    expect(service.queries.some((q) => /ON CONFLICT \(/.test(q))).toBe(false);
++  });
++  it('C05: retained idempotency — full-tuple replay, changed captured_at and in-batch duplicates dedupe; another intent or coach inserts', async () => {
++    const service = ingest('c05');
++    settle('coach', 'c5');
++    const batch = ['a', 'b', 'c'].map((sourceId) => ({ sourceId, sourcePlatform: 'truecoach' }));
++    expect(await service.ingest('clients', batch, 'c5')).toEqual({ received: 3, deduped: 0 });
++    const rows = stagedRows('coach', 'c5');
++    expect(rows).toHaveLength(3);
++    expect(await service.ingest('clients', batch, 'c5')).toEqual({ received: 3, deduped: 3 });
++    expect(stagedRows('coach', 'c5')).toEqual(rows);
++    // captured_at is a value, not a key (R-IDEMP-1): a fresh timestamp is still a replay.
++    expect(
++      await service.ingest(
++        'clients',
++        batch.map((e) => ({ ...e, capturedAt: '2026-09-25T12:00:00.000Z' })),
++        'c5',
++      ),
++    ).toEqual({ received: 3, deduped: 3 });
++    expect(stagedRows('coach', 'c5')).toEqual(rows);
++    // In-batch duplicates collapse to one row.
++    expect(
++      await service.ingest(
++        'clients',
++        ['d', 'd', 'd'].map((sourceId) => ({ sourceId, sourcePlatform: 'truecoach' })),
++        'c5',
++      ),
++    ).toEqual({ received: 3, deduped: 2 });
++    expect(stagedRows('coach', 'c5')).toHaveLength(4);
++    // Another intent or another coach is a new observation series.
++    expect(await service.ingest('clients', [batch[0]], 'c5b')).toEqual({ received: 1, deduped: 0 });
++    expect(await service.ingest('clients', [batch[0]], 'c5', 'coach2')).toEqual({
++      received: 1,
++      deduped: 0,
++    });
++    expect(stagedRows('coach', 'c5b')).toHaveLength(1);
++    expect(stagedRows('coach2', 'c5')).toHaveLength(1);
++    expect(narrowDuplicates('c5')).toEqual({ staging: 0, ledger: 0 });
++    sql(`DELETE FROM "ScoutIngestEntity" WHERE coach_id='coach2'`);
++  });
++  it('C06: one source on two platforms through the real service inserts both, replays both as deduped, and the N writer reconstructs two identities', async () => {
++    const service = ingest('c06');
++    settle('coach', 'c6');
++    const both = [
++      { sourceId: 'u', sourcePlatform: 'truecoach' },
++      { sourceId: 'u', sourcePlatform: 'conformance_alpha' },
++    ];
++    expect(await service.ingest('clients', both, 'c6')).toEqual({ received: 2, deduped: 0 });
++    const rows = stagedRows('coach', 'c6');
++    expect(rows.map((r: any[]) => r.slice(0, 3))).toEqual([
++      ['clients', 'u', 'conformance_alpha'],
++      ['clients', 'u', 'truecoach'],
++    ]);
++    expect(
++      await service.ingest(
++        'clients',
++        both.map((e) => ({ ...e, capturedAt: '2026-09-25T12:00:00.000Z' })),
++        'c6',
++      ),
++    ).toEqual({ received: 2, deduped: 2 });
++    expect(stagedRows('coach', 'c6')).toEqual(rows);
++    expect(service.events.map((e: any) => [e[2].received, e[2].deduped])).toEqual([
++      [2, 0],
++      [2, 2],
++    ]);
++    const n = await run({ intent: 'c6' });
++    expect(n.failure).toBeUndefined();
++    expect(n.result).toMatchObject({ staged: 2, reconstructed: 2, skipped: 0, failed: 0 });
++    expect(identityRows('coach', 'c6', 'clients').map((r: any[]) => r.slice(0, 4))).toEqual([
++      ['clients', 'u', 'conformance_alpha', 'reconstructed'],
++      ['clients', 'u', 'truecoach', 'reconstructed'],
++    ]);
++    expect(
++      sql(
++        `SELECT count(DISTINCT id)||','||count(DISTINCT source_platform) FROM "Person" WHERE coach_id='coach' AND source_person_id='u'`,
++      ),
++    ).toBe('2,2');
++    expect(narrowDuplicates('c6')).toEqual({ staging: 1, ledger: 1 });
++    const replay = await run({ intent: 'c6' });
++    expect(replay.result).toEqual(n.result);
++    expect(nullCount()).toBe(0);
++  });
++  it('C07: three platforms of one workout through the writer: two reconstructed, the unregistered one skipped; replay and the old N writer are identical', async () => {
++    settle('coach', 'c7');
++    for (const platform of ['truecoach', 'conformance_alpha', 'unknown_platform']) {
++      stage('w', 'workouts', platform, 'Synthetic W', 'coach', 'c7');
++    }
++    const first = await run({ intent: 'c7', family: 'workouts' });
++    expect(first.failure).toBeUndefined();
++    expect(first.result).toEqual({
++      intent_id: 'c7',
++      staged: 3,
++      reconstructed: 2,
++      skipped: 1,
++      failed: 0,
++    });
++    const rows = records('coach', 'c7', 'workouts');
++    expect(identityRows('coach', 'c7', 'workouts').map((r: any[]) => r.slice(0, 4))).toEqual([
++      ['workouts', 'w', 'conformance_alpha', 'reconstructed'],
++      ['workouts', 'w', 'truecoach', 'reconstructed'],
++      ['workouts', 'w', 'unknown_platform', 'skipped'],
++    ]);
++    expect(
++      sql(
++        `SELECT reason FROM "ScoutReconstructionLedger" WHERE intent_id='c7' AND source_platform='unknown_platform'`,
++      ),
++    ).toBe('unsupported_platform:unknown_platform');
++    expect(
++      sql(
++        `SELECT count(*) FROM "ScoutReconstructedEntity" WHERE coach_id='coach' AND entity_type='workouts' AND source_id='w'`,
++      ),
++    ).toBe('2');
++    // The tally is cumulative over the ledger: a replay reports the same non-zero tally.
++    const replay = await run({ intent: 'c7', family: 'workouts' });
++    expect(replay.result).toEqual(first.result);
++    expect(records('coach', 'c7', 'workouts')).toEqual(rows);
++    const old = await run({ intent: 'c7', family: 'workouts' }, true);
++    expect(old.failure).toBeUndefined();
++    expect(old.result).toEqual(first.result);
++    expect(records('coach', 'c7', 'workouts')).toEqual(rows);
++    expect(narrowDuplicates('c7')).toEqual({ staging: 1, ledger: 1 });
++  });
++  it('C08: candidate/candidate and candidate/old races on one identity converge to one row and one target; cross-family/platform rows race to distinct outcomes; success dominates', async () => {
++    // (a) candidate paused inside its row transaction before the ledger write; a second
++    // candidate waits on the row lock; both converge on one row.
++    resetData();
++    stage('m1', 'clients');
++    const paused = worker({ pause: 'before-ledger', txTimeout: 60000 });
++    await paused.ready;
++    const late = worker({});
++    await blocked(late.name);
++    paused.release();
++    const [a1, a2] = await Promise.all([paused.done, late.done]);
++    expect(a1.failure).toBeUndefined();
++    expect(a2.failure).toBeUndefined();
++    expect(a1.result).toMatchObject({ reconstructed: 1 });
++    expect(a2.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m1'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    // (b) old paused after its staging read; candidate completes; old converges.
++    resetData();
++    stage('m2', 'clients');
++    const oldPaused = worker({ pause: 'staged' }, true);
++    await oldPaused.ready;
++    expect((await run()).result).toMatchObject({ reconstructed: 1 });
++    oldPaused.release();
++    const b = await oldPaused.done;
++    expect(b.failure).toBeUndefined();
++    expect(b.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m2'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    // (c) the reverse order.
++    resetData();
++    stage('m3', 'clients');
++    const candidatePaused = worker({ pause: 'staged' });
++    await candidatePaused.ready;
++    expect((await run({}, true)).result).toMatchObject({ reconstructed: 1 });
++    candidatePaused.release();
++    const c = await candidatePaused.done;
++    expect(c.failure).toBeUndefined();
++    expect(c.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m3'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    // (d) success dominates a later non-success attempt from either writer.
++    const [[, , , status, targetBefore]] = identityRows('coach', 'intent', 'clients');
++    expect(status).toBe('reconstructed');
++    expect((await run({ mapper: 'skip' }, true)).failure).toBeUndefined();
++    expect((await run({ mapper: 'skip' })).failure).toBeUndefined();
++    expect(identityRows('coach', 'intent', 'clients')).toEqual([
++      ['clients', 'm3', 'truecoach', 'reconstructed', targetBefore],
++    ]);
++    // (e) the same source across families and platforms, written concurrently by both writers:
++    // three distinct identities, three outcomes, two Persons (two platforms), one entity.
++    resetData();
++    stage('m4', 'clients', 'truecoach');
++    stage('m4', 'clients', 'conformance_alpha');
++    stage('m4', 'workouts', 'truecoach');
++    const [e1, e2] = await Promise.all([
++      run({ family: 'clients' }),
++      run({ family: 'workouts' }, true),
++    ]);
++    expect(e1.failure).toBeUndefined();
++    expect(e2.failure).toBeUndefined();
++    expect(e1.result).toMatchObject({ staged: 2, reconstructed: 2 });
++    expect(e2.result).toMatchObject({ staged: 1, reconstructed: 1 });
++    expect(identityRows('coach', 'intent').map((r: any[]) => r.slice(0, 4))).toEqual([
++      ['clients', 'm4', 'conformance_alpha', 'reconstructed'],
++      ['clients', 'm4', 'truecoach', 'reconstructed'],
++      ['workouts', 'm4', 'truecoach', 'reconstructed'],
++    ]);
++    expect(
++      sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach' AND source_person_id='m4'`),
++    ).toBe('2');
++    expect(
++      sql(
++        `SELECT count(*) FROM "ScoutReconstructedEntity" WHERE coach_id='coach' AND source_id='m4'`,
++      ),
++    ).toBe('1');
++    console.warn(
++      'PG17_C08_QUERIES',
++      JSON.stringify({
++        candidate_pair: [a1.queries.length, a2.queries.length],
++        late_rollbacks: a2.queries.filter((q) => q === 'ROLLBACK').length,
++        old_after_candidate: b.queries.length,
++        candidate_after_old: c.queries.length,
++      }),
++    );
++  });
++  it('C09b: a held (uncommitted) ingest insert makes C.down hit lock_timeout atomically; rolled back, the row never lands and later ingest counts are accurate', async () => {
++    resetData();
++    const before = snapshot();
++    const holder = holdTransaction(stagingInsert('hold-c9', 'truecoach'));
++    await holder.held;
++    try {
++      expectLockTimeout(cDownFile);
++      expectUnchanged(before);
++      expect(narrow()).toEqual([]);
++    } finally {
++      holder.rollback();
++    }
++    await expectTableUnlocked('ScoutIngestEntity');
++    expect(sql(`SELECT count(*) FROM "ScoutIngestEntity" WHERE source_id='hold-c9'`)).toBe('0');
++    // The contraction is committed: replay + new identities through the real service are exact.
++    const service = ingest('c09');
++    expect(
++      await service.ingest('clients', [
++        { sourceId: 'hold-c9', sourcePlatform: 'truecoach' },
++        { sourceId: 'hold-c9', sourcePlatform: 'conformance_alpha' },
++      ]),
++    ).toEqual({ received: 2, deduped: 0 });
++    expect(
++      await service.ingest('clients', [{ sourceId: 'hold-c9', sourcePlatform: 'truecoach' }]),
++    ).toEqual({ received: 1, deduped: 1 });
++    expect(stagedRows().map((r: any[]) => r.slice(0, 3))).toEqual([
++      ['clients', 'hold-c9', 'conformance_alpha'],
++      ['clients', 'hold-c9', 'truecoach'],
++    ]);
++  });
++  it.each(['clients', 'workouts'])(
++    'C16: real %s identity ties (one source on three platforms) enumerate every reconstructed row exactly once at limit 1 on both heads; a tied legacy token is 400; an untied one resolves',
++    async (family) => {
++      resetData();
++      // truecoach and conformance_alpha are registered mappers (reconstructed); p3 is canonical but
++      // unregistered (skipped: the readers page reconstructed rows only). d is untied.
++      for (const platform of ['truecoach', 'conformance_alpha', 'p3']) stage('a', family, platform);
++      stage('d', family, 'truecoach');
++      const written = await run({ family });
++      expect(written.failure).toBeUndefined();
++      expect(written.result).toMatchObject({ staged: 4, reconstructed: 3, skipped: 1, failed: 0 });
++      const expected = reconstructedTargets('intent', family);
++      expect(expected).toHaveLength(3);
++      for (const old of [false, true]) {
++        const { union, tokens } = await enumerate(family, undefined, old);
++        expect(union).toEqual(expected);
++        expect(tokens).toEqual([
++          v2(family, 'a', 'conformance_alpha'),
++          v2(family, 'a', 'truecoach'),
++          null,
++        ]);
++        // The legacy format cannot name a tied boundary: 400, no page read, restart from the top.
++        const tied = await run(
++          { action: actionOf(family), family, cursor: nextLegacy(family, 'a') },
++          old,
++        );
++        expect(tied.result).toBeUndefined();
++        expect(tied.failure).toEqual(MALFORMED);
++        expect(readPage(tied.queries)).toBe(false);
++        // A legacy token for the untied row still resolves (last row → empty final page).
++        const untied = await run(
++          { action: actionOf(family), family, cursor: nextLegacy(family, 'd') },
++          old,
++        );
++        expect(untied.failure).toBeUndefined();
++        expect(visible(family, untied.result)).toEqual([]);
++        expect(cursorOf(family, untied.result)).toBeNull();
++      }
++      // The old reader fed the candidate's exact v2 token pages the same next row.
++      const crossed = await run(
++        { action: actionOf(family), family, cursor: v2(family, 'a', 'conformance_alpha') },
++        true,
++      );
++      expect(crossed.failure).toBeUndefined();
++      expect(ids(visible(family, crossed.result))).toEqual([expected[1]]);
++      expect(narrowDuplicates('intent')).toEqual({ staging: 1, ledger: 1 });
++    },
++  );
++  it("C17a: after C the API roles are denied on both tables, the runtime role's rollback leaves nothing, and content refusals (CHECK, NOT NULL, fence) are unchanged", () => {
++    expectApiRolesDenied();
++    for (const role of [undefined, 'service_role']) {
++      refusedCode(ledgerInsert('bad-l', 'Bad_Platform', role), '23514');
++      refused(
++        ledgerInsert('bad-l', 'Bad_Platform', role),
++        'ScoutReconstructionLedger_source_platform_canonical',
++      );
++      refusedCode(ledgerInsert('bad-l', 'truecoach\n', role), '23514');
++      // NULL meets the fence (BEFORE ROW trigger, check_violation) before NOT NULL.
++      refusedCode(ledgerInsert('bad-l', null, role), '23514');
++      refused(ledgerInsert('bad-l', null, role), FENCED);
++      refusedCode(stagingInsert('bad-s', 'Auto:X', role), '23514');
++      refused(
++        stagingInsert('bad-s', 'Auto:X', role),
++        'ScoutIngestEntity_source_platform_canonical',
++      );
++      refusedCode(stagingInsert('bad-s', '', role), '23514');
++      refusedCode(stagingInsert('bad-s', null, role), '23502');
++    }
++    expect(ledgerIds(`id='bad-l'`)).toEqual([]);
++    expect(sql(`SELECT count(*) FROM "ScoutIngestEntity" WHERE id='bad-s'`)).toBe('0');
++  });
++  it('C18 (D-C1): an ingest between the count and the page leaves its row staged and unaccounted; the next replay converges and the tally equals the ledger', async () => {
++    settle('coach', 'c18');
++    const service = ingest('c18');
++    expect(
++      await service.ingest('clients', [{ sourceId: 'e1', sourcePlatform: 'truecoach' }], 'c18'),
++    ).toEqual({ received: 1, deduped: 0 });
++    // The shared worker's `staged` barrier fires after the count AND the page read.
++    const paused = worker({ intent: 'c18', pause: 'staged' });
++    await paused.ready;
++    expect(
++      await service.ingest('clients', [{ sourceId: 'e2', sourcePlatform: 'truecoach' }], 'c18'),
++    ).toEqual({ received: 1, deduped: 0 });
++    paused.release();
++    const first = await paused.done;
++    expect(first.failure).toBeUndefined();
++    expect(first.result).toEqual({
++      intent_id: 'c18',
++      staged: 1,
++      reconstructed: 1,
++      skipped: 0,
++      failed: 0,
++    });
++    // (b) e2 is observable as staged (present in staging, absent from the ledger, no target);
++    // nothing marks it reconstructed.
++    expect(stagedRows('coach', 'c18').map((r: any[]) => r[1])).toEqual(['e1', 'e2']);
++    expect(identityRows('coach', 'c18').map((r: any[]) => r[1])).toEqual(['e1']);
++    expect(ledgerRow('e2', 'truecoach', 'clients', 'coach', 'c18')).toBeNull();
++    expect(
++      sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach' AND source_person_id='e2'`),
++    ).toBe('0');
++    // (a) the next idempotent replay converges; the tally is ledger truth.
++    const second = await run({ intent: 'c18' });
++    expect(second.result).toEqual({
++      intent_id: 'c18',
++      staged: 2,
++      reconstructed: 2,
++      skipped: 0,
++      failed: 0,
++    });
++    expect(identityRows('coach', 'c18')).toHaveLength(stagedRows('coach', 'c18').length);
++    expect(ledgerRow('e2', 'truecoach', 'clients', 'coach', 'c18')).toMatchObject({
++      status: 'reconstructed',
++    });
++    const rows = records('coach', 'c18');
++    const third = await run({ intent: 'c18' });
++    expect(third.result).toEqual(second.result);
++    expect(records('coach', 'c18')).toEqual(rows);
++  });
++});
++
++describe('stage 5: C.down refuses — collisions (fixed 23505, no identifiers), decoys, shadow, and the older downs with C applied', () => {
++  beforeAll(() => resetData());
++  it('C11: a cross-family collision in staging refuses C.down; both rows and the wide keys remain; no narrow relation on either table', async () => {
++    const service = ingest('c11');
++    expect(
++      await service.ingest(
++        'clients',
++        [{ sourceId: 'xf-c11', sourcePlatform: 'truecoach' }],
++        'i-c11',
++      ),
++    ).toEqual({ received: 1, deduped: 0 });
++    expect(
++      await service.ingest(
++        'workouts',
++        [{ sourceId: 'xf-c11', sourcePlatform: 'truecoach' }],
++        'i-c11',
++      ),
++    ).toEqual({ received: 1, deduped: 0 });
++    expect(narrowDuplicates()).toEqual({ staging: 1, ledger: 0 });
++    const output = expectDownRefusedCollision(['xf-c11', 'i-c11']);
++    expect(stagedRows('coach', 'i-c11')).toHaveLength(2);
++    console.warn(
++      'PG17_C11_REFUSAL',
++      JSON.stringify(output.split('\n').filter((l) => /ERROR|DETAIL|HINT/.test(l))),
++    );
++    sql(`DELETE FROM "ScoutIngestEntity" WHERE intent_id='i-c11'`);
++  });
++  it('C12: a cross-platform collision in staging refuses C.down identically', async () => {
++    const service = ingest('c12');
++    expect(
++      await service.ingest(
++        'clients',
++        [
++          { sourceId: 'xp-c12', sourcePlatform: 'truecoach' },
++          { sourceId: 'xp-c12', sourcePlatform: 'conformance_alpha' },
++        ],
++        'i-c12',
++      ),
++    ).toEqual({ received: 2, deduped: 0 });
++    expect(narrowDuplicates()).toEqual({ staging: 1, ledger: 0 });
++    expectDownRefusedCollision(['xp-c12', 'i-c12']);
++    expect(stagedRows('coach', 'i-c12')).toHaveLength(2);
++    sql(`DELETE FROM "ScoutIngestEntity" WHERE intent_id='i-c12'`);
++  });
++  it('C13: a ledger-only collision refuses C.down; the staging narrow key is NOT created first (no half-narrow state)', () => {
++    expect(narrowDuplicates()).toEqual({ staging: 0, ledger: 0 });
++    sql(ledgerInsert('c13-l1', 'truecoach', undefined, 'clients', 'xl-c13', 'i-c13'));
++    sql(ledgerInsert('c13-l2', 'conformance_alpha', undefined, 'clients', 'xl-c13', 'i-c13'));
++    expect(narrowDuplicates()).toEqual({ staging: 0, ledger: 1 });
++    expectDownRefusedCollision(['xl-c13', 'i-c13', 'c13-l1', 'c13-l2']);
++    expect(ledgerIds(`intent_id='i-c13'`)).toEqual(['c13-l1', 'c13-l2']);
++    sql(`DELETE FROM "ScoutReconstructionLedger" WHERE intent_id='i-c13'`);
++  });
++  it('C14c: a decoy relation holding a narrow name refuses C.down (contract absent) and C.up (unexpected prerequisite), shadow or not; the decoy is untouched', () => {
++    expect(narrowDuplicates()).toEqual({ staging: 0, ledger: 0 });
++    // A table named as the staging narrow key, and an index on a decoy table named as the ledger
++    // narrow key (the 70-character text truncates to the same 63-character stored name).
++    sql(`CREATE TABLE public."ScoutIngestEntity_coach_id_intent_id_source_id_key" (x text);
++      CREATE TABLE public.g2c_decoy (x text);
++      CREATE INDEX "ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key" ON public.g2c_decoy (x)`);
++    const decoys = narrowNamed();
++    expect(decoys.map(([name, , kind]: any[]) => [name, kind])).toEqual([
++      [NARROW_STAGING_NAME, 'r'],
++      [NARROW_LEDGER_NAME, 'i'],
++    ]);
++    const before = snapshot();
++    expect(before.narrow).toEqual([]);
++    refusedFile(cDownFile, CONTRACT_ABSENT);
++    expectUnchanged(before);
++    expect(narrowNamed()).toEqual(decoys);
++    refusedFile(cUpFile, NARROW_PREREQUISITE);
++    expectUnchanged(before);
++    expect(narrowNamed()).toEqual(decoys);
++    withShadowSearchPath(() => {
++      refusedFile(cDownFile, CONTRACT_ABSENT);
++      refusedFile(cUpFile, NARROW_PREREQUISITE);
++    });
++    expectUnchanged(before);
++    expect(narrowNamed()).toEqual(decoys);
++    // Only the staging-named decoy: the ledger-named decoy alone refuses the same way.
++    sql(`DROP TABLE public."ScoutIngestEntity_coach_id_intent_id_source_id_key"`);
++    refusedFile(cDownFile, CONTRACT_ABSENT);
++    expectUnchanged(before);
++    sql(`DROP TABLE public.g2c_decoy`);
++    expect(narrowNamed()).toEqual([]);
++    expectUnchanged(before);
++  });
++  it('C15: with C applied, R.down, B.down and E.down each refuse atomically on the absent narrow keys', () => {
++    const before = snapshot();
++    expect(before.narrow).toEqual([]);
++    refusedFile(rDownFile, /G2-R unexpected identity prerequisite/);
++    expectUnchanged(before);
++    refusedFile(bDownFile, /G2-B unexpected identity prerequisite/);
++    expectUnchanged(before);
++    refusedFile(downFile, /G2-E unexpected identity prerequisite/);
++    expectUnchanged(before);
++    expect(fence().triggers).toHaveLength(1);
++    expect(hasColumn()).toBe('1');
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++  });
++});
++
++describe('stage 6: collision-free reverse and forward — C.down, the whole chain down, the whole chain up', () => {
++  let installedWide: any;
++  let installedCatalog: any;
++  let installedFence: unknown;
++  it('C10: C.down restores the exact R shape with rows and targets intact (history not rewritten, narrow arbitrates again, writers idle; C14d rerun refused; C17b security); then R/B/E down and E/B/R/C up restore the C shape with staging byte-equivalent and the ledger re-derived identically', async () => {
++    resetData();
++    for (const id of ['a', 'b', 'c']) stage(id, 'clients');
++    stage('w1', 'workouts');
++    expect((await run({ family: 'clients' })).result).toMatchObject({ reconstructed: 3 });
++    expect((await run({ family: 'workouts' })).result).toMatchObject({ reconstructed: 1 });
++    expect(narrowDuplicates()).toEqual({ staging: 0, ledger: 0 });
++    // Replay tallies (cumulative over the ledger) BEFORE the snapshots: a replay touches only
++    // the targets' updated_at.
++    const clientsTally = (await run({ family: 'clients' })).result;
++    const workoutsTally = (await run({ family: 'workouts' })).result;
++    installedWide = wide();
++    installedCatalog = parsedCatalog();
++    installedFence = fence();
++    const ledger = allLedger();
++    const identities = identityRows();
++    const staging = stagingSnapshot();
++    const persisted = targets();
++    const persistedStable = stableTargets(persisted);
++    // C.down under a shadow-first search_path still acts on public only.
++    withShadowSearchPath(() => {
++      sqlFile(cDownFile);
++    });
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++    expect(wide()).toEqual(installedWide);
++    expect(fence()).toEqual(installedFence);
++    expect(hasColumn()).toBe('1');
++    expect(allLedger()).toEqual(ledger);
++    expect(stagingSnapshot()).toEqual(staging);
++    expect(targets()).toEqual(persisted);
++    let after = parsedCatalog();
++    expect(after.tables).toEqual(installedCatalog.tables);
++    expect(after.policies).toEqual(installedCatalog.policies);
++    expect(after.indexes).toHaveLength(installedCatalog.indexes.length + 2);
++    // History is not rewritten by down (S1-owned recovery semantics, recorded not judged): C
++    // stays applied and deploy has nothing pending while the narrow keys are back.
++    expect(appliedMigrations()).toBe(String(EXPECTED_HISTORY + 1));
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    // The narrow keys arbitrate again.
++    refusedCode(stagingInsert('a-other', 'conformance_alpha', undefined, 'a'), '23505');
++    refused(stagingInsert('a-other', 'conformance_alpha', undefined, 'a'), NARROW_STAGING_NAME);
++    refusedCode(ledgerInsert('a-other', 'conformance_alpha', undefined, 'clients', 'a'), '23505');
++    expect(stagingSnapshot()).toEqual(staging);
++    // Both writers are idle on the restored shape.
++    expect((await run({ family: 'clients' })).result).toEqual(clientsTally);
++    expect((await run({ family: 'clients' }, true)).result).toEqual(clientsTally);
++    expect((await run({ family: 'workouts' }, true)).result).toEqual(workoutsTally);
++    expect(allLedger()).toEqual(ledger);
++    expect(stableTargets(targets())).toEqual(persistedStable);
++    // C14d: a raw rerun of C.down is refused atomically.
++    const restored = snapshot();
++    refusedFile(cDownFile, CONTRACT_ABSENT);
++    expectUnchanged(restored);
++    // C17b: security after C.down.
++    expectApiRolesDenied();
++    refusedCode(ledgerInsert('bad-l', 'Bad_Platform'), '23514');
++    refusedCode(ledgerInsert('bad-l', null), '23514');
++    // R.down → B.down → E.down. E.down refuses assigned provenance first; the ledger is emptied
++    // for the E step only and re-derived by the writers after the forward chain.
++    sqlFile(rDownFile);
++    expect(wide()).toEqual(R_ABSENT);
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++    expect(stagingSnapshot()).toEqual(staging);
++    sqlFile(bDownFile);
++    expect(fence()).toEqual({ triggers: [], function: null });
++    expect(stagingSnapshot()).toEqual(staging);
++    refusedFile(downFile, /G2-E refuses removal of assigned provenance/);
++    expect(hasColumn()).toBe('1');
++    expect(allLedger()).toEqual(ledger);
++    sql(`DELETE FROM "ScoutReconstructionLedger"`);
++    sqlFile(downFile);
++    expect(hasColumn()).toBe('0');
++    expect(stagingSnapshot()).toEqual(staging);
++    expect(stableTargets(targets())).toEqual(persistedStable);
++    // E.up → B.up → R.up → C.up.
++    sqlFile(upFile);
++    expect(hasColumn()).toBe('1');
++    sqlFile(bUpFile);
++    expect(fence().triggers).toHaveLength(1);
++    sqlFile(rUpFile);
++    expect(shape(wide())).toEqual(shape(installedWide));
++    expect(narrowDefs()).toEqual(NARROW_SHAPE);
++    sqlFile(cUpFile);
++    expect(narrow()).toEqual([]);
++    expect(shape(wide())).toEqual(shape(installedWide));
++    expect(fence()).toEqual(installedFence);
++    after = parsedCatalog();
++    expect(after.tables).toEqual(installedCatalog.tables);
++    expect(after.policies).toEqual(installedCatalog.policies);
++    expect(indexDefs(after)).toEqual(indexDefs(installedCatalog));
++    expect(stagingSnapshot()).toEqual(staging);
++    expect(stableTargets(targets())).toEqual(persistedStable);
++    expect(appliedMigrations()).toBe(String(EXPECTED_HISTORY + 1));
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    // Re-derive the ledger: the targets survived, so the same identities point at the same targets.
++    expect((await run({ family: 'clients' })).result).toEqual(clientsTally);
++    expect((await run({ family: 'workouts' })).result).toEqual(workoutsTally);
++    expect(identityRows()).toEqual(identities);
++    expect(stableTargets(targets())).toEqual(persistedStable);
++    expect(ledgerCount()).toBe(ledger.length);
++    expect(nullCount()).toBe(0);
++    // Raw reruns refused on the restored C shape.
++    const final = snapshot();
++    refusedFile(cUpFile, NARROW_PREREQUISITE);
++    expectUnchanged(final);
++  });
++  it('N/Q1 continues on C: the old writer admits a cross-family tuple after re-C and both readers page it', async () => {
++    stage('a', 'workouts');
++    const old = await run({ family: 'workouts' }, true);
++    expect(old.failure).toBeUndefined();
++    expect(old.result).toMatchObject({ staged: 2, reconstructed: 2, skipped: 0, failed: 0 });
++    expect(identityRows('coach', 'intent', 'workouts').map((r: any[]) => r.slice(0, 4))).toEqual([
++      ['workouts', 'a', 'truecoach', 'reconstructed'],
++      ['workouts', 'w1', 'truecoach', 'reconstructed'],
++    ]);
++    expect(narrowDuplicates()).toEqual({ staging: 1, ledger: 0 });
++    const expected = reconstructedTargets('intent', 'workouts');
++    for (const isOld of [false, true]) {
++      const page = await run({ action: 'entities', family: 'workouts', limit: 200 }, isOld);
++      expect(page.failure).toBeUndefined();
++      expect(ids(visible('workouts', page.result))).toEqual(expected);
++      expect(cursorOf('workouts', page.result)).toBeNull();
++      expect((await enumerate('workouts', undefined, isOld)).union).toEqual(expected);
++    }
++    // The clients reader still pages a, b, c: the cross-family row is invisible to it.
++    const roster = await run({ action: 'roster', limit: 200 });
++    expect(ids(visible('clients', roster.result))).toEqual(
++      reconstructedTargets('intent', 'clients'),
++    );
++    expect(nullCount()).toBe(0);
++  });
++});
+diff --git a/test/scout/g2-c-db-guard.spec.ts b/test/scout/g2-c-db-guard.spec.ts
+new file mode 100644
+index 00000000..78fd72c9
+--- /dev/null
++++ b/test/scout/g2-c-db-guard.spec.ts
+@@ -0,0 +1,112 @@
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_C_CLUSTER_MARKER,
++  G2_C_DATABASE_MARKER,
++  g2CTestTarget,
++  withFixturePassword,
++} from '../utils/g2-c-db';
++
++const base = 'postgresql://c_super@127.0.0.1:55491/g2_c_disposable';
++const ack = 'g2_c_disposable:55491';
++
++describe('S7-3 C/contract PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2CTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://c_super@127.0.0.1:55491/postgres?connect_timeout=5`,
++      port: 55491,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55491', '5432'),
++    base.replace('55491', '6543'),
++    base.replace('55491', '55439'),
++    base.replace('55491', '70000'),
++    base.replace('55491', '55461'),
++    base.replace('55491', '55471'),
++    base.replace('55491', '55481'),
++    base.replace('g2_c_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_c_disposable', 'g2_r_ready_disposable'),
++    base.replace('g2_c_disposable', 'g2_nq1_disposable'),
++    base.replace('c_super@', 'b_super@'),
++    base.replace('c_super@', 'r_super@'),
++    base.replace('c_super@', 'nq1_super@'),
++    base.replace('g2_c_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_c_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55491', '54325'),
++    base.replace('g2_c_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_c_disposable', 'postgres'),
++    base.replace('c_super@', 'service_role@'),
++    base.replace('c_super@', 'c_super:secret@'),
++    base.replace('c_super@', 'postgres@'),
++    base.replace('55491', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2CTestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2CTestTarget(base)).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_c_disposable')).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_c_disposable:55492')).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_tq0_disposable:55491')).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_b_drain_disposable:55491')).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_r_ready_disposable:55491')).toThrow();
++    expect(() => g2CTestTarget(base, 'g2_nq1_disposable:55491')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_C_CLUSTER_MARKER).toBe('c-disposable-pg17');
++    expect(G2_C_DATABASE_MARKER).toBe('c-g2-contract-synthetic-disposable-fixture-safe-to-drop');
++    for (const marker of [G2_C_CLUSTER_MARKER, G2_C_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^c-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-c-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_C_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_C_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://c_super:local_fixture@127.0.0.1:55491/g2_c_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55491/g2_c_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55491/g2_c_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      'nq1_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++});
+diff --git a/test/scout/reconstruct/conformance-alpha.e2e.spec.ts b/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
+index 467d3c4d..a4abf7ad 100644
+--- a/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
++++ b/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
+@@ -263,7 +263,9 @@ class FakePrisma {
+       data: Partial<LedgerRow>;
+     }) => {
+       const w = args.where;
+-      const row = this.ledger.get(`${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`);
++      const row = this.ledger.get(
++        `${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_platform}|${w.source_id}`,
++      );
+       if (
+         !row ||
+         row.source_platform !== w.source_platform ||
+@@ -273,26 +275,20 @@ class FakePrisma {
+       Object.assign(row, args.data);
+       return { count: 1 };
+     },
+-    // Keyed by the NARROW key the real table still enforces until C: a wide
+-    // identity that misses while the narrow key is taken raises P2002, as on PG.
++    // Keyed by the WIDE identity, the real table's only key since G2-C: the same
++    // source on another platform or in another family is a distinct row, as on PG.
+     upsert: async (args: {
+       where: { coach_id_intent_id_entity_type_source_platform_source_id: LedgerRow };
+       create: LedgerRow;
+       update: Partial<LedgerRow>;
+     }) => {
+       const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
+-      const key = `${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`;
++      const key = `${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_platform}|${w.source_id}`;
+       const existing = this.ledger.get(key);
+-      if (existing && existing.source_platform === w.source_platform) {
++      if (existing) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
+-      if (existing) {
+-        throw new Prisma.PrismaClientKnownRequestError('unique violation', {
+-          code: 'P2002',
+-          clientVersion: 'test',
+-        });
+-      }
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+diff --git a/test/scout/reconstruct/scout-reconstruct.families.spec.ts b/test/scout/reconstruct/scout-reconstruct.families.spec.ts
+index 03d4499c..189392a6 100644
+--- a/test/scout/reconstruct/scout-reconstruct.families.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.families.spec.ts
+@@ -60,13 +60,15 @@ class FakePrisma {
+   private entityKey(coach: string, platform: string, entityType: string, sourceId: string): string {
+     return `${coach}|${platform}|${entityType}|${sourceId}`;
+   }
++  /** G2-C: the five-field wide identity is the ledger's only key (narrow key dropped). */
+   private ledgerKey(r: {
+     coach_id: string;
+     intent_id: string;
+     entity_type: string;
++    source_platform: string;
+     source_id: string;
+   }): string {
+-    return `${r.coach_id}|${r.intent_id}|${r.entity_type}|${r.source_id}`;
++    return `${r.coach_id}|${r.intent_id}|${r.entity_type}|${r.source_platform}|${r.source_id}`;
+   }
+ 
+   scoutImport = {
+@@ -148,8 +150,8 @@ class FakePrisma {
+       Object.assign(row, args.data);
+       return { count: 1 };
+     },
+-    // Keyed by the NARROW key the real table still enforces until C: a wide
+-    // identity that misses while the narrow key is taken raises P2002, as on PG.
++    // Keyed by the WIDE identity, the real table's only key since G2-C: the same
++    // source on another platform or in another family is a distinct row, as on PG.
+     upsert: async (args: {
+       where: { coach_id_intent_id_entity_type_source_platform_source_id: LedgerRow };
+       create: LedgerRow;
+@@ -158,16 +160,10 @@ class FakePrisma {
+       const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
+       const key = this.ledgerKey(w);
+       const existing = this.ledger.get(key);
+-      if (existing && existing.source_platform === w.source_platform) {
++      if (existing) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
+-      if (existing) {
+-        throw new Prisma.PrismaClientKnownRequestError('unique violation', {
+-          code: 'P2002',
+-          clientVersion: 'test',
+-        });
+-      }
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+diff --git a/test/scout/reconstruct/scout-reconstruct.migration.spec.ts b/test/scout/reconstruct/scout-reconstruct.migration.spec.ts
+index 06188da7..89c6a340 100644
+--- a/test/scout/reconstruct/scout-reconstruct.migration.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.migration.spec.ts
+@@ -87,10 +87,19 @@ describe('IMPORTER-F schema + migration structural guard', () => {
+   });
+ 
+   describe('ScoutReconstructionLedger (idempotent reconciliation)', () => {
+-    it('keys the ledger on (coach_id, intent_id, entity_type, source_id)', () => {
+-      const unique = ledger.match(/@@unique\(\[([^\]]+)\]\)/) as RegExpMatchArray;
+-      const cols = unique[1].split(',').map((c) => c.trim());
+-      expect(cols).toEqual(['coach_id', 'intent_id', 'entity_type', 'source_id']);
++    it('keys the ledger on exactly the G2-C wide identity (coach_id, intent_id, entity_type, source_platform, source_id) under the identity map name', () => {
++      const keys = [...ledger.matchAll(/@@unique\(\[([^\]]+)\](?:,\s*map:\s*"([^"]+)")?\)/g)].map(
++        (m) => ({ cols: m[1].split(',').map((c) => c.trim()), map: m[2] ?? null }),
++      );
++      expect(keys).toEqual([
++        {
++          cols: ['coach_id', 'intent_id', 'entity_type', 'source_platform', 'source_id'],
++          map: 'ScoutReconstructionLedger_identity_key',
++        },
++      ]);
++      // The historical narrow key (this migration's DDL) was dropped by
++      // 20270121000000_scout_identity_contract; it must not be declared.
++      expect(ledger).not.toContain('@@unique([coach_id, intent_id, entity_type, source_id])');
+     });
+ 
+     it('carries an optional target_id and reason for non-reconstructed outcomes', () => {
+@@ -98,7 +107,7 @@ describe('IMPORTER-F schema + migration structural guard', () => {
+       expect(ledger).toMatch(/reason\s+String\?/);
+     });
+ 
+-    it('creates the ledger UNIQUE INDEX in the migration DDL', () => {
++    it('historical DDL: this migration created the original narrow ledger UNIQUE INDEX', () => {
+       const ddl = migration.match(
+         /CREATE UNIQUE INDEX[^;]*"ScoutReconstructionLedger"[^;]*\(([^)]*)\)/,
+       ) as RegExpMatchArray;
+diff --git a/test/scout/reconstruct/scout-reconstruct.service.spec.ts b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+index a736d9a4..b71b54e3 100644
+--- a/test/scout/reconstruct/scout-reconstruct.service.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+@@ -79,12 +79,13 @@ class FakePrisma {
+     return `${coach}|${platform}|${personId}`;
+   }
+   /**
+-   * The ledger is keyed by the NARROW (coach, intent, entity, source) key the
+-   * real table still enforces until C, so a wide-identity upsert that misses
+-   * but collides on the narrow key raises P2002 exactly like PostgreSQL.
++   * The ledger is keyed by the five-field WIDE identity (coach, intent, entity,
++   * platform, source): the only unique key the real table carries since G2-C
++   * (20270121000000_scout_identity_contract dropped the narrow key). The same
++   * source on another platform is a distinct row, exactly like PostgreSQL.
+    */
+   private ledgerKey(r: LedgerIdentity): string {
+-    return `${r.coach_id}|${r.intent_id}|${r.entity_type}|${r.source_id}`;
++    return `${r.coach_id}|${r.intent_id}|${r.entity_type}|${r.source_platform}|${r.source_id}`;
+   }
+ 
+   scoutImport = {
+@@ -176,13 +177,11 @@ class FakePrisma {
+       const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
+       const key = this.ledgerKey(w);
+       const existing = this.ledger.get(key);
+-      if (existing && existing.source_platform === w.source_platform) {
++      if (existing) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
+-      // Wide identity missed but the narrow key is taken: the INSERT half of the
+-      // upsert violates the retained narrow unique index (P2002), as on PG.
+-      if (existing) throw p2002();
++      // G2-C: no narrow key remains, so a wide-identity miss is simply an insert.
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+@@ -287,31 +286,47 @@ describe('ScoutReconstructService', () => {
+   );
+ 
+   it.each(['reconstructed', 'skipped', 'failed'])(
+-    'reports a narrow-key collision (same source, other platform, existing %s) as 409 with nothing written',
++    'G2-C: the same source on another platform (existing %s) is a distinct identity — its own ledger row and target, the existing row untouched',
+     async (status) => {
+       const { service, prisma } = build((p) => {
+         p.staged = [stagedClient('1')];
+       });
+       await service.reconstruct('coach-1', 'intent-1');
+-      const row = [...prisma.ledger.values()][0];
+-      row.source_platform = 'different';
+-      row.status = status;
+-      const before = { ...row };
++      const existing = [...prisma.ledger.values()][0];
++      existing.status = status;
++      const before = { ...existing };
++      // The second observation of source 1 arrives on another registered platform.
++      prisma.staged = [{ ...stagedClient('1'), source_platform: 'conformance_alpha' }];
+       const upsert = jest.spyOn(prisma.scoutReconstructionLedger, 'upsert');
+       const precedence = jest.spyOn(prisma.scoutReconstructionLedger, 'updateMany');
+-      jest
+-        .spyOn(service['families'].get('clients')!, 'map')
+-        .mockReturnValueOnce({ ok: false, reason: 'synthetic mapper skip' });
+-      const err = await service.reconstruct('coach-1', 'intent-1').catch((e: unknown) => e);
+-      expect(err).toBeInstanceOf(ConflictException);
+-      expect((err as ConflictException).message).toBe('reconstruction provenance conflict');
+-      // Wide upsert (retried once for the P2002) never reached precedence; the
+-      // ledger holds exactly the pre-existing row, byte for byte.
+-      expect(upsert).toHaveBeenCalledTimes(2);
+-      expect(precedence).not.toHaveBeenCalled();
+-      expect(prisma.ledger.size).toBe(1);
+-      expect(row).toEqual(before);
+-      expect(JSON.stringify(err)).not.toContain('different');
++      const result = await service.reconstruct('coach-1', 'intent-1');
++      // The tally is cumulative over the ledger: the pre-existing row keeps its status and the
++      // new identity is reconstructed beside it.
++      expect(result).toEqual({
++        intent_id: 'intent-1',
++        staged: 1,
++        reconstructed: status === 'reconstructed' ? 2 : 1,
++        skipped: status === 'skipped' ? 1 : 0,
++        failed: status === 'failed' ? 1 : 0,
++      });
++      // One wide upsert, no retry, precedence applied to the NEW identity only.
++      expect(upsert).toHaveBeenCalledTimes(1);
++      expect(precedence).toHaveBeenCalledTimes(1);
++      expect(prisma.ledger.size).toBe(2);
++      expect(existing).toEqual(before);
++      const added = [...prisma.ledger.values()].find((r) => r !== existing)!;
++      expect(added).toMatchObject({
++        coach_id: 'coach-1',
++        intent_id: 'intent-1',
++        entity_type: 'clients',
++        source_platform: 'conformance_alpha',
++        source_id: '1',
++        status: 'reconstructed',
++      });
++      // Distinct target: the Person key embeds the platform.
++      expect(added.target_id).not.toBeNull();
++      expect(added.target_id).not.toBe(before.target_id);
++      expect(prisma.persons.size).toBe(2);
+     },
+   );
+ 
+diff --git a/test/scout/scout-ingest.idempotency.spec.ts b/test/scout/scout-ingest.idempotency.spec.ts
+index 858808af..ba7b9e46 100644
+--- a/test/scout/scout-ingest.idempotency.spec.ts
++++ b/test/scout/scout-ingest.idempotency.spec.ts
+@@ -5,8 +5,11 @@ import { join } from 'path';
+  * R-IDEMP-1 (2026-07-08) structural idempotency guard.
+  *
+  * The idempotency contract for scout ingest is: the UNIQUE key
+- * (coach_id, intent_id, source_id) makes "the coach saw entity X during crawl
+- * session Y" a single row. captured_at is a VALUE, not part of the key — a
++ * (coach_id, intent_id, entity_type, source_platform, source_id) — the G2-C
++ * wide identity, the only key since 20270121000000_scout_identity_contract
++ * dropped the narrow (coach_id, intent_id, source_id) key — makes "the coach
++ * saw entity X of family F on platform P during crawl session Y" a single row.
++ * captured_at is a VALUE, not part of the key — a
+  * coach re-observes the same source entity over time, and each re-observation
+  * within an intent must collapse to a no-op replay (ON CONFLICT DO NOTHING),
+  * never a new row per timestamp. If captured_at were in the key, an extension
+@@ -19,7 +22,9 @@ import { join } from 'path';
+  * migration DDL) and asserts the key columns and their order, and that
+  * captured_at is excluded. This pins the key so a future refactor toward the
+  * (sourceId, capturedAt) shape the round-1 auditor suggested cannot land
+- * silently — it would fail here with the reasoning above.
++ * silently — it would fail here with the reasoning above. The historical
++ * 20261222000000 DDL (the original narrow key) is pinned as history only; the
++ * live key is the wide `@@unique(..., map: "ScoutIngestEntity_identity_key")`.
+  */
+ 
+ const REPO_ROOT = join(__dirname, '..', '..');
+@@ -32,7 +37,17 @@ const MIGRATION_PATH = join(
+   'migration.sql',
+ );
+ 
+-const EXPECTED_KEY_COLUMNS = ['coach_id', 'intent_id', 'source_id'];
++/** The historical narrow key (20261222000000 DDL; dropped by G2-C). */
++const HISTORICAL_KEY_COLUMNS = ['coach_id', 'intent_id', 'source_id'];
++/** The live G2-C wide identity key, in declared order. */
++const EXPECTED_KEY_COLUMNS = [
++  'coach_id',
++  'intent_id',
++  'entity_type',
++  'source_platform',
++  'source_id',
++];
++const WIDE_KEY_MAP = 'ScoutIngestEntity_identity_key';
+ 
+ function scoutModelBlock(schema: string): string {
+   const match = schema.match(/model ScoutIngestEntity \{[\s\S]*?\n\}/);
+@@ -40,32 +55,44 @@ function scoutModelBlock(schema: string): string {
+   return match[0];
+ }
+ 
+-describe('R-IDEMP-1 idempotency key is (coach_id, intent_id, source_id)', () => {
++/** Every `@@unique([...])` of the model with its optional `map:` name. */
++function uniqueKeys(model: string): { cols: string[]; map: string | null }[] {
++  return [...model.matchAll(/@@unique\(\[([^\]]+)\](?:,\s*map:\s*"([^"]+)")?\)/g)].map((m) => ({
++    cols: m[1].split(',').map((c) => c.trim()),
++    map: m[2] ?? null,
++  }));
++}
++
++describe('R-IDEMP-1 idempotency key is the G2-C wide identity (coach_id, intent_id, entity_type, source_platform, source_id)', () => {
+   const schema = readFileSync(SCHEMA_PATH, 'utf8');
+   const migration = readFileSync(MIGRATION_PATH, 'utf8');
+   const model = scoutModelBlock(schema);
+ 
+-  it('declares the composite @@unique on exactly the three key columns in order', () => {
+-    const unique = model.match(/@@unique\(\[([^\]]+)\]\)/);
+-    expect(unique).not.toBeNull();
+-    const cols = (unique as RegExpMatchArray)[1].split(',').map((c) => c.trim());
+-    expect(cols).toEqual(EXPECTED_KEY_COLUMNS);
++  it('declares exactly one @@unique: the wide key, on the five columns in order, under the identity map name', () => {
++    const keys = uniqueKeys(model);
++    expect(keys).toEqual([{ cols: EXPECTED_KEY_COLUMNS, map: WIDE_KEY_MAP }]);
++  });
++
++  it('declares no narrow (coach_id, intent_id, source_id) key (dropped by G2-C)', () => {
++    expect(
++      uniqueKeys(model).some((k) => k.cols.join(',') === HISTORICAL_KEY_COLUMNS.join(',')),
++    ).toBe(false);
++    expect(model).not.toContain('@@unique([coach_id, intent_id, source_id])');
+   });
+ 
+   it('does NOT include captured_at in the unique key (captured_at is a value)', () => {
+-    const unique = model.match(/@@unique\(\[([^\]]+)\]\)/) as RegExpMatchArray;
+-    expect(unique[1]).not.toContain('captured_at');
++    for (const key of uniqueKeys(model)) expect(key.cols).not.toContain('captured_at');
+   });
+ 
+   it('keeps captured_at nullable and outside the key in the model', () => {
+     expect(model).toMatch(/captured_at\s+DateTime\?/);
+   });
+ 
+-  it('creates a UNIQUE INDEX on the three key columns in the migration DDL', () => {
++  it('historical DDL: 20261222000000 created the original narrow UNIQUE INDEX on three columns', () => {
+     const ddl = migration.match(/CREATE UNIQUE INDEX[^;]*ScoutIngestEntity[^;]*\(([^)]*)\)/);
+     expect(ddl).not.toBeNull();
+     const cols = (ddl as RegExpMatchArray)[1].split(',').map((c) => c.trim().replace(/"/g, ''));
+-    expect(cols).toEqual(EXPECTED_KEY_COLUMNS);
++    expect(cols).toEqual(HISTORICAL_KEY_COLUMNS);
+   });
+ 
+   it('does not put captured_at into any UNIQUE INDEX in the migration DDL', () => {
+diff --git a/test/scout/scout-ingest.service.spec.ts b/test/scout/scout-ingest.service.spec.ts
+index f2f934fe..b9ed9e39 100644
+--- a/test/scout/scout-ingest.service.spec.ts
++++ b/test/scout/scout-ingest.service.spec.ts
+@@ -82,7 +82,8 @@ describe('ScoutIngestService', () => {
+   // NOTE: replay/dedup counting was previously asserted here against a mocked
+   // createMany count — a tautology (the mock decided the count, so the test
+   // only proved received - count arithmetic, not that the unique index dedups).
+-  // The real idempotency semantics of the (coach_id, intent_id, source_id) key
++  // The real idempotency semantics of the (coach_id, intent_id, entity_type,
++  // source_platform, source_id) key
+   // — including that a re-observation with a fresh capturedAt is a no-op replay
+   // and a new intent_id inserts a fresh series (R-IDEMP-1) — are now enforced
+   // structurally and asserted in scout-ingest.idempotency.spec.ts. The
+diff --git a/test/utils/g2-c-bootstrap.sh b/test/utils/g2-c-bootstrap.sh
+new file mode 100644
+index 00000000..54ad1352
+--- /dev/null
++++ b/test/utils/g2-c-bootstrap.sh
+@@ -0,0 +1,279 @@
++#!/usr/bin/env bash
++# S7-3' G2 C/contract proof bootstrap, derived by substitution from the accepted N/Q1 bootstrap
++# test/utils/g2-nq1-bootstrap.sh (unchanged) for the C-only disposable cluster/database.
++# The "old" side is N/Q1: a detached checkout of the accepted N/Q1 head (N writer, Q1 readers,
++# R schema, narrow keys still declared); its `prisma migrate deploy` installs the whole accepted
++# history (S1..R, 169) so the C candidate has EXACTLY C pending. C is NOT applied here: the spec
++# applies it through the candidate's `prisma migrate deploy` (the release mechanism, C01).
++# Validation harness only: it never touches a hosted or application database, never edits
++# schema/migration/generator sources, and stops on the first unexpected state instead of
++# repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_C_DATABASE_URL  postgresql://c_super@127.0.0.1:<port>/g2_c_disposable?schema=public&connection_limit=2
++#   G2_C_CONFIRM       g2_c_disposable:<port>
++#   G2_C_PASSWORD      disposable local fixture password shared by c_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_C_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_C_OLD_ROOT      DETACHED Git checkout of the accepted N/Q1 head (the old side); create it
++#                         with test/utils/g2-c-old-root.sh (a `git archive` extraction is not a
++#                         repository and cannot pass step 4 below)
++#   G2_C_OLD_CLIENT    directory that receives the independently generated N/Q1 Prisma client
++# Optional:
++#   G2_C_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# Accepted N/Q1 head: placeholder until the parent records N/Q1 acceptance (phase 2 fill).
++OLD_HEAD=29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd
++R_MIGRATION=20270120000000_scout_identity_ready
++C_MIGRATION=20270121000000_scout_identity_contract
++# 164 base migrations + S1 + C1 + E + B + R tracked by the N/Q1 root; the candidate adds C (170).
++EXPECTED_MIGRATIONS=169
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++EXPECTED_VERSION="${G2_C_SERVER_VERSION:-170006}"
++# Distinctive C fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-c-db.ts G2_C_CLUSTER_MARKER / G2_C_DATABASE_MARKER, kept identical by
++# test/scout/g2-c-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 'c-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=c-disposable-pg17
++DB_MARKER=c-g2-contract-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_C_DATABASE_URL G2_C_CONFIRM G2_C_PASSWORD G2_C_PSQL G2_C_OLD_ROOT G2_C_OLD_CLIENT; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++[[ -x "$G2_C_PSQL" ]] || { echo "psql binary not executable: $G2_C_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted C1 dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: `prisma generate` must never auto-install anything (B2 finding:
++# an output directory outside a package root made the CLI run `npm i` silently). The N/Q1 client is
++# generated INSIDE the N/Q1 checkout, whose node_modules is the shared symlink to the pinned npm-ci tree,
++# and @prisma/client must resolve from there to exactly $ROOT/node_modules/@prisma/client.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++[[ "$G2_C_OLD_CLIENT" == "$G2_C_OLD_ROOT"/* ]] \
++  || { echo "G2_C_OLD_CLIENT must live inside G2_C_OLD_ROOT (pinned package root); got $G2_C_OLD_CLIENT" >&2; exit 2; }
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2CTestTarget } = require("./test/utils/g2-c-db");
++  const t = g2CTestTarget(process.env.G2_C_DATABASE_URL, process.env.G2_C_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  const { withFixturePassword } = require("./test/utils/g2-c-db");
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_C_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_C_PASSWORD"
++
++psql_maint() { "$G2_C_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_C_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|generate-only) ;; *) echo "usage: g2-pg17-bootstrap.sh [bootstrap|generate-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the C lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the C fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_C_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_c_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_c_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_c_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_c_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_c_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_c_disposable exists without the C disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_c_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_c_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. N/Q1 source: exact accepted N/Q1 head, shared dependency tree, the full tracked history (S1..R), no C.
++[[ "$OLD_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "OLD_HEAD is not a filled commit id ($OLD_HEAD); N/Q1 acceptance not recorded" >&2; exit 4; }
++[[ "$(git -C "$G2_C_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$ROOT" merge-base --is-ancestor "$OLD_HEAD" HEAD || { echo "N/Q1 head $OLD_HEAD is not an ancestor of candidate HEAD" >&2; exit 4; }
++git -C "$G2_C_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between N/Q1 and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -e "$G2_C_OLD_ROOT/node_modules" ]] || ln -s "$ROOT/node_modules" "$G2_C_OLD_ROOT/node_modules"
++[[ -d "$G2_C_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_C_OLD_ROOT/prisma/migrations/$R_MIGRATION" ]] \
++  || { echo "old root lacks E or R; it is not the accepted N/Q1 head" >&2; exit 4; }
++[[ ! -e "$G2_C_OLD_ROOT/prisma/migrations/$C_MIGRATION" ]] \
++  || { echo "old root carries C; it is not the accepted N/Q1 head" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_C_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# C ships exactly two files: the candidate's migration tree differs from the N/Q1 root's by
++# EXACTLY $C_MIGRATION/{down.sql,migration.sql} (no verify.sql, nothing else touched).
++EXPECTED_C_DIFF="$(printf 'prisma/migrations/%s/down.sql\nprisma/migrations/%s/migration.sql' "$C_MIGRATION" "$C_MIGRATION")"
++ACTUAL_C_DIFF="$(git -C "$ROOT" diff --name-only "$OLD_HEAD" HEAD -- prisma/migrations | LC_ALL=C sort)"
++[[ "$ACTUAL_C_DIFF" == "$EXPECTED_C_DIFF" ]] \
++  || { echo "candidate migrations differ from the accepted N/Q1 head by other than exactly C's two files:" >&2; echo "$ACTUAL_C_DIFF" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$C_MIGRATION/migration.sql" && -f "$ROOT/prisma/migrations/$C_MIGRATION/down.sql" && ! -e "$ROOT/prisma/migrations/$C_MIGRATION/verify.sql" ]] \
++  || { echo "C must ship migration.sql + down.sql and no verify.sql" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history (S1..R) through the real release mechanism from the N/Q1 root; C is
++#    NOT applied here. Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the
++#    cluster superuser.
++(cd "$G2_C_OLD_ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='source_platform' AND NOT attisdropped AND attnotnull")" == "1" ]] \
++  || { echo "ledger lacks NOT NULL source_platform after the accepted history (R absent)" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_class WHERE relname IN ('ScoutIngestEntity_identity_key','ScoutReconstructionLedger_identity_key') AND relnamespace='public'::regnamespace")" == "2" ]] \
++  || { echo "wide identity keys absent after the accepted history (R absent)" >&2; exit 5; }
++# The pre-C shape: both narrow keys present (exact stored names; the ledger name is the 63-char
++# truncation) and C not recorded — the spec's C01 applies C through the candidate's deploy.
++[[ "$(psql_db -c "SELECT count(*) FROM pg_class WHERE relname IN ('ScoutIngestEntity_coach_id_intent_id_source_id_key','ScoutReconstructionLedger_coach_id_intent_id_entity_type_source') AND relnamespace='public'::regnamespace")" == "2" ]] \
++  || { echo "narrow identity keys absent after the accepted history; not the pre-C shape" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$C_MIGRATION'")" == "0" ]] \
++  || { echo "C is already recorded; the bootstrap must leave C pending for the spec" >&2; exit 5; }
++
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative (S5-R3-A-05 / S5-R3B-02): a missing file is a
++# refusal (exit 6), not an empty field nested inside an echo.
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++# The runtime a generated client actually executes. The default-output candidate client requires
++# `@prisma/client/runtime/library.js` from the pinned package (it has no runtime/ copy of its own);
++# a custom-output client (the N/Q1 client) receives a copy under <output>/runtime/.
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Independent N/Q1 client generated from the N/Q1 schema (accepted N/Q1 head) into its own directory.
++mkdir -p "$G2_C_OLD_CLIENT"
++PINNED_CLIENT_PKG="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
++RESOLVED_CLIENT_PKG="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_C_OLD_CLIENT")"
++[[ "$RESOLVED_CLIENT_PKG" == "$PINNED_CLIENT_PKG" ]] \
++  || { echo "@prisma/client does not resolve from $G2_C_OLD_CLIENT to the pinned tree ($RESOLVED_CLIENT_PKG != $PINNED_CLIENT_PKG); refusing to generate" >&2; exit 6; }
++echo "O_CLIENT_RESOLUTION pinned=$PINNED_CLIENT_PKG version=$(node -p 'require(process.argv[1]).version' "$PINNED_CLIENT_PKG") skip_autoinstall=$PRISMA_GENERATE_SKIP_AUTOINSTALL"
++OLD_SCHEMA_COPY="$G2_C_OLD_CLIENT/.schema-for-generate.prisma"
++sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$G2_C_OLD_CLIENT\"|" \
++  "$G2_C_OLD_ROOT/prisma/schema.prisma" > "$OLD_SCHEMA_COPY"
++(cd "$G2_C_OLD_ROOT" && "$ROOT/node_modules/.bin/prisma" generate --schema "$OLD_SCHEMA_COPY" >/dev/null)
++grep -q 'model ScoutReconstructionLedger' "$G2_C_OLD_CLIENT/schema.prisma"
++O_ENGINE_SHA="$(hash_required 'generated N/Q1 client engine' "$G2_C_OLD_CLIENT/$ENGINE")"
++[[ "$O_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated N/Q1 client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The N/Q1 client's copied runtime must be the pinned package runtime: identical bytes, or the pinned
++# bytes preceded only by the generator's header (observed 130 B for prisma 6.19.3). Any other
++# difference is a refusal; a false refusal here fails closed and is reported, never skipped.
++O_RUNTIME="$G2_C_OLD_CLIENT/runtime/library.js"
++O_RUNTIME_SHA="$(hash_required 'generated N/Q1 client runtime' "$O_RUNTIME")"
++PINNED_RUNTIME_SIZE="$(stat -c %s "$PINNED_RUNTIME")"
++O_RUNTIME_SIZE="$(stat -c %s "$O_RUNTIME")"
++[[ "$O_RUNTIME_SIZE" -ge "$PINNED_RUNTIME_SIZE" ]] && cmp -s <(tail -c "$PINNED_RUNTIME_SIZE" "$O_RUNTIME") "$PINNED_RUNTIME" \
++  || { echo "generated N/Q1 client runtime ($O_RUNTIME_SIZE B, $O_RUNTIME_SHA) does not end with the pinned @prisma/client runtime ($PINNED_RUNTIME_SIZE B, $PINNED_RUNTIME_SHA)" >&2; exit 6; }
++echo "O_CLIENT_GENERATED dir=$G2_C_OLD_CLIENT engine_sha256=$O_ENGINE_SHA runtime=$O_RUNTIME runtime_sha256=$O_RUNTIME_SHA runtime_header_bytes=$((O_RUNTIME_SIZE - PINNED_RUNTIME_SIZE)) pinned_runtime=$PINNED_RUNTIME pinned_runtime_sha256=$PINNED_RUNTIME_SHA"
++# The old client is N's: REQUIRED ledger provenance (`String`), both wide keys declared AND both
++# narrow `@@unique` selectors still declared (C removes them from the candidate only).
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_C_OLD_CLIENT/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "generated N/Q1 client does not carry N's required ledger source_platform" >&2; exit 6; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_C_OLD_CLIENT/schema.prisma" | grep -Eq 'source_platform +String\?' \
++  || { echo "generated old client carries R's optional ledger source_platform; it is not the N client" >&2; exit 6; }
++for key in ScoutIngestEntity_identity_key ScoutReconstructionLedger_identity_key; do
++  grep -q "map: \"$key\"" "$G2_C_OLD_CLIENT/schema.prisma" \
++    || { echo "generated N/Q1 client schema lacks $key; it is not the N client" >&2; exit 6; }
++done
++awk '/model ScoutIngestEntity \{/,/\}/' "$G2_C_OLD_CLIENT/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, source_id])' \
++  || { echo "generated N/Q1 client lacks the narrow staging @@unique; it is not the pre-C client" >&2; exit 6; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_C_OLD_CLIENT/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, entity_type, source_id])' \
++  || { echo "generated N/Q1 client lacks the narrow ledger @@unique; it is not the pre-C client" >&2; exit 6; }
++
++# 7. Candidate (C) client in the candidate root: the C client generated once, before commit, in
++#    the isolated copy of the accepted dependency tree (C changes prisma/schema.prisma: both narrow
++#    `@@unique` lines are removed) is only VERIFIED here; no `prisma generate` runs in the bootstrap.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated C1 tree not in place)" >&2; exit 7; }
++grep -q 'model ScoutReconstructionLedger' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client schema lacks ScoutReconstructionLedger; refusing (no regeneration in the bootstrap)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The runtime the candidate client actually loads, resolved from the generated client directory.
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++# The generated client must be C's: REQUIRED ledger provenance (`String`, inherited from N), both
++# wide keys declared (inherited from R) and NEITHER narrow `@@unique` — not a stale N/R/B client.
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "candidate client does not carry the required ledger source_platform (N, inherited by C)" >&2; exit 7; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String\?' \
++  || { echo "candidate client still carries optional ledger source_platform; the C client was not generated" >&2; exit 7; }
++for key in ScoutIngestEntity_identity_key ScoutReconstructionLedger_identity_key; do
++  grep -q "map: \"$key\"" "$ROOT/node_modules/.prisma/client/schema.prisma" \
++    || { echo "candidate client schema lacks $key; the C client was not generated from the N-derived schema" >&2; exit 7; }
++done
++! awk '/model ScoutIngestEntity \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, source_id])' \
++  || { echo "candidate client still declares the narrow staging @@unique; the C client was not generated" >&2; exit 7; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, entity_type, source_id])' \
++  || { echo "candidate client still declares the narrow ledger @@unique; the C client was not generated" >&2; exit 7; }
++
++if [[ "$MODE" == generate-only ]]; then echo "G2_C_GENERATE_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_C_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-c-db.ts b/test/utils/g2-c-db.ts
+new file mode 100644
+index 00000000..2d282024
+--- /dev/null
++++ b/test/utils/g2-c-db.ts
+@@ -0,0 +1,109 @@
++/**
++ * S7-3' G2 C/contract proof target guard: derived by literal substitution from the accepted
++ * N/Q1 guard test/utils/g2-nq1-db.ts, which stays byte-identical and keeps governing the
++ * accepted N/Q1 proof. One dedicated disposable database on a C-only disposable PostgreSQL 17
++ * cluster; a SEVENTH identity, separate from the E, T/Q0, S5, B, R and N/Q1 targets, so no
++ * earlier proof state is reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_C_DATABASE = 'g2_c_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      c_super      cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy`, C up/down and all harness DDL/data
++ *  - runtime    service_role  BYPASSRLS runtime role used by the N writer, the in-process ingest service and Q1 reader processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_C_ROLE = 'c_super';
++export const G2_C_ADMIN_ROLE = G2_C_ROLE;
++export const G2_C_MIGRATION_ROLE = 'postgres';
++export const G2_C_RUNTIME_ROLE = 'service_role';
++export const G2_C_LOGIN_ROLES = new Set([G2_C_ADMIN_ROLE, G2_C_MIGRATION_ROLE, G2_C_RUNTIME_ROLE]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_C_PASSWORD_ENV = 'G2_C_PASSWORD';
++/**
++ * Distinctive C fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 'c-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_c_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-c-bootstrap.sh and the C fixture binding under execution/cf8ff737/c/binding/ must carry the same literals.
++ */
++export const G2_C_CLUSTER_MARKER = 'c-disposable-pg17';
++export const G2_C_DATABASE_MARKER = 'c-g2-contract-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the retained stopped N/Q1 lane (61b93cff).
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2CTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_C_DATABASE}` ||
++    url.username !== G2_C_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_C_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'C G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('C G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_C_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('C G2 proof requires a plain fixture password in the environment');
++  if (!G2_C_LOGIN_ROLES.has(username))
++    throw new Error('C G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
+diff --git a/test/utils/g2-c-harness.ts b/test/utils/g2-c-harness.ts
+new file mode 100644
+index 00000000..daf74010
+--- /dev/null
++++ b/test/utils/g2-c-harness.ts
+@@ -0,0 +1,246 @@
++/**
++ * G2-C live-proof helpers layered on the C-only derivative (test/utils/g2-c-pg-harness.ts) of
++ * the accepted N/Q1 harness (test/utils/g2-nq1-pg-harness.ts, unchanged).
++ * Carries the B, R and N/Q1 helpers unchanged (S1, C1, E, B, R are fixture history here: the
++ * old root IS the accepted N/Q1 head, so its `prisma migrate deploy` installs exactly that
++ * history, 169 recorded) and adds only what C needs: the C migration files, the narrow-key
++ * observations the contraction removes, the C.down refusal text, staging/ledger identity
++ * observations without the harness ids, and an in-process REAL ingest service (the shared
++ * worker has no ingest action; the accepted worker file is not modified).
++ * Imported only by the explicitly guarded test/rls-g2-c-contract.spec.ts.
++ */
++import { Prisma, PrismaClient } from '@prisma/client';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import { AnalyticsService } from '../../src/analytics/analytics.service';
++import { PrismaService } from '../../src/prisma.service';
++import { ScoutEntityDto, ScoutIngestDto } from '../../src/scout/scout-ingest.dto';
++import { ScoutIngestService } from '../../src/scout/scout-ingest.service';
++import { json, quote, root, sql, target } from './g2-c-pg-harness';
++import { G2_C_RUNTIME_ROLE, withFixturePassword } from './g2-c-db';
++
++export const B_MIGRATION = '20270119000000_scout_ledger_obsolete_writer_fence';
++export const bDir = resolve(root, 'prisma/migrations', B_MIGRATION);
++export const bUpFile = resolve(bDir, 'migration.sql');
++export const bDownFile = resolve(bDir, 'down.sql');
++export const bUp = readFileSync(bUpFile, 'utf8');
++export const bDown = readFileSync(bDownFile, 'utf8');
++export const R_MIGRATION = '20270120000000_scout_identity_ready';
++export const rDir = resolve(root, 'prisma/migrations', R_MIGRATION);
++export const rUpFile = resolve(rDir, 'migration.sql');
++export const rDownFile = resolve(rDir, 'down.sql');
++export const rUp = readFileSync(rUpFile, 'utf8');
++export const rDown = readFileSync(rDownFile, 'utf8');
++/** C: the identity contract (this packet's files). No verify.sql ships with C. */
++export const C_MIGRATION = '20270121000000_scout_identity_contract';
++export const cDir = resolve(root, 'prisma/migrations', C_MIGRATION);
++export const cUpFile = resolve(cDir, 'migration.sql');
++export const cDownFile = resolve(cDir, 'down.sql');
++export const cUp = readFileSync(cUpFile, 'utf8');
++export const cDown = readFileSync(cDownFile, 'utf8');
++export const WIDE_COLUMNS = 'coach_id, intent_id, entity_type, source_platform, source_id';
++export const CANONICAL_CHECK = `CHECK (((source_platform COLLATE "C") ~ '^[a-z0-9][a-z0-9._:-]{0,255}$'::text))`;
++/** The accepted narrow keys C drops: exact stored names (the ledger name is PostgreSQL's
++ *  63-character truncation of the 70-character accepted text) and exact definitions. */
++export const NARROW_STAGING_NAME = 'ScoutIngestEntity_coach_id_intent_id_source_id_key';
++export const NARROW_LEDGER_NAME = 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source';
++export const NARROW_STAGING_DEF = `CREATE UNIQUE INDEX "${NARROW_STAGING_NAME}" ON public."ScoutIngestEntity" USING btree (coach_id, intent_id, source_id)`;
++export const NARROW_LEDGER_DEF = `CREATE UNIQUE INDEX "${NARROW_LEDGER_NAME}" ON public."ScoutReconstructionLedger" USING btree (coach_id, intent_id, entity_type, source_id)`;
++/** C.down's fixed, identifier-free refusal (SQLSTATE 23505). The exact text is the contract. */
++export const C_DOWN_REFUSAL =
++  'G2-C.down refused: cross-family/cross-platform identities exist; restoring narrow keys would lose data. Forward repair only: keep C, fix forward with N-compatible writers; no deletion.';
++/** R's catalog contribution: exact wide index definitions, exact CHECK definitions (as
++ *  pg_get_constraintdef renders them), the ledger column's NOT NULL. Empty arrays / false when
++ *  R is absent. Index and constraint OIDs are included so "unchanged" is provable across a rerun. */
++export const wide = () =>
++  json(`SELECT jsonb_build_object(
++  'indexes',(SELECT COALESCE(jsonb_agg(jsonb_build_array(c.relname,i.indexrelid,i.indisunique,i.indisvalid,pg_get_indexdef(i.indexrelid)) ORDER BY c.relname),'[]')
++    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
++    WHERE c.relname IN ('ScoutIngestEntity_identity_key','ScoutReconstructionLedger_identity_key')
++      AND c.relnamespace='public'::regnamespace),
++  'checks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(conname,oid,conrelid::regclass::text,convalidated,pg_get_constraintdef(oid)) ORDER BY conname),'[]')
++    FROM pg_constraint WHERE contype='c' AND connamespace='public'::regnamespace
++      AND conname IN ('ScoutIngestEntity_source_platform_canonical','ScoutReconstructionLedger_source_platform_canonical')),
++  'ledgerNotNull',(SELECT attnotnull FROM pg_attribute WHERE attrelid='public."ScoutReconstructionLedger"'::regclass
++    AND attname='source_platform' AND NOT attisdropped))`);
++/** Both narrow unique indexes with their OIDs: absent (`[]`) once C is applied; C.down must
++ *  recreate them byte-exact (OIDs aside). */
++export const narrow = () =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(c.relname,i.indexrelid,pg_get_indexdef(i.indexrelid)) ORDER BY c.relname),'[]')
++  FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
++  WHERE c.relname IN ('ScoutIngestEntity_coach_id_intent_id_source_id_key',
++    'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key'::name)
++    AND c.relnamespace='public'::regnamespace`);
++/** Any relation in `public` holding a narrow name (an index, or a decoy table/view): oid, kind. */
++export const narrowNamed = () =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(relname,oid,relkind) ORDER BY relname),'[]')
++  FROM pg_class WHERE relnamespace='public'::regnamespace AND relname IN
++  ('ScoutIngestEntity_coach_id_intent_id_source_id_key','ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key'::name)`);
++/** Accepted S1 and C1 migrations: both the candidate root and the N/Q1 root track them; the old
++ *  root's `prisma migrate deploy` in the bootstrap records the whole history (169), so the
++ *  candidate's deploy has EXACTLY C pending. Nothing about them is proven. */
++export const S1_MIGRATION = '20261224000000_rls_close_public_exposure';
++export const C1_MIGRATION = '20270117000000_durable_import_setup';
++export const E_MIGRATION_DIR = '20270118000000_scout_ledger_platform_expand';
++export const acceptedUpFile = (name: string) =>
++  resolve(root, 'prisma/migrations', name, 'migration.sql');
++/** Every ledger row of a scope keyed by the five-field identity, ordered as Q1 pages it. */
++export const identityRows = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(jsonb_build_array(entity_type,source_id,source_platform,status,target_id)
++  ORDER BY entity_type,source_id,source_platform),'[]')
++  FROM "ScoutReconstructionLedger" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++/** Staged rows of a scope by identity (no harness/uuid id): (entity_type, source_id,
++ *  source_platform, captured_at, payload). ScoutIngestEntity has NO status column: "still
++ *  staged" means present here and absent from the ledger. */
++export const stagedRows = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(jsonb_build_array(entity_type,source_id,source_platform,captured_at,payload)
++  ORDER BY entity_type,source_id,source_platform),'[]')
++  FROM "ScoutIngestEntity" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++/** Groups that would collide on the NARROW keys (the identities only the wide key can hold):
++ *  duplicate (c,i,s) groups in staging and duplicate (c,i,e,s) groups in the ledger, database-wide
++ *  or for one intent. These are exactly the groups C.down's pre-check refuses on. */
++export const narrowDuplicates = (intent?: string) => {
++  const scope = intent ? `WHERE intent_id=${quote(intent)}` : '';
++  return json(`SELECT jsonb_build_object(
++  'staging',(SELECT count(*) FROM (SELECT 1 FROM "ScoutIngestEntity" ${scope} GROUP BY coach_id,intent_id,source_id HAVING count(*)>1) d),
++  'ledger',(SELECT count(*) FROM (SELECT 1 FROM "ScoutReconstructionLedger" ${scope} GROUP BY coach_id,intent_id,entity_type,source_id HAVING count(*)>1) d))`);
++};
++/** One ledger row by its five-field identity, or null. */
++export const ledgerRow = (
++  source: string,
++  platform = 'truecoach',
++  family = 'clients',
++  coach = 'coach',
++  intent = 'intent',
++) =>
++  json(
++    `SELECT COALESCE((SELECT to_jsonb(l) FROM "ScoutReconstructionLedger" l WHERE coach_id=${quote(coach)}
++  AND intent_id=${quote(intent)} AND entity_type=${quote(family)} AND source_platform=${quote(platform)}
++  AND source_id=${quote(source)}),'null')`,
++  );
++/** Migrations recorded as finished at or after a server timestamp (`SELECT now()`), sorted. */
++export const appliedSince = (since: string): string[] =>
++  json(`SELECT COALESCE(jsonb_agg(migration_name ORDER BY migration_name),'[]')
++  FROM "_prisma_migrations" WHERE finished_at >= ${quote(since)}::timestamptz`);
++
++/** Trigger + function catalog shape; '[]'/null when absent. Includes proconfig and ACL.
++ *  The trigger definition is rendered under an EMPTY search_path so the text is the canonical,
++ *  fully qualified form whatever the session default is; tgtype is included so BEFORE INSERT
++ *  FOR EACH ROW (7) is asserted structurally as well. */
++export const fence = () =>
++  json(`SET search_path = '';
++  SELECT jsonb_build_object(
++  'triggers',(SELECT COALESCE(jsonb_agg(jsonb_build_array(tgname,tgenabled,tgtype,pg_get_triggerdef(oid)) ORDER BY tgname),'[]')
++    FROM pg_trigger WHERE tgrelid='public."ScoutReconstructionLedger"'::regclass AND NOT tgisinternal),
++  'function',(SELECT to_jsonb(f) FROM (SELECT proname,prosecdef,proconfig,proacl::text,provolatile,
++    pg_get_functiondef(oid) def FROM pg_proc WHERE oid=to_regprocedure('public.scout_ledger_platform_fence()')) f))`);
++export const nullCount = () =>
++  Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform IS NULL`));
++export const ledgerCount = () => Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger"`));
++export const stagingCount = () => Number(sql(`SELECT count(*) FROM "ScoutIngestEntity"`));
++/** Every ledger column except provenance, deterministic order: the backfill's "untouched" proof. */
++export const ledgerWithoutPlatform = () =>
++  json(`SELECT COALESCE(jsonb_agg((to_jsonb(l) - 'source_platform')
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const stagingSnapshot = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY coach_id,intent_id,entity_type,source_platform,source_id,id),'[]')
++  FROM "ScoutIngestEntity" s`);
++/** Rows whose provenance differs from the exact staging match (never written by the backfill). */
++export const disagreeing = () =>
++  Number(
++    sql(`SELECT count(*) FROM "ScoutReconstructionLedger" l JOIN "ScoutIngestEntity" s
++  ON s.coach_id=l.coach_id AND s.intent_id=l.intent_id AND s.entity_type=l.entity_type AND s.source_id=l.source_id
++  WHERE l.source_platform IS DISTINCT FROM s.source_platform`),
++  );
++/** Fixture shaping only: re-open provenance on existing rows (an UPDATE; the fence is INSERT-only). */
++export const nullify = (where: string) =>
++  Number(
++    sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform=NULL WHERE ${where} RETURNING id)
++  SELECT count(*) FROM c`),
++  );
++export const ledgerIds = (where: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`,
++  );
++export const platformOf = (id: string) =>
++  sql(
++    `SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`,
++  );
++
++/**
++ * In-process runtime-role (service_role) client: the same generated C client the candidate ships,
++ * connected exactly like the worker processes, with an application_name so lock waits are
++ * observable through the accepted `blocked()` helper. Query text only is logged, never parameters.
++ */
++export function runtimeClient(name: string) {
++  const url = new URL(
++    withFixturePassword(target.prismaUrl, process.env.G2_C_PASSWORD, G2_C_RUNTIME_ROLE),
++  );
++  url.searchParams.set('application_name', name);
++  const queries: string[] = [];
++  const client = new PrismaClient({
++    datasources: { db: { url: url.toString() } },
++    log: [{ emit: 'event', level: 'query' }],
++  });
++  client.$on('query', (e) => {
++    queries.push(e.query);
++  });
++  return { client, queries, name };
++}
++
++/** One staged entity for the real ingest service: the envelope fields the extension sends. */
++export type IngestEntity = {
++  sourceId: string;
++  sourcePlatform: string;
++  capturedAt?: string;
++  payload?: Prisma.InputJsonObject;
++};
++/**
++ * The REAL ScoutIngestService (src/scout/scout-ingest.service.ts) on the candidate's C client
++ * as service_role: `createMany({ skipDuplicates: true })` → INSERT ... ON CONFLICT DO NOTHING,
++ * arbitrated by whatever unique indexes the database carries (narrow + wide before C, wide only
++ * after). Analytics events are captured in memory (nothing is forwarded); the shared worker is
++ * NOT modified (it has no ingest action). Returns `{ received, deduped }` exactly as the service
++ * does; callers `$disconnect()` the client when done.
++ */
++export function ingestClient(name: string) {
++  const { client, queries } = runtimeClient(name);
++  const events: unknown[][] = [];
++  // The accepted unit-spec construction (scout-ingest.service.spec.ts makePrisma/makeAnalytics):
++  // prototype handles carrying the REAL client delegate and an in-memory capture. No banned casts.
++  const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, {
++    scoutIngestEntity: client.scoutIngestEntity,
++  });
++  const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, {
++    capture: (...args: unknown[]) => {
++      events.push(args);
++    },
++  });
++  const service = new ScoutIngestService(prisma, analytics);
++  const ingest = (
++    family: string,
++    entities: IngestEntity[],
++    intent = 'intent',
++    coach = 'coach',
++  ): Promise<{ received: number; deduped: number }> => {
++    const dto = new ScoutIngestDto();
++    dto.intent_id = intent;
++    dto.entity_type = family;
++    dto.entities = entities.map((e) => {
++      const entity = new ScoutEntityDto();
++      entity.sourceId = e.sourceId;
++      entity.sourcePlatform = e.sourcePlatform;
++      entity.capturedAt = e.capturedAt ?? '2026-09-24T00:00:00.000Z';
++      entity.payload = e.payload ?? { name: `Synthetic ${e.sourceId}`, client_id: 'client-new' };
++      return entity;
++    });
++    return service.ingest(coach, dto);
++  };
++  return { client, queries, events, ingest, name, disconnect: () => client.$disconnect() };
++}
+diff --git a/test/utils/g2-c-old-root.sh b/test/utils/g2-c-old-root.sh
+new file mode 100644
+index 00000000..0f7d1401
+--- /dev/null
++++ b/test/utils/g2-c-old-root.sh
+@@ -0,0 +1,105 @@
++#!/usr/bin/env bash
++# S7-3' G2 C old-side fixture: create (or preflight) the detached checkout of the accepted N/Q1
++# head (the N writer / Q1 readers / R schema with both narrow keys still declared) that
++# test/utils/g2-c-bootstrap.sh step 4 requires. Derived by substitution from the accepted N/Q1
++# helper test/utils/g2-nq1-old-root.sh (unchanged): the same clone + detached checkout recipe,
++# with the identity gate moved to the N/Q1 head: the old root MUST carry E and R, MUST NOT carry
++# C, and carries N's REQUIRED ledger provenance plus both narrow `@@unique` declarations.
++# OLD_HEAD is a placeholder until the parent records N/Q1 acceptance (phase 2 fill).
++#
++# Why this exists: a `git archive | tar` extraction is NOT a Git repository, so it can
++# never satisfy bootstrap's identity gate (`git rev-parse HEAD` == the N/Q1 head and a clean
++# relevant-path diff). The fixture must be a real detached checkout. This script clones
++# the candidate root itself (which must contain the N/Q1 head in its history) and checks out
++# it detached, changing no ref, worktree
++# metadata or file of the candidate repository. It then runs the exact offline checks
++# bootstrap will repeat, so the recipe is verified before any database or dependency work.
++#
++# Usage: G2_C_OLD_ROOT=<path> bash test/utils/g2-c-old-root.sh [create|preflight]
++#   create     (default) clone + detached checkout at the N/Q1 head when the path does not exist,
++#              then preflight. Refuses to reuse a path that is not that checkout.
++#   preflight  only verify an existing path.
++# Optional: G2_C_OLD_ROOT_SHARED=1 uses `git clone --shared` (objects read through
++#   alternates from the candidate's object store; zero copy). Default is a self-contained
++#   local clone (hardlinked/copied objects) that keeps working if the source moves.
++# Needs git only. Never deletes anything; never touches PostgreSQL, node_modules, hosted
++# or customer resources.
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++OLD_HEAD=29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++R_MIGRATION=20270120000000_scout_identity_ready
++C_MIGRATION=20270121000000_scout_identity_contract
++EXPECTED_MIGRATIONS=169
++MODE="${1:-create}"
++[[ -n "${G2_C_OLD_ROOT:-}" ]] || { echo "missing G2_C_OLD_ROOT" >&2; exit 2; }
++[[ "$MODE" == create || "$MODE" == preflight ]] || { echo "usage: $0 [create|preflight]" >&2; exit 2; }
++case "$G2_C_OLD_ROOT" in /*) ;; *) echo "G2_C_OLD_ROOT must be absolute" >&2; exit 2;; esac
++[[ "$G2_C_OLD_ROOT" != "$ROOT" && "$G2_C_OLD_ROOT" != "$ROOT"/* ]] \
++  || { echo "old root must live outside the candidate root $ROOT" >&2; exit 2; }
++
++# The candidate must carry the N/Q1 head in its own history; otherwise the shared node_modules
++# rule in bootstrap (identical package.json/lock) has no basis either.
++[[ "$OLD_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "OLD_HEAD is not a filled commit id ($OLD_HEAD); N/Q1 acceptance not recorded" >&2; exit 3; }
++git -C "$ROOT" cat-file -e "$OLD_HEAD^{commit}" || { echo "candidate root does not contain the N/Q1 head $OLD_HEAD" >&2; exit 3; }
++git -C "$ROOT" merge-base --is-ancestor "$OLD_HEAD" HEAD || { echo "N/Q1 head $OLD_HEAD is not an ancestor of candidate HEAD" >&2; exit 3; }
++
++if [[ "$MODE" == create ]]; then
++  if [[ -e "$G2_C_OLD_ROOT" ]]; then
++    [[ -f "$G2_C_OLD_ROOT/.git" || -d "$G2_C_OLD_ROOT/.git" ]] \
++      || { echo "$G2_C_OLD_ROOT exists but is not a Git checkout (an archive extraction cannot pass the identity gate); remove it" >&2; exit 4; }
++    echo "old root already exists; verifying only"
++  else
++    # --no-checkout + checkout --detach: HEAD is the exact N/Q1 commit, on no branch.
++    # Nothing in the source repository changes either way.
++    if [[ "${G2_C_OLD_ROOT_SHARED:-0}" == 1 ]]; then
++      git clone --quiet --shared --no-checkout "$ROOT" "$G2_C_OLD_ROOT"
++    else
++      git clone --quiet --no-checkout "$ROOT" "$G2_C_OLD_ROOT"
++    fi
++    git -C "$G2_C_OLD_ROOT" checkout --quiet --detach "$OLD_HEAD"
++  fi
++fi
++
++# ---- Offline preflight: exactly the bootstrap step-4 gate, plus the spec's byte checks.
++[[ "$(git -C "$G2_C_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_C_OLD_ROOT" symbolic-ref -q HEAD >/dev/null && { echo "old root HEAD must be detached, not a branch" >&2; exit 4; }
++git -C "$G2_C_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between N/Q1 and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -d "$G2_C_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_C_OLD_ROOT/prisma/migrations/$R_MIGRATION" ]] \
++  || { echo "old root lacks E or R; it is not the accepted N/Q1 head" >&2; exit 4; }
++[[ ! -e "$G2_C_OLD_ROOT/prisma/migrations/$C_MIGRATION" ]] \
++  || { echo "old root carries C; it is not the accepted N/Q1 head" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_C_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# C ships exactly two files: the candidate's migration tree differs from the N/Q1 root's by
++# EXACTLY $C_MIGRATION/{down.sql,migration.sql} (the same gate bootstrap step 4 repeats).
++EXPECTED_C_DIFF="$(printf 'prisma/migrations/%s/down.sql\nprisma/migrations/%s/migration.sql' "$C_MIGRATION" "$C_MIGRATION")"
++ACTUAL_C_DIFF="$(git -C "$ROOT" diff --name-only "$OLD_HEAD" HEAD -- prisma/migrations | LC_ALL=C sort)"
++[[ "$ACTUAL_C_DIFF" == "$EXPECTED_C_DIFF" ]] \
++  || { echo "candidate migrations differ from the accepted N/Q1 head by other than exactly C's two files:" >&2; echo "$ACTUAL_C_DIFF" >&2; exit 4; }
++for file in scout-reconstruct.service.ts scout-roster.service.ts scout-entities.service.ts scout-ingest.service.ts scout-cursor.ts; do
++  cmp -s "$G2_C_OLD_ROOT/src/scout/$file" <(git -C "$ROOT" show "$OLD_HEAD:src/scout/$file") \
++    || { echo "old root src/scout/$file is not byte-identical to $OLD_HEAD" >&2; exit 4; }
++done
++# The old ledger model carries N's REQUIRED provenance (`String`) and BOTH narrow `@@unique`
++# declarations; the C candidate removes the narrow declarations only.
++grep -q 'model ScoutReconstructionLedger' "$G2_C_OLD_ROOT/prisma/schema.prisma" || { echo "old schema lacks the ledger model" >&2; exit 4; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_C_OLD_ROOT/prisma/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "old ledger model does not carry N's required source_platform" >&2; exit 4; }
++awk '/model ScoutIngestEntity \{/,/\}/' "$G2_C_OLD_ROOT/prisma/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, source_id])' \
++  || { echo "old staging model lacks the narrow @@unique; it is not the pre-C schema" >&2; exit 4; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_C_OLD_ROOT/prisma/schema.prisma" | grep -Fq '@@unique([coach_id, intent_id, entity_type, source_id])' \
++  || { echo "old ledger model lacks the narrow @@unique; it is not the pre-C schema" >&2; exit 4; }
++# Dependencies are shared read-only by bootstrap through a symlink; report provenance if present.
++if [[ -L "$G2_C_OLD_ROOT/node_modules" ]]; then
++  echo "node_modules symlink -> $(readlink "$G2_C_OLD_ROOT/node_modules")"
++elif [[ -e "$G2_C_OLD_ROOT/node_modules" ]]; then
++  echo "old root has its own node_modules directory (not the shared symlink); bootstrap will not replace it" >&2; exit 4
++fi
++echo "old_root=$G2_C_OLD_ROOT head=$(git -C "$G2_C_OLD_ROOT" rev-parse HEAD) detached=yes migrations=$OLD_COUNT" \
++  "alternates=$(cat "$(git -C "$G2_C_OLD_ROOT" rev-parse --absolute-git-dir)/objects/info/alternates" 2>/dev/null || echo none)"
++echo "G2_C_OLD_ROOT_OK"
+diff --git a/test/utils/g2-c-pg-harness.ts b/test/utils/g2-c-pg-harness.ts
+new file mode 100644
+index 00000000..378e0110
+--- /dev/null
++++ b/test/utils/g2-c-pg-harness.ts
+@@ -0,0 +1,389 @@
++/**
++ * S7-3' G2 C/contract live-proof helpers: derived by substitution from the accepted N/Q1 harness
++ * test/utils/g2-nq1-pg-harness.ts, which stays byte-identical. Same real psql, same real
++ * generated Prisma clients in separate OS processes (test/utils/g2-tq0-worker.cjs, shared
++ * unchanged), no transaction or query mocks; bound to the C-only identity guard
++ * test/utils/g2-c-db.ts and the G2_C_* environment. Only test/rls-g2-c-contract.spec.ts
++ * (via test/utils/g2-c-harness.ts) imports this.
++ *
++ * The "old" process role here is N/Q1 (the accepted N/Q1 head: N writer + Q1 readers with the
++ * N client generated in that detached checkout), not T. `worker(..., true)` runs N/Q1. The
++ * candidate is C: the same writer/readers on the contracted schema with the C client.
++ * OLD_HEAD is a placeholder until the parent records N/Q1 acceptance (phase 2 fill).
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_C_ADMIN_ROLE,
++  G2_C_MIGRATION_ROLE,
++  G2_C_RUNTIME_ROLE,
++  g2CTestTarget,
++  withFixturePassword,
++} from './g2-c-db';
++
++export const root = resolve(__dirname, '..', '..');
++export const OLD_HEAD = '29e60705d8c4e1228fd1d2f248c7e53b6b8e56dd';
++export const E_MIGRATION = '20270118000000_scout_ledger_platform_expand';
++
++const raw = process.env.G2_C_DATABASE_URL;
++const password = process.env.G2_C_PASSWORD;
++export const psql = process.env.G2_C_PSQL;
++export const oldRoot = process.env.G2_C_OLD_ROOT;
++export const oldClient = process.env.G2_C_OLD_CLIENT;
++export const directory = process.env.G2_C_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_C_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !oldRoot || !oldClient || !directory) {
++  throw new Error(
++    'C G2 proof requires explicit database, password, psql, data directory, N/Q1 source and N/Q1 client',
++  );
++}
++export const target = g2CTestTarget(raw, process.env.G2_C_CONFIRM);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_C_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_C_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** Operator form: `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>`. The G2 files carry their own
++ *  BEGIN/COMMIT, so --single-transaction is redundant there (psql only emits nested-transaction
++ *  WARNINGs); it is kept so the harness runs the same command the recovery packet documents.
++ *  Recovery semantics themselves are S1-owned; this helper asserts nothing about them. */
++export const sqlFile = (file: string): string =>
++  psqlRun(migrationUrl, ['--single-transaction', '-f', file]);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string): void {
++  let error: unknown;
++  try {
++    sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++
++export const stageSql = resolve(root, 'prisma/migrations', E_MIGRATION);
++export const upFile = resolve(stageSql, 'migration.sql');
++export const downFile = resolve(stageSql, 'down.sql');
++export const up = readFileSync(upFile, 'utf8');
++export const down = readFileSync(downFile, 'utf8');
++export const hasColumn = () =>
++  sql(`SELECT count(*) FROM pg_attribute WHERE
++  attrelid='public."ScoutReconstructionLedger"'::regclass AND attname='source_platform' AND NOT attisdropped`);
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++/** Ledger rows in a scope, ordered deterministically; provenance column optional pre-E. */
++export const records = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY entity_type,source_id,id),'[]')
++  FROM "ScoutReconstructionLedger" l WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++export const allLedger = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(l)
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const targets = (coach = 'coach') =>
++  json(`SELECT jsonb_build_object(
++  'persons',(SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY id),'[]') FROM "Person" p WHERE coach_id=${quote(coach)}),
++  'entities',(SELECT COALESCE(jsonb_agg(to_jsonb(e) ORDER BY id),'[]') FROM "ScoutReconstructedEntity" e WHERE coach_id=${quote(coach)}))`);
++export const catalog = () =>
++  sql(`SELECT jsonb_build_object(
++  'tables',(SELECT jsonb_agg(jsonb_build_array(oid,relname,relrowsecurity,relforcerowsecurity) ORDER BY relname)
++    FROM pg_class WHERE oid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'indexes',(SELECT jsonb_agg(jsonb_build_array(indexrelid,pg_get_indexdef(indexrelid)) ORDER BY indexrelid)
++    FROM pg_index WHERE indrelid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'policies',(SELECT jsonb_agg(to_jsonb(p) ORDER BY tablename,policyname) FROM pg_policies p
++    WHERE schemaname='public' AND tablename IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity')))`);
++
++export function settle(coach = 'coach', intent = 'intent') {
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},'settled','success')
++    ON CONFLICT DO NOTHING`);
++}
++export function stage(
++  source = 'a',
++  family = 'clients',
++  platform = 'truecoach',
++  name = 'Synthetic A',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  // Primary key includes family AND platform so a same-source collision can only fire on the
++  // product's identity key (narrow before C, wide after), never on the harness's own id.
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify({ name, client_id: 'client-new' }))})`);
++}
++/**
++ * A canonical platform token (R CHECK `^[a-z0-9][a-z0-9._:-]{0,255}$`) with NO registered source
++ * mapper. The product's own family dispatch (src/scout/reconstruct/families.ts, byte-identical on
++ * the N and T heads) records such a row `skipped` with reason `unsupported_platform:<token>`; it is
++ * the one non-success outcome the current product reaches from staged data alone (every registered
++ * mapper is total, and a noncanonical token is a structural 409, not a ledger outcome).
++ */
++export const UNMAPPED_PLATFORM = 'auto:other.example';
++export const UNMAPPED_REASON = `unsupported_platform:${UNMAPPED_PLATFORM}`;
++/** Bulk synthetic staging through generate_series; names are synthetic, no customer data.
++ *  `skipEvery` > 0 stages every k-th row under UNMAPPED_PLATFORM (a genuine, data-reachable
++ *  `skipped`); the other rows carry `platform`. */
++export function stageMany(
++  count: number,
++  family = 'clients',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++  skipEvery = 0,
++  prefix = 's',
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    SELECT ${quote(`${coach}-${intent}-${prefix}`)}||lpad(n::text,5,'0'),${quote(coach)},${quote(intent)},${quote(family)},
++      ${quote(prefix)}||lpad(n::text,5,'0'),
++      CASE WHEN ${skipEvery} > 0 AND n % ${skipEvery} = 0 THEN ${quote(UNMAPPED_PLATFORM)} ELSE ${quote(platform)} END,
++      jsonb_build_object('name','Synthetic '||n,'client_id','client-'||n)
++    FROM generate_series(1,${count}) n`);
++}
++/** How many of `count` rows `stageMany(..., skipEvery)` stages under UNMAPPED_PLATFORM. */
++export const skippedOf = (count: number, skipEvery: number) =>
++  skipEvery > 0 ? Math.floor(count / skipEvery) : 0;
++export function legacy(
++  status: string,
++  platform: string | null | 'ABSENT' = null,
++  source = 'a',
++  family = 'clients',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  const withColumn = platform !== 'ABSENT';
++  sql(`INSERT INTO "ScoutReconstructionLedger"
++    (id,coach_id,intent_id,entity_type,source_id,${withColumn ? 'source_platform,' : ''}status,target_id,reason)
++    VALUES (${quote(`${coach}-${intent}-${family}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},${quote(source)},
++    ${withColumn ? `${platform === null ? 'NULL' : quote(platform)},` : ''}${quote(status)},'saved-target','saved-reason')`);
++}
++export function resetData() {
++  sql(`DELETE FROM "ScoutReconstructionLedger"; DELETE FROM "ScoutIngestEntity";
++    DELETE FROM "Person"; DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutImport";`);
++  settle();
++}
++
++export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
++let sequence = 0;
++export function worker(options: Record<string, unknown> = {}, old = false) {
++  const name = `g2c_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_C_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root: old ? oldRoot : root,
++    client: old ? oldClient : resolve(root, 'node_modules/.prisma/client'),
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    family: 'clients',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-tq0-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_TQ0_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  let readyResolve: () => void;
++  const ready = new Promise<void>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.ready) readyResolve();
++      if (message.done) result = message;
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          old,
++          options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return {
++    done,
++    ready: options.pause
++      ? Promise.race([
++          ready,
++          done.then(() => {
++            throw new Error('barrier not reached');
++          }),
++        ])
++      : Promise.resolve(),
++    release: () => child.send('continue'),
++    stop: () => child.kill(),
++    name,
++  };
++}
++export const run = (options: Record<string, unknown> = {}, old = false) =>
++  worker(options, old).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_C_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return {
++    held,
++    release: () => holder.stdin.end('COMMIT;\n'),
++    // C addition: end the held transaction WITHOUT committing (an in-flight ingest that never lands).
++    rollback: () => holder.stdin.end('ROLLBACK;\n'),
++    kill: () => holder.kill(),
++  };
++}
++export const holdAdvisory = (key: number) =>
++  holdTransaction(`SELECT pg_advisory_xact_lock(${key})`, G2_C_MIGRATION_ROLE);
++export const encoded = (s: string) => Buffer.from(s).toString('base64url');
++/** Q0's roster legacy token: bare base64url(source_id). */
++export const legacyRosterCursor = (s: string) => encoded(s);
++export const legacyEntityCursor = (family: string, s: string) =>
++  encoded(
++    JSON.stringify({
++      c: 'coach',
++      i: 'intent',
++      f: family,
++      o: 'source_id:asc',
++      s,
++    }),
++  );
++export const v2 = (
++  family: string,
++  source = 'a',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++) =>
++  `v2.${encoded(
++    JSON.stringify({
++      v: 2,
++      c: coach,
++      i: intent,
++      f: family,
++      o: 'source_id:asc,source_platform:asc',
++      s: source,
++      p: platform,
++    }),
++  )}`;
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_C_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
+-- 
+2.53.0
+
