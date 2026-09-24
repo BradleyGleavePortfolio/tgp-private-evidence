@@ -1,0 +1,107 @@
+### T1 HEAD step, #530-shaped tree, strict newest-first stub: rc=0
+    ==> Checking 20261224000000_rls_close_public_exposure
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270117000000_durable_import_setup
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270120000000_scout_identity_ready
+      OK: schema is byte-identical after forward → down chain → forward.
+    down/up call order for 20261224 check:
+      psql -f 20261224000000_rls_close_public_exposure/down.sql
+      psql -f 20261224000000_rls_close_public_exposure/migration.sql
+      psql -f 20270117000000_durable_import_setup/migration.sql
+      psql -f 20270118000000_scout_ledger_platform_expand/migration.sql
+      psql -f 20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+      psql -f 20270120000000_scout_identity_ready/migration.sql
+### T2 BASE step, same tree (control: must fail on non-newest downs): rc=1
+    ==> Checking 20261224000000_rls_close_public_exposure
+      FAIL: 20261224000000_rls_close_public_exposure/down.sql did not apply cleanly.
+    ==> Checking 20270117000000_durable_import_setup
+      FAIL: 20270117000000_durable_import_setup/down.sql did not apply cleanly.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      FAIL: 20270118000000_scout_ledger_platform_expand/down.sql did not apply cleanly.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      FAIL: 20270119000000_scout_ledger_obsolete_writer_fence/down.sql did not apply cleanly.
+    ==> Checking 20270120000000_scout_identity_ready
+      OK: schema is byte-identical after forward → down → forward.
+### T3 HEAD, later dir B IRREVERSIBLE/no down (must FAIL E,17,1224; B OK marked; R OK): rc=1
+    ==> Checking 20261224000000_rls_close_public_exposure
+      FAIL: 20270119000000_scout_ledger_obsolete_writer_fence applies after 20261224000000_rls_close_public_exposure but has no down.sql; 20261224000000_rls_close_public_exposure cannot be reversed in chain order.
+    ==> Checking 20270117000000_durable_import_setup
+      FAIL: 20270119000000_scout_ledger_obsolete_writer_fence applies after 20270117000000_durable_import_setup but has no down.sql; 20270117000000_durable_import_setup cannot be reversed in chain order.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      FAIL: 20270119000000_scout_ledger_obsolete_writer_fence applies after 20270118000000_scout_ledger_platform_expand but has no down.sql; 20270118000000_scout_ledger_platform_expand cannot be reversed in chain order.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      OK: marked IRREVERSIBLE — test
+    ==> Checking 20270120000000_scout_identity_ready
+      OK: schema is byte-identical after forward → down chain → forward.
+### T4 HEAD, newest down refuses (all must FAIL): rc=1
+    ==> Checking 20261224000000_rls_close_public_exposure
+      FAIL: 20270120000000_scout_identity_ready/down.sql did not apply cleanly (reversing 20261224000000_rls_close_public_exposure).
+    ==> Checking 20270117000000_durable_import_setup
+      FAIL: 20270120000000_scout_identity_ready/down.sql did not apply cleanly (reversing 20270117000000_durable_import_setup).
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      FAIL: 20270120000000_scout_identity_ready/down.sql did not apply cleanly (reversing 20270118000000_scout_ledger_platform_expand).
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      FAIL: 20270120000000_scout_identity_ready/down.sql did not apply cleanly (reversing 20270119000000_scout_ledger_obsolete_writer_fence).
+    ==> Checking 20270120000000_scout_identity_ready
+      FAIL: 20270120000000_scout_identity_ready/down.sql did not apply cleanly (reversing 20270120000000_scout_identity_ready).
+### T5 HEAD, R re-apply fails (all FAIL): rc=1
+    ==> Checking 20261224000000_rls_close_public_exposure
+      FAIL: re-applying 20270120000000_scout_identity_ready/migration.sql after the down chain for 20261224000000_rls_close_public_exposure failed.
+    ==> Checking 20270117000000_durable_import_setup
+      FAIL: re-applying 20270120000000_scout_identity_ready/migration.sql after the down chain for 20270117000000_durable_import_setup failed.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      FAIL: re-applying 20270120000000_scout_identity_ready/migration.sql after the down chain for 20270118000000_scout_ledger_platform_expand failed.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      FAIL: re-applying 20270120000000_scout_identity_ready/migration.sql after the down chain for 20270119000000_scout_ledger_obsolete_writer_fence failed.
+    ==> Checking 20270120000000_scout_identity_ready
+      FAIL: re-applying 20270120000000_scout_identity_ready/migration.sql after the down chain for 20270120000000_scout_identity_ready failed.
+### T6 HEAD, E.down over-drops an older object (E,17,1224 FAIL; B,R OK): rc=1
+    ==> Checking 20261224000000_rls_close_public_exposure
+      FAIL: 20261224000000_rls_close_public_exposure/down.sql (with its down chain) does not faithfully reverse the migrations.
+    ==> Checking 20270117000000_durable_import_setup
+      FAIL: 20270117000000_durable_import_setup/down.sql (with its down chain) does not faithfully reverse the migrations.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      FAIL: 20270118000000_scout_ledger_platform_expand/down.sql (with its down chain) does not faithfully reverse the migrations.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270120000000_scout_identity_ready
+      OK: schema is byte-identical after forward → down chain → forward.
+### T7 C-1 masking model: same over-drop masked by idempotent later R.up (expected PASS = the recorded blind spot): rc=0
+    ==> Checking 20261224000000_rls_close_public_exposure
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270117000000_durable_import_setup
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270118000000_scout_ledger_platform_expand
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270119000000_scout_ledger_obsolete_writer_fence
+      OK: schema is byte-identical after forward → down chain → forward.
+    ==> Checking 20270120000000_scout_identity_ready
+      OK: schema is byte-identical after forward → down chain → forward.
+### T8 HEAD, NEW_DIRS blank lines only: rc=0
+### T9 HEAD, NEW_DIRS names a non-listed dir: rc=1
+    ==> Checking nested/x
+      FAIL: nested/x lacks both down.sql AND '-- IRREVERSIBLE: <reason>' marker.
+
+### T1 full psql -f sequence for the first check (20261224, chain of 5): between 1st and 2nd pg_dump
+      psql -f 20270120000000_scout_identity_ready/down.sql
+      psql -f 20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+      psql -f 20270118000000_scout_ledger_platform_expand/down.sql
+      psql -f 20270117000000_durable_import_setup/down.sql
+      psql -f 20261224000000_rls_close_public_exposure/down.sql
+      psql -f 20261224000000_rls_close_public_exposure/migration.sql
+      psql -f 20270117000000_durable_import_setup/migration.sql
+      psql -f 20270118000000_scout_ledger_platform_expand/migration.sql
+      psql -f 20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+      psql -f 20270120000000_scout_identity_ready/migration.sql
+### T1 sequence for 20270118 (E, chain of 3): between 5th and 6th pg_dump
+      psql -f 20270120000000_scout_identity_ready/down.sql
+      psql -f 20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+      psql -f 20270118000000_scout_ledger_platform_expand/down.sql
+      psql -f 20270118000000_scout_ledger_platform_expand/migration.sql
+      psql -f 20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+      psql -f 20270120000000_scout_identity_ready/migration.sql

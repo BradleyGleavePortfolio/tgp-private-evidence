@@ -42,3 +42,20 @@ Continue B/drain → R → N/Q1 → C → remaining S7 → S8–S12 with eligibl
 | UX-03c | Frozen at `7a5305e5`; its gate is running |
 | UX-07-on-S4 | Build in progress |
 | Landing census | In progress |
+
+## 17:50Z update
+
+**Landed:**
+
+| Repo and ref | Tip | Change |
+|---|---|---|
+| Backend `integration/importer` | `c7a5fe8d` | PROD-CI-1 |
+| Mobile `main` | `c7641cb3` | |
+
+**CI:** PR #530 is at `c7a5fe8d`; it is the production boundary, owner-only. The #532 proof ran green with the same bytes.
+
+**Extension chain:** S4, then UX-07 `322b749a` (accepted), then S4-CQ `aa0abd83`. S4-CQ is under review, and its CI proof is on draft PR #28. Then `land/s4-r6` fast-forwards and #28 is closed.
+
+**N/Q1:** T4 build active.
+
+**Routes:** `claude_opus_5_0` and `claude_fable_5` are no longer offered for subagents. T3 now requests `claude_opus_5_5`, and T4 requests `claude_fable_5_1`. These are requested routes only.

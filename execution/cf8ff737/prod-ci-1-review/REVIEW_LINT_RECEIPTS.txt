@@ -1,0 +1,58 @@
+# Reviewer lint receipts (independent), 2026-09-24T17:28:30Z
+shellcheck: version: 0.9.0 sha256(tarball)=700324c6… (== official koalaman v0.9.0 asset, downloaded by reviewer)
+actionlint: 1.7.7 (tarball sha256 == official actionlint_1.7.7_checksums.txt entry)
+
+## L1 CI replica shellcheck 0.9.0 on scripts/*.sh at HEAD (export via git archive c7a5fe8d)
+  - scripts/ci/assert-prod-sbom.sh
+  - scripts/ci/check-relrowsecurity.sh
+  - scripts/ci/filter-machines.sh
+  - scripts/ci/migration-delta.sh
+  - scripts/ci/release-evidence-gate.sh
+  - scripts/ci/verify-fly-release.sh
+  - scripts/preflight.sh
+  - scripts/release.sh
+  - scripts/sentry-upload-sourcemaps.sh
+  - scripts/setup-branch-protection.sh
+rc=0
+
+## L2 same at BASE 7d2895e1
+
+In scripts/release.sh line 326:
+if APPLIED_COUNT=$(DIRECT_URL="${DIRECT_URL}" node -e '
+                                                      ^-- SC2016 (info): Expressions don't expand in single quotes, use double quotes for that.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2016 -- Expressions don't expand in singl...
+rc=1
+
+## L3 actionlint 1.7.7 whole repo at HEAD, shellcheck 0.9.0 first on PATH
+rc=0
+
+## L4 actionlint 1.7.7 at BASE (control)
+rc=0
+
+## L5 release.sh executed bytes: HEAD with the single added line removed vs BASE
+identical rc=0
+occurrences of directive line: 1
+bash -n rc=0
+100755 blob c86b3ab961cb0569369d28e95278be4aa9669d03	scripts/release.sh
+100755 blob 9cdf29f840fec8423502288966e575c0da52d0b6	scripts/release.sh
+
+## L6 YAML semantic check: parsed workflow with ONLY the target step's run: masked, HEAD == BASE: True
+   job migrations-apply: equal=True
+   job migrations-schema-parity: equal=True
+   job reversibility-check: equal=False
+   top-level keys equal (excl jobs): True
+   target step keys: ['env', 'if', 'name', 'run'] if: steps.diff.outputs.new_dirs != '' env: {'NEW_DIRS': '${{ steps.diff.outputs.new_dirs }}'}
+
+## L7 extracted step script at HEAD: bash -n / shellcheck 0.9.0 -s bash
+bash -n rc=0
+shellcheck rc=0
+
+## L8 negative control (reviewer copy only): inject unquoted $dir in the new chain loop; actionlint must flag
+623:            for later in ${CHAIN[@]:1}; do
+.github/workflows/migration-dry-run.yml:532:9: shellcheck reported issue in this script: SC2068:error:91:16: Double quote array expansions to avoid re-splitting elements [shellcheck]
+    |
+532 |         run: |
+    |         ^~~~
+rc=1

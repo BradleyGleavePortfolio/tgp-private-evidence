@@ -77,3 +77,23 @@ The landing census `landing_backlog_census_mufqyitp` (T3, read-only) is active u
   - Extension S4 is staged as PR #27, which needs a non-author approval under the protection rules (owner step).
   - Backend PR #530 is a draft and is the production-deploy boundary.
 - R closure 1 is ready at `7d2895e1`, with new binding sha `787d34b0…`. Both reviewers are re-attesting the delta. The builder's default-Jest flag is C: the delta touches only `migration.sql` and the PG-only spec, so receipt 11 stands and there is no rerun.
+- UX-03c ACCEPTED at `c7641cb3` (`UX03C_LOCAL_ACCEPTANCE.md`). LANDED: mobile `main` → `c7641cb3` at 16:59Z. This lands UX-03a, UX-03b and UX-03c.
+- R single PG proof GRANTED at 17:00Z (`R_SINGLE_PG_PROOF_GRANT.md`) on `7d2895e1`, binding `787d34b0…`. Both delta re-attestations are GO.
+- N/Q1 readiness brief GRANTED at 17:05Z (T3, read-only, parallel with the R proof; `NQ1_READINESS_BRIEF_GRANT.md`).
+- R ACCEPTED at `7d2895e1` (`R_LOCAL_ACCEPTANCE.md`). LANDED: backend `integration/importer` → `7d2895e1` at 17:01Z. Landing census received (`landing-census/LANDING_PLAN.md`). Its G05 committer correction for the extension rebase-merge is recorded in the ledger.
+- Disk reclaim at 17:1xZ: removed the reinstallable `node_modules` from the landed, clean mobile worktrees `ux03-j3`, `ux03a-paired` and `ux03b-correlation`. Their sources are committed and landed on mobile `main`.
+- N/Q1 brief received (`nq1-prep/NQ1_SLICE_BRIEF.md`).
+  - P1–P3 frozen by the parent.
+  - N/Q1 T4 build GRANTED at 17:12Z (`NQ1_BUILD_GRANT.md`).
+- PR #530 CI found 2 failures on the backend production path:
+  - shellcheck SC2016 in `release.sh`, from S2;
+  - the reversibility harness is incompatible with the staged fail-closed downs from E and B.
+  - Classified A, scoped to the production path only. The integration landing and the importer lanes are not blocked.
+  - PROD-CI-1 T3 GRANTED (`PROD_CI_1_GRANT.md`).
+- UX-07-on-S4 source ready (merge `14fc6ab9`, tree `cce80315`). The parent made linear commit `322b749a` (same tree, parent S4) to satisfy the linear-history protection, and pushed it to `land/ux07-on-s4` for CI. One independent T2 review dispatched.
+- UX-07-on-S4 ACCEPTED at linear `322b749a`. PR #27 CodeQL SARIF gate: 3 findings introduced by S4. Classified A, scoped to the extension landing. S4 CodeQL closure T2 GRANTED (`S4_CODEQL_CLOSURE_GRANT.md`).
+- PROD-CI-1 source ready at `c7a5fe8d` (tree `74b97064`). Pushed `land/prod-ci-1` and opened PR #531 to `integration/importer` for remote CI. Independent T3 review dispatched. Route note: `claude_opus_5_0` is no longer offered for subagents, so this T3 request uses `claude_opus_5_5`, and the future T4 request uses `claude_fable_5_1`. These are requested routes only, with no telemetry.
+- PROD-CI-1 T3 review returned NOT ACCEPT (B, proof only). The #531 reversibility check was vacuous because the PR adds no new migration folders, and the code itself passes. Minimum closure: proof-only draft PR #532 (`land/prod-ci-1` to `main`, same bytes, never merged; opening it does not deploy, because `fly-deploy.yml` is `workflow_dispatch` only). A green run on #532 with 5 OK lines converts the verdict to ACCEPT without re-review.
+- Correction (C): `fly-deploy.yml` is `workflow_dispatch`-only at `7d2895e1` (S-slice lineage), but on backend `main` `c23b9d9f` it still has a `push: branches` trigger. Opening #532 is still non-deploying, because a PR event is not a push. Backend main remains the production boundary per the owner directive.
+- S4-CQ source ready at `aa0abd83` (tree `d1f9721c`, parent `322b749a`). Local `npm test` 65/1743 and gates green. One pre-existing flake in an unrelated file cleared on rerun (C). Pushed `land/s4-cq` and opened a draft CI-proof PR to `main` (CodeQL runs on `pull_request` only). Independent T2 review dispatched.
+- PROD-CI-1 ACCEPTED: #532 real-PG15 reversibility 5/5 OK, 0 FAIL. Landed `integration/importer` `7d2895e1` → `c7a5fe8d` (FF). #532 closed unmerged. Draft #530 now carries `c7a5fe8d` and CI re-runs.

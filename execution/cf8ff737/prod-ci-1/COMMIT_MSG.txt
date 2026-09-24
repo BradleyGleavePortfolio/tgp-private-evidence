@@ -1,0 +1,13 @@
+ci: silence intended SC2016 in release.sh and reverse staged downs in chain order
+
+scripts/release.sh: comment-only shellcheck SC2016 directive before the
+node -e ledger count. The single-quoted JS must keep $queryRaw literal; the
+executed command bytes are unchanged.
+
+migration-dry-run.yml, reversibility step only: for each new migration
+directory with a down.sql, migrate to the tip and dump, apply the down.sql
+of every later directory newest first and then its own, re-apply its
+migration.sql and every later migration.sql oldest first, and require the
+schema dump to be byte-identical. A later directory without down.sql fails
+explicitly. The IRREVERSIBLE marker path is unchanged, and with no later
+directory the check is the same forward, down, forward parity as before.

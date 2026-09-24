@@ -7,7 +7,9 @@ This ledger lists only the remote identities that have been verified with `git l
 | Repo | Ref | Before → after | Accepted content | Verified |
 |---|---|---|---|---|
 | growth-project-mobile | `main` | `a5933fd6` → `797be96806745624e09b949fae10831e52e7078b` | Fast-forward of 24 commits: S6 `bc7b4e96` → UX-02/07 `df0ad112` → UX-01 `8fd4cf75` → pure composition `716a606e` → J3 `9ff749c3` → UX-03a `797be968`. These are the exact accepted bytes. | 16:44Z |
+| growth-project-mobile | `main` | `797be968` → `c7641cb3a4b69de4846a5b5b3a5a939da2c97ebc` | Fast-forward of 3 commits: UX-03b `519b0122`, the merge `76d3bb4c` and UX-03c `c7641cb3`. These are the exact accepted bytes. | 16:59Z |
 | growth-project-backend | `integration/importer` (new, non-production) | created at `c23b9d9f` → `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c` | Fast-forward of 64 commits: S1 `56fb0d22`, S2 `d5cd9b8b`, S3 `be0ba827`, S5 `98d39610`, S7 foundation `5c760b77`, C1 `a0ea1bea` and B/drain `0d69c7ba`. These are the exact accepted bytes. | 16:46Z |
+| growth-project-backend | `integration/importer` | `0d69c7ba` → `7d2895e1fe03ea82353e8ce0b07aacaf66af74c8` | Fast-forward of R: `df36e331` then `7d2895e1`. These are the exact accepted bytes. | 17:01Z |
 
 **Mobile `main`.** No branch protection and no deploy trigger. The heads of PRs #289–#292 are contained in it.
 
@@ -46,8 +48,6 @@ These remote PRs have heads contained in a landed composition.
 
 | Work | Lands on |
 |---|---|
-| UX-03b `519b0122` | mobile `main`, as a fast-forward through the UX-03c composition (merge of `797be968` with `519b0122`, plus the panel reason copy) |
-| R | backend `integration/importer`, fast-forward from B |
 | UX-07 extension | extension `main` through a PR after the composition is accepted, then the same review requirement as PR #27 |
 
 ## Qualifications (C)
@@ -60,3 +60,12 @@ These remote PRs have heads contained in a landed composition.
 
 - Mobile `main` now contains importer UX that depends on backend endpoints that exist only on `integration/importer` (the C1 pair surface). Mobile `main` has no deploy trigger, but **no store or production build should be cut from mobile `main` before the backend production boundary is crossed**.
 - The same applies to extension store packaging.
+
+## Census correction (G05)
+
+The landing census found that GitHub's rebase-merge rewrites the committer to `GitHub <noreply@github.com>`, as on every earlier GitHub merge to extension `main`. G05 requires Bradley as committer.
+
+- **Order of attempts for PR #27 after owner approval.** First try an ordinary fast-forward push of the exact PR head, if the protection accepts it once the approval and checks are satisfied. Otherwise use rebase-merge, but only with the owner's explicit acceptance of a GitHub committer on those commits.
+- **Backend production.** It must be an ordinary fast-forward push of the exact integration tip, not the GitHub merge button.
+
+| 17:44Z | backend `integration/importer` | PROD-CI-1 `c7a5fe8d` | FF from `7d2895e1` | accepted: T3 review plus #532 real-PG proof (5/5 OK) |

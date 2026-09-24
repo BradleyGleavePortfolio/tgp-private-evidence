@@ -4,6 +4,31 @@ EXEC-CF8FF737. Bradley's September 24, 2026 EXECUTE is active; recon accepted an
 
 ## Current cursor
 
+**Updated 17:50Z.**
+
+**Landed:**
+
+| Repo and ref | Tip | Contents |
+|---|---|---|
+| Backend `integration/importer` | `c7a5fe8dd0b82fb2c81847d875e0e03912faff26` | B, then R `7d2895e1`, then PROD-CI-1 `c7a5fe8d` (CI closure) |
+| Mobile `main` | `c7641cb3a4b69de4846a5b5b3a5a939da2c97ebc` | UX-03a, UX-03b and UX-03c |
+
+**Active:**
+
+1. **N/Q1 (T4 build):** the final writer plus reader on R, per `execution/cf8ff737/NQ1_BUILD_GRANT.md` (P1–P3 frozen).
+2. **Extension landing:** S4 `91990ae9`, then UX-07-on-S4 linear `322b749a` (accepted), then S4-CQ `aa0abd83`. S4-CQ closes the three CodeQL SARIF-gate findings that S4 introduced; independent T2 review and draft CI-proof PR #28 are in flight. On ACCEPT, PR #27's head `land/s4-r6` fast-forwards to `aa0abd83`, so one owner approval lands all three.
+
+**Next:** C, then the remaining S7 work.
+
+**Owner-reserved:**
+
+- Extension PR #27 needs 1 approval, including the G05 committer question on rebase-merge.
+- Backend production merge via #530, now at `c7a5fe8d` with the #532-equivalent CI green. `main`'s `fly-deploy.yml` triggers on push.
+
+Everything below this section is history, kept verbatim.
+
+### Historical cursor (superseded)
+
 B/drain v4 is the primary constraint. Both predecessor independent source reviewers returned SOURCE_GRANTABLE with no open source A/B. Exact tree `f4922ca070e887fb7f613ce955b12621b5c33156`, base accepted C1 `a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992`.
 
 The original phase-A driver completed the dependency copy then stopped at its overstrict inherited external-Prettier detector, RC71, before hooks/gates/commit. The parent already granted the exact stage-2 remainder; no source repair or source-review restart is required. See `execution/95633079/B_DRAIN_V4_PHASE_A_GRANT.md`.
@@ -41,6 +66,10 @@ J3 acceptance is mocked component-interaction coverage only, not device/browser/
 | UX-03a paired-state truth | `797be96806745624e09b949fae10831e52e7078b` | Accepted: 137/137 mocked tests, independent T2 ACCEPT; landed on mobile main |
 | UX-03b C1 correlation consumer | `519b01227f2855fc7968994d389094008f222e20` | Accepted: tsc/eslint rc0, 396/396 mocked tests, dual T4 ACCEPT; lands through UX-03c |
 | B/drain | `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c` | Accepted: v5 real PG 19/19, dual T4 ACCEPT; landed on backend integration/importer |
+| R identity-ready | `7d2895e1fe03ea82353e8ce0b07aacaf66af74c8` | Accepted: single real-PG 17/17, dual final ACCEPT; landed on backend integration/importer |
+| UX-03c | `c7641cb3a4b69de4846a5b5b3a5a939da2c97ebc` | Accepted: tsc/lint, Jest 403/403, independent T2 ACCEPT; landed on mobile main |
+| PROD-CI-1 CI closure | `c7a5fe8dd0b82fb2c81847d875e0e03912faff26` | Accepted: T3 review plus #532 real-PG15 reversibility 5/5 OK; landed on backend integration/importer |
+| UX-07 extension on S4 | `322b749a75d83378d4bb46426e15a25be0d8001b` | Accepted: tree `cce80315`, 1742/1742, independent T2 ACCEPT; staged for PR #27 |
 | J3 r5 source selection | `9ff749c35f64068e156400d2ed37c0b144c2d56d` | Exact frozen test-only correction, full ordered mocked 50/50 proof, independent final closure; no device/browser/E2E claim |
 
 Original failures, packets, attestations and qualifications remain immutable in their existing execution paths. The predecessor complete state is preserved in Git at `50684d66a2961453415c4ff02ba5725deea8699e:LAST_OPERATOR_STATE.md`. Recovery does not repurchase accepted evidence.
@@ -81,10 +110,18 @@ All five mains matched the owner baseline at recon: backend `c23b9d9f3fcc106b92c
 - **Mobile `main`:** `797be96806745624e09b949fae10831e52e7078b`. This is J3 plus UX-03a, and contains S6, UX-02/07, UX-01 and the pure composition.
 - **Backend `integration/importer`:** `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c`. This contains S1, S2, S3, S5, the S7 foundation, C1 and B. Backend `main` is unchanged at `c23b9d9f`.
 
-**Staged:**
+**Staged (at 16:46Z, superseded by the current cursor):**
 
 - **Extension S4** `91990ae9`: PR #27 is waiting for the owner's approval.
-- **Extension UX-07** `6fd7e4a9`: waiting for the UX-07-on-S4 composition.
+- **Extension UX-07** `6fd7e4a9`: now composed as `322b749a`.
+
+**Later landings:**
+
+| Time | Repo and ref | Landed |
+|---|---|---|
+| 16:59Z | Mobile `main` | UX-03c `c7641cb3` |
+| 17:01Z | Backend `integration/importer` | R `7d2895e1` |
+| 17:44Z | Backend `integration/importer` | PROD-CI-1 `c7a5fe8d` |
 
 ## Mission and automatic continuation
 

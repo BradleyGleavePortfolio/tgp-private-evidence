@@ -1,0 +1,73 @@
+# PROD-CI-1 local receipts  (observed 2026-09-24T17:22:09Z)
+worktree HEAD=c7a5fe8dd0b82fb2c81847d875e0e03912faff26 tree=74b9706497d995bf4bf07744a63793b423e88983 base=7d2895e1fe03ea82353e8ce0b07aacaf66af74c8; tracked status lines=0
+tools: shellcheck-v0.9.0 release tarball sha256=700324c6dd0ebea0117591c6cc9d7350d9c7c5c287acbad7630fa17b1d4d9e2f; actionlint 1.7.7 tarball sha256=023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757; local shellcheck version: 0.11.0; bash 5.3.9(1)-release
+
+## R1 CI replica: shellcheck 0.9.0 on scripts/*.sh at HEAD
+  - scripts/ci/assert-prod-sbom.sh
+  - scripts/ci/check-relrowsecurity.sh
+  - scripts/ci/filter-machines.sh
+  - scripts/ci/migration-delta.sh
+  - scripts/ci/release-evidence-gate.sh
+  - scripts/ci/verify-fly-release.sh
+  - scripts/preflight.sh
+  - scripts/release.sh
+  - scripts/sentry-upload-sourcemaps.sh
+  - scripts/setup-branch-protection.sh
+version: 0.9.0
+rc=0
+
+## R2 same, at BASE 7d2895e1fe03ea82353e8ce0b07aacaf66af74c8 (reproduces CI failure)
+
+In release_base.sh line 326:
+if APPLIED_COUNT=$(DIRECT_URL="${DIRECT_URL}" node -e '
+                                                      ^-- SC2016 (info): Expressions don't expand in single quotes, use double quotes for that.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2016 -- Expressions don't expand in singl...
+rc=1
+
+## R3 shellcheck 0.11 (local) on scripts/*.sh at HEAD — SC2329 on line 72 is pre-existing on main, not flagged by 0.9.0 (C)
+
+In scripts/release.sh line 72:
+on_error() {
+^-- SC2329 (info): This function is never invoked. Check usage (or ignored if invoked indirectly).
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2329 -- This function is never invoked. C...
+rc=1
+
+## R4 scope probe: SC2016 outside the directive's if-compound is still reported (0.9.0)
+
+In release_scope_probe.sh line 347:
+echo 'probe $NOT_EXPANDED outside the directive scope'
+     ^-- SC2016 (info): Expressions don't expand in single quotes, use double quotes for that.
+rc=1
+
+## R5 release.sh executed bytes unchanged: HEAD minus the single added comment line == BASE
+identical (rc=0)
+bash -n release.sh rc=0
+
+## R6 actionlint 1.7.7 (CI-pinned), whole repo, shellcheck 0.9.0 on PATH
+rc=0
+## R6b actionlint 1.7.7 with shellcheck 0.11 on migration-dry-run.yml
+rc=0
+## R6c negative control: injected unquoted expansion in the edited step is caught by actionlint's shellcheck pass
+.github/workflows/migration-dry-run.yml:532:9: shellcheck reported issue in this script: SC2086:info:90:8: Double quote to prevent globbing and word splitting [shellcheck]
+rc=1
+
+## R7 extracted step script (HEAD) — bash -n and shellcheck -s bash
+non-run YAML structure (all jobs/steps/triggers/env, incl. this step's name/if/env) identical to BASE: True
+bash -n step rc=0
+shellcheck 0.9.0 step rc=0
+shellcheck 0.11 step rc=0
+
+## R8 textual diff hunks for migration-dry-run.yml (must lie inside the step run block, lines 524+ at BASE)
+@@ -572,0 +573,5 @@ jobs:
+@@ -595 +600,34 @@ jobs:
+@@ -601,5 +639,18 @@ jobs:
+@@ -607,4 +658 @@ jobs:
+@@ -619 +667 @@ jobs:
+@@ -621 +669 @@ jobs:
+
+## R9 apply-order check: LC_ALL=C sort == Prisma 6.19.3 listMigrations localeCompare order for this tree
+identical, 169 dirs (rc=0)
