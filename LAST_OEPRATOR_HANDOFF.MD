@@ -59,3 +59,24 @@ Continue B/drain → R → N/Q1 → C → remaining S7 → S8–S12 with eligibl
 **N/Q1:** T4 build active.
 
 **Routes:** `claude_opus_5_0` and `claude_fable_5` are no longer offered for subagents. T3 now requests `claude_opus_5_5`, and T4 requests `claude_fable_5_1`. These are requested routes only.
+
+## 18:55Z update
+
+**Extension:** S4-CQ `aa0abd83` accepted. `land/s4-r6` (PR #27) is at `aa0abd83`: all checks green, 1 approval required (owner-reserved). Draft #28 is closed.
+
+**#530:** its body now carries the staged-promotion warning. Promote stepwise only: pre-E, then E with the T image, then B plus the production backfill, then R, then N/Q1, then C.
+
+**N/Q1:**
+
+- Candidate `61b93cff`. Both T4 attestations were GO with no A or B.
+- The single PG proof FAILED rc1 at the jest stage: 15/20 passed; N02, N03(a), N06 and Q05×2 failed. N and T agreed in every case, and the failures were spec expectations. This is recorded unchanged.
+- Classified B (proof only). The v2 spec-only correction is granted and in build; the failed/skipped coverage must stay genuine.
+- `clusters/nq1` is retained and stopped. A preserving rename happens at the next grant.
+
+**C:** phase-1 draft ready (8 uncommitted files in `s7-c` and the binding template). Phase 2 waits for N/Q1 acceptance, then rebases onto it.
+
+**Next:**
+
+1. N/Q1 v2 delta re-attestation, then a single PG run, then acceptance.
+2. Land onto `integration/importer` (sibling of PROD-CI-1, disjoint paths).
+3. C phase 2.

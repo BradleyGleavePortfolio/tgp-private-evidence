@@ -1,0 +1,3729 @@
+diff --git a/docs/contracts/importer-openapi.json b/docs/contracts/importer-openapi.json
+index 55c864e..88bd7c1 100644
+--- a/docs/contracts/importer-openapi.json
++++ b/docs/contracts/importer-openapi.json
+@@ -896,7 +896,7 @@
+   "info": {
+     "description": "Frozen public contract for the tgp-importer Chrome extension + mobile pairing surface. Generated from the backend @nestjs/swagger document — do not hand-edit. Run `npm run contract:importer` to regenerate.",
+     "title": "Growth Project API — Importer Contract",
+-    "version": "2.0.0-c1-s1.1"
++    "version": "2.0.0-c1-s1.2"
+   },
+   "openapi": "3.1.0",
+   "paths": {
+@@ -1998,7 +1998,7 @@
+             }
+           },
+           {
+-            "description": "Opaque forward-only page cursor returned as `next_cursor` by a prior call for the SAME intent + family. Accepts legacy and scoped v2 tokens; emits legacy. Omit for the first page. A malformed or mismatched cursor is a 400 (fail closed).",
++            "description": "Opaque forward-only page cursor returned as `next_cursor` by a prior call for the SAME intent + family. Accepts legacy and scoped v2 tokens; emits scoped v2. Omit for the first page. A malformed or mismatched cursor, or a legacy cursor that no longer resolves to one reconstructed row, is a 400 (fail closed): restart pagination from the first page.",
+             "in": "query",
+             "name": "cursor",
+             "required": false,
+@@ -2040,7 +2040,7 @@
+                 }
+               }
+             },
+-            "description": "Invalid query (missing/oversized intent_id, unsupported family, out-of-range limit, or malformed/mismatched cursor). Standard HttpExceptionFilter envelope."
++            "description": "Invalid query (missing/oversized intent_id, unsupported family, out-of-range limit, or malformed/mismatched cursor, including a legacy cursor that no longer resolves — restart from the first page). Standard HttpExceptionFilter envelope."
+           },
+           "401": {
+             "content": {
+@@ -2112,7 +2112,7 @@
+             }
+           },
+           {
+-            "description": "Opaque forward-only page cursor returned as `page.next_cursor` by a prior call. Omit for the first page. Accepts legacy and scoped v2 tokens; emits legacy. A malformed cursor is a 400 (fail closed).",
++            "description": "Opaque forward-only page cursor returned as `page.next_cursor` by a prior call. Omit for the first page. Accepts legacy and scoped v2 tokens; emits scoped v2. A malformed cursor, or a legacy cursor that no longer resolves to one reconstructed row, is a 400 (fail closed): restart pagination from the first page.",
+             "in": "query",
+             "name": "cursor",
+             "required": false,
+@@ -2154,7 +2154,7 @@
+                 }
+               }
+             },
+-            "description": "Invalid query (missing/oversized intent_id, out-of-range limit, or malformed cursor). Standard HttpExceptionFilter envelope."
++            "description": "Invalid query (missing/oversized intent_id, out-of-range limit, or malformed cursor, including a legacy cursor that no longer resolves — restart from the first page). Standard HttpExceptionFilter envelope."
+           },
+           "401": {
+             "content": {
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index bd3e007..a53732e 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -6942,7 +6942,7 @@ model ScoutReconstructionLedger {
+   intent_id   String
+   entity_type String
+   source_id   String
+-  source_platform String?
++  source_platform String
+   status      String
+   target_id   String?
+   reason      String?
+@@ -6950,9 +6950,10 @@ model ScoutReconstructionLedger {
+ 
+   @@unique([coach_id, intent_id, entity_type, source_id])
+   // G2-R wide identity beside the retained narrow key (see ScoutIngestEntity). source_platform
+-  // stays `String?` here while the database is NOT NULL from 20270120000000 on: the accepted T
+-  // writer's null-claim branch and its specs compile unchanged until N; the resulting
+-  // informational `migrate diff` drift (DROP NOT NULL) is recorded, not a schema push.
++  // is `String` from N on, matching the NOT NULL + canonical CHECK the database carries since
++  // 20270120000000; the final writer upserts on this five-field identity and has no null-claim.
++  // No migration ships with N: the column and both keys already exist. The narrow key is
++  // retained until C.
+   @@unique([coach_id, intent_id, entity_type, source_platform, source_id], map: "ScoutReconstructionLedger_identity_key")
+   @@index([coach_id, intent_id])
+ }
+diff --git a/scripts/importer-contract.ts b/scripts/importer-contract.ts
+index ba82725..7b5e804 100644
+--- a/scripts/importer-contract.ts
++++ b/scripts/importer-contract.ts
+@@ -43,9 +43,10 @@ export const API_PREFIX = '/api';
+ // change and no regeneration in the release flow). Bump this by hand only when
+ // the importer surface itself changes in a client-visible way.
+ // Unfrozen forward-2.x prerelease: the C1 setup-recovery surface (2.0.0-c1-s1.0)
+-// composed with the 1.4.1 cursor-limit repair. Not consumer-frozen; reconcile
+-// before consumers.
+-export const CONTRACT_VERSION = '2.0.0-c1-s1.1';
++// composed with the 1.4.1 cursor-limit repair (s1.1) and the Q1 scoped v2
++// cursor emission / legacy-boundary resolution (s1.2). Not consumer-frozen;
++// reconcile before consumers.
++export const CONTRACT_VERSION = '2.0.0-c1-s1.2';
+ 
+ /** Recursively sort object keys so JSON.stringify is byte-stable across runs. */
+ export function stableSort<T>(value: T): T {
+diff --git a/src/scout/scout-cursor.ts b/src/scout/scout-cursor.ts
+index 734b9e6..b24ed64 100644
+--- a/src/scout/scout-cursor.ts
++++ b/src/scout/scout-cursor.ts
+@@ -1,4 +1,4 @@
+-import { BadRequestException } from '@nestjs/common';
++import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+ import { isCanonicalPlatform } from './scout-platform';
+ 
+@@ -6,7 +6,12 @@ import { isCanonicalPlatform } from './scout-platform';
+ // Shared by HTTP DTOs and direct service calls; allocation is bounded pre-decode.
+ export const SCOUT_CURSOR_MAX_LENGTH = 8192;
+ const ORDER = 'source_id:asc,source_platform:asc';
+-type Boundary = { s: string; p?: string } | null;
++const V2_PREFIX = 'v2.';
++
++/** A decoded token: v2 carries the platform; legacy is source-only until resolved. */
++export type ScoutCursorBoundary = { s: string; p?: string } | null;
++/** A page boundary the readers page from: always the full (source_id, source_platform). */
++export type ScoutCursorPosition = { s: string; p: string } | null;
+ 
+ function value(v: unknown): v is string {
+   return (
+@@ -22,18 +27,47 @@ function value(v: unknown): v is string {
+ }
+ const encode = (v: string) => Buffer.from(v, 'utf8').toString('base64url');
+ 
++/** The one canonical v2 envelope, in the one key order; encoder and decoder share it. */
++function canonicalV2(coach: string, intent: string, family: string, s: unknown, p: unknown) {
++  return { v: 2, c: coach, i: intent, f: family, o: ORDER, s, p };
++}
++
++/**
++ * Q1 emission: every boundary is the last ledger row of a page, so it always
++ * carries its platform. Encoder and decoder share `canonicalV2`, so
++ * `decodeScoutCursor(encodeScoutCursor(x)) === x` for every emitted token. A
++ * boundary the decoder would refuse is never emitted: the reader fails closed
++ * (no cursor is invented) rather than hand out an undecodable token.
++ */
++export function encodeScoutCursor(
++  coach: string,
++  intent: string,
++  family: string,
++  s: string,
++  p: string,
++): string {
++  if (!value(coach) || !value(intent) || !value(s) || !isCanonicalPlatform(p)) {
++    throw new InternalServerErrorException('cursor boundary not encodable');
++  }
++  const token = V2_PREFIX + encode(JSON.stringify(canonicalV2(coach, intent, family, s, p)));
++  if (token.length > SCOUT_CURSOR_MAX_LENGTH) {
++    throw new InternalServerErrorException('cursor boundary not encodable');
++  }
++  return token;
++}
++
+ /** Legacy roster is a raw source id; legacy entities are scope-bound JSON. */
+ export function decodeScoutCursor(
+   cursor: string | undefined,
+   coach: string,
+   intent: string,
+   family: string,
+-): Boundary {
++): ScoutCursorBoundary {
+   if (cursor === undefined || cursor === '') return null;
+   try {
+     if (typeof cursor !== 'string' || cursor.length > SCOUT_CURSOR_MAX_LENGTH) throw new Error();
+-    const v2 = cursor.startsWith('v2.');
+-    const token = v2 ? cursor.slice(3) : cursor;
++    const v2 = cursor.startsWith(V2_PREFIX);
++    const token = v2 ? cursor.slice(V2_PREFIX.length) : cursor;
+     const decoded = Buffer.from(token, 'base64url').toString('utf8');
+     if (encode(decoded) !== token) throw new Error();
+     if (!v2 && family === 'clients') {
+@@ -53,7 +87,7 @@ export function decodeScoutCursor(
+     )
+       throw new Error();
+     const canonical = v2
+-      ? { v: 2, c: coach, i: intent, f: family, o: ORDER, s: v.s, p: v.p }
++      ? canonicalV2(coach, intent, family, v.s, v.p)
+       : { c: coach, i: intent, f: family, o: 'source_id:asc', s: v.s };
+     if (v2 && (v.v !== 2 || !isCanonicalPlatform(v.p))) throw new Error();
+     if (encode(JSON.stringify(canonical)) !== token) throw new Error();
+@@ -63,21 +97,44 @@ export function decodeScoutCursor(
+   }
+ }
+ 
+-/** Q0 deliberately keeps source-only legacy boundaries on E/R narrow keys. */
+-export function scoutCursorWhere(after: Boundary): Prisma.ScoutReconstructionLedgerWhereInput {
++/**
++ * Q1 legacy-boundary resolution. A legacy token names only a source id, so its
++ * platform is looked up inside the caller's RepeatableRead transaction, after the
++ * settled/ownership gate and before any page read, strictly within the requested
++ * (coach, intent, family) scope — a roster token is never widened past `clients`.
++ * Exactly one reconstructed ledger row with a canonical platform is the boundary.
++ * Zero (forged, foreign, or absent) or two or more (a tie the legacy format cannot
++ * name) is the existing 400 `malformed cursor`: the caller restarts pagination
++ * from the first page. No page is read on that path.
++ */
++export async function resolveScoutCursor(
++  tx: Prisma.TransactionClient,
++  scope: { coach_id: string; intent_id: string; entity_type: string; status: string },
++  after: ScoutCursorBoundary,
++): Promise<ScoutCursorPosition> {
++  if (!after) return null;
++  if (after.p !== undefined) return { s: after.s, p: after.p };
++  const rows = await tx.scoutReconstructionLedger.findMany({
++    where: { ...scope, source_id: after.s },
++    select: { source_platform: true },
++    take: 2,
++  });
++  const p = rows.length === 1 ? rows[0].source_platform : undefined;
++  if (!isCanonicalPlatform(p)) throw new BadRequestException('malformed cursor');
++  return { s: after.s, p };
++}
++
++/** Lexicographic (source_id, source_platform) continuation; every page uses it. */
++export function scoutCursorWhere(
++  after: ScoutCursorPosition,
++): Prisma.ScoutReconstructionLedgerWhereInput {
+   if (!after) return {};
+-  if (after.p === undefined) return { source_id: { gt: after.s } };
+   return {
+     OR: [{ source_id: { gt: after.s } }, { source_id: after.s, source_platform: { gt: after.p } }],
+   };
+ }
+ 
+-export function scoutCursorOrder(
+-  after: Boundary,
+-):
+-  | Prisma.ScoutReconstructionLedgerOrderByWithRelationInput
+-  | Prisma.ScoutReconstructionLedgerOrderByWithRelationInput[] {
+-  return after?.p === undefined
+-    ? { source_id: 'asc' }
+-    : [{ source_id: 'asc' }, { source_platform: 'asc' }];
++/** Every page, including the first, is ordered by (source_id, source_platform). */
++export function scoutCursorOrder(): Prisma.ScoutReconstructionLedgerOrderByWithRelationInput[] {
++  return [{ source_id: 'asc' }, { source_platform: 'asc' }];
+ }
+diff --git a/src/scout/scout-entities.controller.ts b/src/scout/scout-entities.controller.ts
+index 722700b..7756cda 100644
+--- a/src/scout/scout-entities.controller.ts
++++ b/src/scout/scout-entities.controller.ts
+@@ -51,7 +51,8 @@ export class ScoutEntitiesController {
+     status: 400,
+     description:
+       'Invalid query (missing/oversized intent_id, unsupported family, out-of-range ' +
+-      'limit, or malformed/mismatched cursor). Standard HttpExceptionFilter envelope.',
++      'limit, or malformed/mismatched cursor, including a legacy cursor that no longer ' +
++      'resolves — restart from the first page). Standard HttpExceptionFilter envelope.',
+     schema: errorEnvelopeSchema(),
+   })
+   @ApiResponse({
+diff --git a/src/scout/scout-entities.dto.ts b/src/scout/scout-entities.dto.ts
+index 6964351..4f15339 100644
+--- a/src/scout/scout-entities.dto.ts
++++ b/src/scout/scout-entities.dto.ts
+@@ -74,9 +74,10 @@ export class ScoutEntitiesQueryDto {
+   @ApiPropertyOptional({
+     description:
+       'Opaque forward-only page cursor returned as `next_cursor` by a prior call ' +
+-      'for the SAME intent + family. Accepts legacy and scoped v2 tokens; emits legacy. ' +
+-      'Omit for the first page. A malformed or ' +
+-      'mismatched cursor is a 400 (fail closed).',
++      'for the SAME intent + family. Accepts legacy and scoped v2 tokens; emits scoped v2. ' +
++      'Omit for the first page. A malformed or mismatched cursor, or a legacy cursor that ' +
++      'no longer resolves to one reconstructed row, is a 400 (fail closed): restart ' +
++      'pagination from the first page.',
+     maxLength: SCOUT_CURSOR_MAX_LENGTH,
+   })
+   @IsOptional()
+diff --git a/src/scout/scout-entities.service.ts b/src/scout/scout-entities.service.ts
+index cf39a65..50adeeb 100644
+--- a/src/scout/scout-entities.service.ts
++++ b/src/scout/scout-entities.service.ts
+@@ -3,7 +3,13 @@ import { Prisma } from '@prisma/client';
+ import { AnalyticsService } from '../analytics/analytics.service';
+ import { Events } from '../analytics/events';
+ import { PrismaService } from '../prisma.service';
+-import { decodeScoutCursor, scoutCursorOrder, scoutCursorWhere } from './scout-cursor';
++import {
++  decodeScoutCursor,
++  encodeScoutCursor,
++  resolveScoutCursor,
++  scoutCursorOrder,
++  scoutCursorWhere,
++} from './scout-cursor';
+ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+@@ -16,9 +22,6 @@ import { RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ /** Prisma transaction client — the interactive-transaction handle passed to $transaction. */
+ type Tx = Prisma.TransactionClient;
+ 
+-/** Forward-only ordering this endpoint pages in — pinned into the cursor. */
+-const CURSOR_ORDER = 'source_id:asc';
+-
+ /**
+  * IMPORTER-I — authoritative read bridge for reconstructed NON-person canonical
+  * entities (D2, site-agnostic). Projects one settled intent's `workouts` /
+@@ -34,11 +37,13 @@ const CURSOR_ORDER = 'source_id:asc';
+  *  - No existence oracle: an unknown, cross-tenant, OR not-yet-settled intent all
+  *    collapse to a single indistinguishable 404.
+  *  - Deterministic, bounded pagination: reconstructed ledger rows are read one
+- *    bounded page at a time ordered by source_id; the cursor is an opaque
+- *    forward-only token BOUND to (coach, intent, family, order) — a malformed or
+- *    mismatched cursor fails closed (400). The binding is a consistency guard,
+- *    not an authorizer: authorization is the settled-intent gate re-run every
+- *    call.
++ *    bounded page at a time ordered by (source_id, source_platform); the cursor
++ *    is an opaque forward-only scoped v2 token BOUND to (coach, intent, family,
++ *    order) and naming that boundary. A legacy source-only token is still
++ *    accepted and resolved inside the read snapshot within the same scope; a
++ *    malformed, mismatched, or unresolvable cursor fails closed (400). The
++ *    binding is a consistency guard, not an authorizer: authorization is the
++ *    settled-intent gate re-run every call.
+  *  - Honest page metadata, no total scan: `page_count` is the size of THIS page;
+  *    the endpoint issues no unbounded count query.
+  *  - Erasure preserved: a cascade-erased entity is simply absent from the join,
+@@ -99,17 +104,27 @@ export class ScoutEntitiesService {
+           throw new NotFoundException();
+         }
+ 
++        // Q1: a legacy token becomes a full (source_id, source_platform)
++        // boundary here — after the gate, before any page read, and never
++        // outside this (coach, intent, family). Unresolvable is a 400.
++        const position = await resolveScoutCursor(
++          tx,
++          { ...where, status: RECONSTRUCT_STATUS.reconstructed },
++          after,
++        );
++
+         // Fetch limit + 1 reconstructed ledger rows to compute has_more without a
+-        // second count query. Ordered by source_id (asc) — the same deterministic
+-        // order the reconstruction write pages in — so the cursor is stable.
++        // second count query. Ordered by (source_id, source_platform) asc on every
++        // page — the same deterministic order the reconstruction write pages in —
++        // so the cursor is stable and identity ties never repeat or skip a row.
+         const ledgerPage = await tx.scoutReconstructionLedger.findMany({
+           where: {
+             ...where,
+             status: RECONSTRUCT_STATUS.reconstructed,
+-            ...scoutCursorWhere(after),
++            ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, target_id: true },
+-          orderBy: scoutCursorOrder(after),
++          select: { source_id: true, source_platform: true, target_id: true },
++          orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+ 
+@@ -124,13 +139,14 @@ export class ScoutEntitiesService {
+ 
+     const { hasMore, pageRows, entities } = snapshot;
+ 
+-    // next_cursor is anchored to the LEDGER source_id (not a filtered entity), so
++    // next_cursor is anchored to the LEDGER row (not a filtered entity), so
+     // paging advances deterministically even when a cascade-erased row is dropped
+-    // from the visible page.
+-    const nextCursor =
+-      hasMore && pageRows.length > 0
+-        ? encodeCursor(coachId, intentId, family, pageRows[pageRows.length - 1].source_id)
+-        : null;
++    // from the visible page. Emitted as a scoped v2 token naming the last row's
++    // (source_id, source_platform).
++    const last = hasMore && pageRows.length > 0 ? pageRows[pageRows.length - 1] : undefined;
++    const nextCursor = last
++      ? encodeScoutCursor(coachId, intentId, family, last.source_id, last.source_platform)
++      : null;
+ 
+     this.analytics.capture(coachId, Events.SCOUT_RECONSTRUCT_ENTITIES_READ, {
+       intent_id: intentId,
+@@ -201,9 +217,3 @@ export class ScoutEntitiesService {
+     return out;
+   }
+ }
+-
+-/** Encode a ledger source_id into an opaque cursor bound to its read context. */
+-function encodeCursor(coachId: string, intentId: string, family: string, sourceId: string): string {
+-  const payload = { c: coachId, i: intentId, f: family, o: CURSOR_ORDER, s: sourceId };
+-  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+-}
+diff --git a/src/scout/scout-reconstruct.service.ts b/src/scout/scout-reconstruct.service.ts
+index a16bc81..49b0cd1 100644
+--- a/src/scout/scout-reconstruct.service.ts
++++ b/src/scout/scout-reconstruct.service.ts
+@@ -33,10 +33,14 @@ import {
+  *    rejected fail-closed, and the rest are read one deterministic page at a
+  *    time — never the whole roster at once and never an unbounded query burst.
+  *  - Idempotent: the canonical target is keyed on the tenant-scoped external_ref
+- *    and the ledger on (coach_id, intent_id, entity_type, source_id), both
+- *    upserted, so a replay mints no new rows and returns identical counts. A
+- *    concurrent replay that loses the insert race (unique violation) is retried
+- *    once and converges, never a spurious `failed`.
++ *    and the ledger on the wide identity (coach_id, intent_id, entity_type,
++ *    source_platform, source_id), both upserted, so a replay mints no new rows
++ *    and returns identical counts. A concurrent replay that loses the insert
++ *    race (unique violation) is retried once and converges, never a spurious
++ *    `failed`. A unique violation that persists after the retry cannot be the
++ *    wide identity (the retry's upsert would have matched it): it is a
++ *    provenance collision on the retained narrow key and is a 409 with nothing
++ *    written, never a fabricated ledger outcome.
+  *  - Poison-row isolation: each staged row is reconstructed in its own
+  *    transaction inside a try/catch; one bad row is recorded `failed` and its
+  *    siblings still reconstruct.
+@@ -77,7 +81,8 @@ export class ScoutReconstructService {
+     const staged = await this.prisma.scoutIngestEntity.count({ where });
+     this.assertWithinBound(coachId, intentId, staged);
+ 
+-    // Deterministic paged read (ordered by source_id): bounded memory + a
++    // Deterministic paged read (ordered by source_id, source_platform — the
++    // staged identity, total once the narrow key is gone): bounded memory + a
+     // bounded number of queries regardless of roster size. Each row is
+     // reconstructed idempotently, so a re-run picks up exactly where a prior
+     // pass left off without minting duplicates.
+@@ -85,7 +90,7 @@ export class ScoutReconstructService {
+       const page = await this.prisma.scoutIngestEntity.findMany({
+         where,
+         select: { source_id: true, source_platform: true, payload: true },
+-        orderBy: { source_id: 'asc' },
++        orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
+         take: RECONSTRUCT_PAGE_SIZE,
+         skip,
+       });
+@@ -210,7 +215,7 @@ export class ScoutReconstructService {
+         this.prisma.$transaction(async (tx) => {
+           // Keep target-before-ledger lock order compatible with old writers.
+           const targetId = await family.persist(tx, coachId, row.source_id, mapped.mapped);
+-          await this.claimAndWrite(
++          await this.writeLedger(
+             tx,
+             family.entityType,
+             coachId,
+@@ -247,12 +252,20 @@ export class ScoutReconstructService {
+     // durable outcome. Success/skip/failure transactions each retry at most once.
+     await retryContention(() =>
+       this.prisma.$transaction((tx) =>
+-        this.claimAndWrite(tx, entityType, coachId, intentId, row, status, null, reason),
++        this.writeLedger(tx, entityType, coachId, intentId, row, status, null, reason),
+       ),
+     );
+   }
+ 
+-  private async claimAndWrite(
++  /**
++   * Final (N) ledger write: one wide-identity upsert, then the precedence
++   * update. The staged row's platform is part of the identity, so there is no
++   * claim step — the database's NOT NULL + canonical CHECK (R) and the wide key
++   * are the arbiter. A concurrent insert of the same identity surfaces as P2002
++   * and the caller retries the whole transaction once; the retry's upsert then
++   * matches the committed row and proceeds to precedence.
++   */
++  private async writeLedger(
+     tx: Prisma.TransactionClient,
+     entityType: string,
+     coachId: string,
+@@ -266,26 +279,19 @@ export class ScoutReconstructService {
+       coach_id: coachId,
+       intent_id: intentId,
+       entity_type: entityType,
++      source_platform: row.source_platform,
+       source_id: row.source_id,
+     };
+     const outcome = { status, target_id: targetId, reason };
+     await tx.scoutReconstructionLedger.upsert({
+-      where: { coach_id_intent_id_entity_type_source_id: identity },
+-      create: { ...identity, source_platform: row.source_platform, ...outcome },
++      where: { coach_id_intent_id_entity_type_source_platform_source_id: identity },
++      create: { ...identity, ...outcome },
+       // Do NOT change status before checking precedence. A no-op upsert can
+       // race an insert; P2002 retries the entire transaction, never part of it.
+       update: {},
+     });
+-    const claimed = await tx.scoutReconstructionLedger.updateMany({
+-      where: {
+-        ...identity,
+-        OR: [{ source_platform: null }, { source_platform: row.source_platform }],
+-      },
+-      data: { source_platform: row.source_platform },
+-    });
+-    if (claimed.count !== 1) throw new ProvenanceConflict();
+-    // The claim UPDATE holds the row lock until commit. Under ReadCommitted a
+-    // waiting claim rechecks the predicate against the winner's current row.
++    // The precedence UPDATE holds the row lock until commit. Under ReadCommitted
++    // a waiting writer rechecks the predicate against the winner's current row.
+     // Non-success attempts are last serialized writer wins; success dominates
+     // T attempts, preserving target AND reason of a committed reconstruction.
+     await tx.scoutReconstructionLedger.updateMany({
+@@ -330,20 +336,36 @@ class ProvenanceConflict extends ConflictException {
+   }
+ }
+ 
+-/** Only actual Prisma insert races / transaction conflicts, once per attempt. */
++/**
++ * Only actual Prisma insert races / transaction conflicts, once per attempt. A
++ * unique violation that survives the retry is not a race: the wide-identity
++ * upsert would have matched a committed row of the same identity, so the row
++ * blocking the insert carries the same narrow (coach, intent, entity, source)
++ * key under a different platform. That is a provenance collision — reported as
++ * the same 409 the T writer returned for it, with nothing written.
++ */
+ async function retryContention<T>(operation: () => Promise<T>): Promise<T> {
+   try {
+     return await operation();
+   } catch (err) {
+-    if (
+-      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+-      !['P2002', 'P2034'].includes(err.code)
+-    )
+-      throw err;
+-    return operation();
++    if (!isContention(err)) throw err;
++    try {
++      return await operation();
++    } catch (again) {
++      if (again instanceof Prisma.PrismaClientKnownRequestError && again.code === 'P2002') {
++        throw new ProvenanceConflict();
++      }
++      throw again;
++    }
+   }
+ }
+ 
++function isContention(err: unknown): boolean {
++  return (
++    err instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(err.code)
++  );
++}
++
+ /**
+  * Collapse an arbitrary thrown value into a short, non-PII reason string for the
+  * ledger. Never includes the staged payload — only the error class/code.
+diff --git a/src/scout/scout-roster.controller.ts b/src/scout/scout-roster.controller.ts
+index 0585fd1..fbe6eae 100644
+--- a/src/scout/scout-roster.controller.ts
++++ b/src/scout/scout-roster.controller.ts
+@@ -44,7 +44,8 @@ export class ScoutRosterController {
+     status: 400,
+     description:
+       'Invalid query (missing/oversized intent_id, out-of-range limit, or malformed ' +
+-      'cursor). Standard HttpExceptionFilter envelope.',
++      'cursor, including a legacy cursor that no longer resolves — restart from the ' +
++      'first page). Standard HttpExceptionFilter envelope.',
+     schema: errorEnvelopeSchema(),
+   })
+   @ApiResponse({
+diff --git a/src/scout/scout-roster.dto.ts b/src/scout/scout-roster.dto.ts
+index 49df4e7..7f7e797 100644
+--- a/src/scout/scout-roster.dto.ts
++++ b/src/scout/scout-roster.dto.ts
+@@ -44,7 +44,9 @@ export class ScoutRosterQueryDto {
+   @ApiPropertyOptional({
+     description:
+       'Opaque forward-only page cursor returned as `page.next_cursor` by a prior ' +
+-      'call. Omit for the first page. Accepts legacy and scoped v2 tokens; emits legacy. A malformed cursor is a 400 (fail closed).',
++      'call. Omit for the first page. Accepts legacy and scoped v2 tokens; emits scoped v2. ' +
++      'A malformed cursor, or a legacy cursor that no longer resolves to one reconstructed ' +
++      'row, is a 400 (fail closed): restart pagination from the first page.',
+     maxLength: SCOUT_CURSOR_MAX_LENGTH,
+   })
+   @IsOptional()
+diff --git a/src/scout/scout-roster.service.ts b/src/scout/scout-roster.service.ts
+index 5823675..ef355bc 100644
+--- a/src/scout/scout-roster.service.ts
++++ b/src/scout/scout-roster.service.ts
+@@ -3,7 +3,13 @@ import { PersonState, Prisma } from '@prisma/client';
+ import { AnalyticsService } from '../analytics/analytics.service';
+ import { Events } from '../analytics/events';
+ import { PrismaService } from '../prisma.service';
+-import { decodeScoutCursor, scoutCursorOrder, scoutCursorWhere } from './scout-cursor';
++import {
++  decodeScoutCursor,
++  encodeScoutCursor,
++  resolveScoutCursor,
++  scoutCursorOrder,
++  scoutCursorWhere,
++} from './scout-cursor';
+ import { RECONSTRUCT_ENTITY_TYPE, RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ import {
+   ROSTER_DEFAULT_PAGE_SIZE,
+@@ -30,8 +36,11 @@ type Tx = Prisma.TransactionClient;
+  *    count; reconstructed/skipped/failed are read from the durable ledger, so a
+  *    partial pass is visible (staged > reconstructed + skipped + failed).
+  *  - Deterministic, bounded pagination: reconstructed ledger rows are read one
+- *    bounded page at a time ordered by source_id; the cursor is an opaque
+- *    forward-only token; a malformed cursor / oversized limit fails closed (400).
++ *    bounded page at a time ordered by (source_id, source_platform); the cursor
++ *    is an opaque forward-only scoped v2 token naming that boundary. A legacy
++ *    source-only token is still accepted and resolved to its boundary inside
++ *    the read snapshot, within this (coach, intent, clients) scope only; a
++ *    malformed, unresolvable, or oversized cursor / limit fails closed (400).
+  *  - Erasure preserved: Deleted persons are excluded from the roster list.
+  *  - Read-only, idempotent, PII-safe: no mutation, no email/billing/secret in the
+  *    response or logs.
+@@ -85,6 +94,15 @@ export class ScoutRosterService {
+           throw new NotFoundException();
+         }
+ 
++        // Q1: a legacy token becomes a full (source_id, source_platform)
++        // boundary here — after the gate, before any count or page read, and
++        // never outside this scope. Unresolvable is a 400; nothing else runs.
++        const position = await resolveScoutCursor(
++          tx,
++          { ...where, status: RECONSTRUCT_STATUS.reconstructed },
++          after,
++        );
++
+         // staged: authoritative source count. reconstructed/skipped/failed: ledger.
+         const staged = await tx.scoutIngestEntity.count({ where });
+         const grouped = await tx.scoutReconstructionLedger.groupBy({
+@@ -93,16 +111,17 @@ export class ScoutRosterService {
+           _count: { _all: true },
+         });
+         // Fetch limit + 1 reconstructed ledger rows to compute has_more without a
+-        // second count query. Ordered by source_id (asc) — the same deterministic
+-        // order the reconstruction write pages in — so the cursor is stable.
++        // second count query. Ordered by (source_id, source_platform) asc on every
++        // page — the same deterministic order the reconstruction write pages in —
++        // so the cursor is stable and identity ties never repeat or skip a row.
+         const ledgerPage = await tx.scoutReconstructionLedger.findMany({
+           where: {
+             ...where,
+             status: RECONSTRUCT_STATUS.reconstructed,
+-            ...scoutCursorWhere(after),
++            ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, target_id: true },
+-          orderBy: scoutCursorOrder(after),
++          select: { source_id: true, source_platform: true, target_id: true },
++          orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+ 
+@@ -119,11 +138,20 @@ export class ScoutRosterService {
+     const count = (status: string): number =>
+       grouped.find((g) => g.status === status)?._count._all ?? 0;
+ 
+-    // next_cursor is anchored to the LEDGER source_id (not a filtered Person), so
++    // next_cursor is anchored to the LEDGER row (not a filtered Person), so
+     // paging advances deterministically even when a Deleted person is skipped
+-    // from the visible list.
+-    const nextCursor =
+-      hasMore && pageRows.length > 0 ? encodeCursor(pageRows[pageRows.length - 1].source_id) : null;
++    // from the visible list. Emitted as a scoped v2 token naming the last row's
++    // (source_id, source_platform).
++    const last = hasMore && pageRows.length > 0 ? pageRows[pageRows.length - 1] : undefined;
++    const nextCursor = last
++      ? encodeScoutCursor(
++          coachId,
++          intentId,
++          RECONSTRUCT_ENTITY_TYPE,
++          last.source_id,
++          last.source_platform,
++        )
++      : null;
+ 
+     this.analytics.capture(coachId, Events.SCOUT_RECONSTRUCT_ROSTER_READ, {
+       intent_id: intentId,
+@@ -194,8 +222,3 @@ export class ScoutRosterService {
+     return out;
+   }
+ }
+-
+-/** Encode a ledger source_id into an opaque forward-only cursor. */
+-function encodeCursor(sourceId: string): string {
+-  return Buffer.from(sourceId, 'utf8').toString('base64url');
+-}
+diff --git a/test/contracts/importer-contract.spec.ts b/test/contracts/importer-contract.spec.ts
+index eeda5bb..0b1ebb5 100644
+--- a/test/contracts/importer-contract.spec.ts
++++ b/test/contracts/importer-contract.spec.ts
+@@ -439,7 +439,7 @@ describe('importer contract (R80 freeze)', () => {
+     });
+ 
+     it('setup recovery is an unfrozen 2.x prerelease, with optional nonce and current lookup', () => {
+-      expect(contract.info.version).toBe('2.0.0-c1-s1.1');
++      expect(contract.info.version).toBe('2.0.0-c1-s1.2');
+       const dto = rec(dig(contract, 'components', 'schemas', 'PairInitDto'));
+       expect(dto.required).toEqual(['chosen_platform']);
+       expect(dig(dto, 'properties', 'setup_nonce', 'format')).toBe('uuid');
+diff --git a/test/rls-g2-nq1.spec.ts b/test/rls-g2-nq1.spec.ts
+new file mode 100644
+index 0000000..8ad3af3
+--- /dev/null
++++ b/test/rls-g2-nq1.spec.ts
+@@ -0,0 +1,777 @@
++// S7-3′ G2 N/Q1 proof on the isolated PostgreSQL 17 lane (S1-provisioned,
++// synthetic data only). Ordered stages in ONE file, run with --runInBand, on a
++// FRESH bootstrap whose "old" side is T: a detached checkout of the accepted R
++// head 7d2895e1, whose `prisma migrate deploy` installed the whole accepted
++// history (164 base + S1, C1, E, B, R = 169). N/Q1 ships NO migration, so the
++// candidate's deploy must have nothing pending and the catalog must not move.
++// Establishes only what is new in N/Q1: the final writer on the wide identity
++// (N) and the scoped v2 cursor emission with legacy-token resolution (Q1).
++//   1. N01 deploy exactness, N02 N on R with the T tally, N03 mixed T+N
++//   processes, N04 narrow collision, N05 N on the E shape (negative), N06 N→T
++//   rollback;  2. Q01 emission, Q02 chains, Q03 legacy resolution, Q04 ties,
++//   Q05 scope, Q06 erasure, Q07 bounds.
++// Accepted E/T-Q0, B and R proofs are neither rerun nor restated. Nothing here
++// claims deployment, drain of any real database, or customer acceptance; C
++// remains unimplemented and unclaimed.
++import { execFileSync } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  appliedMigrations,
++  catalog,
++  directory,
++  E_MIGRATION,
++  encoded,
++  expectedVersion,
++  hasColumn,
++  json,
++  legacyEntityCursor,
++  legacyRosterCursor,
++  OLD_HEAD,
++  oldClient,
++  prismaMigrateDeploy,
++  quote,
++  records,
++  resetData,
++  root,
++  run,
++  settle,
++  sql,
++  sqlAdmin,
++  sqlFile,
++  stage,
++  stageMany,
++  target,
++  targets,
++  v2,
++  blocked,
++  worker,
++} from './utils/g2-nq1-pg-harness';
++import { G2_NQ1_CLUSTER_MARKER, G2_NQ1_DATABASE_MARKER } from './utils/g2-nq1-db';
++import {
++  B_MIGRATION,
++  C1_MIGRATION,
++  fence,
++  identityRows,
++  ledgerCount,
++  ledgerIds,
++  narrow,
++  nullCount,
++  nullify,
++  R_MIGRATION,
++  rDownFile,
++  rUpFile,
++  S1_MIGRATION,
++  wide,
++} from './utils/g2-nq1-harness';
++
++jest.setTimeout(240000);
++const EXPECTED_HISTORY = 169;
++const ledgerKey = '"ScoutReconstructionLedger_coach_id_intent_id_entity_type_source"';
++/** Prisma's rendered ORDER BY for a (source_id, source_platform) ascending page of `table`. */
++const orderBy = (table: string) =>
++  new RegExp(
++    `ORDER BY (?:"public"\\.)?"${table}"\\."source_id" ASC, (?:"public"\\.)?"${table}"\\."source_platform" ASC`,
++  );
++const LEDGER_ORDER = orderBy('ScoutReconstructionLedger');
++const STAGING_ORDER = orderBy('ScoutIngestEntity');
++const MALFORMED = { status: 400, message: 'malformed cursor' };
++const ids = (rows: any[]) => rows.map((r) => r.id);
++const visible = (family: string, r: any) => (family === 'clients' ? r.persons : r.entities);
++const cursorOf = (family: string, r: any) =>
++  family === 'clients' ? r.page.next_cursor : r.next_cursor;
++const actionOf = (family: string) => (family === 'clients' ? 'roster' : 'entities');
++const nextLegacy = (family: string, s: string) =>
++  family === 'clients' ? legacyRosterCursor(s) : legacyEntityCursor(family, s);
++/** Ledger rows of a scope without the intent (so two intents' outcomes can be compared). */
++const outcomes = (intent: string, family?: string) =>
++  identityRows('coach', intent, family).map(([f, s, p, status, target_id]: string[]) => [
++    f,
++    s,
++    p,
++    status,
++    target_id === null ? null : typeof target_id,
++  ]);
++/** The writer's summary without its intent id, so two intents' tallies can be compared. */
++const tally = (result: any) => {
++  const { intent_id, ...rest } = result;
++  expect(typeof intent_id).toBe('string');
++  return rest;
++};
++/** A page read touched the ledger page (target_id selected) or the staged count. */
++const readPage = (queries: string[]) =>
++  queries.some(
++    (q) =>
++      (q.includes('"ScoutReconstructionLedger"') && q.includes('"target_id"')) ||
++      (q.includes('"ScoutIngestEntity"') && q.includes('COUNT')),
++  );
++const parsedCatalog = () => JSON.parse(catalog());
++/** Every non-final Q1 page of `family` from `after`, one row at a time; returns visible ids. */
++async function enumerate(family: string, after?: string, old = false, limit = 1) {
++  const action = actionOf(family);
++  const union: string[] = [];
++  const tokens: (string | null)[] = [];
++  for (let guard = 0; guard < 50; guard++) {
++    const page = await run({ action, family, cursor: after, limit }, old);
++    expect(page.failure).toBeUndefined();
++    union.push(...ids(visible(family, page.result)));
++    const next = cursorOf(family, page.result);
++    tokens.push(next);
++    if (next === null) return { union, tokens };
++    after = next;
++  }
++  throw new Error('pagination did not terminate');
++}
++
++// Teardown authority (S5-R3-A-01), unchanged from the accepted proofs: no mutating cleanup
++// against a fixture whose identity this proof never accepted.
++let teardownAuthorized = false;
++
++beforeAll(() => {
++  const identity =
++    json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
++    'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
++    'version',current_setting('server_version_num'),'user',current_user,'super',
++    (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
++    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
++    (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
++  expect(identity).toMatchObject({
++    database: 'g2_nq1_disposable',
++    address: '127.0.0.1',
++    port: target.port,
++    directory,
++    user: 'postgres',
++    super: false,
++    bypassrls: true,
++    owner: 'postgres',
++  });
++  expect(Number(identity.version)).toBe(expectedVersion);
++  expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
++  expect(Number(identity.version)).toBeLessThan(180000);
++  expect(directory).toMatch(/\/pg17\/clusters\/nq1\/pg-data$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_NQ1_CLUSTER_MARKER);
++  expect(
++    sql(
++      `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++    ),
++  ).toBe(G2_NQ1_DATABASE_MARKER);
++  console.warn('PG17_DATABASE', JSON.stringify(identity));
++  // Fresh T-shaped bootstrap: the accepted R head's whole history through its own
++  // `prisma migrate deploy`; R's shape (column, fence, wide keys, NOT NULL) is present.
++  expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name IN
++    (${[S1_MIGRATION, C1_MIGRATION, E_MIGRATION, B_MIGRATION, R_MIGRATION].map(quote).join(',')})
++    AND finished_at IS NOT NULL AND rolled_back_at IS NULL`),
++  ).toBe('5');
++  expect(hasColumn()).toBe('1');
++  expect(fence().triggers).toHaveLength(1);
++  const installed = wide();
++  expect(installed.indexes).toHaveLength(2);
++  expect(installed.checks).toHaveLength(2);
++  expect(installed.ledgerNotNull).toBe(true);
++  expect(narrow()).toHaveLength(2);
++  // N/Q1 ships no migration: the candidate's migration tree is the accepted R head's.
++  expect(
++    execFileSync('git', ['diff', '--stat', OLD_HEAD, 'HEAD', '--', 'prisma/migrations'], {
++      cwd: root,
++      encoding: 'utf8',
++    }),
++  ).toBe('');
++  // The candidate client is N's (required ledger provenance, both wide keys); the old client
++  // is T's (optional ledger provenance, both wide keys).
++  const client = readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8');
++  expect(client).toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String(?!\?)/);
++  expect(client).not.toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/);
++  expect(client).toMatch(/map: "ScoutIngestEntity_identity_key"/);
++  expect(client).toMatch(/map: "ScoutReconstructionLedger_identity_key"/);
++  const old = readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8');
++  expect(old).toMatch(/model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/);
++  expect(old).toMatch(/map: "ScoutReconstructionLedger_identity_key"/);
++  expect(
++    sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
++    FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`),
++  ).toBe('false:false,false:false,false:true');
++  // Read-only gates passed; authorize teardown, then the accepted setup mutations.
++  teardownAuthorized = true;
++  sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
++    GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
++      public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
++  resetData();
++});
++afterAll(() => {
++  if (!teardownAuthorized) {
++    console.warn(
++      'PG17_TEARDOWN_SKIPPED',
++      JSON.stringify({ reason: 'setup refused before first mutation; no DDL/DML issued' }),
++    );
++    return;
++  }
++  resetData();
++  sql('DELETE FROM "ScoutImport"');
++});
++
++describe('stage 1: N — the final writer on the accepted R shape', () => {
++  it('N01: prisma migrate deploy from the candidate has nothing pending; the catalog does not move; N writes the five-field identity', async () => {
++    const before = { catalog: parsedCatalog(), wide: wide(), narrow: narrow(), fence: fence() };
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    expect(appliedMigrations()).toBe(String(EXPECTED_HISTORY));
++    expect(parsedCatalog()).toEqual(before.catalog);
++    expect(wide()).toEqual(before.wide);
++    expect(narrow()).toEqual(before.narrow);
++    expect(fence()).toEqual(before.fence);
++    // Same five-tuple on this fixture twice (same staged identity, T then N) is proven in N02;
++    // here: N writes rows whose identity is the staged (source_platform, source_id).
++    for (const id of ['a', 'b', 'c']) stage(id, 'clients');
++    const n = await run();
++    expect(n.failure).toBeUndefined();
++    expect(n.result).toMatchObject({ reconstructed: 3 });
++    expect(identityRows('coach', 'intent', 'clients').map((r: string[]) => r.slice(0, 4))).toEqual(
++      ['a', 'b', 'c'].map((s) => ['clients', s, 'truecoach', 'reconstructed']),
++    );
++    expect(nullCount()).toBe(0);
++    // The N process paged staging by (source_id, source_platform) and addressed the ledger by
++    // the five-field selector (both provenance columns in one ledger predicate).
++    expect(n.queries.some((q) => STAGING_ORDER.test(q))).toBe(true);
++    expect(
++      n.queries.some(
++        (q) =>
++          q.includes('"ScoutReconstructionLedger"') &&
++          /"source_platform" = \$\d+/.test(q) &&
++          /"source_id" = \$\d+/.test(q) &&
++          /"entity_type" = \$\d+/.test(q),
++      ),
++    ).toBe(true);
++    expect(
++      n.queries.some((q) =>
++        /INSERT INTO "public"\."ScoutReconstructionLedger" \([^)]*"source_platform"/.test(q),
++      ),
++    ).toBe(true);
++    // Replay writes nothing and is identical.
++    const rows = records();
++    const replay = await run();
++    expect(replay.result).toEqual(n.result);
++    expect(records()).toEqual(rows);
++  });
++  it('N02: N on R, per family, matches the accepted T tally on an identical fixture; replay identical; ledger provenance is the staged provenance', async () => {
++    for (const family of ['clients', 'workouts']) {
++      const n = `n2-${family}`;
++      const t = `t2-${family}`;
++      settle('coach', n);
++      settle('coach', t);
++      // Every 6th clients name is refused by the target (accepted fixture semantics: `failed`);
++      // the workouts fixture stays all-success.
++      const failEvery = family === 'clients' ? 6 : 0;
++      stageMany(24, family, 'truecoach', 'coach', n, failEvery);
++      stageMany(24, family, 'truecoach', 'coach', t, failEvery);
++      const fromN = await run({ intent: n, family });
++      const fromT = await run({ intent: t, family }, true);
++      expect(fromN.failure).toBeUndefined();
++      expect(fromT.failure).toBeUndefined();
++      expect(tally(fromN.result)).toEqual(tally(fromT.result));
++      expect(fromN.result).toMatchObject({
++        staged: 24,
++        reconstructed: family === 'clients' ? 20 : 24,
++        failed: family === 'clients' ? 4 : 0,
++      });
++      expect(outcomes(n, family)).toEqual(outcomes(t, family));
++      expect(outcomes(n, family)).toHaveLength(24);
++      // Provenance is the staged provenance, row for row.
++      expect(
++        sql(`SELECT count(*) FROM "ScoutReconstructionLedger" l JOIN "ScoutIngestEntity" s
++        ON s.coach_id=l.coach_id AND s.intent_id=l.intent_id AND s.entity_type=l.entity_type AND s.source_id=l.source_id
++        WHERE l.intent_id=${quote(n)} AND l.source_platform IS DISTINCT FROM s.source_platform`),
++      ).toBe('0');
++      const rows = records('coach', n, family);
++      const replay = await run({ intent: n, family });
++      expect(replay.result).toEqual(fromN.result);
++      expect(records('coach', n, family)).toEqual(rows);
++      // Exactly one ledger row per five-tuple, and per narrow key.
++      expect(
++        sql(`SELECT count(*) FROM (SELECT 1 FROM "ScoutReconstructionLedger" WHERE intent_id=${quote(n)}
++        GROUP BY coach_id,intent_id,entity_type,source_id HAVING count(*)>1) d`),
++      ).toBe('0');
++    }
++  });
++  it('N03: mixed T and N processes on one staged row, both orders: one ledger row, one target, success dominates', async () => {
++    // (a) T paused after its staging read; N completes; T resumes and converges on N's row.
++    stage('m1', 'clients');
++    const tPaused = worker({ pause: 'staged' }, true);
++    await tPaused.ready;
++    const n1 = await run();
++    expect(n1.result).toMatchObject({ reconstructed: 1 });
++    tPaused.release();
++    const t1 = await tPaused.done;
++    expect(t1.failure).toBeUndefined();
++    expect(t1.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m1'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    expect(identityRows('coach', 'intent', 'clients')[0].slice(0, 4)).toEqual([
++      'clients',
++      'm1',
++      'truecoach',
++      'reconstructed',
++    ]);
++    // (b) N paused inside its row transaction before the ledger write (target persisted,
++    // uncommitted); T starts, waits on N's row lock; N resumes and commits; T converges.
++    resetData();
++    stage('m2', 'clients');
++    const nPaused = worker({ pause: 'before-ledger', txTimeout: 60000 });
++    await nPaused.ready;
++    const tLate = worker({}, true);
++    await blocked(tLate.name);
++    nPaused.release();
++    const [n2, t2] = await Promise.all([nPaused.done, tLate.done]);
++    expect(n2.failure).toBeUndefined();
++    expect(t2.failure).toBeUndefined();
++    expect(n2.result).toMatchObject({ reconstructed: 1 });
++    expect(t2.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m2'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    // (c) N paused after its staging read; T completes; N resumes: its wide-identity upsert
++    // matches T's committed row (same staged platform) and precedence keeps success.
++    resetData();
++    stage('m3', 'clients');
++    const nStaged = worker({ pause: 'staged' });
++    await nStaged.ready;
++    const t3 = await run({}, true);
++    expect(t3.result).toMatchObject({ reconstructed: 1 });
++    nStaged.release();
++    const n3 = await nStaged.done;
++    expect(n3.failure).toBeUndefined();
++    expect(n3.result).toMatchObject({ reconstructed: 1 });
++    expect(ledgerIds(`source_id='m3'`)).toHaveLength(1);
++    expect(sql(`SELECT count(*) FROM "Person" WHERE coach_id='coach'`)).toBe('1');
++    // (d) Success dominates a later non-success attempt from either writer.
++    const [[, , , status, targetBefore]] = identityRows('coach', 'intent', 'clients');
++    expect(status).toBe('reconstructed');
++    const tSkip = await run({ mapper: 'skip' }, true);
++    expect(tSkip.failure).toBeUndefined();
++    const nSkip = await run({ mapper: 'skip' });
++    expect(nSkip.failure).toBeUndefined();
++    expect(identityRows('coach', 'intent', 'clients')).toEqual([
++      ['clients', 'm3', 'truecoach', 'reconstructed', targetBefore],
++    ]);
++    console.warn(
++      'PG17_N03_QUERIES',
++      JSON.stringify({
++        t_after_n: t1.queries.length,
++        n_paused_then_t: [n2.queries.length, t2.queries.length],
++        t_rollbacks_after_waiting: t2.queries.filter((q) => q === 'ROLLBACK').length,
++        n_after_t: n3.queries.length,
++      }),
++    );
++  });
++  it('N04: a same-source, different-platform staged row against a committed ledger row is a 409 with nothing written — for N and for T', async () => {
++    for (const [intent, old] of [
++      ['n4', false],
++      ['t4', true],
++    ] as [string, boolean][]) {
++      settle('coach', intent);
++      sql(`INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id)
++      VALUES (${quote(`${intent}-shared`)},'coach',${quote(intent)},'clients','shared','truecoach','reconstructed','saved-target')`);
++      stage('shared', 'clients', 'auto:other.example', 'Synthetic X', 'coach', intent);
++      const before = { ledger: records('coach', intent), targets: targets(), count: ledgerCount() };
++      const attempt = await run({ intent }, old);
++      expect(attempt.result).toBeUndefined();
++      expect(attempt.failure).toMatchObject({
++        status: 409,
++        message: 'reconstruction provenance conflict',
++      });
++      expect(records('coach', intent)).toEqual(before.ledger);
++      expect(targets()).toEqual(before.targets);
++      expect(ledgerCount()).toBe(before.count);
++      expect(nullCount()).toBe(0);
++    }
++  });
++  it('N05 (negative control, release-order precondition): on the E+B shape (R down) the N client fails closed on a NULL-provenance row; nothing is written; R up restores the shape', async () => {
++    const installed = { wide: wide(), narrow: narrow(), fence: fence() };
++    settle('coach', 'n5');
++    stage('n5', 'clients', 'truecoach', 'Synthetic N5', 'coach', 'n5');
++    expect((await run({ intent: 'n5' })).result).toMatchObject({ reconstructed: 1 });
++    const written = records('coach', 'n5');
++    sqlFile(rDownFile);
++    try {
++      expect(wide()).toEqual({ indexes: [], checks: [], ledgerNotNull: false });
++      expect(nullify(`intent_id='n5'`)).toBe(1);
++      const before = { targets: targets(), count: ledgerCount() };
++      // Q1 reader: a NULL provenance row cannot be decoded by the N client → 500, no page.
++      const read = await run({ action: 'roster', intent: 'n5', limit: 5 });
++      expect(read.result).toBeUndefined();
++      expect(read.failure).toMatchObject({ status: 500, message: 'Internal server error' });
++      // N writer replay against the NULL row: fails closed (500 on the missing wide key /
++      // undecodable row, or 409 on the narrow key), never a fabricated outcome, nothing written.
++      const write = await run({ intent: 'n5' });
++      expect(write.result).toBeUndefined();
++      expect([409, 500]).toContain(write.failure?.status);
++      console.warn('PG17_N05_WRITER', JSON.stringify(write.failure));
++      expect(targets()).toEqual(before.targets);
++      expect(ledgerCount()).toBe(before.count);
++      expect(nullCount()).toBe(1);
++      // The accepted T writer still reclaims the NULL row on E+B (R proof, restated only as
++      // the recovery path this fixture uses to make R's entry gate admissible again).
++      const t = await run({ intent: 'n5' }, true);
++      expect(t.failure).toBeUndefined();
++      expect(nullCount()).toBe(0);
++    } finally {
++      if (nullCount() > 0)
++        sql(`DELETE FROM "ScoutReconstructionLedger" WHERE source_platform IS NULL`);
++      sqlFile(rUpFile);
++    }
++    expect(wide().indexes.map((i: any[]) => [i[0], i[2], i[3], i[4]])).toEqual(
++      installed.wide.indexes.map((i: any[]) => [i[0], i[2], i[3], i[4]]),
++    );
++    expect(wide().ledgerNotNull).toBe(true);
++    expect(narrow()).toEqual(installed.narrow);
++    expect(fence()).toEqual(installed.fence);
++    expect(records('coach', 'n5')).toEqual(written);
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++  });
++  it('N06: rollback N→T — after N writes, T replays identically and the T/Q0 readers enumerate the same union as N/Q1', async () => {
++    for (const family of ['clients', 'workouts']) {
++      const intent = `n6-${family}`;
++      settle('coach', intent);
++      const success = family === 'clients' ? 9 : 12;
++      stageMany(12, family, 'truecoach', 'coach', intent, family === 'clients' ? 4 : 0);
++      const n = await run({ intent, family });
++      expect(n.result).toMatchObject({ reconstructed: success });
++      const rows = records('coach', intent, family);
++      const t = await run({ intent, family }, true);
++      expect(t.failure).toBeUndefined();
++      expect(t.result).toEqual(n.result);
++      expect(records('coach', intent, family)).toEqual(rows);
++      const action = actionOf(family);
++      const fromQ1 = await run({ action, family, intent, limit: 200 });
++      const fromQ0 = await run({ action, family, intent, limit: 200 }, true);
++      expect(fromQ1.failure).toBeUndefined();
++      expect(fromQ0.failure).toBeUndefined();
++      expect(ids(visible(family, fromQ1.result))).toHaveLength(success);
++      expect(ids(visible(family, fromQ1.result))).toEqual(ids(visible(family, fromQ0.result)));
++      expect(cursorOf(family, fromQ1.result)).toBeNull();
++      expect(cursorOf(family, fromQ0.result)).toBeNull();
++    }
++  });
++});
++
++describe('stage 2: Q1 — scoped v2 emission, legacy resolution, ties, scope, erasure, bounds', () => {
++  beforeEach(() => resetData());
++
++  it.each(['clients', 'workouts'])(
++    'Q01: every non-final %s page emits the exact scoped v2 token; every page orders by (source_id, source_platform) under REPEATABLE READ',
++    async (family) => {
++      for (const id of ['a', 'b', 'c']) stage(id, family);
++      await run({ family });
++      const targetIds = records('coach', 'intent', family).map((r: any) => r.target_id);
++      const action = actionOf(family);
++      const union: string[] = [];
++      let after: string | undefined;
++      for (const id of ['a', 'b', 'c']) {
++        const page = await run({ action, family, cursor: after });
++        expect(page.failure).toBeUndefined();
++        union.push(...ids(visible(family, page.result)));
++        const next = id === 'c' ? null : v2(family, id, 'truecoach');
++        expect(cursorOf(family, page.result)).toBe(next);
++        expect(page.queries.some((q) => q.includes('REPEATABLE READ'))).toBe(true);
++        expect(page.queries.some((q) => LEDGER_ORDER.test(q))).toBe(true);
++        expect(
++          page.queries.some(
++            (q) =>
++              q.includes('ORDER BY') &&
++              !LEDGER_ORDER.test(q) &&
++              q.includes('"ScoutReconstructionLedger"'),
++          ),
++        ).toBe(false);
++        after = next ?? undefined;
++      }
++      expect(union).toEqual(targetIds);
++      // A first page (no cursor) orders identically and its token is decodable by the same rules.
++      const first = await run({ action, family, limit: 2 });
++      expect(ids(visible(family, first.result))).toEqual(targetIds.slice(0, 2));
++      expect(cursorOf(family, first.result)).toBe(v2(family, 'b', 'truecoach'));
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q02: %s tokens chain Q1→Q0→Q1 and Q0→Q1→Q0 at limit 1 without repeating or skipping a row',
++    async (family) => {
++      for (const id of ['a', 'b', 'c', 'd']) stage(id, family);
++      await run({ family });
++      const targetIds = records('coach', 'intent', family).map((r: any) => r.target_id);
++      const action = actionOf(family);
++      // Q1 → Q0 → Q1 → Q1
++      let page = await run({ action, family });
++      expect(ids(visible(family, page.result))).toEqual([targetIds[0]]);
++      expect(cursorOf(family, page.result)).toBe(v2(family, 'a', 'truecoach'));
++      page = await run({ action, family, cursor: cursorOf(family, page.result) }, true);
++      expect(page.failure).toBeUndefined();
++      expect(ids(visible(family, page.result))).toEqual([targetIds[1]]);
++      expect(cursorOf(family, page.result)).toBe(nextLegacy(family, 'b'));
++      page = await run({ action, family, cursor: cursorOf(family, page.result) });
++      expect(page.failure).toBeUndefined();
++      expect(ids(visible(family, page.result))).toEqual([targetIds[2]]);
++      expect(cursorOf(family, page.result)).toBe(v2(family, 'c', 'truecoach'));
++      page = await run({ action, family, cursor: cursorOf(family, page.result) });
++      expect(ids(visible(family, page.result))).toEqual([targetIds[3]]);
++      expect(cursorOf(family, page.result)).toBeNull();
++      // Q0 → Q1 → Q0 → Q0
++      page = await run({ action, family }, true);
++      expect(ids(visible(family, page.result))).toEqual([targetIds[0]]);
++      expect(cursorOf(family, page.result)).toBe(nextLegacy(family, 'a'));
++      page = await run({ action, family, cursor: cursorOf(family, page.result) });
++      expect(page.failure).toBeUndefined();
++      expect(ids(visible(family, page.result))).toEqual([targetIds[1]]);
++      expect(cursorOf(family, page.result)).toBe(v2(family, 'b', 'truecoach'));
++      page = await run({ action, family, cursor: cursorOf(family, page.result) }, true);
++      expect(page.failure).toBeUndefined();
++      expect(ids(visible(family, page.result))).toEqual([targetIds[2]]);
++      page = await run({ action, family, cursor: cursorOf(family, page.result) }, true);
++      expect(ids(visible(family, page.result))).toEqual([targetIds[3]]);
++      expect(cursorOf(family, page.result)).toBeNull();
++      // The whole enumeration from either reader is the same union.
++      expect((await enumerate(family)).union).toEqual(targetIds);
++      expect((await enumerate(family, undefined, true)).union).toEqual(targetIds);
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q03: a legacy %s token resolves to the same page as its v2 boundary inside the scope; forged or foreign resolves to 400 before any page read',
++    async (family) => {
++      for (const id of ['a', 'b', 'c']) stage(id, family);
++      await run({ family });
++      const targetIds = records('coach', 'intent', family).map((r: any) => r.target_id);
++      const action = actionOf(family);
++      const fromLegacy = await run({ action, family, cursor: nextLegacy(family, 'a'), limit: 5 });
++      const fromV2 = await run({ action, family, cursor: v2(family, 'a', 'truecoach'), limit: 5 });
++      expect(fromLegacy.failure).toBeUndefined();
++      expect(fromLegacy.result).toEqual(fromV2.result);
++      expect(ids(visible(family, fromLegacy.result))).toEqual(targetIds.slice(1));
++      // Resolution ran inside the snapshot as a scoped, bounded ledger lookup selecting only the
++      // platform, before the page read.
++      const resolveAt = fromLegacy.queries.findIndex(
++        (q) =>
++          q.includes('"ScoutReconstructionLedger"') &&
++          q.includes('"source_platform"') &&
++          !q.includes('"target_id"') &&
++          /"source_id" = \$\d+/.test(q) &&
++          /"entity_type" = \$\d+/.test(q) &&
++          /"status" = \$\d+/.test(q),
++      );
++      const pageAt = fromLegacy.queries.findIndex(
++        (q) => q.includes('"ScoutReconstructionLedger"') && q.includes('"target_id"'),
++      );
++      expect(resolveAt).toBeGreaterThanOrEqual(0);
++      expect(pageAt).toBeGreaterThan(resolveAt);
++      expect(
++        fromLegacy.queries.slice(0, resolveAt).some((q) => q.includes('REPEATABLE READ')),
++      ).toBe(true);
++      // Forged (no such row), foreign (another intent's row), non-reconstructed (a skipped row):
++      // 400 `malformed cursor`, no page or count query issued.
++      settle('coach', 'other');
++      stage('z', family, 'truecoach', 'Synthetic Z', 'coach', 'other');
++      await run({ family, intent: 'other' });
++      stage('k', family);
++      await run({ family, mapper: 'skip' });
++      expect(ledgerIds(`source_id='k' AND status='skipped'`)).toHaveLength(1);
++      for (const s of ['forged', 'z', 'k']) {
++        const refused = await run({ action, family, cursor: nextLegacy(family, s) });
++        expect(refused.result).toBeUndefined();
++        expect(refused.failure).toEqual(MALFORMED);
++        expect(readPage(refused.queries)).toBe(false);
++      }
++      // A resolved legacy token restarts nothing: the Q1 page it yields carries a v2 token onward.
++      const onward = await run({ action, family, cursor: nextLegacy(family, 'a') });
++      expect(cursorOf(family, onward.result)).toBe(v2(family, 'b', 'truecoach'));
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q04: identity ties (same source_id, several platforms) enumerate every %s row exactly once at limit 1; Q0 accepts the v2 tokens; a tied legacy token is 400',
++    async (family) => {
++      for (const id of ['a', 'b', 'c', 'd']) stage(id, family);
++      await run({ family });
++      const original = records('coach', 'intent', family);
++      const definition = sql(`SELECT pg_get_indexdef('public.${ledgerKey}'::regclass)`);
++      const action = actionOf(family);
++      // The retained narrow key forbids the tie on this shape; it is dropped ONLY inside this
++      // case and restored in finally. Nothing about the narrow key's fate (C) is claimed.
++      sql(`DROP INDEX public.${ledgerKey};
++      UPDATE "ScoutReconstructionLedger" SET source_id='a',source_platform=CASE source_id
++        WHEN 'a' THEN 'p1' WHEN 'b' THEN 'p2' ELSE 'p3' END WHERE source_id<>'d'`);
++      try {
++        expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_id='a'`)).toBe(
++          '3',
++        );
++        const { union, tokens } = await enumerate(family);
++        expect(union).toEqual(original.map((r: any) => r.target_id));
++        expect(tokens).toEqual([
++          v2(family, 'a', 'p1'),
++          v2(family, 'a', 'p2'),
++          v2(family, 'a', 'p3'),
++          null,
++        ]);
++        // Q0 fed Q1's exact v2 tokens pages the same rows.
++        const q0 = await run({ action, family, cursor: v2(family, 'a', 'p2') }, true);
++        expect(q0.failure).toBeUndefined();
++        expect(ids(visible(family, q0.result))).toEqual([original[2].target_id]);
++        // The legacy format cannot name a tied boundary: 400, no page read, restart from the top.
++        const tied = await run({ action, family, cursor: nextLegacy(family, 'a') });
++        expect(tied.failure).toEqual(MALFORMED);
++        expect(readPage(tied.queries)).toBe(false);
++        // A legacy token for the untied row still resolves.
++        const untied = await run({ action, family, cursor: nextLegacy(family, 'd') });
++        expect(untied.failure).toBeUndefined();
++        expect(visible(family, untied.result)).toEqual([]);
++      } finally {
++        sql(`DELETE FROM "ScoutReconstructionLedger"; ${definition}`);
++      }
++      expect(narrow()).toHaveLength(2);
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q05: a %s token outside its (coach, intent, family) scope, or on the other endpoint, is 400; a foreign coach is 404',
++    async (family) => {
++      for (const id of ['a', 'b']) stage(id, family);
++      await run({ family });
++      const action = actionOf(family);
++      const otherFamily = family === 'clients' ? 'workouts' : 'clients';
++      const foreign = [
++        v2(otherFamily, 'a'),
++        v2(family, 'a', 'truecoach', 'other'),
++        v2(family, 'a', 'truecoach', 'coach', 'other'),
++        nextLegacy(otherFamily, 'a'),
++        v2(family, 'a', 'TrueCoach'),
++      ];
++      for (const cursor of foreign) {
++        const refused = await run({ action, family, cursor });
++        expect(refused.result).toBeUndefined();
++        expect(refused.failure).toEqual(MALFORMED);
++        expect(readPage(refused.queries)).toBe(false);
++      }
++      expect((await run({ action, family, coach: 'foreign' })).failure?.status).toBe(404);
++      expect(
++        (await run({ action, family, cursor: v2(family, 'a'), coach: 'foreign' })).failure?.status,
++      ).toBe(404);
++      const valid = await run({ action, family, cursor: v2(family, 'a') });
++      expect(ids(visible(family, valid.result))).toHaveLength(1);
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q06: erased or re-scoped %s targets stay hidden while the cursor still advances to a final null',
++    async (family) => {
++      for (const id of ['a', 'b', 'c']) stage(id, family);
++      await run({ family });
++      const targetIds = records('coach', 'intent', family).map((r: any) => r.target_id);
++      const action = actionOf(family);
++      const table = family === 'clients' ? 'Person' : 'ScoutReconstructedEntity';
++      sql(`UPDATE "${table}" SET coach_id='foreign' WHERE id=${quote(targetIds[1])};
++      DELETE FROM "${table}" WHERE id=${quote(targetIds[2])}`);
++      const hidden = await run({ action, family, cursor: v2(family, 'a'), limit: 1 });
++      expect(visible(family, hidden.result)).toEqual([]);
++      expect(cursorOf(family, hidden.result)).toBe(v2(family, 'b', 'truecoach'));
++      const final = await run({
++        action,
++        family,
++        cursor: cursorOf(family, hidden.result),
++        limit: 1,
++      });
++      expect(visible(family, final.result)).toEqual([]);
++      expect(cursorOf(family, final.result)).toBeNull();
++      if (family === 'clients') {
++        sql(`UPDATE "Person" SET state='Deleted' WHERE id=${quote(targetIds[0])}`);
++      } else {
++        sql(
++          `UPDATE "ScoutReconstructedEntity" SET entity_type='client_history' WHERE id=${quote(targetIds[0])}`,
++        );
++      }
++      const all = await run({ action, family, limit: 200 });
++      expect(visible(family, all.result)).toEqual([]);
++      expect(cursorOf(family, all.result)).toBeNull();
++      // The ledger still accounts for all three: erasure hides targets, never history.
++      expect(ledgerCount()).toBe(3);
++    },
++  );
++
++  it.each(['clients', 'workouts'])(
++    'Q07: %s tokens are bounded at 8,192 characters for Q1 and Q0; every malformed shape is a 400 without reflection',
++    async (family) => {
++      stage('a', family);
++      await run({ family });
++      const action = actionOf(family);
++      const long = 'x'.repeat(256);
++      const longV2 = v2(family, long, 'p'.repeat(256), 'coach', 'intent');
++      expect(longV2.length).toBeLessThanOrEqual(8192);
++      for (const old of [false, true]) {
++        const accepted = await run({ action, family, cursor: longV2 }, old);
++        expect(accepted.failure).toBeUndefined();
++        expect(visible(family, accepted.result)).toEqual([]);
++        expect(cursorOf(family, accepted.result)).toBeNull();
++      }
++      const maximal = `v2.${encoded(
++        JSON.stringify({
++          v: 2,
++          c: 'c'.repeat(256),
++          i: 'i'.repeat(256),
++          f: family,
++          o: 'source_id:asc,source_platform:asc',
++          s: long,
++          p: 'p'.repeat(256),
++        }),
++      )}`;
++      expect(maximal.length).toBeLessThanOrEqual(8192);
++      expect((await run({ action, family, cursor: maximal })).failure).toEqual(MALFORMED);
++      const envelope = (patch: Record<string, unknown>) =>
++        'v2.' +
++        encoded(
++          JSON.stringify({
++            v: 2,
++            c: 'coach',
++            i: 'intent',
++            f: family,
++            o: 'source_id:asc,source_platform:asc',
++            s: 'a',
++            p: 'truecoach',
++            ...patch,
++          }),
++        );
++      // Shapes the accepted Q0 proof already refuses (Q0 is exercised on exactly those); Q1 must
++      // refuse them and every additional shape below identically, without a page read.
++      const shared = [
++        `${v2(family, 'a', 'truecoach')}x`.padEnd(8193, 'A'),
++        envelope({ p: 'TrueCoach' }),
++        envelope({ p: undefined }),
++        envelope({ o: 'source_id:asc' }),
++        envelope({ v: 1 }),
++        envelope({ i: 'other' }),
++      ];
++      const q1Only = [
++        'A'.repeat(8193),
++        envelope({ s: '' }),
++        envelope({ s: 'a\u0000' }),
++        envelope({ c: 'other' }),
++        envelope({ f: family === 'clients' ? 'workouts' : 'clients' }),
++        'v2.' + encoded('"a"'),
++        'v2.' + encoded('[]'),
++        'v2.!!!',
++        'v2.',
++        family === 'clients' ? encoded('a\u0000') : encoded('{"c":"coach"}'),
++        encoded(
++          JSON.stringify({ c: 'coach', i: 'intent', f: family, o: 'source_id:asc', s: 'a' }),
++        ) + '=',
++      ];
++      for (const cursor of [...shared, ...q1Only]) {
++        for (const old of shared.includes(cursor) ? [false, true] : [false]) {
++          const refused = await run({ action, family, cursor }, old);
++          expect(refused.result).toBeUndefined();
++          expect(refused.failure).toEqual(MALFORMED);
++          expect(JSON.stringify(refused.failure)).not.toContain(cursor.slice(0, 64));
++          if (!old) expect(readPage(refused.queries)).toBe(false);
++        }
++      }
++      const valid = await run({ action, family, cursor: v2(family, 'a', 'truecoach') });
++      expect(valid.failure).toBeUndefined();
++      expect(visible(family, valid.result)).toEqual([]);
++    },
++  );
++});
+diff --git a/test/scout/entities/scout-entities.service.spec.ts b/test/scout/entities/scout-entities.service.spec.ts
+index d4ce62e..30c418f 100644
+--- a/test/scout/entities/scout-entities.service.spec.ts
++++ b/test/scout/entities/scout-entities.service.spec.ts
+@@ -10,6 +10,7 @@ import {
+   ENTITY_REVIEW_FAMILIES,
+ } from '../../../src/scout/scout-entities.dto';
+ import { RECONSTRUCT_FAMILY } from '../../../src/scout/scout-reconstruct.dto';
++import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+ 
+ /**
+  * ScoutEntitiesService unit tests (IMPORTER-I).
+@@ -31,6 +32,7 @@ interface LedgerRow {
+   intent_id: string;
+   entity_type: string;
+   source_id: string;
++  source_platform: string;
+   status: string;
+   target_id: string | null;
+ }
+@@ -51,7 +53,9 @@ interface Where {
+   intent_id?: string;
+   entity_type?: string;
+   status?: string;
+-  source_id?: { gt?: string };
++  source_id?: string | { gt?: string };
++  source_platform?: { gt?: string };
++  OR?: Where[];
+   id?: { in?: string[] };
+ }
+ 
+@@ -68,6 +72,8 @@ class FakePrisma {
+   transactionCalls: Array<{ isolationLevel?: string }> = [];
+   private txDepth = 0;
+   readsOutsideTx = 0;
++  /** Every ledger findMany, in order, so tests can prove what was (not) read. */
++  ledgerReads: Array<{ where: Where; take?: number; orderBy?: unknown }> = [];
+ 
+   $transaction = async <T>(
+     fn: (tx: FakePrisma) => Promise<T>,
+@@ -98,17 +104,19 @@ class FakePrisma {
+   };
+ 
+   scoutReconstructionLedger = {
+-    findMany: async (args: { where: Where; take?: number }) => {
++    findMany: async (args: { where: Where; take?: number; orderBy?: unknown }) => {
+       this.noteRead();
+-      let rows = this.ledgerRows.filter(
+-        (r) =>
+-          matchBase(r, args.where) &&
+-          (args.where.status === undefined || r.status === args.where.status) &&
+-          (args.where.source_id?.gt === undefined || r.source_id > args.where.source_id.gt),
+-      );
+-      rows = rows.sort((a, b) => a.source_id.localeCompare(b.source_id));
++      this.ledgerReads.push(args);
++      // Real (source_id, source_platform) order and predicate semantics: the
++      // fake mirrors the schema's wide identity so tie-break paging is proven
++      // by behaviour (PG remains the authority; see the NQ1 real-PG proof).
++      let rows = this.ledgerRows.filter((r) => matchLedger(r, args.where)).sort(byIdentity);
+       if (args.take !== undefined) rows = rows.slice(0, args.take);
+-      return rows.map((r) => ({ source_id: r.source_id, target_id: r.target_id }));
++      return rows.map((r) => ({
++        source_id: r.source_id,
++        source_platform: r.source_platform,
++        target_id: r.target_id,
++      }));
+     },
+   };
+ 
+@@ -148,6 +156,37 @@ function matchBase(
+   );
+ }
+ 
++function matchLedger(r: LedgerRow, w: Where): boolean {
++  if (!matchBase(r, w)) return false;
++  if (w.status !== undefined && r.status !== w.status) return false;
++  if (typeof w.source_id === 'string' && r.source_id !== w.source_id) return false;
++  if (
++    typeof w.source_id === 'object' &&
++    w.source_id.gt !== undefined &&
++    !(r.source_id > w.source_id.gt)
++  )
++    return false;
++  if (w.source_platform?.gt !== undefined && !(r.source_platform > w.source_platform.gt))
++    return false;
++  if (w.OR !== undefined && !w.OR.some((o) => matchLedger(r, o))) return false;
++  return true;
++}
++
++const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
++const byIdentity = (a: LedgerRow, b: LedgerRow): number =>
++  cmp(a.source_id, b.source_id) || cmp(a.source_platform, b.source_platform);
++
++const b64 = (v: string): string => Buffer.from(v, 'utf8').toString('base64url');
++/** The exact scoped v2 token Q1 must emit for an entity-family boundary. */
++function expectedV2(coach: string, intent: string, f: string, s: string, p: string): string {
++  const o = 'source_id:asc,source_platform:asc';
++  return `v2.${b64(JSON.stringify({ v: 2, c: coach, i: intent, f, o, s, p }))}`;
++}
++/** The legacy scope-bound token Q0 emitted for an entity-family boundary. */
++function legacyEntities(coach: string, intent: string, f: string, s: string): string {
++  return b64(JSON.stringify({ c: coach, i: intent, f, o: 'source_id:asc', s }));
++}
++
+ // Wire the service through the Nest DI container: `useValue` is typed to accept
+ // any provider value, so the in-memory FakePrisma and the capture-only analytics
+ // stub are injected WITHOUT any cast — no widening assertion is used to launder
+@@ -200,6 +239,7 @@ function seed(
+       intent_id: intent,
+       entity_type: family,
+       source_id: sid,
++      source_platform: platform,
+       status: 'reconstructed',
+       target_id: targetId,
+     });
+@@ -312,6 +352,10 @@ describe('ScoutEntitiesService.getEntities', () => {
+     expect(page1.next_cursor).toBeTruthy();
+     // Cursor is opaque (base64url of a bound payload), not the raw source_id.
+     expect(page1.next_cursor).not.toBe('s001');
++    // Q1: the exact scoped v2 token of the last LEDGER row; first page ordered
++    // by (source_id, source_platform) like every later page.
++    expect(page1.next_cursor).toBe(expectedV2(COACH, INTENT, FAM, 's001', 'truecoach'));
++    expect(fake.ledgerReads[0].orderBy).toEqual([{ source_id: 'asc' }, { source_platform: 'asc' }]);
+ 
+     const page2 = await service.getEntities(COACH, INTENT, FAM, page1.next_cursor ?? undefined, 2);
+     expect(page2.entities.map((e) => e.source_id)).toEqual(['truecoach_s002', 'truecoach_s003']);
+@@ -337,6 +381,161 @@ describe('ScoutEntitiesService.getEntities', () => {
+     expect(new Set(seen).size).toBe(7);
+   });
+ 
++  describe('Q1 cursor emission and legacy-boundary resolution', () => {
++    it('emits scoped v2 on every non-final page, each accepted back by the decoder', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 5 });
++      const { service } = await makeService(fake);
++      let cursor: string | undefined;
++      const emitted: string[] = [];
++      for (let guard = 0; guard < 10; guard++) {
++        const page = await service.getEntities(COACH, INTENT, FAM, cursor, 2);
++        if (!page.next_cursor) break;
++        emitted.push(page.next_cursor);
++        expect(decodeScoutCursor(page.next_cursor, COACH, INTENT, FAM)).toEqual({
++          s: page.entities[page.entities.length - 1].source_id.replace('truecoach_', ''),
++          p: 'truecoach',
++        });
++        cursor = page.next_cursor;
++      }
++      expect(emitted).toEqual([
++        expectedV2(COACH, INTENT, FAM, 's001', 'truecoach'),
++        expectedV2(COACH, INTENT, FAM, 's003', 'truecoach'),
++      ]);
++    });
++
++    it('resolves a Q0-emitted legacy entities token to the same next page as its v2 twin', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 5 });
++      const { service } = await makeService(fake);
++      const page1 = await service.getEntities(COACH, INTENT, FAM, undefined, 2);
++      const viaV2 = await service.getEntities(
++        COACH,
++        INTENT,
++        FAM,
++        page1.next_cursor ?? undefined,
++        2,
++      );
++      const viaLegacy = await service.getEntities(
++        COACH,
++        INTENT,
++        FAM,
++        legacyEntities(COACH, INTENT, FAM, 's001'),
++        2,
++      );
++      expect(viaLegacy).toEqual(viaV2);
++      expect(viaLegacy.entities.map((e) => e.source_id)).toEqual([
++        'truecoach_s002',
++        'truecoach_s003',
++      ]);
++      const reads = fake.ledgerReads.slice(-2);
++      expect(reads[0]).toEqual({
++        where: {
++          coach_id: COACH,
++          intent_id: INTENT,
++          entity_type: FAM,
++          status: 'reconstructed',
++          source_id: 's001',
++        },
++        select: { source_platform: true },
++        take: 2,
++      });
++      expect(reads[1].where.OR).toEqual([
++        { source_id: { gt: 's001' } },
++        { source_id: 's001', source_platform: { gt: 'truecoach' } },
++      ]);
++      expect(fake.readsOutsideTx).toBe(0);
++    });
++
++    it('400s an unresolvable legacy token (absent source) with no page read', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 3 });
++      const { service } = await makeService(fake);
++      const before = fake.ledgerReads.length;
++      const err = await service
++        .getEntities(COACH, INTENT, FAM, legacyEntities(COACH, INTENT, FAM, 'zzz-absent'), 2)
++        .catch((e: unknown) => e);
++      expect(err).toBeInstanceOf(BadRequestException);
++      expect((err as BadRequestException).message).toBe('malformed cursor');
++      expect(fake.ledgerReads.length - before).toBe(1);
++      expect(fake.ledgerReads[before].take).toBe(2);
++    });
++
++    it('resolves within the token family only: a row of another family is not a boundary', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 3 });
++      seed(fake, { family: RECONSTRUCT_FAMILY.client_history, reconstructed: 0 });
++      const { service } = await makeService(fake);
++      // s001 is reconstructed for `workouts` only; a client_history legacy
++      // token naming it is scope-bound to client_history and finds nothing.
++      await expect(
++        service.getEntities(
++          COACH,
++          INTENT,
++          RECONSTRUCT_FAMILY.client_history,
++          legacyEntities(COACH, INTENT, RECONSTRUCT_FAMILY.client_history, 's001'),
++          2,
++        ),
++      ).rejects.toThrow('malformed cursor');
++    });
++
++    it('enumerates identity ties exactly once and refuses a tied legacy boundary', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 2 });
++      // Future-schema fixture: one source_id reconstructed from three platforms.
++      for (const p of ['c-plat', 'a-plat', 'b-plat']) {
++        const id = `e-${p}`;
++        fake.ledgerRows.push({
++          coach_id: COACH,
++          intent_id: INTENT,
++          entity_type: FAM,
++          source_id: 's000',
++          source_platform: p,
++          status: 'reconstructed',
++          target_id: id,
++        });
++        fake.entities.push({
++          id,
++          coach_id: COACH,
++          source_platform: p,
++          entity_type: FAM,
++          source_id: `${p}_s000`,
++          client_source_id: null,
++          label: null,
++          created_at: new Date(0),
++          updated_at: new Date(0),
++        });
++      }
++      const { service } = await makeService(fake);
++      const seen: string[] = [];
++      const tokens: string[] = [];
++      let cursor: string | undefined;
++      for (let guard = 0; guard < 20; guard++) {
++        const page = await service.getEntities(COACH, INTENT, FAM, cursor, 1);
++        seen.push(...page.entities.map((e) => e.source_id));
++        if (!page.next_cursor) break;
++        tokens.push(page.next_cursor);
++        cursor = page.next_cursor;
++      }
++      expect(seen).toEqual([
++        'a-plat_s000',
++        'b-plat_s000',
++        'c-plat_s000',
++        'truecoach_s000',
++        'truecoach_s001',
++      ]);
++      expect(tokens).toEqual([
++        expectedV2(COACH, INTENT, FAM, 's000', 'a-plat'),
++        expectedV2(COACH, INTENT, FAM, 's000', 'b-plat'),
++        expectedV2(COACH, INTENT, FAM, 's000', 'c-plat'),
++        expectedV2(COACH, INTENT, FAM, 's000', 'truecoach'),
++      ]);
++      await expect(
++        service.getEntities(COACH, INTENT, FAM, legacyEntities(COACH, INTENT, FAM, 's000'), 1),
++      ).rejects.toThrow('malformed cursor');
++    });
++  });
++
+   it('rejects a malformed cursor (fail closed, never a silent full scan)', async () => {
+     const fake = new FakePrisma();
+     seed(fake, { reconstructed: 2 });
+@@ -422,6 +621,7 @@ describe('ScoutEntitiesService.getEntities', () => {
+       intent_id: INTENT,
+       entity_type: FAM,
+       source_id: 's999',
++      source_platform: 'truecoach',
+       status: 'reconstructed',
+       target_id: 'e-foreign',
+     });
+@@ -450,6 +650,7 @@ describe('ScoutEntitiesService.getEntities', () => {
+       intent_id: INTENT,
+       entity_type: RECONSTRUCT_FAMILY.workouts,
+       source_id: 's999',
++      source_platform: 'truecoach',
+       status: 'reconstructed',
+       target_id: 'e-crossfam',
+     });
+@@ -475,6 +676,7 @@ describe('ScoutEntitiesService.getEntities', () => {
+         intent_id: INTENT,
+         entity_type: FAM,
+         source_id: 'z-skip',
++        source_platform: 'truecoach',
+         status: 'skipped',
+         target_id: null,
+       },
+@@ -483,6 +685,7 @@ describe('ScoutEntitiesService.getEntities', () => {
+         intent_id: INTENT,
+         entity_type: FAM,
+         source_id: 'z-fail',
++        source_platform: 'truecoach',
+         status: 'failed',
+         target_id: null,
+       },
+diff --git a/test/scout/g2-nq1-db-guard.spec.ts b/test/scout/g2-nq1-db-guard.spec.ts
+new file mode 100644
+index 0000000..9bc1480
+--- /dev/null
++++ b/test/scout/g2-nq1-db-guard.spec.ts
+@@ -0,0 +1,107 @@
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_NQ1_CLUSTER_MARKER,
++  G2_NQ1_DATABASE_MARKER,
++  g2Nq1TestTarget,
++  withFixturePassword,
++} from '../utils/g2-nq1-db';
++
++const base = 'postgresql://nq1_super@127.0.0.1:55481/g2_nq1_disposable';
++const ack = 'g2_nq1_disposable:55481';
++
++describe('S7-3 N/Q1 PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2Nq1TestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://nq1_super@127.0.0.1:55481/postgres?connect_timeout=5`,
++      port: 55481,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55481', '5432'),
++    base.replace('55481', '6543'),
++    base.replace('55481', '55439'),
++    base.replace('55481', '70000'),
++    base.replace('55481', '55461'),
++    base.replace('55481', '55471'),
++    base.replace('g2_nq1_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_nq1_disposable', 'g2_r_ready_disposable'),
++    base.replace('nq1_super@', 'b_super@'),
++    base.replace('nq1_super@', 'r_super@'),
++    base.replace('g2_nq1_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_nq1_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55481', '54325'),
++    base.replace('g2_nq1_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_nq1_disposable', 'postgres'),
++    base.replace('nq1_super@', 'service_role@'),
++    base.replace('nq1_super@', 'nq1_super:secret@'),
++    base.replace('nq1_super@', 'postgres@'),
++    base.replace('55481', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2Nq1TestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2Nq1TestTarget(base)).toThrow();
++    expect(() => g2Nq1TestTarget(base, 'g2_nq1_disposable')).toThrow();
++    expect(() => g2Nq1TestTarget(base, 'g2_nq1_disposable:55472')).toThrow();
++    expect(() => g2Nq1TestTarget(base, 'g2_tq0_disposable:55481')).toThrow();
++    expect(() => g2Nq1TestTarget(base, 'g2_b_drain_disposable:55481')).toThrow();
++    expect(() => g2Nq1TestTarget(base, 'g2_r_ready_disposable:55481')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_NQ1_CLUSTER_MARKER).toBe('nq1-disposable-pg17');
++    expect(G2_NQ1_DATABASE_MARKER).toBe('nq1-g2-synthetic-disposable-fixture-safe-to-drop');
++    for (const marker of [G2_NQ1_CLUSTER_MARKER, G2_NQ1_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^nq1-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-nq1-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_NQ1_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_NQ1_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://nq1_super:local_fixture@127.0.0.1:55481/g2_nq1_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55481/g2_nq1_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55481/g2_nq1_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++});
+diff --git a/test/scout/reconstruct/conformance-alpha.e2e.spec.ts b/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
+index b50d98c..467d3c4 100644
+--- a/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
++++ b/test/scout/reconstruct/conformance-alpha.e2e.spec.ts
+@@ -134,7 +134,7 @@ interface StagedRecord {
+   readonly payload: Prisma.JsonValue;
+ }
+ interface LedgerRow {
+-  source_platform?: string | null;
++  source_platform: string;
+   coach_id: string;
+   intent_id: string;
+   entity_type: string;
+@@ -181,7 +181,11 @@ class FakePrisma {
+       const take = args.take ?? this.staged.length;
+       return this.staged
+         .filter((r) => this.inScope(r, args.where))
+-        .sort((a, b) => a.source_id.localeCompare(b.source_id))
++        .sort(
++          (a, b) =>
++            a.source_id.localeCompare(b.source_id) ||
++            a.source_platform.localeCompare(b.source_platform),
++        )
+         .slice(skip, skip + take)
+         .map((r) => ({
+           source_id: r.source_id,
+@@ -252,8 +256,8 @@ class FakePrisma {
+         coach_id: string;
+         intent_id: string;
+         entity_type: string;
++        source_platform: string;
+         source_id: string;
+-        OR?: Array<{ source_platform: string | null }>;
+         status?: { not: string };
+       };
+       data: Partial<LedgerRow>;
+@@ -262,25 +266,33 @@ class FakePrisma {
+       const row = this.ledger.get(`${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`);
+       if (
+         !row ||
+-        (w.OR && !w.OR.some((p) => p.source_platform === (row.source_platform ?? null))) ||
++        row.source_platform !== w.source_platform ||
+         (w.status && row.status === w.status.not)
+       )
+         return { count: 0 };
+       Object.assign(row, args.data);
+       return { count: 1 };
+     },
++    // Keyed by the NARROW key the real table still enforces until C: a wide
++    // identity that misses while the narrow key is taken raises P2002, as on PG.
+     upsert: async (args: {
+-      where: { coach_id_intent_id_entity_type_source_id: LedgerRow };
++      where: { coach_id_intent_id_entity_type_source_platform_source_id: LedgerRow };
+       create: LedgerRow;
+       update: Partial<LedgerRow>;
+     }) => {
+-      const w = args.where.coach_id_intent_id_entity_type_source_id;
++      const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
+       const key = `${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`;
+       const existing = this.ledger.get(key);
+-      if (existing) {
++      if (existing && existing.source_platform === w.source_platform) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
++      if (existing) {
++        throw new Prisma.PrismaClientKnownRequestError('unique violation', {
++          code: 'P2002',
++          clientVersion: 'test',
++        });
++      }
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+diff --git a/test/scout/reconstruct/scout-reconstruct.families.spec.ts b/test/scout/reconstruct/scout-reconstruct.families.spec.ts
+index be10749..03d4499 100644
+--- a/test/scout/reconstruct/scout-reconstruct.families.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.families.spec.ts
+@@ -26,7 +26,7 @@ interface StagedRow {
+   payload: unknown;
+ }
+ interface LedgerRow {
+-  source_platform?: string | null;
++  source_platform: string;
+   coach_id: string;
+   intent_id: string;
+   entity_type: string;
+@@ -79,7 +79,11 @@ class FakePrisma {
+     findMany: async (args: { take?: number; skip?: number }) => {
+       const skip = args.skip ?? 0;
+       const take = args.take ?? this.staged.length;
+-      const ordered = [...this.staged].sort((a, b) => a.source_id.localeCompare(b.source_id));
++      const ordered = [...this.staged].sort(
++        (a, b) =>
++          a.source_id.localeCompare(b.source_id) ||
++          a.source_platform.localeCompare(b.source_platform),
++      );
+       return ordered.slice(skip, skip + take);
+     },
+   };
+@@ -127,8 +131,8 @@ class FakePrisma {
+         coach_id: string;
+         intent_id: string;
+         entity_type: string;
++        source_platform: string;
+         source_id: string;
+-        OR?: Array<{ source_platform: string | null }>;
+         status?: { not: string };
+       };
+       data: Partial<LedgerRow>;
+@@ -137,24 +141,33 @@ class FakePrisma {
+       const row = this.ledger.get(`${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`);
+       if (
+         !row ||
+-        (w.OR && !w.OR.some((p) => p.source_platform === (row.source_platform ?? null))) ||
++        row.source_platform !== w.source_platform ||
+         (w.status && row.status === w.status.not)
+       )
+         return { count: 0 };
+       Object.assign(row, args.data);
+       return { count: 1 };
+     },
++    // Keyed by the NARROW key the real table still enforces until C: a wide
++    // identity that misses while the narrow key is taken raises P2002, as on PG.
+     upsert: async (args: {
+-      where: { coach_id_intent_id_entity_type_source_id: LedgerRow };
++      where: { coach_id_intent_id_entity_type_source_platform_source_id: LedgerRow };
+       create: LedgerRow;
+       update: Partial<LedgerRow>;
+     }) => {
+-      const key = this.ledgerKey(args.where.coach_id_intent_id_entity_type_source_id);
++      const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
++      const key = this.ledgerKey(w);
+       const existing = this.ledger.get(key);
+-      if (existing) {
++      if (existing && existing.source_platform === w.source_platform) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
++      if (existing) {
++        throw new Prisma.PrismaClientKnownRequestError('unique violation', {
++          code: 'P2002',
++          clientVersion: 'test',
++        });
++      }
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+diff --git a/test/scout/reconstruct/scout-reconstruct.service.spec.ts b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+index 181ea64..a736d9a 100644
+--- a/test/scout/reconstruct/scout-reconstruct.service.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+@@ -26,7 +26,7 @@ interface StagedRow {
+   payload: unknown;
+ }
+ interface LedgerRow {
+-  source_platform?: string | null;
++  source_platform: string;
+   coach_id: string;
+   intent_id: string;
+   entity_type: string;
+@@ -35,6 +35,21 @@ interface LedgerRow {
+   target_id: string | null;
+   reason: string | null;
+ }
++/** The five-field ledger identity the N writer addresses. */
++interface LedgerIdentity {
++  coach_id: string;
++  intent_id: string;
++  entity_type: string;
++  source_platform: string;
++  source_id: string;
++}
++
++function p2002(): Prisma.PrismaClientKnownRequestError {
++  return new Prisma.PrismaClientKnownRequestError('unique violation', {
++    code: 'P2002',
++    clientVersion: 'test',
++  });
++}
+ 
+ class FakePrisma {
+   terminalStatus: string | null | undefined = 'success';
+@@ -63,12 +78,12 @@ class FakePrisma {
+   private personKey(coach: string, platform: string, personId: string): string {
+     return `${coach}|${platform}|${personId}`;
+   }
+-  private ledgerKey(r: {
+-    coach_id: string;
+-    intent_id: string;
+-    entity_type: string;
+-    source_id: string;
+-  }): string {
++  /**
++   * The ledger is keyed by the NARROW (coach, intent, entity, source) key the
++   * real table still enforces until C, so a wide-identity upsert that misses
++   * but collides on the narrow key raises P2002 exactly like PostgreSQL.
++   */
++  private ledgerKey(r: LedgerIdentity): string {
+     return `${r.coach_id}|${r.intent_id}|${r.entity_type}|${r.source_id}`;
+   }
+ 
+@@ -83,8 +98,12 @@ class FakePrisma {
+       const skip = args.skip ?? 0;
+       const take = args.take ?? this.staged.length;
+       this.pages.push({ skip, take });
+-      // Deterministic order by source_id, mirroring the service's orderBy.
+-      const ordered = [...this.staged].sort((a, b) => a.source_id.localeCompare(b.source_id));
++      // Deterministic (source_id, source_platform) order, mirroring the service's orderBy.
++      const ordered = [...this.staged].sort(
++        (a, b) =>
++          a.source_id.localeCompare(b.source_id) ||
++          a.source_platform.localeCompare(b.source_platform),
++      );
+       return ordered.slice(skip, skip + take);
+     },
+   };
+@@ -135,21 +154,14 @@ class FakePrisma {
+ 
+   scoutReconstructionLedger = {
+     updateMany: async (args: {
+-      where: {
+-        coach_id: string;
+-        intent_id: string;
+-        entity_type: string;
+-        source_id: string;
+-        OR?: Array<{ source_platform: string | null }>;
+-        status?: { not: string };
+-      };
++      where: LedgerIdentity & { status?: { not: string } };
+       data: Partial<LedgerRow>;
+     }) => {
+       const w = args.where;
+-      const row = this.ledger.get(`${w.coach_id}|${w.intent_id}|${w.entity_type}|${w.source_id}`);
++      const row = this.ledger.get(this.ledgerKey(w));
+       if (
+         !row ||
+-        (w.OR && !w.OR.some((p) => p.source_platform === (row.source_platform ?? null))) ||
++        row.source_platform !== w.source_platform ||
+         (w.status && row.status === w.status.not)
+       )
+         return { count: 0 };
+@@ -157,16 +169,20 @@ class FakePrisma {
+       return { count: 1 };
+     },
+     upsert: async (args: {
+-      where: { coach_id_intent_id_entity_type_source_id: LedgerRow };
++      where: { coach_id_intent_id_entity_type_source_platform_source_id: LedgerIdentity };
+       create: LedgerRow;
+       update: Partial<LedgerRow>;
+     }) => {
+-      const key = this.ledgerKey(args.where.coach_id_intent_id_entity_type_source_id);
++      const w = args.where.coach_id_intent_id_entity_type_source_platform_source_id;
++      const key = this.ledgerKey(w);
+       const existing = this.ledger.get(key);
+-      if (existing) {
++      if (existing && existing.source_platform === w.source_platform) {
+         Object.assign(existing, args.update);
+         return existing;
+       }
++      // Wide identity missed but the narrow key is taken: the INSERT half of the
++      // upsert violates the retained narrow unique index (P2002), as on PG.
++      if (existing) throw p2002();
+       const row = { ...args.create };
+       this.ledger.set(key, row);
+       return row;
+@@ -245,14 +261,13 @@ describe('ScoutReconstructService', () => {
+   );
+ 
+   it.each(['skipped', 'failed'])(
+-    'claims NULL but preserves a committed success on %s replay, including reason',
++    'preserves a committed success on %s replay, including reason (no claim step)',
+     async (attempt) => {
+       const { service, prisma } = build((p) => {
+         p.staged = [stagedClient('1')];
+       });
+       await service.reconstruct('coach-1', 'intent-1');
+       const row = [...prisma.ledger.values()][0];
+-      row.source_platform = null;
+       row.reason = 'retained-success-reason';
+       const target = row.target_id;
+       if (attempt === 'skipped')
+@@ -272,7 +287,7 @@ describe('ScoutReconstructService', () => {
+   );
+ 
+   it.each(['reconstructed', 'skipped', 'failed'])(
+-    'refuses contradictory provenance even if preserving an existing %s',
++    'reports a narrow-key collision (same source, other platform, existing %s) as 409 with nothing written',
+     async (status) => {
+       const { service, prisma } = build((p) => {
+         p.staged = [stagedClient('1')];
+@@ -282,16 +297,48 @@ describe('ScoutReconstructService', () => {
+       row.source_platform = 'different';
+       row.status = status;
+       const before = { ...row };
++      const upsert = jest.spyOn(prisma.scoutReconstructionLedger, 'upsert');
++      const precedence = jest.spyOn(prisma.scoutReconstructionLedger, 'updateMany');
+       jest
+         .spyOn(service['families'].get('clients')!, 'map')
+         .mockReturnValueOnce({ ok: false, reason: 'synthetic mapper skip' });
+-      await expect(service.reconstruct('coach-1', 'intent-1')).rejects.toThrow(
+-        'reconstruction provenance conflict',
+-      );
++      const err = await service.reconstruct('coach-1', 'intent-1').catch((e: unknown) => e);
++      expect(err).toBeInstanceOf(ConflictException);
++      expect((err as ConflictException).message).toBe('reconstruction provenance conflict');
++      // Wide upsert (retried once for the P2002) never reached precedence; the
++      // ledger holds exactly the pre-existing row, byte for byte.
++      expect(upsert).toHaveBeenCalledTimes(2);
++      expect(precedence).not.toHaveBeenCalled();
++      expect(prisma.ledger.size).toBe(1);
+       expect(row).toEqual(before);
++      expect(JSON.stringify(err)).not.toContain('different');
+     },
+   );
+ 
++  it('addresses the ledger by the five-field identity with an empty update (no claim, no early status)', async () => {
++    const { service, prisma } = build((p) => {
++      p.staged = [stagedClient('1')];
++    });
++    const upsert = jest.spyOn(prisma.scoutReconstructionLedger, 'upsert');
++    const precedence = jest.spyOn(prisma.scoutReconstructionLedger, 'updateMany');
++    await service.reconstruct('coach-1', 'intent-1');
++    const identity = {
++      coach_id: 'coach-1',
++      intent_id: 'intent-1',
++      entity_type: 'clients',
++      source_platform: 'truecoach',
++      source_id: '1',
++    };
++    expect(upsert).toHaveBeenCalledTimes(1);
++    expect(upsert.mock.calls[0][0]).toEqual({
++      where: { coach_id_intent_id_entity_type_source_platform_source_id: identity },
++      create: { ...identity, status: 'reconstructed', target_id: expect.any(String), reason: null },
++      update: {},
++    });
++    expect(precedence).toHaveBeenCalledTimes(1);
++    expect(precedence.mock.calls[0][0].where).toEqual(identity);
++  });
++
+   it('uses serialized last non-success attempt, then allows success to upgrade it', async () => {
+     const { service, prisma } = build((p) => {
+       p.staged = [stagedClient('1')];
+@@ -366,23 +413,34 @@ describe('ScoutReconstructService', () => {
+     },
+   );
+ 
+-  it.each(['P2002', 'P2034', 'P2003'])(
+-    'bounds exhausted/nonretryable %s ledger writes',
+-    async (code) => {
+-      const { service, prisma } = build((p) => {
+-        p.staged = [{ ...stagedClient('1'), source_platform: 'unsupported' }];
+-      });
+-      const upsert = jest.spyOn(prisma.scoutReconstructionLedger, 'upsert').mockRejectedValue(
+-        new Prisma.PrismaClientKnownRequestError('private', {
+-          code,
+-          clientVersion: 'test',
+-        }),
+-      );
+-      await expect(service.reconstruct('coach-1', 'intent-1')).rejects.toMatchObject({ code });
+-      expect(upsert).toHaveBeenCalledTimes(code === 'P2003' ? 1 : 2);
+-      expect(prisma.ledger.size).toBe(0);
+-    },
+-  );
++  it.each(['P2034', 'P2003'])('bounds exhausted/nonretryable %s ledger writes', async (code) => {
++    const { service, prisma } = build((p) => {
++      p.staged = [{ ...stagedClient('1'), source_platform: 'unsupported' }];
++    });
++    const upsert = jest.spyOn(prisma.scoutReconstructionLedger, 'upsert').mockRejectedValue(
++      new Prisma.PrismaClientKnownRequestError('private', {
++        code,
++        clientVersion: 'test',
++      }),
++    );
++    await expect(service.reconstruct('coach-1', 'intent-1')).rejects.toMatchObject({ code });
++    expect(upsert).toHaveBeenCalledTimes(code === 'P2003' ? 1 : 2);
++    expect(prisma.ledger.size).toBe(0);
++  });
++
++  it('maps a P2002 that survives the single retry to the 409 provenance conflict', async () => {
++    const { service, prisma } = build((p) => {
++      p.staged = [{ ...stagedClient('1'), source_platform: 'unsupported' }];
++    });
++    const upsert = jest
++      .spyOn(prisma.scoutReconstructionLedger, 'upsert')
++      .mockRejectedValue(p2002());
++    const err = await service.reconstruct('coach-1', 'intent-1').catch((e: unknown) => e);
++    expect(err).toBeInstanceOf(ConflictException);
++    expect((err as ConflictException).message).toBe('reconstruction provenance conflict');
++    expect(upsert).toHaveBeenCalledTimes(2);
++    expect(prisma.ledger.size).toBe(0);
++  });
+ 
+   it('rejects an intent that has not settled (still running) with 409', async () => {
+     const { service } = build((p) => {
+diff --git a/test/scout/roster/scout-roster.service.spec.ts b/test/scout/roster/scout-roster.service.spec.ts
+index 85c6dd3..c933359 100644
+--- a/test/scout/roster/scout-roster.service.spec.ts
++++ b/test/scout/roster/scout-roster.service.spec.ts
+@@ -9,6 +9,7 @@ import {
+   ROSTER_MAX_PAGE_SIZE,
+ } from '../../../src/scout/scout-roster.dto';
+ import { RECONSTRUCT_ENTITY_TYPE } from '../../../src/scout/scout-reconstruct.dto';
++import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+ 
+ /**
+  * ScoutRosterService unit tests.
+@@ -36,6 +37,7 @@ interface LedgerRow {
+   intent_id: string;
+   entity_type: string;
+   source_id: string;
++  source_platform: string;
+   status: string;
+   target_id: string | null;
+ }
+@@ -55,7 +57,9 @@ interface Where {
+   intent_id?: string;
+   entity_type?: string;
+   status?: string;
+-  source_id?: { gt?: string };
++  source_id?: string | { gt?: string };
++  source_platform?: { gt?: string };
++  OR?: Where[];
+   id?: { in?: string[] };
+   state?: { not?: PersonState };
+ }
+@@ -76,6 +80,8 @@ class FakePrisma {
+   transactionCalls: Array<{ isolationLevel?: string }> = [];
+   private txDepth = 0;
+   readsOutsideTx = 0;
++  /** Every ledger findMany, in order, so tests can prove what was (not) read. */
++  ledgerReads: Array<{ where: Where; take?: number; orderBy?: unknown }> = [];
+ 
+   // Interactive $transaction: records the isolation option and runs the callback
+   // against this same fake as the tx client, so the real service's reads (count,
+@@ -126,17 +132,19 @@ class FakePrisma {
+         _count: { _all: n },
+       }));
+     },
+-    findMany: async (args: { where: Where; take?: number }) => {
++    findMany: async (args: { where: Where; take?: number; orderBy?: unknown }) => {
+       this.noteRead();
+-      let rows = this.ledgerRows.filter(
+-        (r) =>
+-          matchBase(r, args.where) &&
+-          (args.where.status === undefined || r.status === args.where.status) &&
+-          (args.where.source_id?.gt === undefined || r.source_id > args.where.source_id.gt),
+-      );
+-      rows = rows.sort((a, b) => a.source_id.localeCompare(b.source_id));
++      this.ledgerReads.push(args);
++      // Real (source_id, source_platform) order and predicate semantics: the
++      // fake mirrors the schema's wide identity so tie-break paging is proven
++      // by behaviour (PG remains the authority; see the NQ1 real-PG proof).
++      let rows = this.ledgerRows.filter((r) => matchLedger(r, args.where)).sort(byIdentity);
+       if (args.take !== undefined) rows = rows.slice(0, args.take);
+-      return rows.map((r) => ({ source_id: r.source_id, target_id: r.target_id }));
++      return rows.map((r) => ({
++        source_id: r.source_id,
++        source_platform: r.source_platform,
++        target_id: r.target_id,
++      }));
+     },
+   };
+ 
+@@ -175,6 +183,33 @@ function matchBase(
+   );
+ }
+ 
++function matchLedger(r: LedgerRow, w: Where): boolean {
++  if (!matchBase(r, w)) return false;
++  if (w.status !== undefined && r.status !== w.status) return false;
++  if (typeof w.source_id === 'string' && r.source_id !== w.source_id) return false;
++  if (
++    typeof w.source_id === 'object' &&
++    w.source_id.gt !== undefined &&
++    !(r.source_id > w.source_id.gt)
++  )
++    return false;
++  if (w.source_platform?.gt !== undefined && !(r.source_platform > w.source_platform.gt))
++    return false;
++  if (w.OR !== undefined && !w.OR.some((o) => matchLedger(r, o))) return false;
++  return true;
++}
++
++const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
++const byIdentity = (a: LedgerRow, b: LedgerRow): number =>
++  cmp(a.source_id, b.source_id) || cmp(a.source_platform, b.source_platform);
++
++const b64 = (v: string): string => Buffer.from(v, 'utf8').toString('base64url');
++/** The exact scoped v2 token Q1 must emit for a roster boundary. */
++function expectedV2(coach: string, intent: string, s: string, p: string): string {
++  const o = 'source_id:asc,source_platform:asc';
++  return `v2.${b64(JSON.stringify({ v: 2, c: coach, i: intent, f: ET, o, s, p }))}`;
++}
++
+ function makeService(fake: FakePrisma): {
+   service: ScoutRosterService;
+   capture: jest.Mock;
+@@ -223,6 +258,7 @@ function seed(
+       intent_id: intent,
+       entity_type: ET,
+       source_id: sid,
++      source_platform: 'truecoach',
+       status,
+       target_id: targetId,
+     });
+@@ -348,6 +384,11 @@ describe('ScoutRosterService.getRoster', () => {
+     expect(page1.page.next_cursor).toBeTruthy();
+     // Cursor is opaque (base64url), not the raw source_id.
+     expect(page1.page.next_cursor).not.toBe('s001');
++    // Q1: every non-final page emits the exact scoped v2 token of its last
++    // LEDGER row (source_id, source_platform); the first page is ordered the
++    // same way as every later page.
++    expect(page1.page.next_cursor).toBe(expectedV2(COACH, INTENT, 's001', 'truecoach'));
++    expect(fake.ledgerReads[0].orderBy).toEqual([{ source_id: 'asc' }, { source_platform: 'asc' }]);
+ 
+     const page2 = await service.getRoster(COACH, INTENT, page1.page.next_cursor ?? undefined, 2);
+     expect(page2.persons.map((p) => p.source_person_id)).toEqual(['tc_s002', 'tc_s003']);
+@@ -383,6 +424,178 @@ describe('ScoutRosterService.getRoster', () => {
+     expect(new Set(seen).size).toBe(seen.length);
+   });
+ 
++  describe('Q1 cursor emission and legacy-boundary resolution', () => {
++    const legacyRoster = (s: string): string => b64(s);
++
++    it('emits scoped v2 on every non-final page and the decoder accepts each one back', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 5 });
++      const { service } = makeService(fake);
++      let cursor: string | undefined;
++      const emitted: string[] = [];
++      for (let guard = 0; guard < 10; guard++) {
++        const page = await service.getRoster(COACH, INTENT, cursor, 2);
++        if (!page.page.has_more) {
++          expect(page.page.next_cursor).toBeNull();
++          break;
++        }
++        const token = page.page.next_cursor ?? '';
++        emitted.push(token);
++        expect(token.startsWith('v2.')).toBe(true);
++        expect(decodeScoutCursor(token, COACH, INTENT, ET)).toEqual({
++          s: page.persons[page.persons.length - 1].source_person_id.replace('tc_', ''),
++          p: 'truecoach',
++        });
++        cursor = token;
++      }
++      expect(emitted).toEqual([
++        expectedV2(COACH, INTENT, 's001', 'truecoach'),
++        expectedV2(COACH, INTENT, 's003', 'truecoach'),
++      ]);
++    });
++
++    it('resolves a Q0-emitted legacy roster token to the same next page as its v2 twin', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 5 });
++      const { service } = makeService(fake);
++      const page1 = await service.getRoster(COACH, INTENT, undefined, 2);
++      const viaV2 = await service.getRoster(COACH, INTENT, page1.page.next_cursor ?? undefined, 2);
++      const viaLegacy = await service.getRoster(COACH, INTENT, legacyRoster('s001'), 2);
++      expect(viaLegacy).toEqual(viaV2);
++      expect(viaLegacy.persons.map((p) => p.source_person_id)).toEqual(['tc_s002', 'tc_s003']);
++      // Resolution happened inside the one RepeatableRead snapshot, after the
++      // gate, as a bounded (take 2) equality lookup — then the page read.
++      expect(fake.transactionCalls).toHaveLength(3);
++      const reads = fake.ledgerReads.slice(-2);
++      expect(reads[0]).toEqual({
++        where: {
++          coach_id: COACH,
++          intent_id: INTENT,
++          entity_type: ET,
++          status: 'reconstructed',
++          source_id: 's001',
++        },
++        select: { source_platform: true },
++        take: 2,
++      });
++      expect(reads[1].where.OR).toEqual([
++        { source_id: { gt: 's001' } },
++        { source_id: 's001', source_platform: { gt: 'truecoach' } },
++      ]);
++      expect(fake.readsOutsideTx).toBe(0);
++    });
++
++    it('400s an unresolvable legacy token (absent source) before any count or page read', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 3 });
++      const { service } = makeService(fake);
++      const before = fake.ledgerReads.length;
++      const err = await service
++        .getRoster(COACH, INTENT, legacyRoster('zzz-never-reconstructed'), 2)
++        .catch((e: unknown) => e);
++      expect(err).toBeInstanceOf(BadRequestException);
++      expect((err as BadRequestException).message).toBe('malformed cursor');
++      // Exactly one ledger read: the resolution lookup. No page was read.
++      expect(fake.ledgerReads.length - before).toBe(1);
++      expect(fake.ledgerReads[before].take).toBe(2);
++      expect(JSON.stringify(err)).not.toContain('zzz-never');
++    });
++
++    it('never widens a roster legacy token past the requested (coach, intent, clients) scope', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 3 });
++      seed(fake, { intent: 'intent-2', reconstructed: 0 });
++      // The boundary exists as a reconstructed row of intent-1 (and of another
++      // coach), but not of intent-2: the intent-2 read must not find it.
++      fake.ledgerRows.push({
++        coach_id: OTHER,
++        intent_id: 'intent-2',
++        entity_type: ET,
++        source_id: 's001',
++        source_platform: 'truecoach',
++        status: 'reconstructed',
++        target_id: null,
++      });
++      const { service } = makeService(fake);
++      await expect(service.getRoster(COACH, 'intent-2', legacyRoster('s001'), 2)).rejects.toThrow(
++        'malformed cursor',
++      );
++      // A skipped/failed row of the same source is not a boundary either.
++      fake.ledgerRows.push({
++        coach_id: COACH,
++        intent_id: 'intent-2',
++        entity_type: ET,
++        source_id: 's001',
++        source_platform: 'truecoach',
++        status: 'skipped',
++        target_id: null,
++      });
++      await expect(service.getRoster(COACH, 'intent-2', legacyRoster('s001'), 2)).rejects.toThrow(
++        'malformed cursor',
++      );
++    });
++
++    it('enumerates identity ties exactly once via (source_id, source_platform) and refuses a tied legacy boundary', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 2 });
++      // Future-schema fixture: the same source_id reconstructed from three
++      // platforms (only possible once the narrow key is gone at C).
++      for (const p of ['c-plat', 'a-plat', 'b-plat']) {
++        fake.ledgerRows.push({
++          coach_id: COACH,
++          intent_id: INTENT,
++          entity_type: ET,
++          source_id: 's000',
++          source_platform: p,
++          status: 'reconstructed',
++          target_id: `p-${p}`,
++        });
++        fake.persons.push({
++          id: `p-${p}`,
++          coach_id: COACH,
++          source_platform: p,
++          source_person_id: `${p}_s000`,
++          display_name: null,
++          state: PersonState.InvitePending,
++          created_at: new Date(0),
++          updated_at: new Date(0),
++        });
++      }
++      const { service } = makeService(fake);
++      const seen: string[] = [];
++      const tokens: string[] = [];
++      let cursor: string | undefined;
++      for (let guard = 0; guard < 20; guard++) {
++        const page = await service.getRoster(COACH, INTENT, cursor, 1);
++        seen.push(...page.persons.map((p) => p.source_person_id));
++        if (!page.page.has_more) break;
++        tokens.push(page.page.next_cursor ?? '');
++        cursor = page.page.next_cursor ?? undefined;
++      }
++      expect(seen).toEqual(['a-plat_s000', 'b-plat_s000', 'c-plat_s000', 'tc_s000', 'tc_s001']);
++      expect(tokens).toEqual([
++        expectedV2(COACH, INTENT, 's000', 'a-plat'),
++        expectedV2(COACH, INTENT, 's000', 'b-plat'),
++        expectedV2(COACH, INTENT, 's000', 'c-plat'),
++        expectedV2(COACH, INTENT, 's000', 'truecoach'),
++      ]);
++      // A legacy token naming the tied source cannot pick a platform: 400 restart.
++      await expect(service.getRoster(COACH, INTENT, legacyRoster('s000'), 1)).rejects.toThrow(
++        'malformed cursor',
++      );
++    });
++
++    it('does not hand out a token when the last ledger row is not encodable', async () => {
++      const fake = new FakePrisma();
++      seed(fake, { reconstructed: 3 });
++      fake.ledgerRows[1].source_platform = 'Not-Canonical';
++      const { service } = makeService(fake);
++      await expect(service.getRoster(COACH, INTENT, undefined, 2)).rejects.toThrow(
++        'cursor boundary not encodable',
++      );
++    });
++  });
++
+   it('rejects a malformed cursor (fail closed, never a silent full scan)', async () => {
+     const fake = new FakePrisma();
+     seed(fake, { reconstructed: 2 });
+@@ -423,6 +636,7 @@ describe('ScoutRosterService.getRoster', () => {
+       intent_id: INTENT,
+       entity_type: ET,
+       source_id: 's999',
++      source_platform: 'truecoach',
+       status: 'reconstructed',
+       target_id: 'p-foreign',
+     });
+diff --git a/test/scout/scout-cursor.spec.ts b/test/scout/scout-cursor.spec.ts
+index 8286de5..e330835 100644
+--- a/test/scout/scout-cursor.spec.ts
++++ b/test/scout/scout-cursor.spec.ts
+@@ -1,4 +1,4 @@
+-import { BadRequestException, ValidationPipe } from '@nestjs/common';
++import { BadRequestException, InternalServerErrorException, ValidationPipe } from '@nestjs/common';
+ import { PrismaService } from '../../src/prisma.service';
+ import { AnalyticsService } from '../../src/analytics/analytics.service';
+ import { ScoutRosterService } from '../../src/scout/scout-roster.service';
+@@ -7,10 +7,13 @@ import { ScoutRosterQueryDto } from '../../src/scout/scout-roster.dto';
+ import { ScoutEntitiesQueryDto } from '../../src/scout/scout-entities.dto';
+ import {
+   decodeScoutCursor,
++  encodeScoutCursor,
++  resolveScoutCursor,
+   SCOUT_CURSOR_MAX_LENGTH,
+   scoutCursorOrder,
+   scoutCursorWhere,
+ } from '../../src/scout/scout-cursor';
++import { Prisma } from '@prisma/client';
+ 
+ const encode = (s: string) => Buffer.from(s, 'utf8').toString('base64url');
+ const envelope = (family: string) => ({
+@@ -24,27 +27,121 @@ const envelope = (family: string) => ({
+ });
+ const v2 = (v: unknown) => `v2.${encode(JSON.stringify(v))}`;
+ 
+-describe('Q0 scoped decoder and HTTP boundary', () => {
++const SCOPE = {
++  coach_id: 'coach',
++  intent_id: 'intent',
++  entity_type: 'workouts',
++  status: 'reconstructed',
++};
++/** A ledger reader fake: records the resolution query and answers with the given rows. */
++function ledgerTx(rows: Array<{ source_platform: string | null }>) {
++  const findMany = jest.fn((_args: unknown) => Promise.resolve(rows));
++  const tx = { scoutReconstructionLedger: { findMany } } as object as Prisma.TransactionClient;
++  return { tx, findMany };
++}
++
++describe('Q1 scoped v2 encoder, decoder, legacy resolution and HTTP boundary', () => {
+   it.each(['clients', 'workouts', 'client_history'])('accepts exact v2 %s boundary', (family) => {
+     const after = decodeScoutCursor(v2(envelope(family)), 'coach', 'intent', family);
+     expect(after).toEqual({ s: 'source', p: 'truecoach' });
+-    expect(scoutCursorWhere(after)).toEqual({
++    expect(scoutCursorWhere({ s: 'source', p: 'truecoach' })).toEqual({
+       OR: [
+         { source_id: { gt: 'source' } },
+         { source_id: 'source', source_platform: { gt: 'truecoach' } },
+       ],
+     });
+-    expect(scoutCursorOrder(after)).toEqual([{ source_id: 'asc' }, { source_platform: 'asc' }]);
++    expect(scoutCursorOrder()).toEqual([{ source_id: 'asc' }, { source_platform: 'asc' }]);
++  });
++
++  it.each(['clients', 'workouts', 'client_history'])(
++    'emits the exact canonical v2 envelope for %s and round-trips it',
++    (family) => {
++      const token = encodeScoutCursor('coach', 'intent', family, 'source', 'truecoach');
++      expect(token).toBe(v2(envelope(family)));
++      expect(token.startsWith('v2.')).toBe(true);
++      const json = Buffer.from(token.slice(3), 'base64url').toString('utf8');
++      expect(Object.keys(JSON.parse(json) as object)).toEqual(['v', 'c', 'i', 'f', 'o', 's', 'p']);
++      expect(decodeScoutCursor(token, 'coach', 'intent', family)).toEqual({
++        s: 'source',
++        p: 'truecoach',
++      });
++      // Emitted tokens are bound: any other scope or endpoint refuses them.
++      expect(() => decodeScoutCursor(token, 'other', 'intent', family)).toThrow('malformed cursor');
++      expect(() => decodeScoutCursor(token, 'coach', 'other', family)).toThrow('malformed cursor');
++      expect(() =>
++        decodeScoutCursor(token, 'coach', 'intent', family === 'clients' ? 'workouts' : 'clients'),
++      ).toThrow('malformed cursor');
++    },
++  );
++
++  it('round-trips every worst-case boundary and stays within the HTTP bound', () => {
++    for (const id of ['\u0001'.repeat(256), '😀'.repeat(256), '\\'.repeat(256), '"'.repeat(256)]) {
++      const token = encodeScoutCursor(id, id, 'clients', id, 'a'.repeat(256));
++      expect(token.length).toBeLessThanOrEqual(SCOUT_CURSOR_MAX_LENGTH);
++      expect(decodeScoutCursor(token, id, id, 'clients')).toEqual({ s: id, p: 'a'.repeat(256) });
++    }
+   });
+ 
+-  it('retains the distinct legacy formats without a provenance lookup', () => {
++  it('fails closed instead of emitting an undecodable token', () => {
++    const bad: Array<[string, string, string, string]> = [
++      ['coach', 'intent', '', 'truecoach'],
++      ['coach', 'intent', 'a'.repeat(257), 'truecoach'],
++      ['coach', 'intent', 's\u0000', 'truecoach'],
++      ['coach', 'intent', '\ud800', 'truecoach'],
++      ['coach', 'intent', 's', 'TrueCoach'],
++      ['coach', 'intent', 's', ''],
++      ['coach', 'intent', 's', 'a'.repeat(257)],
++      ['', 'intent', 's', 'truecoach'],
++      ['coach', '', 's', 'truecoach'],
++    ];
++    for (const [c, i, s, p] of bad) {
++      expect(() => encodeScoutCursor(c, i, 'clients', s, p)).toThrow(InternalServerErrorException);
++    }
++  });
++
++  it('still decodes the distinct legacy formats to a source-only boundary', () => {
+     const e = { c: 'coach', i: 'intent', f: 'workouts', o: 'source_id:asc', s: 's' };
+     expect(decodeScoutCursor(encode('s'), 'coach', 'intent', 'clients')).toEqual({ s: 's' });
+     expect(decodeScoutCursor(encode(JSON.stringify(e)), 'coach', 'intent', 'workouts')).toEqual({
+       s: 's',
+     });
+-    expect(scoutCursorWhere({ s: 's' })).toEqual({ source_id: { gt: 's' } });
+-    expect(scoutCursorOrder({ s: 's' })).toEqual({ source_id: 'asc' });
++    expect(scoutCursorWhere(null)).toEqual({});
++  });
++
++  it('resolves a legacy boundary only through exactly one canonical ledger row in scope', async () => {
++    const { tx, findMany } = ledgerTx([{ source_platform: 'truecoach' }]);
++    await expect(resolveScoutCursor(tx, SCOPE, { s: 's' })).resolves.toEqual({
++      s: 's',
++      p: 'truecoach',
++    });
++    expect(findMany).toHaveBeenCalledTimes(1);
++    expect(findMany.mock.calls[0][0]).toEqual({
++      where: { ...SCOPE, source_id: 's' },
++      select: { source_platform: true },
++      take: 2,
++    });
++  });
++
++  it('passes v2 and empty boundaries through without any lookup', async () => {
++    const { tx, findMany } = ledgerTx([]);
++    await expect(resolveScoutCursor(tx, SCOPE, { s: 's', p: 'p' })).resolves.toEqual({
++      s: 's',
++      p: 'p',
++    });
++    await expect(resolveScoutCursor(tx, SCOPE, null)).resolves.toBeNull();
++    expect(findMany).not.toHaveBeenCalled();
++  });
++
++  it.each<[string, Array<{ source_platform: string | null }>]>([
++    ['absent (forged, foreign or never reconstructed)', []],
++    ['tied across platforms', [{ source_platform: 'a' }, { source_platform: 'b' }]],
++    ['noncanonical provenance', [{ source_platform: 'TrueCoach' }]],
++    ['null provenance', [{ source_platform: null }]],
++  ])('refuses an unresolvable legacy boundary as the documented 400: %s', async (_label, rows) => {
++    const { tx } = ledgerTx(rows);
++    const err = await resolveScoutCursor(tx, SCOPE, { s: 's' }).catch((e: unknown) => e);
++    expect(err).toBeInstanceOf(BadRequestException);
++    expect((err as BadRequestException).message).toBe('malformed cursor');
+   });
+ 
+   it.each(['clients', 'workouts'])(
+diff --git a/test/utils/g2-nq1-bootstrap.sh b/test/utils/g2-nq1-bootstrap.sh
+new file mode 100755
+index 0000000..96b7668
+--- /dev/null
++++ b/test/utils/g2-nq1-bootstrap.sh
+@@ -0,0 +1,248 @@
++#!/usr/bin/env bash
++# S7-3' G2 N/Q1 proof bootstrap, derived by substitution from the accepted R bootstrap
++# test/utils/g2-r-ready-bootstrap.sh (unchanged) for the N/Q1-only disposable cluster/database.
++# The "old" side is T: a detached checkout of the accepted R head 7d2895e1 (T writer, Q0 readers,
++# R schema); its `prisma migrate deploy` installs the whole accepted history (S1..R) so the N/Q1
++# candidate, which ships no migration, must have nothing pending. Validation harness only: it never touches a hosted or
++# application database, never edits schema/migration/generator sources, and
++# stops on the first unexpected state instead of repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_NQ1_DATABASE_URL  postgresql://nq1_super@127.0.0.1:<port>/g2_nq1_disposable?schema=public&connection_limit=2
++#   G2_NQ1_CONFIRM       g2_nq1_disposable:<port>
++#   G2_NQ1_PASSWORD      disposable local fixture password shared by nq1_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_NQ1_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_NQ1_OLD_ROOT      DETACHED Git checkout of the accepted R head 7d2895e1 (the T side); create it
++#                         with `git worktree add --detach` (a `git archive` extraction is not a
++#                         repository and cannot pass step 4 below)
++#   G2_NQ1_OLD_CLIENT    directory that receives the independently generated T Prisma client
++# Optional:
++#   G2_NQ1_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++OLD_HEAD=7d2895e1fe03ea82353e8ce0b07aacaf66af74c8
++R_MIGRATION=20270120000000_scout_identity_ready
++# 164 base migrations + S1 + C1 + E + B + R tracked by the T root (and by this candidate).
++EXPECTED_MIGRATIONS=169
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++EXPECTED_VERSION="${G2_NQ1_SERVER_VERSION:-170006}"
++# Distinctive R fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-nq1-db.ts G2_NQ1_CLUSTER_MARKER / G2_NQ1_DATABASE_MARKER, kept identical by
++# test/scout/g2-nq1-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 'nq1-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=nq1-disposable-pg17
++DB_MARKER=nq1-g2-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_NQ1_DATABASE_URL G2_NQ1_CONFIRM G2_NQ1_PASSWORD G2_NQ1_PSQL G2_NQ1_OLD_ROOT G2_NQ1_OLD_CLIENT; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++[[ -x "$G2_NQ1_PSQL" ]] || { echo "psql binary not executable: $G2_NQ1_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted C1 dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: `prisma generate` must never auto-install anything (B2 finding:
++# an output directory outside a package root made the CLI run `npm i` silently). The T client is
++# generated INSIDE the T checkout, whose node_modules is the shared symlink to the pinned npm-ci tree,
++# and @prisma/client must resolve from there to exactly $ROOT/node_modules/@prisma/client.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++[[ "$G2_NQ1_OLD_CLIENT" == "$G2_NQ1_OLD_ROOT"/* ]] \
++  || { echo "G2_NQ1_OLD_CLIENT must live inside G2_NQ1_OLD_ROOT (pinned package root); got $G2_NQ1_OLD_CLIENT" >&2; exit 2; }
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2Nq1TestTarget } = require("./test/utils/g2-nq1-db");
++  const t = g2Nq1TestTarget(process.env.G2_NQ1_DATABASE_URL, process.env.G2_NQ1_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  const { withFixturePassword } = require("./test/utils/g2-nq1-db");
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_NQ1_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_NQ1_PASSWORD"
++
++psql_maint() { "$G2_NQ1_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_NQ1_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|generate-only) ;; *) echo "usage: g2-pg17-bootstrap.sh [bootstrap|generate-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the R lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the R fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_NQ1_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_nq1_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_nq1_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_nq1_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_nq1_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_nq1_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_nq1_disposable exists without the R disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_nq1_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_nq1_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. T source: exact accepted R head, shared dependency tree, the full tracked history (S1..R).
++[[ "$(git -C "$G2_NQ1_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_NQ1_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between T and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -e "$G2_NQ1_OLD_ROOT/node_modules" ]] || ln -s "$ROOT/node_modules" "$G2_NQ1_OLD_ROOT/node_modules"
++[[ -d "$G2_NQ1_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_NQ1_OLD_ROOT/prisma/migrations/$R_MIGRATION" ]] \
++  || { echo "old root lacks E or R; it is not the accepted R head" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_NQ1_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# N/Q1 ships no migration: the candidate's migration directories are byte-identical to the T root's.
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- prisma/migrations \
++  || { echo "candidate migrations differ from the accepted R head; N/Q1 must ship none" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history (S1..R) through the real release mechanism from the T root.
++#    Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the cluster superuser.
++(cd "$G2_NQ1_OLD_ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='source_platform' AND NOT attisdropped AND attnotnull")" == "1" ]] \
++  || { echo "ledger lacks NOT NULL source_platform after the accepted history (R absent)" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_class WHERE relname IN ('ScoutIngestEntity_identity_key','ScoutReconstructionLedger_identity_key') AND relnamespace='public'::regnamespace")" == "2" ]] \
++  || { echo "wide identity keys absent after the accepted history (R absent)" >&2; exit 5; }
++
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative (S5-R3-A-05 / S5-R3B-02): a missing file is a
++# refusal (exit 6), not an empty field nested inside an echo.
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++# The runtime a generated client actually executes. The default-output candidate client requires
++# `@prisma/client/runtime/library.js` from the pinned package (it has no runtime/ copy of its own);
++# a custom-output client (the T client) receives a copy under <output>/runtime/.
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Independent T client generated from the T schema (accepted R head) into its own directory.
++mkdir -p "$G2_NQ1_OLD_CLIENT"
++PINNED_CLIENT_PKG="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
++RESOLVED_CLIENT_PKG="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_NQ1_OLD_CLIENT")"
++[[ "$RESOLVED_CLIENT_PKG" == "$PINNED_CLIENT_PKG" ]] \
++  || { echo "@prisma/client does not resolve from $G2_NQ1_OLD_CLIENT to the pinned tree ($RESOLVED_CLIENT_PKG != $PINNED_CLIENT_PKG); refusing to generate" >&2; exit 6; }
++echo "O_CLIENT_RESOLUTION pinned=$PINNED_CLIENT_PKG version=$(node -p 'require(process.argv[1]).version' "$PINNED_CLIENT_PKG") skip_autoinstall=$PRISMA_GENERATE_SKIP_AUTOINSTALL"
++OLD_SCHEMA_COPY="$G2_NQ1_OLD_CLIENT/.schema-for-generate.prisma"
++sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$G2_NQ1_OLD_CLIENT\"|" \
++  "$G2_NQ1_OLD_ROOT/prisma/schema.prisma" > "$OLD_SCHEMA_COPY"
++(cd "$G2_NQ1_OLD_ROOT" && "$ROOT/node_modules/.bin/prisma" generate --schema "$OLD_SCHEMA_COPY" >/dev/null)
++grep -q 'model ScoutReconstructionLedger' "$G2_NQ1_OLD_CLIENT/schema.prisma"
++O_ENGINE_SHA="$(hash_required 'generated T client engine' "$G2_NQ1_OLD_CLIENT/$ENGINE")"
++[[ "$O_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated T client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The T client's copied runtime must be the pinned package runtime: identical bytes, or the pinned
++# bytes preceded only by the generator's header (observed 130 B for prisma 6.19.3). Any other
++# difference is a refusal; a false refusal here fails closed and is reported, never skipped.
++O_RUNTIME="$G2_NQ1_OLD_CLIENT/runtime/library.js"
++O_RUNTIME_SHA="$(hash_required 'generated T client runtime' "$O_RUNTIME")"
++PINNED_RUNTIME_SIZE="$(stat -c %s "$PINNED_RUNTIME")"
++O_RUNTIME_SIZE="$(stat -c %s "$O_RUNTIME")"
++[[ "$O_RUNTIME_SIZE" -ge "$PINNED_RUNTIME_SIZE" ]] && cmp -s <(tail -c "$PINNED_RUNTIME_SIZE" "$O_RUNTIME") "$PINNED_RUNTIME" \
++  || { echo "generated T client runtime ($O_RUNTIME_SIZE B, $O_RUNTIME_SHA) does not end with the pinned @prisma/client runtime ($PINNED_RUNTIME_SIZE B, $PINNED_RUNTIME_SHA)" >&2; exit 6; }
++echo "O_CLIENT_GENERATED dir=$G2_NQ1_OLD_CLIENT engine_sha256=$O_ENGINE_SHA runtime=$O_RUNTIME runtime_sha256=$O_RUNTIME_SHA runtime_header_bytes=$((O_RUNTIME_SIZE - PINNED_RUNTIME_SIZE)) pinned_runtime=$PINNED_RUNTIME pinned_runtime_sha256=$PINNED_RUNTIME_SHA"
++# The T client is R's: optional ledger provenance (`String?`, R's D1) and both wide keys declared.
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_NQ1_OLD_CLIENT/schema.prisma" | grep -Eq 'source_platform +String\?' \
++  || { echo "generated T client does not carry R's optional ledger source_platform" >&2; exit 6; }
++for key in ScoutIngestEntity_identity_key ScoutReconstructionLedger_identity_key; do
++  grep -q "map: \"$key\"" "$G2_NQ1_OLD_CLIENT/schema.prisma" \
++    || { echo "generated T client schema lacks $key; it is not the R client" >&2; exit 6; }
++done
++
++# 7. Candidate (N) client in the candidate root: the N client generated once, before commit, in
++#    the isolated copy of the accepted R dependency tree (N changes prisma/schema.prisma: the ledger
++#    provenance becomes required) is only VERIFIED here; no `prisma generate` runs in the bootstrap.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated C1 tree not in place)" >&2; exit 7; }
++grep -q 'model ScoutReconstructionLedger' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client schema lacks ScoutReconstructionLedger; refusing (no regeneration in B)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The runtime the candidate client actually loads, resolved from the generated client directory.
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++# The generated client must be N's: REQUIRED ledger provenance (`String`, not `String?`) and both
++# wide keys declared (inherited from R), not a stale R/B client.
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "candidate client does not carry N's required ledger source_platform" >&2; exit 7; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String\?' \
++  || { echo "candidate client still carries optional ledger source_platform; the N client was not generated" >&2; exit 7; }
++for key in ScoutIngestEntity_identity_key ScoutReconstructionLedger_identity_key; do
++  grep -q "map: \"$key\"" "$ROOT/node_modules/.prisma/client/schema.prisma" \
++    || { echo "candidate client schema lacks $key; the N client was not generated from the R-derived schema" >&2; exit 7; }
++done
++
++if [[ "$MODE" == generate-only ]]; then echo "G2_NQ1_GENERATE_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_NQ1_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-nq1-db.ts b/test/utils/g2-nq1-db.ts
+new file mode 100644
+index 0000000..dbe10bc
+--- /dev/null
++++ b/test/utils/g2-nq1-db.ts
+@@ -0,0 +1,112 @@
++/**
++ * S7-3' G2 N/Q1 proof target guard: derived by literal substitution from the accepted
++ * R guard test/utils/g2-r-ready-db.ts, which stays byte-identical and keeps governing the
++ * accepted R proof. One dedicated disposable database on an N/Q1-only disposable PostgreSQL 17
++ * cluster; a SIXTH identity, separate from the E, T/Q0, S5, B and R targets, so no earlier
++ * proof state is reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_NQ1_DATABASE = 'g2_nq1_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      nq1_super    cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy`, E up/down and all harness DDL/data
++ *  - runtime    service_role  BYPASSRLS runtime role used by the T/N writer and Q0/Q1 reader processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_NQ1_ROLE = 'nq1_super';
++export const G2_NQ1_ADMIN_ROLE = G2_NQ1_ROLE;
++export const G2_NQ1_MIGRATION_ROLE = 'postgres';
++export const G2_NQ1_RUNTIME_ROLE = 'service_role';
++export const G2_NQ1_LOGIN_ROLES = new Set([
++  G2_NQ1_ADMIN_ROLE,
++  G2_NQ1_MIGRATION_ROLE,
++  G2_NQ1_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_NQ1_PASSWORD_ENV = 'G2_NQ1_PASSWORD';
++/**
++ * Distinctive N/Q1 fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 'nq1-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_nq1_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-nq1-bootstrap.sh and the R fixture binding under execution/cf8ff737/nq1/ must carry the same literals.
++ */
++export const G2_NQ1_CLUSTER_MARKER = 'nq1-disposable-pg17';
++export const G2_NQ1_DATABASE_MARKER = 'nq1-g2-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1).
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2Nq1TestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_NQ1_DATABASE}` ||
++    url.username !== G2_NQ1_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_NQ1_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'N/Q1 G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('N/Q1 G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_NQ1_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('N/Q1 G2 proof requires a plain fixture password in the environment');
++  if (!G2_NQ1_LOGIN_ROLES.has(username))
++    throw new Error('N/Q1 G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
+diff --git a/test/utils/g2-nq1-harness.ts b/test/utils/g2-nq1-harness.ts
+new file mode 100644
+index 0000000..a629c59
+--- /dev/null
++++ b/test/utils/g2-nq1-harness.ts
+@@ -0,0 +1,132 @@
++/**
++ * G2-N/Q1 live-proof helpers layered on the N/Q1-only derivative (test/utils/g2-nq1-pg-harness.ts)
++ * of the accepted R harness (test/utils/g2-r-ready-pg-harness.ts, unchanged).
++ * Carries the B and R helpers unchanged (S1, C1, E, B, R are fixture history here: the T root IS
++ * the accepted R head, so its `prisma migrate deploy` installs exactly that history) and adds
++ * only what N/Q1 needs: the five-field ledger identity observation. N/Q1 ships no migration.
++ * Imported only by the explicitly guarded test/rls-g2-nq1.spec.ts.
++ */
++import { PrismaClient } from '@prisma/client';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import { json, quote, root, sql, target } from './g2-nq1-pg-harness';
++import { G2_NQ1_RUNTIME_ROLE, withFixturePassword } from './g2-nq1-db';
++
++export const B_MIGRATION = '20270119000000_scout_ledger_obsolete_writer_fence';
++export const bDir = resolve(root, 'prisma/migrations', B_MIGRATION);
++export const bUpFile = resolve(bDir, 'migration.sql');
++export const bDownFile = resolve(bDir, 'down.sql');
++export const bUp = readFileSync(bUpFile, 'utf8');
++export const bDown = readFileSync(bDownFile, 'utf8');
++export const R_MIGRATION = '20270120000000_scout_identity_ready';
++export const rDir = resolve(root, 'prisma/migrations', R_MIGRATION);
++export const rUpFile = resolve(rDir, 'migration.sql');
++export const rDownFile = resolve(rDir, 'down.sql');
++export const rUp = readFileSync(rUpFile, 'utf8');
++export const rDown = readFileSync(rDownFile, 'utf8');
++export const WIDE_COLUMNS = 'coach_id, intent_id, entity_type, source_platform, source_id';
++export const CANONICAL_CHECK = `CHECK (((source_platform COLLATE "C") ~ '^[a-z0-9][a-z0-9._:-]{0,255}$'::text))`;
++/** R's catalog contribution: exact wide index definitions, exact CHECK definitions (as
++ *  pg_get_constraintdef renders them), the ledger column's NOT NULL. Empty arrays / false when
++ *  R is absent. Index and constraint OIDs are included so "unchanged" is provable across a rerun. */
++export const wide = () =>
++  json(`SELECT jsonb_build_object(
++  'indexes',(SELECT COALESCE(jsonb_agg(jsonb_build_array(c.relname,i.indexrelid,i.indisunique,i.indisvalid,pg_get_indexdef(i.indexrelid)) ORDER BY c.relname),'[]')
++    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
++    WHERE c.relname IN ('ScoutIngestEntity_identity_key','ScoutReconstructionLedger_identity_key')
++      AND c.relnamespace='public'::regnamespace),
++  'checks',(SELECT COALESCE(jsonb_agg(jsonb_build_array(conname,oid,conrelid::regclass::text,convalidated,pg_get_constraintdef(oid)) ORDER BY conname),'[]')
++    FROM pg_constraint WHERE contype='c' AND connamespace='public'::regnamespace
++      AND conname IN ('ScoutIngestEntity_source_platform_canonical','ScoutReconstructionLedger_source_platform_canonical')),
++  'ledgerNotNull',(SELECT attnotnull FROM pg_attribute WHERE attrelid='public."ScoutReconstructionLedger"'::regclass
++    AND attname='source_platform' AND NOT attisdropped))`);
++/** Both narrow unique indexes with their OIDs: R must leave them byte- and OID-identical. */
++export const narrow = () =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(c.relname,i.indexrelid,pg_get_indexdef(i.indexrelid)) ORDER BY c.relname),'[]')
++  FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
++  WHERE c.relname IN ('ScoutIngestEntity_coach_id_intent_id_source_id_key',
++    'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key'::name)
++    AND c.relnamespace='public'::regnamespace`);
++/** Accepted S1 and C1 migrations: both the candidate root and the T root (accepted R head) track
++ *  them; the T root's `prisma migrate deploy` in the bootstrap records the whole history, so the
++ *  candidate's deploy has NOTHING pending (N/Q1 ships no migration). Nothing about them is proven. */
++export const S1_MIGRATION = '20261224000000_rls_close_public_exposure';
++export const C1_MIGRATION = '20270117000000_durable_import_setup';
++export const acceptedUpFile = (name: string) =>
++  resolve(root, 'prisma/migrations', name, 'migration.sql');
++/** Every ledger row of a scope keyed by the five-field identity, ordered as Q1 pages it. */
++export const identityRows = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(jsonb_build_array(entity_type,source_id,source_platform,status,target_id)
++  ORDER BY entity_type,source_id,source_platform),'[]')
++  FROM "ScoutReconstructionLedger" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++/** Migrations recorded as finished at or after a server timestamp (`SELECT now()`), sorted. */
++export const appliedSince = (since: string): string[] =>
++  json(`SELECT COALESCE(jsonb_agg(migration_name ORDER BY migration_name),'[]')
++  FROM "_prisma_migrations" WHERE finished_at >= ${quote(since)}::timestamptz`);
++
++/** Trigger + function catalog shape; '[]'/null when absent. Includes proconfig and ACL.
++ *  The trigger definition is rendered under an EMPTY search_path so the text is the canonical,
++ *  fully qualified form (FENCE_TRIGGER_DEFINITION) whatever the session default is; tgtype is
++ *  included so BEFORE INSERT FOR EACH ROW (7) is asserted structurally as well. */
++export const fence = () =>
++  json(`SET search_path = '';
++  SELECT jsonb_build_object(
++  'triggers',(SELECT COALESCE(jsonb_agg(jsonb_build_array(tgname,tgenabled,tgtype,pg_get_triggerdef(oid)) ORDER BY tgname),'[]')
++    FROM pg_trigger WHERE tgrelid='public."ScoutReconstructionLedger"'::regclass AND NOT tgisinternal),
++  'function',(SELECT to_jsonb(f) FROM (SELECT proname,prosecdef,proconfig,proacl::text,provolatile,
++    pg_get_functiondef(oid) def FROM pg_proc WHERE oid=to_regprocedure('public.scout_ledger_platform_fence()')) f))`);
++export const nullCount = () =>
++  Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform IS NULL`));
++export const ledgerCount = () => Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger"`));
++/** Every ledger column except provenance, deterministic order: the backfill's "untouched" proof. */
++export const ledgerWithoutPlatform = () =>
++  json(`SELECT COALESCE(jsonb_agg((to_jsonb(l) - 'source_platform')
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const stagingSnapshot = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY coach_id,intent_id,source_id,id),'[]')
++  FROM "ScoutIngestEntity" s`);
++/** Rows whose provenance differs from the exact staging match (never written by the backfill). */
++export const disagreeing = () =>
++  Number(
++    sql(`SELECT count(*) FROM "ScoutReconstructionLedger" l JOIN "ScoutIngestEntity" s
++  ON s.coach_id=l.coach_id AND s.intent_id=l.intent_id AND s.entity_type=l.entity_type AND s.source_id=l.source_id
++  WHERE l.source_platform IS DISTINCT FROM s.source_platform`),
++  );
++/** Fixture shaping only: re-open provenance on existing rows (an UPDATE; the fence is INSERT-only). */
++export const nullify = (where: string) =>
++  Number(
++    sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform=NULL WHERE ${where} RETURNING id)
++  SELECT count(*) FROM c`),
++  );
++export const ledgerIds = (where: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`,
++  );
++export const platformOf = (id: string) =>
++  sql(
++    `SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`,
++  );
++
++/**
++ * In-process runtime-role (service_role) client: the same generated N client the candidate ships,
++ * connected exactly like the worker processes, with an application_name so lock waits are
++ * observable through the accepted `blocked()` helper. Query text only is logged, never parameters.
++ */
++export function runtimeClient(name: string) {
++  const url = new URL(
++    withFixturePassword(target.prismaUrl, process.env.G2_NQ1_PASSWORD, G2_NQ1_RUNTIME_ROLE),
++  );
++  url.searchParams.set('application_name', name);
++  const queries: string[] = [];
++  const client = new PrismaClient({
++    datasources: { db: { url: url.toString() } },
++    log: [{ emit: 'event', level: 'query' }],
++  });
++  client.$on('query', (e) => {
++    queries.push(e.query);
++  });
++  return { client, queries, name };
++}
+diff --git a/test/utils/g2-nq1-old-root.sh b/test/utils/g2-nq1-old-root.sh
+new file mode 100755
+index 0000000..4569f5f
+--- /dev/null
++++ b/test/utils/g2-nq1-old-root.sh
+@@ -0,0 +1,91 @@
++#!/usr/bin/env bash
++# S7-3' G2 N/Q1 T fixture: create (or preflight) the detached checkout of the accepted R head
++# 7d2895e1 (the T writer / Q0 readers / R schema) that test/utils/g2-nq1-bootstrap.sh step 4
++# requires. Derived by substitution from the accepted S5 helper test/utils/g2-pg17-old-root.sh
++# (unchanged): the same clone + detached checkout recipe, with the identity gate inverted where
++# the T root, unlike O, MUST carry E and R and the R-shaped (optional) ledger provenance.
++#
++# Why this exists: a `git archive | tar` extraction is NOT a Git repository, so it can
++# never satisfy bootstrap's identity gate (`git rev-parse HEAD` == T and a clean
++# relevant-path diff). The fixture must be a real detached checkout. This script clones
++# the candidate root itself (which must contain the R head in its history) and checks out
++# it detached, changing no ref, worktree
++# metadata or file of the candidate repository. It then runs the exact offline checks
++# bootstrap will repeat, so the recipe is verified before any database or dependency work.
++#
++# Usage: G2_NQ1_OLD_ROOT=<path> bash test/utils/g2-nq1-old-root.sh [create|preflight]
++#   create     (default) clone + detached checkout at the R head when the path does not exist,
++#              then preflight. Refuses to reuse a path that is not that checkout.
++#   preflight  only verify an existing path.
++# Optional: G2_NQ1_OLD_ROOT_SHARED=1 uses `git clone --shared` (objects read through
++#   alternates from the candidate's object store; zero copy). Default is a self-contained
++#   local clone (hardlinked/copied objects) that keeps working if the source moves.
++# Needs git only. Never deletes anything; never touches PostgreSQL, node_modules, hosted
++# or customer resources.
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++OLD_HEAD=7d2895e1fe03ea82353e8ce0b07aacaf66af74c8
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++R_MIGRATION=20270120000000_scout_identity_ready
++EXPECTED_MIGRATIONS=169
++MODE="${1:-create}"
++[[ -n "${G2_NQ1_OLD_ROOT:-}" ]] || { echo "missing G2_NQ1_OLD_ROOT" >&2; exit 2; }
++[[ "$MODE" == create || "$MODE" == preflight ]] || { echo "usage: $0 [create|preflight]" >&2; exit 2; }
++case "$G2_NQ1_OLD_ROOT" in /*) ;; *) echo "G2_NQ1_OLD_ROOT must be absolute" >&2; exit 2;; esac
++[[ "$G2_NQ1_OLD_ROOT" != "$ROOT" && "$G2_NQ1_OLD_ROOT" != "$ROOT"/* ]] \
++  || { echo "old root must live outside the candidate root $ROOT" >&2; exit 2; }
++
++# The candidate must carry the R head in its own history; otherwise the shared node_modules
++# rule in bootstrap (identical package.json/lock) has no basis either.
++git -C "$ROOT" cat-file -e "$OLD_HEAD^{commit}" || { echo "candidate root does not contain the R head $OLD_HEAD" >&2; exit 3; }
++git -C "$ROOT" merge-base --is-ancestor "$OLD_HEAD" HEAD || { echo "R head $OLD_HEAD is not an ancestor of candidate HEAD" >&2; exit 3; }
++
++if [[ "$MODE" == create ]]; then
++  if [[ -e "$G2_NQ1_OLD_ROOT" ]]; then
++    [[ -f "$G2_NQ1_OLD_ROOT/.git" || -d "$G2_NQ1_OLD_ROOT/.git" ]] \
++      || { echo "$G2_NQ1_OLD_ROOT exists but is not a Git checkout (an archive extraction cannot pass the identity gate); remove it" >&2; exit 4; }
++    echo "old root already exists; verifying only"
++  else
++    # --no-checkout + checkout --detach: HEAD is the exact R commit, on no branch.
++    # Nothing in the source repository changes either way.
++    if [[ "${G2_NQ1_OLD_ROOT_SHARED:-0}" == 1 ]]; then
++      git clone --quiet --shared --no-checkout "$ROOT" "$G2_NQ1_OLD_ROOT"
++    else
++      git clone --quiet --no-checkout "$ROOT" "$G2_NQ1_OLD_ROOT"
++    fi
++    git -C "$G2_NQ1_OLD_ROOT" checkout --quiet --detach "$OLD_HEAD"
++  fi
++fi
++
++# ---- Offline preflight: exactly the bootstrap step-4 gate, plus the spec's byte checks.
++[[ "$(git -C "$G2_NQ1_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_NQ1_OLD_ROOT" symbolic-ref -q HEAD >/dev/null && { echo "old root HEAD must be detached, not a branch" >&2; exit 4; }
++git -C "$G2_NQ1_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between T and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -d "$G2_NQ1_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_NQ1_OLD_ROOT/prisma/migrations/$R_MIGRATION" ]] \
++  || { echo "old root lacks E or R; it is not the accepted R head" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_NQ1_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# N/Q1 ships no migration: the candidate's migration tree is byte-identical to the T root's.
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- prisma/migrations \
++  || { echo "candidate migrations differ from the accepted R head; N/Q1 must ship none" >&2; exit 4; }
++for file in scout-reconstruct.service.ts scout-roster.service.ts scout-entities.service.ts; do
++  cmp -s "$G2_NQ1_OLD_ROOT/src/scout/$file" <(git -C "$ROOT" show "$OLD_HEAD:src/scout/$file") \
++    || { echo "old root src/scout/$file is not byte-identical to $OLD_HEAD" >&2; exit 4; }
++done
++# The T ledger model carries R's OPTIONAL provenance (`String?`); the N candidate makes it required.
++grep -q 'model ScoutReconstructionLedger' "$G2_NQ1_OLD_ROOT/prisma/schema.prisma" || { echo "old schema lacks the ledger model" >&2; exit 4; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_NQ1_OLD_ROOT/prisma/schema.prisma" | grep -Eq 'source_platform +String\?' \
++  || { echo "old ledger model does not carry R's optional source_platform" >&2; exit 4; }
++# Dependencies are shared read-only by bootstrap through a symlink; report provenance if present.
++if [[ -L "$G2_NQ1_OLD_ROOT/node_modules" ]]; then
++  echo "node_modules symlink -> $(readlink "$G2_NQ1_OLD_ROOT/node_modules")"
++elif [[ -e "$G2_NQ1_OLD_ROOT/node_modules" ]]; then
++  echo "old root has its own node_modules directory (not the shared symlink); bootstrap will not replace it" >&2; exit 4
++fi
++echo "old_root=$G2_NQ1_OLD_ROOT head=$(git -C "$G2_NQ1_OLD_ROOT" rev-parse HEAD) detached=yes migrations=$OLD_COUNT" \
++  "alternates=$(cat "$(git -C "$G2_NQ1_OLD_ROOT" rev-parse --absolute-git-dir)/objects/info/alternates" 2>/dev/null || echo none)"
++echo "G2_NQ1_OLD_ROOT_OK"
+diff --git a/test/utils/g2-nq1-pg-harness.ts b/test/utils/g2-nq1-pg-harness.ts
+new file mode 100644
+index 0000000..c8f6fea
+--- /dev/null
++++ b/test/utils/g2-nq1-pg-harness.ts
+@@ -0,0 +1,367 @@
++/**
++ * S7-3' G2 N/Q1 live-proof helpers: derived by substitution from the accepted R harness
++ * test/utils/g2-r-ready-pg-harness.ts, which stays byte-identical. Same real psql, same real
++ * generated Prisma clients in separate OS processes (test/utils/g2-tq0-worker.cjs, shared
++ * unchanged), no transaction or query mocks; bound to the N/Q1-only identity guard
++ * test/utils/g2-nq1-db.ts and the G2_NQ1_* environment. Only test/rls-g2-nq1.spec.ts
++ * (via test/utils/g2-nq1-harness.ts) imports this.
++ *
++ * The "old" process role here is T (the accepted R head 7d2895e1: T writer + Q0 readers with
++ * the T client generated in that detached checkout), not O. `worker(..., true)` runs T.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_NQ1_ADMIN_ROLE,
++  G2_NQ1_MIGRATION_ROLE,
++  G2_NQ1_RUNTIME_ROLE,
++  g2Nq1TestTarget,
++  withFixturePassword,
++} from './g2-nq1-db';
++
++export const root = resolve(__dirname, '..', '..');
++export const OLD_HEAD = '7d2895e1fe03ea82353e8ce0b07aacaf66af74c8';
++export const E_MIGRATION = '20270118000000_scout_ledger_platform_expand';
++
++const raw = process.env.G2_NQ1_DATABASE_URL;
++const password = process.env.G2_NQ1_PASSWORD;
++export const psql = process.env.G2_NQ1_PSQL;
++export const oldRoot = process.env.G2_NQ1_OLD_ROOT;
++export const oldClient = process.env.G2_NQ1_OLD_CLIENT;
++export const directory = process.env.G2_NQ1_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_NQ1_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !oldRoot || !oldClient || !directory) {
++  throw new Error(
++    'N/Q1 G2 proof requires explicit database, password, psql, data directory, T source and T client',
++  );
++}
++export const target = g2Nq1TestTarget(raw, process.env.G2_NQ1_CONFIRM);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_NQ1_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_NQ1_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** Operator form: `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>`. E's files carry their own
++ *  BEGIN/COMMIT, so --single-transaction is redundant there (psql only emits nested-transaction
++ *  WARNINGs); it is kept so the harness runs the same command the recovery packet documents.
++ *  Recovery semantics themselves are S1-owned; this helper asserts nothing about them. */
++export const sqlFile = (file: string): string =>
++  psqlRun(migrationUrl, ['--single-transaction', '-f', file]);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string): void {
++  let error: unknown;
++  try {
++    sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++
++export const stageSql = resolve(root, 'prisma/migrations', E_MIGRATION);
++export const upFile = resolve(stageSql, 'migration.sql');
++export const downFile = resolve(stageSql, 'down.sql');
++export const up = readFileSync(upFile, 'utf8');
++export const down = readFileSync(downFile, 'utf8');
++export const hasColumn = () =>
++  sql(`SELECT count(*) FROM pg_attribute WHERE
++  attrelid='public."ScoutReconstructionLedger"'::regclass AND attname='source_platform' AND NOT attisdropped`);
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++/** Ledger rows in a scope, ordered deterministically; provenance column optional pre-E. */
++export const records = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY entity_type,source_id,id),'[]')
++  FROM "ScoutReconstructionLedger" l WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`,
++  );
++export const allLedger = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(l)
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const targets = (coach = 'coach') =>
++  json(`SELECT jsonb_build_object(
++  'persons',(SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY id),'[]') FROM "Person" p WHERE coach_id=${quote(coach)}),
++  'entities',(SELECT COALESCE(jsonb_agg(to_jsonb(e) ORDER BY id),'[]') FROM "ScoutReconstructedEntity" e WHERE coach_id=${quote(coach)}))`);
++export const catalog = () =>
++  sql(`SELECT jsonb_build_object(
++  'tables',(SELECT jsonb_agg(jsonb_build_array(oid,relname,relrowsecurity,relforcerowsecurity) ORDER BY relname)
++    FROM pg_class WHERE oid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'indexes',(SELECT jsonb_agg(jsonb_build_array(indexrelid,pg_get_indexdef(indexrelid)) ORDER BY indexrelid)
++    FROM pg_index WHERE indrelid IN ('public."ScoutIngestEntity"'::regclass,'public."ScoutReconstructionLedger"'::regclass,
++      'public."Person"'::regclass,'public."ScoutReconstructedEntity"'::regclass)),
++  'policies',(SELECT jsonb_agg(to_jsonb(p) ORDER BY tablename,policyname) FROM pg_policies p
++    WHERE schemaname='public' AND tablename IN ('ScoutIngestEntity','ScoutReconstructionLedger','Person','ScoutReconstructedEntity')))`);
++
++export function settle(coach = 'coach', intent = 'intent') {
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},'settled','success')
++    ON CONFLICT DO NOTHING`);
++}
++export function stage(
++  source = 'a',
++  family = 'clients',
++  platform = 'truecoach',
++  name = 'Synthetic A',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  // Primary key includes family AND platform so a same-source collision can only fire on the
++  // product's narrow staging key (coach_id, intent_id, source_id), never on the harness's own id.
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify({ name, client_id: 'client-new' }))})`);
++}
++/** Bulk synthetic staging through generate_series; names are synthetic, no customer data. */
++export function stageMany(
++  count: number,
++  family = 'clients',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++  failEvery = 0,
++  prefix = 's',
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    SELECT ${quote(`${coach}-${intent}-${prefix}`)}||lpad(n::text,5,'0'),${quote(coach)},${quote(intent)},${quote(family)},
++      ${quote(prefix)}||lpad(n::text,5,'0'),${quote(platform)},
++      jsonb_build_object('name',CASE WHEN ${failEvery} > 0 AND n % ${failEvery} = 0 THEN 'FAIL' ELSE 'Synthetic '||n END,
++        'client_id','client-'||n)
++    FROM generate_series(1,${count}) n`);
++}
++export function legacy(
++  status: string,
++  platform: string | null | 'ABSENT' = null,
++  source = 'a',
++  family = 'clients',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  const withColumn = platform !== 'ABSENT';
++  sql(`INSERT INTO "ScoutReconstructionLedger"
++    (id,coach_id,intent_id,entity_type,source_id,${withColumn ? 'source_platform,' : ''}status,target_id,reason)
++    VALUES (${quote(`${coach}-${intent}-${family}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},${quote(source)},
++    ${withColumn ? `${platform === null ? 'NULL' : quote(platform)},` : ''}${quote(status)},'saved-target','saved-reason')`);
++}
++export function resetData() {
++  sql(`DELETE FROM "ScoutReconstructionLedger"; DELETE FROM "ScoutIngestEntity";
++    DELETE FROM "Person"; DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutImport";`);
++  settle();
++}
++
++export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
++let sequence = 0;
++export function worker(options: Record<string, unknown> = {}, old = false) {
++  const name = `g2n_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_NQ1_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root: old ? oldRoot : root,
++    client: old ? oldClient : resolve(root, 'node_modules/.prisma/client'),
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    family: 'clients',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-tq0-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_TQ0_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  let readyResolve: () => void;
++  const ready = new Promise<void>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.ready) readyResolve();
++      if (message.done) result = message;
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          old,
++          options: { ...options, cursor: options.cursor ? '<cursor>' : undefined },
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return {
++    done,
++    ready: options.pause
++      ? Promise.race([
++          ready,
++          done.then(() => {
++            throw new Error('barrier not reached');
++          }),
++        ])
++      : Promise.resolve(),
++    release: () => child.send('continue'),
++    stop: () => child.kill(),
++    name,
++  };
++}
++export const run = (options: Record<string, unknown> = {}, old = false) =>
++  worker(options, old).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_NQ1_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const holdAdvisory = (key: number) =>
++  holdTransaction(`SELECT pg_advisory_xact_lock(${key})`, G2_NQ1_MIGRATION_ROLE);
++export const encoded = (s: string) => Buffer.from(s).toString('base64url');
++/** Q0's roster legacy token: bare base64url(source_id). */
++export const legacyRosterCursor = (s: string) => encoded(s);
++export const legacyEntityCursor = (family: string, s: string) =>
++  encoded(
++    JSON.stringify({
++      c: 'coach',
++      i: 'intent',
++      f: family,
++      o: 'source_id:asc',
++      s,
++    }),
++  );
++export const v2 = (
++  family: string,
++  source = 'a',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++) =>
++  `v2.${encoded(
++    JSON.stringify({
++      v: 2,
++      c: coach,
++      i: intent,
++      f: family,
++      o: 'source_id:asc,source_platform:asc',
++      s: source,
++      p: platform,
++    }),
++  )}`;
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_NQ1_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}

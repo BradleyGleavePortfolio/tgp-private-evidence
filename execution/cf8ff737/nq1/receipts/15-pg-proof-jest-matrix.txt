@@ -1,0 +1,131 @@
+✓ N01: prisma migrate deploy from the candidate has nothing pending; the catalog does not move; N writes the five-field identity (5090 ms)
+✕ N02: N on R, per family, matches the accepted T tally on an identical fixture; replay identical; ledger provenance is the staged provenance (3560 ms)
+✕ N03: mixed T and N processes on one staged row, both orders: one ledger row, one target, success dominates (3081 ms)
+✓ N04: a same-source, different-platform staged row against a committed ledger row is a 409 with nothing written — for N and for T (4227 ms)
+✓ N05 (negative control, release-order precondition): on the E+B shape (R down) the N client fails closed on a NULL-provenance row; nothing is written; R up restores the shape (6783 ms)
+✕ N06: rollback N→T — after N writes, T replays identically and the T/Q0 readers enumerate the same union as N/Q1 (969 ms)
+✓ Q01: every non-final clients page emits the exact scoped v2 token; every page orders by (source_id, source_platform) under REPEATABLE READ (4688 ms)
+✓ Q01: every non-final workouts page emits the exact scoped v2 token; every page orders by (source_id, source_platform) under REPEATABLE READ (4715 ms)
+✓ Q02: clients tokens chain Q1→Q0→Q1 and Q0→Q1→Q0 at limit 1 without repeating or skipping a row (19347 ms)
+✓ Q02: workouts tokens chain Q1→Q0→Q1 and Q0→Q1→Q0 at limit 1 without repeating or skipping a row (15456 ms)
+✓ Q03: a legacy clients token resolves to the same page as its v2 boundary inside the scope; forged or foreign resolves to 400 before any page read (8651 ms)
+✓ Q03: a legacy workouts token resolves to the same page as its v2 boundary inside the scope; forged or foreign resolves to 400 before any page read (8704 ms)
+✓ Q04: identity ties (same source_id, several platforms) enumerate every clients row exactly once at limit 1; Q0 accepts the v2 tokens; a tied legacy token is 400 (7524 ms)
+✓ Q04: identity ties (same source_id, several platforms) enumerate every workouts row exactly once at limit 1; Q0 accepts the v2 tokens; a tied legacy token is 400 (7645 ms)
+✕ Q05: a clients token outside its (coach, intent, family) scope, or on the other endpoint, is 400; a foreign coach is 404 (7359 ms)
+✕ Q05: a workouts token outside its (coach, intent, family) scope, or on the other endpoint, is 400; a foreign coach is 404 (7278 ms)
+✓ Q06: erased or re-scoped clients targets stay hidden while the cursor still advances to a final null (3913 ms)
+✓ Q06: erased or re-scoped workouts targets stay hidden while the cursor still advances to a final null (3919 ms)
+✓ Q07: clients tokens are bounded at 8,192 characters for Q1 and Q0; every malformed shape is a 400 without reflection (24820 ms)
+✓ Q07: workouts tokens are bounded at 8,192 characters for Q1 and Q0; every malformed shape is a 400 without reflection (24607 ms)
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 15 passed, 20 total
+Time:        190.738 s
+  ● stage 1: N — the final writer on the accepted R shape › N02: N on R, per family, matches the accepted T tally on an identical fixture; replay identical; ledger provenance is the staged provenance
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 2
+
+      Object {
+    -   "failed": 4,
+    -   "reconstructed": 20,
+    +   "failed": 0,
+    +   "reconstructed": 24,
+        "staged": 24,
+      }
+
+      270 |       expect(fromT.failure).toBeUndefined();
+      271 |       expect(tally(fromN.result)).toEqual(tally(fromT.result));
+    > 272 |       expect(fromN.result).toMatchObject({
+          |                            ^
+      273 |         staged: 24,
+      274 |         reconstructed: family === 'clients' ? 20 : 24,
+      275 |         failed: family === 'clients' ? 4 : 0,
+
+      at Object.<anonymous> (test/rls-g2-nq1.spec.ts:272:28)
+
+  ● stage 1: N — the final writer on the accepted R shape › N03: mixed T and N processes on one staged row, both orders: one ledger row, one target, success dominates
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "reconstructed": 1,
+    +   "reconstructed": 4,
+      }
+
+      300 |     await tPaused.ready;
+      301 |     const n1 = await run();
+    > 302 |     expect(n1.result).toMatchObject({ reconstructed: 1 });
+          |                       ^
+      303 |     tPaused.release();
+      304 |     const t1 = await tPaused.done;
+      305 |     expect(t1.failure).toBeUndefined();
+
+      at Object.<anonymous> (test/rls-g2-nq1.spec.ts:302:23)
+
+  ● stage 1: N — the final writer on the accepted R shape › N06: rollback N→T — after N writes, T replays identically and the T/Q0 readers enumerate the same union as N/Q1
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "reconstructed": 9,
+    +   "reconstructed": 12,
+      }
+
+      435 |       stageMany(12, family, 'truecoach', 'coach', intent, family === 'clients' ? 4 : 0);
+      436 |       const n = await run({ intent, family });
+    > 437 |       expect(n.result).toMatchObject({ reconstructed: success });
+          |                        ^
+      438 |       const rows = records('coach', intent, family);
+      439 |       const t = await run({ intent, family }, true);
+      440 |       expect(t.failure).toBeUndefined();
+
+      at Object.<anonymous> (test/rls-g2-nq1.spec.ts:437:24)
+
+  ● stage 2: Q1 — scoped v2 emission, legacy resolution, ties, scope, erasure, bounds › Q05: a clients token outside its (coach, intent, family) scope, or on the other endpoint, is 400; a foreign coach is 404
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 404
+    Received: 400
+
+      652 |       expect(
+      653 |         (await run({ action, family, cursor: v2(family, 'a'), coach: 'foreign' })).failure?.status,
+    > 654 |       ).toBe(404);
+          |         ^
+      655 |       const valid = await run({ action, family, cursor: v2(family, 'a') });
+      656 |       expect(ids(visible(family, valid.result))).toHaveLength(1);
+      657 |     },
+
+      at test/rls-g2-nq1.spec.ts:654:9
+
+  ● stage 2: Q1 — scoped v2 emission, legacy resolution, ties, scope, erasure, bounds › Q05: a workouts token outside its (coach, intent, family) scope, or on the other endpoint, is 400; a foreign coach is 404
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 404
+    Received: 400
+
+      652 |       expect(
+      653 |         (await run({ action, family, cursor: v2(family, 'a'), coach: 'foreign' })).failure?.status,
+    > 654 |       ).toBe(404);
+          |         ^
+      655 |       const valid = await run({ action, family, cursor: v2(family, 'a') });
+      656 |       expect(ids(visible(family, valid.result))).toHaveLength(1);
+      657 |     },
+
+      at test/rls-g2-nq1.spec.ts:654:9
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 15 passed, 20 total
+Snapshots:   0 total
+Time:        190.738 s
+Ran all test suites matching test/rls-g2-nq1.spec.ts.

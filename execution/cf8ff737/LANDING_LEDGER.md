@@ -69,3 +69,5 @@ The landing census found that GitHub's rebase-merge rewrites the committer to `G
 - **Backend production.** It must be an ordinary fast-forward push of the exact integration tip, not the GitHub merge button.
 
 | 17:44Z | backend `integration/importer` | PROD-CI-1 `c7a5fe8d` | FF from `7d2895e1` | accepted: T3 review plus #532 real-PG proof (5/5 OK) |
+
+| 18:04Z | extension `land/s4-r6` (PR #27, staged) | S4, then UX-07 `322b749a`, then S4-CQ `aa0abd83` | FF from `91990ae9` | accepted; landing on `main` awaits the owner approval required by protection |

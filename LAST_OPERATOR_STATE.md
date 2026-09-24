@@ -4,7 +4,9 @@ EXEC-CF8FF737. Bradley's September 24, 2026 EXECUTE is active; recon accepted an
 
 ## Current cursor
 
-**Updated 17:50Z.**
+**Updated 18:55Z.** See the handoff's 18:55Z update. The N/Q1 v2 spec correction is in build after its PG proof failed with spec-only failures (B). C phase 1 is drafted and waits for N/Q1. Extension #27 and backend #530 are owner-reserved.
+
+**Prior (17:50Z):**
 
 **Landed:**
 
