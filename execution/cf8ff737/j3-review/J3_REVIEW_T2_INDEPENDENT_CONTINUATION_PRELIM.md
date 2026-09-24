@@ -196,6 +196,132 @@ per the parent's explicit "no extra readiness audit needed" instruction.
 
 ---
 
+## Addendum 2 — actual terminal receipts bound (same review, no source re-audit) (2026-09-24, ~08:25 PDT)
+
+The parent relayed that the driver ran to completion. This reviewer read
+(read-only) the retained T3 executor's own receipts under
+`execution/cf8ff737/j3-recovery-t3/run/receipts/` and independently
+re-confirmed the terminal state directly against the live worktree. No
+source re-audit was performed; this binds **results**, not content — the
+content question stays closed per §1 of this note and the existing source
+closure.
+
+### Independently re-confirmed against the live worktree (read-only)
+
+| Field | Receipt claim | Live re-check | Match |
+|---|---|---|---|
+| New commit HEAD | `9ff749c35f64068e156400d2ed37c0b144c2d56d` | `git rev-parse HEAD` → same | Yes |
+| Parent | `820dbd04500b06648ce4c0820c1badced55d6d7c` (the exact r4 base, unchanged) | `git log -1 --format=%P` → same, single parent | Yes |
+| Tree | `823b97006f7df9617bad5516d7ef578189095e82` (frozen r5 tree) | matches the pinned frozen tree | Yes |
+| Author/committer | Bradley Gleave `<bradley@bradleytgpcoaching.com>`, both identical | `git config --local user.name/user.email` → same; raw commit object shows both fields identical | Yes |
+| Message | Single subject `test(importer): complete J3 screen mock isolation`, empty body, no trailers | raw object confirms exactly that, `trailers=[]` | Yes |
+| Working tree | Clean after commit | `git status` → "nothing to commit, working tree clean" | Yes |
+| Product blob | `92ed52f5cc108f3a098062364d6af793cbb8e2b7`, unchanged | recorded unchanged in `06-post-commit.txt`; not independently re-hashed again this round (already reproduced three times across this family) | Accepted by identity |
+| Hook posture | Restored to unset (not bypassed) | `git config --local --get core.hooksPath` now exits nonzero (unset); only `.sample` hooks remain, no `.husky`, no non-sample hooks | Yes |
+| npm ci | Pinned lock SHA-256 `840be0b8...`, installed-record SHA-256 `c4d7824b...`, exit 0 | `01-npm-ci-status.txt`: `exit_status=0 duration_s=387`; `02-env-pins.txt` shows both hashes matching the grant's pins exactly | Yes |
+
+### Gate results (full original-order two-file run, not filtered)
+
+| Gate | Command | Exit | Result |
+|---|---|---|---|
+| 1 — typecheck | `./node_modules/.bin/tsc --noEmit` | 0 | clean, 30s |
+| 2 — lint (two named test files) | `./node_modules/.bin/eslint .../ImportDataScreen.test.tsx .../ImportDataScreen.restore.test.tsx` | 0 | clean, 1s |
+| 3 — Jest, full two-file suite | `./node_modules/.bin/jest .../ImportDataScreen.test.tsx .../ImportDataScreen.restore.test.tsx --silent --runInBand` | 0 | **`Test Suites: 2 passed, 2 total` / `Tests: 50 passed, 50 total`** — confirmed the full 50-case original-order run, not a filtered Later-only subset |
+
+Portable export receipts also confirmed consistent: the bundle
+(`j3-r5-committed-9ff749c.bundle`) verifies okay and "records a complete
+history"; the regenerated commit diff SHA-256 matches the pinned
+`48d1c583...` exactly; no owned-survivor processes remained after any
+stage (`99-survivors.txt`, all "none").
+
+### npm vulnerability advisories — recorded honestly, not escalated
+
+`npm ci`'s own summary reported **36 vulnerabilities (1 low, 21 moderate,
+14 high)** in the installed dependency graph, plus a run of `npm warn
+deprecated`/`EBADENGINE` lines. Per the parent's explicit instruction, this
+is recorded as-is and not elevated: it is **inherited-graph output from
+the existing pinned lockfile**, not a new advisory introduced by the J3
+test-only change (the lockfile hash matches the pre-existing pin exactly,
+and no dependency was added, removed, or upgraded by this work). It is
+**not** a release security clearance, and it is **not** evidence of an
+exploitable regression caused by this change — no such claim is made
+either way. Per instruction, no `npm audit`/`npm audit fix` was run and no
+source was expanded to investigate it; this reviewer performed no such
+command either.
+
+### Disposition — A/B/C, final for this round
+
+- **A:** none. No product file changed (confirmed unchanged blob); no
+  customer-facing, security, or data-boundary consequence from this
+  test-only commit.
+- **B:** **closed.** Both previously open B items (hook-route ambiguity,
+  missing environment donor) are now resolved with actual passing
+  receipts, not just a decision on paper: hooks restored to the confirmed
+  legitimate unset posture and verified with no non-sample hooks; the
+  pinned `npm ci` completed exit 0 against the exact recorded recipe; the
+  exact commit lands on the frozen r5 tree with the unchanged product
+  blob; and all three gates (`tsc`, `eslint`, `jest`) pass with the full
+  50-case original two-file order, not a filtered run. The minimum
+  gate the existing source closure specified is now satisfied with real,
+  independently re-checked receipts.
+- **C:** the 36 inherited npm advisories and the deprecation/EBADENGINE
+  warnings are recorded as evidence hygiene only, qualified as
+  pre-existing/inherited-graph noise, not escalated into a new fixer,
+  audit, or blocking condition, per explicit instruction.
+
+**Same-review result disposition: the J3 r5 test-only correction is now
+committed (`9ff749c35f64068e156400d2ed37c0b144c2d56d`) on top of the exact,
+unchanged r4 product state, and passes its full designated gate sequence.**
+This reviewer does not self-declare final product/release acceptance —
+that remains the parent's reserved call — but reports, as the independent
+successor reviewer of this same result question, that the actual receipts
+are internally consistent, match every pin carried forward from the source
+closure and the T3 recovery receipt, and show no A/B condition remaining
+open.
+
+---
+
+## Addendum 3 — final bounded finding, manifest independently verified (2026-09-24, ~08:26 PDT)
+
+The parent relayed the terminal receipt set as ready, naming
+`run/J3_R5_EXECUTION_RESULT.md`, `run/receipts/**`, and `run/MANIFEST.sha256`.
+This reviewer read `J3_R5_EXECUTION_RESULT.md` (the T3 executor's own
+summary; content unchanged from what Addendum 2 already bound directly
+from the raw receipt files) and ran `sha256sum -c MANIFEST.sha256` against
+the actual files on disk: **all 21 entries report `OK`** — the driver
+script and every receipt, including the bundle and patch, are byte-exact
+to what the manifest claims. No content was altered, no file regenerated,
+no new command executed beyond this read-only hash verification.
+
+**This changes nothing in Addendum 2's disposition.** It is independent
+corroboration that the artifact set the parent is relaying is intact and
+unmodified between the executor's write and this reviewer's read.
+
+**Final bounded finding for this round:**
+
+- **A:** none.
+- **B:** closed, on actual passing receipts, independently re-checked
+  against the live worktree (Addendum 2) and now also against the
+  executor's own manifest (this addendum). No open B item remains.
+- **C:** the 36 inherited npm advisories remain recorded, non-escalated,
+  and explicitly not a release security clearance (Addendum 2).
+- **Coverage character, restated per explicit instruction:** the passing
+  Jest gate is **mocked component-interaction coverage only** — React
+  Native Testing Library against jest-expo's mocked environment. It is
+  **not** device, browser, or end-to-end proof, and this reviewer makes no
+  such claim. It is likewise not a release/production acceptance claim;
+  that remains the parent's owner-reserved decision.
+
+This independent successor reviewer's same-review result question is
+answered: the J3 r5 test-only correction is committed at
+`9ff749c35f64068e156400d2ed37c0b144c2d56d`, the product blob is unchanged,
+and the designated gate sequence (`tsc`, two-path `eslint`, full
+original-order two-file Jest) passes in full with real, independently
+re-verified receipts. No further action is pending from this reviewer
+unless new evidence or a new question is relayed.
+
+---
+
 ## Sources
 
 - `/tmp/tgp-private-evidence/execution/95633079/ux/j3-review/J3_SOURCE_SELECTION_T2_R5_CHANGED_LINES_BINDING.md` (read-only; existing closed source disposition)
@@ -208,3 +334,4 @@ per the parent's explicit "no extra readiness audit needed" instruction.
 - `worktrees/s7-b-drain` (live git worktree; read-only `package.json`/`node_modules` comparison confirming non-donor status)
 - `/home/user/workspace/execution/cf8ff737/J3_R5_ENV_COMMIT_AND_GATES_GRANT.md` (read-only; parent's minimum-closure grant for hook posture, environment, commit and gates)
 - `/home/user/workspace/execution/cf8ff737/j3-recovery-t3/run/DRIVER_READINESS.md`, `run/READINESS_CHECK.txt`, `run/DRIVER.sha256` (read-only; T3 executor's queued, not-yet-run driver preparation)
+- `/home/user/workspace/execution/cf8ff737/j3-recovery-t3/run/J3_R5_EXECUTION_RESULT.md`, `run/receipts/**`, `run/MANIFEST.sha256` (read-only; T3 executor's terminal execution result and receipt set, independently re-verified against the live worktree and via `sha256sum -c`)

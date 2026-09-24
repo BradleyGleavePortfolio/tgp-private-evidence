@@ -1,0 +1,40 @@
+From 9ff749c35f64068e156400d2ed37c0b144c2d56d Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 15:24:46 +0000
+Subject: [PATCH] test(importer): complete J3 screen mock isolation
+
+---
+ src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx | 4 ++++
+ src/screens/coach/__tests__/ImportDataScreen.test.tsx         | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+index 50bd855..34263ae 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+@@ -29,6 +29,10 @@ jest.mock('../../../theme/useTheme', () => ({
+       textOnPrimary: '#fff', info: '#2b6cb0', error: '#c0392b',
+       success: '#2e7d32', textTertiary: '#777',
+     },
++    semanticColors: {
++      bgPrimary: '#fff', bgSurface: '#f5f5f5', textPrimary: '#111', textMuted: '#999',
++      textOnAccent: '#fff', textOnDisabled: '#999', disabledBg: '#eee',
++    },
+   }),
+ }));
+ jest.mock('../../../analytics/posthog.service', () => ({ track: jest.fn() }));
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+index 2c03215..a1f65a6 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+@@ -83,6 +83,7 @@ describe('ImportDataScreen — J3 source-selection presentation', () => {
+     mockRecordDecision.mockResolvedValue(true);
+     canOpen = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+     openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
++    openUrl.mockClear();
+   });
+   afterEach(async () => {
+     // Unmount first, then drain in-flight openLogin microtasks, so a prior
+-- 
+2.53.0
+

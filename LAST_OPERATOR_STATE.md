@@ -16,7 +16,9 @@ Do not accept B or start R implementation. The original runner exited naturally;
 
 J3 exact recovery is complete. Base r4 `820dbd04500b06648ce4c0820c1badced55d6d7c`; frozen tree `823b97006f7df9617bad5516d7ef578189095e82`; patch SHA-256 `48d1c58355cd8d1d0129d802a3832b686ad9f18a6b877f5806df097e425a5fb6`. Product blob unchanged `92ed52f5cc108f3a098062364d6af793cbb8e2b7`. The initial worker missed the durable complete-history composition bundle; the promoted T3 owner recovered composition, r3, r4 and r5 exactly, without synthetic history or source edits. The initial failed recovery report remains preserved but its unresolvable conclusion is superseded. Same-review T2 source closure remains applicable.
 
-J3's prepared grant `execution/cf8ff737/J3_R5_ENV_COMMIT_AND_GATES_GRANT.md` was activated when parent relayed B's released slot. Driver SHA-256 `2fe6a00f0dd4540f21821813f31ed76143e11b309f700de5c9ed68f2d416a632`: one necessary plain pinned mobile npm ci, remove recovery-only hooksPath override to restore original no-configured-hooks posture, ordinary exact r5 commit, then typecheck, two-test-path lint and FULL original-order two-file/50-case Jest. No filtered Later-only test. Actual runtime/commit/results await receipts; independent same-question reviewer is ready to bind them.
+J3 is now ACCEPTED at the bounded local r5 scope in `execution/cf8ff737/J3_R5_LOCAL_ACCEPTANCE.md`. Actual head `9ff749c35f64068e156400d2ed37c0b144c2d56d`, single parent r4, exact frozen tree and diff, Bradley author/committer, unchanged product blob. Driver ran once, 15:18:14Z–15:25:34Z, RC0: necessary plain npm ci reproduced all pins, original no-configured-hooks posture restored, ordinary commit, ordered tsc/lint/full two-file Jest 50/50. Independent same-question reviewer verified all 21 receipt entries and live identity, A0/B0. Complete-history bundle has no prerequisites. No further J3 rerun/audit without new A/B evidence.
+
+J3 acceptance is mocked component-interaction coverage only, not device/browser/E2E, deployment or customer acceptance. The install's 36 inherited dependency advisories are recorded, not a release security clearance or an introduced-regression claim. No audit/fix ran.
 
 ## Accepted boundaries: do not repeat
 
@@ -34,16 +36,19 @@ J3's prepared grant `execution/cf8ff737/J3_R5_ENV_COMMIT_AND_GATES_GRANT.md` was
 | UX-07 extension presentation | `6fd7e4a95ec2bc400cb8bec62a95955280a31f12` | Accepted bounded presentation leaf |
 | UX-01 local account state | `8fd4cf759c2a8dd3f9ef9772f6dadb2035d93820` | Accepted dual final; 55 transferred passes plus two r2 cases, not 57 together |
 | Pure mobile composition | `716a606e9d23c77a6d705beccb8cefc6e8228284` | Accepted exact 18-path union; no new runtime claimed |
+| J3 r5 source selection | `9ff749c35f64068e156400d2ed37c0b144c2d56d` | Exact frozen test-only correction, full ordered mocked 50/50 proof, independent final closure; no device/browser/E2E claim |
 
 Original failures, packets, attestations and qualifications remain immutable in their existing execution paths. The predecessor complete state is preserved in Git at `50684d66a2961453415c4ff02ba5725deea8699e:LAST_OPERATOR_STATE.md`. Recovery does not repurchase accepted evidence.
 
 ## Runtime and authority
 
-One canonical heavy slot: `/home/user/workspace/execution/test-validation.lock`, nonblocking flock. B released it after terminal failed-proof cleanup; J3 is next activated grantee. B diagnosis and independent reviewers run read-only concurrently. Worker successors are identified honestly; predecessor IDs are not asserted to be live in this runtime.
+One canonical heavy slot: `/home/user/workspace/execution/test-validation.lock`, nonblocking flock. J3 released it at 15:25:34Z and parent relayed release to B v5 phase A. B's exact two-line corrected tree is `d02f9b124bee52107f8ad2f286f8af611b859fe6`; independent reviewer A has bound that delta. Gates and genuine commit are underway; no v5 PG proof granted yet. Worker successors are identified honestly; predecessor IDs are not asserted to be live in this runtime.
 
 Safe parallel dispatches preserve disjoint ownership. R source-only preparation is complete at `execution/cf8ff737/r-prep/R_SLICE_BRIEF.md`; implementation is not permitted before B acceptance and a specific grant. The requested UX comparison is complete: selected directional alignment, not full-doctrine or rendered-device certification. Emotional-target, dedicated confirmation micro-interaction and unassisted under-three-minute path evidence remain unverified. Accepted mobile/extension presentation is locally built/reviewed/accepted, not deployed or customer-accepted. These qualifications do not create a new audit or block unchanged presentation. No measured theoretical maximum-throughput claim is made.
 
 Active tiers were assigned before dispatch; the full compact rationale fields were completed later in `execution/cf8ff737/SCOPE.md`, not backdated. B/drain is T4, J3 product correction T2 with ambiguous recovery promoted T3, R T4, requested UX assessment T2. No fresh historical PR census is claimed. The J3 overbroad scan was stopped and corrected by exact durable recovery, not another historical sweep.
+
+R's routine D1–D4 implementation choices are frozen in `execution/cf8ff737/R_IMPLEMENTATION_DECISIONS_PENDING_B_ACCEPTANCE.md`; this does not activate R. UX-03 handoff prerequisite preparation is active under a separate source-only T4 grant, one writer `ux03_handoff_prerequisite_prep_mufopu8s`, no code/runtime/security-policy authority. It reuses the existing journey catalog and identifies the next executable handoff slice without inventing server behavior.
 
 B/drain continuation: exact recovery and any necessary minimum environment closure → stage-2 remainder with genuine hooks/affected gates/exact-tree commit → filled PG binding → two independent continuation actual-head/binding attestations → separately granted single B-only PG proof → final attestations/acceptance.
 
