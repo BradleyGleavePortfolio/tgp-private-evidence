@@ -1,0 +1,18 @@
+39c39,40
+< mkdir -p "$E/runtime/binding"; SRC=$E/fixture-proposal-v3/binding/b-pg-proof.sh; DST=$E/runtime/binding/b-pg-proof.sh
+---
+> mkdir -p "$CAN/runtime/binding"; SRC=$CAN/fixture-proposal-v3/binding/b-pg-proof.sh; DST=$CAN/runtime/binding/b-pg-proof.sh
+> [ "$(sha256sum "$SRC" | cut -c1-64)" = 25eb683770192de5037143e3d042106890578e9ee0f013a0f90d411174e21c3c ] || stop binding-template-sha 77
+41c42
+< diff -u "$SRC" "$DST" > "$E/runtime/binding/b-pg-proof.sh.substitution-only.diff"; [ "$(grep -c '^[-+][^-+]' "$E/runtime/binding/b-pg-proof.sh.substitution-only.diff")" = 10 ] || stop binding-diff-shape 77
+---
+> diff -u "$SRC" "$DST" > "$CAN/runtime/binding/b-pg-proof.sh.substitution-only.diff"; [ "$(grep -c '^[-+][^-+]' "$CAN/runtime/binding/b-pg-proof.sh.substitution-only.diff")" = 10 ] || stop binding-diff-shape 77
+45c46
+< [ "$(sha256sum "$E/fixture-proposal-v3/binding/b-fixture.sh" | cut -c1-64)" = 4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9 ] || stop binding-fixture-pin 77
+---
+> [ "$(sha256sum "$CAN/fixture-proposal-v3/binding/b-fixture.sh" | cut -c1-64)" = 4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9 ] || stop binding-fixture-pin 77
+47c48,49
+< { echo "source_sha=$(sha256sum "$SRC" | cut -c1-64)"; echo "filled_sha=$(sha256sum "$DST" | cut -c1-64)"; echo "HEAD=$H TREE=$V4 SPEC=9b31fd1813d25a1624ab04666e0b1be4743277ab BOOTSTRAP=b4503eef525baa531eedb148f47828db3a4ade6f FIXTURE=4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9"; grep -n '^EXPECT_\|^D=' "$DST"; } > "$E/runtime/binding/PINS.txt"
+---
+> { echo "source_sha=$(sha256sum "$SRC" | cut -c1-64)"; echo "filled_sha=$(sha256sum "$DST" | cut -c1-64)"; echo "HEAD=$H TREE=$V4 SPEC=9b31fd1813d25a1624ab04666e0b1be4743277ab BOOTSTRAP=b4503eef525baa531eedb148f47828db3a4ade6f FIXTURE=4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9"; grep -n '^EXPECT_\|^D=' "$DST"; } > "$CAN/runtime/binding/PINS.txt"
+> cp "$CAN/runtime/binding/PINS.txt" "$L/07-binding-PINS.txt"
