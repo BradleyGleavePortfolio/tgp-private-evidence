@@ -1,34 +1,16 @@
 # TGP Execution Register
 
-Parent EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`. Bradley's EXECUTE remains active; intake accepted and recon closed. Scope is `execution/95633079/SCOPE.md`.
+Parent EXEC-CF8FF737. Bradley's September 24, 2026 EXECUTE is active; recon accepted and closed. Scope: `cf8ff737/SCOPE.md`. Predecessor register is preserved in Git at `50684d66a2961453415c4ff02ba5725deea8699e`.
 
-All eight e7d2385c workers remain stopped/finished; their immutable assignments are preserved at `a02f368`. No old ACTIVE grant is inherited. Finished current lanes likewise have no continuing runtime grant.
-
-| Slice | Worker | Tier / requested route | Sole writable area | Current state |
+| Slice | Current worker | Tier / requested route | Sole writable area | State |
 |---|---|---|---|---|
-| C1 independent A continuation | `c1_review_a_continuation_muf3n97a` | T4 / parent inheritance | `execution/95633079/audits/c1-a/**` | COMPLETE final ACCEPTED A0/B0, same review |
-| C1 independent B continuation | `c1_reviewer_b_continuation_muf4ra75` | T4 / Claude Fable 5, High requested | `execution/95633079/audits/c1-b/**` | COMPLETE Part4/final ACCEPTED A0/B0 across all phases |
-| C1 recovery, commit, targeted proof, fixture and PG | `c1_exact_recovery_and_validation_muf3sel1` | T4 / Claude Fable 5, High requested | Assigned C1 product/evidence/tool recovery areas | COMPLETE a0ea1bea, 190/190 +22/22 passed, no survivors, retained stopped data, runtime released; no rerun |
-| S7-3′ B/drain | `s7_b_drain_builder_muf5xlqn` | T4 / Claude Fable 5, High requested | `worktrees/s7-b-drain/**`, `execution/95633079/s7-b-drain/**` | ACTIVE phase-A stage-2 remainder; copy verified then own external-Prettier detector RC71 preserved; no recopy, actual pinned tool allowed, no PG |
-| B/drain independent A | `b_drain_independent_a_muf76vdm` | T4 / Claude Fable 5, High requested | `execution/95633079/audits/b-drain-a/**` | v4 SOURCE_GRANTABLE, no source A/B; awaiting actual head/gates and filled PG pins |
-| B/drain independent B | `b_drain_independent_b_muf76vds` | T4 / Claude Fable 5, High requested | `execution/95633079/audits/b-drain-b/**` | v4 SOURCE_GRANTABLE, no source A/B; awaiting actual head/gates and filled PG pins |
-| Roman donor/mobile presentation | `roman_donor_reuse_comparison_muf3n97e` | T2 / Claude Sonnet 5, High requested | Assigned Roman/mobile presentation areas | COMPLETE accepted df0ad112/tree377e4b7a, 69 tests/typecheck, runtime released; Home/J3 not included |
-| J3 source-selection presentation | `roman_donor_reuse_comparison_muf3n97e` | T2 / Claude Sonnet 5, High requested | Former J3 source areas | COMPLETE/stopped at r3 tree4e139900; no commit/copy/gate executed; no continuing grant |
-| J3 exact-head validation | `j3_exact_head_validation_executor_muf8p1wx` | T2 / Claude Sonnet 5, High requested | `worktrees/ux03-j3/**`, additive `execution/95633079/ux/j3-source-selection/**` receipts | r5 tree823b9700 mock-only correction frozen/bound, uncommitted; waits for slot/grant after B remainder |
-| J3 independent source review | `ux_mobile_independent_review_muf47x7e` | T2 / Claude Sonnet 5, High requested | NEW `execution/95633079/ux/j3-review/**` | r5 two-hunk source closure bound; full two-file original-order gate required, awaiting actual head/results |
-| UX-07 design detail | `ux_07_accessibility_detail_muf3n97i` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/design-system/**` | COMPLETE corrected advisory packet; no product writes |
-| UX-07 extension presentation | `ux_07_extension_presentation_muf3to6z` | T1 / GPT 5.6 Terra, Medium requested | Original extension areas plus `/tmp/tgp-ux07-extension/**` | COMPLETE accepted6fd7e4a/tree3750a2ea, B-01 clean-ancestry closure, genuine hooks, runtime released |
-| UX-07 extension targeted review | `ux_07_targeted_presentation_review_muf3zijb` | T1 / GPT 5.6 Terra, Medium requested | `execution/95633079/ux/extension-review/**` | COMPLETE same-review final ACCEPTED A0/B0, bounded local slice only |
-| UX mobile independent review | `ux_mobile_independent_review_muf47x7e` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/mobile-review/**` | COMPLETE actual df0ad112 ACCEPTED A0/B0 |
-| UX-01 account-scoped decision state | `ux_01_account_scoped_decision_state_muf4skdd` | T4 / Claude Fable 5, High requested | Accepted `worktrees/ux01-state/**`, `execution/95633079/ux/account-state/**` | COMPLETE accepted8fd4cf75/tree17a6ce1a, dual finals; timing B closed, original55passes+2r2cases/typecheck/lint preserved; runtime released |
-| Pure mobile presentation/state composition | `ux_01_account_scoped_decision_state_muf4skdd` | T4 / Claude Fable 5, High requested | `worktrees/ux-mobile-composed/**`, `execution/95633079/ux/mobile-composition/**` | COMPLETE accepted716a606e/tree430c76a0, dual exact-union binding; no authored edits or runtime; ownership released |
-| Composition independent A | `ux_01_state_review_a_muf5jh9h` | T4 / Claude Fable 5, High requested | `execution/95633079/ux/mobile-composition-review-a/**` | COMPLETE ACCEPTED A0/B0; prior state reviews unchanged |
-| Composition independent B | `ux_01_state_review_b_muf5jh9n` | T4 / Claude Fable 5, High requested | `execution/95633079/ux/mobile-composition-review-b/**` | COMPLETE ACCEPTED A0/B0; prior state reviews unchanged |
-| UX-01 state independent A | `ux_01_state_review_a_muf5jh9h` | T4 / Claude Fable 5, High requested | `execution/95633079/ux/account-state-review-a/**` | COMPLETE final ACCEPTED, Btiming closed; no active task |
-| UX-01 state independent B | `ux_01_state_review_b_muf5jh9n` | T4 / Claude Fable 5, High requested | `execution/95633079/ux/account-state-review-b/**` | COMPLETE final ACCEPTED, Btiming closed; no active task |
+| B/drain exact recovery and remainder | `b_drain_exact_recovery_and_remainder_mufn6ybc` | T4 / Fable route, High requested | `worktrees/s7-b-drain/**`, `execution/cf8ff737/b-drain/**`, exact recovered binding inputs and additive runtime under `execution/95633079/s7-b-drain/**` | ACTIVE exact restoration; next sole heavy-slot grantee; environment necessity to be evidenced; no PG grant |
+| J3 r5 source-only recovery | `j3_r5_source_only_recovery_mufn6y98` | T2 / Sonnet 5, High requested | `worktrees/ux03-j3/**`, `execution/cf8ff737/j3/**` | ACTIVE source-only restoration; no dependency install/copy/generation, commit, gates or heavy-slot grant |
 
-Requested routing is not observed runtime identity/effort. One writer owns each mutable product surface; shared schema/generator edits require explicit assignment. One heavy-runtime slot is enforced at `execution/test-validation.lock`; J3 r4 stopped/released. B/drain phase A alone is currently granted. No PG execution or J3 retry is authorized.
+Requested routing is not observed model/effort telemetry. The live session model listing labels the Fable route Claude Fable 5.1; the catalog's subagent alias is `claude_fable_5`.
 
-C1 parent acceptance is `execution/95633079/C1_FINAL_ACCEPTANCE.md`. S1–S6, S7 foundation, C1, two presentation leaves, localUX-01 state and pure mobile composition are accepted at exact recorded boundaries. Completed tests/source reviews are not repeated; Class C never creates another cycle.
+Exactly one writer per mutable area and one heavy-runtime owner at `execution/test-validation.lock`. Parent alone publishes private evidence. Immutable predecessor input repositories are read-only to workers.
 
-Next product chain: B/drain → R → N/Q1 → C → remaining S7 → S8–S12. B/drain v2 has two independent T4 source reviewers; the separate minimal B-only fixture binding precedes genuinely new runtime proof. J3 consumes the accepted Later contract and receives one independent T2 review after source freeze, not full UX-03 trust-boundary acceptance.
+Former workers are inaccessible historical identities, not asserted to be running here. Replacement independent reviewers will explicitly continue the existing scoped review lineage without impersonation, peer-report sharing or reopening unchanged source.
+
+Accepted S1–S6, S7 foundation, C1, presentation leaves, local UX-01 and pure mobile composition have no reusable execution grants. B source v4 and J3 r5 source closure remain bound; actual execution and final acceptance are still pending.
