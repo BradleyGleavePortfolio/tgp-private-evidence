@@ -1,0 +1,119 @@
+FAIL src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
+  ● ExtensionPairingPanel — lifecycle rendering › shows the truthful checklist: importer available, identity, and previous platform not yet known
+
+    expect(instance).toHaveTextContent()
+
+    Expected instance to have text content:
+      Not yet known
+    Received:
+      Previous platformNot yet known
+
+      154 |     const { getByTestId } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+      155 |     expect(getByTestId('pairing-check-importer')).toHaveTextContent('Importer available', { exact: false });
+    > 156 |     expect(getByTestId('pairing-check-platform')).toHaveTextContent('Not yet known');
+          |                                                   ^
+      157 |   });
+      158 |
+      159 |   it('shows the instructional primary action with no URL or locator', async () => {
+
+      at Object.toHaveTextContent (src/components/coach/__tests__/ExtensionPairingPanel.test.tsx:156:51)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+FAIL src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx
+  ● paired state — what actually renders instead › shows the truthful confirmation and checklist in place of the removed sections
+
+    expect(instance).toHaveTextContent()
+
+    Expected instance to have text content:
+      Not yet known
+    Received:
+      Previous platformNot yet known
+
+      166 |     expect(getByTestId('pairing-paired')).toHaveTextContent('Connected to your computer', { exact: false });
+      167 |     expect(getByTestId('pairing-checklist')).toBeTruthy();
+    > 168 |     expect(getByTestId('pairing-check-platform')).toHaveTextContent('Not yet known');
+          |                                                   ^
+      169 |   });
+      170 | });
+      171 |
+
+      at Object.toHaveTextContent (src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx:168:51)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/screens/coach/__tests__/ImportDataScreen.test.tsx
+  ● Console
+
+    console.error
+      An update to ImportDataScreen inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      107 |       await Linking.openURL(safe);
+      108 |       track(AnalyticsEvents.IMPORT_LOGIN_OPENED, { platform: platformId });
+    > 109 |       setState({ phase: 'awaitingExtension', platformId });
+          |       ^
+      110 |     } catch {
+      111 |       track(AnalyticsEvents.IMPORT_LOGIN_OPEN_FAILED, { platform: platformId, reason: 'open_failed' });
+      112 |       setState({ phase: 'failed', message: "We couldn't open that site in your browser. Please try again." });
+
+      at node_modules/react-reconciler/cjs/react-reconciler.development.js:16307:19
+      at runWithFiberInDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:2508:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:16306:9)
+      at scheduleUpdateOnFiber (node_modules/react-reconciler/cjs/react-reconciler.development.js:14070:11)
+      at dispatchSetStateInternal (node_modules/react-reconciler/cjs/react-reconciler.development.js:6784:13)
+      at dispatchSetState (node_modules/react-reconciler/cjs/react-reconciler.development.js:6741:7)
+      at setState (src/screens/coach/ImportDataScreen.tsx:109:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+    console.error
+      An update to ImportDataScreen inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      107 |       await Linking.openURL(safe);
+      108 |       track(AnalyticsEvents.IMPORT_LOGIN_OPENED, { platform: platformId });
+    > 109 |       setState({ phase: 'awaitingExtension', platformId });
+          |       ^
+      110 |     } catch {
+      111 |       track(AnalyticsEvents.IMPORT_LOGIN_OPEN_FAILED, { platform: platformId, reason: 'open_failed' });
+      112 |       setState({ phase: 'failed', message: "We couldn't open that site in your browser. Please try again." });
+
+      at node_modules/react-reconciler/cjs/react-reconciler.development.js:16307:19
+      at runWithFiberInDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:2508:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:16306:9)
+      at scheduleUpdateOnFiber (node_modules/react-reconciler/cjs/react-reconciler.development.js:14070:11)
+      at dispatchSetStateInternal (node_modules/react-reconciler/cjs/react-reconciler.development.js:6784:13)
+      at dispatchSetState (node_modules/react-reconciler/cjs/react-reconciler.development.js:6741:7)
+      at setState (src/screens/coach/ImportDataScreen.tsx:109:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+PASS src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
+PASS src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx
+
+Test Suites: 2 failed, 4 passed, 6 total
+Tests:       2 failed, 135 passed, 137 total
+Snapshots:   0 total
+Time:        4.348 s, estimated 10 s
+Ran all test suites within paths "src/components/coach/__tests__/ExtensionPairingPanel.test.tsx", "src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx", "src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx", "src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx", "src/screens/coach/__tests__/ImportDataScreen.test.tsx", "src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx".
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.

@@ -26,3 +26,54 @@ B v5 phase A RC0 15:27:22–15:29:09Z: ordinary hooked commit `0d69c7ba7e7d25731
 Heavy-slot queue (parent relays): B v5 PG proof (active) → UX-03a gates → UX-03b gates → R after B acceptance. Source authoring for UX-03a/03b proceeds concurrently now.
 
 B v5 PG proof RC0 19/19 (15:37:47–15:38:57Z); both independent reviewers final ACCEPT; parent recorded `B_DRAIN_LOCAL_ACCEPTANCE.md`. B builder and both B reviewers DONE for this candidate. R ACTIVE: `r_slice_source_only_preparation_mufnlmx0` sole T4 builder under `R_IDENTITY_READY_BUILD_GRANT.md`, worktree `worktrees/s7-r-ready`.
+
+UX-03a build CLOSED: head `797be96806745624e09b949fae10831e52e7078b`, tree `094e6444834eb428b34d52ac0488be5375b91aff`, parent J3 `9ff749c3`, Bradley author and committer. The mobile repo has no configured hooks, the same posture as J3, so no hooks ran and none is claimed.
+
+Gate history, all three stops preserved:
+
+| Run | Tree | tsc | lint | Jest |
+|---|---|---|---|---|
+| 1 | `0a876c10` | rc0 | rc0 | rc1, 132/137 |
+| 2 | `10047dbd` | rc0 | rc0 | rc≠0, 135/137 (two masked assertions) |
+| 3 | `094e6444` | rc0 | rc0 | rc0, 137/137 |
+
+Closures are in `UX03A_ASSERTION_CLOSURE_GRANT.md` plus Amendment 1. The total change is 7 test lines, each an `exact: false` substring fix.
+
+C items:
+- the commit message says "found in review", but the defects were found by the gates
+- mocked coverage only
+
+Pending: independent T2 reviewer `ux_03a_independent_review_mufpks82`. The lock is free, and the queue order is UX-03b, then R, as each reports ready.
+
+UX-03a ACCEPTED at `797be968` (tree `094e6444`), recorded in `UX03A_LOCAL_ACCEPTANCE.md`. The independent T2 reviewer `ux_03a_independent_review_mufpks82` accepted it, and that reviewer and builder `ux_03a_paired_state_truth_build_mufp5bub` are both done.
+
+UX-03b is re-running under a one-line tsc closure (`UX03B_TSC_CLOSURE_GRANT.md`). Two independent T4 reviewers are active: `ux_03b_independent_review_a_mufq3mzz` and `ux_03b_independent_review_b_mufq3n0q`.
+
+R commit `df36e3310d4088501c93bcac3ce07617d02c749d`, tree `74ddf4dd57657300d96b9a7b0cdd6e6237a52abd`, parent B `0d69c7ba`.
+- Genuine Lefthook hooks ran. Gates all returned rc0: tsc, eslint, prettier, check-r75, and Jest (3 suites, 90 tests). The lock was held 16:14:36–16:18:37Z.
+- The binding `r-ready/binding/r-pg-proof.sh` (sha `ac437b90…`) has its pins filled.
+- Two independent T4 reviewers are dispatched to attest the actual head and binding before any single PG grant: `r_independent_review_a_mufqmwr7` and `r_independent_review_b_mufqmwr0`.
+- UX-03b closure-2 is being refrozen and gets the slot next.
+
+UX-03b build CLOSED at `519b01227f2855fc7968994d389094008f222e20` (tree `3979c681`, parent J3 `9ff749c3`).
+- Gate run 3 returned rc0 for tsc, eslint and Jest, with Jest at 11/11 suites and 396/396 tests.
+- All three stops are preserved:
+  - run 1: tsc rc2
+  - run 2: Jest 389/396, closed by `UX03B_CLOSURE_2_GRANT.md`
+  - run 3: pass
+- Mobile has no configured hooks.
+- Awaiting final findings from both T4 reviewers. The slot is free.
+
+UX-03b ACCEPTED at `519b0122`, recorded in `UX03B_LOCAL_ACCEPTANCE.md`, with both independent T4 findings ACCEPT. The UX-03b builder and both reviewers are done.
+
+UX-03c is ACTIVE under `UX03C_COMPOSITION_GRANT.md`. Its sole T2 builder is `ux_03a_paired_state_truth_build_mufp5bub`, requeued.
+
+The landing census `landing_backlog_census_mufqyitp` (T3, read-only) is active under the owner amendment.
+- R closure 1 GRANTED at 16:40Z (`R_CLOSURE_1_GRANT.md`). It closes three proof-invalidating B findings: the guard order, the R11 decoy check, and the binding's data directory and hook path. PG grant withheld until both reviewers re-attest.
+- UX-07 extension composition on S4 GRANTED at 16:50Z (`UX07_EXT_ON_S4_COMPOSITION_GRANT.md`). B finding scoped to the UX-07 extension landing only: a genuine `popup.html` conflict with S4.
+- LANDED (16:44–16:46Z, see `LANDING_LEDGER.md`):
+  - mobile `main` → `797be968`
+  - backend `integration/importer` → `0d69c7ba`
+  - Extension S4 is staged as PR #27, which needs a non-author approval under the protection rules (owner step).
+  - Backend PR #530 is a draft and is the production-deploy boundary.
+- R closure 1 is ready at `7d2895e1`, with new binding sha `787d34b0…`. Both reviewers are re-attesting the delta. The builder's default-Jest flag is C: the delta touches only `migration.sql` and the PG-only spec, so receipt 11 stands and there is no rerun.

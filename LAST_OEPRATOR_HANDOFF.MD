@@ -17,3 +17,28 @@ S1–S6, S7 foundation, C1, mobile/extension presentation leaves, local account-
 Parent orchestrates and publishes private evidence; builders implement; independent nonbuilders review. No product remote push/merge, deployment, live customer/source-account action, security/governance change, destructive production action, external commitment or new spending is granted.
 
 Continue B/drain → R → N/Q1 → C → remaining S7 → S8–S12 with eligible UX parallel. Return only at a genuine reserved authority boundary.
+
+## Update, September 24, 2026, 16:55Z (EXEC-CF8FF737)
+
+**Landing authority.** The owner amendment authorizes autonomous landing: `execution/cf8ff737/OWNER_AMENDMENT_AUTONOMOUS_LANDING.md`.
+
+**Landed** (recorded in `execution/cf8ff737/LANDING_LEDGER.md`):
+
+- **Mobile `main`:** `797be968`, which is J3 plus UX-03a.
+- **Backend `integration/importer`:** `0d69c7ba`, which is B/drain.
+
+**Backend `main`** auto-deploys to production, so it remains the owner boundary. The draft PR for that decision is #530.
+
+**Extension:**
+
+- **S4:** PR #27 needs a non-author approval, which is an owner step.
+- **UX-07:** a composition onto S4 is being built.
+
+**Active work:**
+
+| Item | State |
+|---|---|
+| R | Closure 1 is at `7d2895e1`; delta re-attestation, then the single PG proof |
+| UX-03c | Frozen at `7a5305e5`; its gate is running |
+| UX-07-on-S4 | Build in progress |
+| Landing census | In progress |

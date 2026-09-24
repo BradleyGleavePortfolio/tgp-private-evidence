@@ -1,0 +1,9 @@
+feat(importer): make scout identity ready with canonical platform tokens
+
+Add migration 20270120000000_scout_identity_ready: NOT NULL source_platform on
+ScoutIngestEntity and ScoutReconstructionLedger, canonical-token CHECKs, and
+the wide (coach_id, intent_id, entity_type, source_platform, source_id)
+unique indexes, guarded against absent fence, unresolved NULL or noncanonical
+provenance and pre-existing wide identity; down.sql reverses it. Validate
+sourcePlatform at the ingest boundary with the same rule. Add the r-ready
+disposable PG harness, guard spec and R01-R12 proof spec.

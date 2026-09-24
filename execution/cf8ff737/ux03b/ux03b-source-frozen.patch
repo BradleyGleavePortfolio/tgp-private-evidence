@@ -1,0 +1,2730 @@
+diff --git a/src/api/__tests__/extensionPairApi.test.ts b/src/api/__tests__/extensionPairApi.test.ts
+index 4f2d250..3b99c4a 100644
+--- a/src/api/__tests__/extensionPairApi.test.ts
++++ b/src/api/__tests__/extensionPairApi.test.ts
+@@ -2,14 +2,16 @@
+  * extensionPairApi — wire-contract tests (v0.3 import, PR-M2).
+  *
+  * Mocks the axios instance at `../../services/api` (the repo's established test
+- * seam) and asserts the EXACT method, path, and body mobile sends for the only
+- * two coach-callable pairing endpoints, that responses pass through untouched,
+- * that the pairing code travels body-only (never a query string), and that
+- * transport errors PROPAGATE to the caller (never coerced into a fake success).
++ * seam) and asserts the EXACT method, path, and body mobile sends for the
++ * coach-callable pairing endpoints, that responses pass through untouched,
++ * that the pairing code and setup nonce travel body-only (never a query string
++ * or path), that transport errors PROPAGATE to the caller (never coerced into
++ * a fake success), and that mobile has NO redeem method.
+  *
+- * Backend contract source of truth:
++ * Backend contract source of truth (consumer-frozen at `2.0.0-c1-s1.1`,
++ * backend a0ea1bea; see src/types/__fixtures__/c1PairSurface.a0ea1bea.json):
+  *   growth-project-backend/docs/contracts/importer-openapi.json
+- *   (POST /api/extension/pair/init, POST /api/extension/pair/status)
++ *   (POST /api/extension/pair/init, /pair/status, /pair/current)
+  */
+ import { AxiosError, AxiosHeaders } from 'axios';
+ import api from '../../services/api';
+@@ -24,30 +26,32 @@ const post = jest.mocked(api.post);
+ 
+ /** Rule 19 key the caller mints once per intent and replays on every retry. */
+ const IDEM_KEY = 'b0a1c2d3-e4f5-4607-8899-aabbccddeeff';
++/** C1 setup_nonce the caller persists before the first attempt and replays. */
++const NONCE = '7f1e2d3c-4b5a-4968-8776-655443322110';
+ 
+ beforeEach(() => {
+   post.mockReset();
+ });
+ 
+-function axiosError(status: number): AxiosError {
++function axiosError(status: number, data: Record<string, unknown> = {}): AxiosError {
+   return new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_RESPONSE', undefined, undefined, {
+     status,
+     statusText: String(status),
+-    data: {},
++    data,
+     headers: {},
+     config: { headers: new AxiosHeaders() },
+   });
+ }
+ 
+ describe('extensionPairApi.init', () => {
+-  it('POSTs /extension/pair/init with the chosen_platform body and returns the response', async () => {
++  it('POSTs /extension/pair/init with chosen_platform + setup_nonce in the body and returns the response', async () => {
+     post.mockResolvedValue({ data: { pairing_code: '123456', expires_at: '2026-07-14T12:05:00Z' } });
+ 
+-    const res = await extensionPairApi.init('truecoach', IDEM_KEY);
++    const res = await extensionPairApi.init('truecoach', IDEM_KEY, NONCE);
+ 
+     expect(post).toHaveBeenCalledTimes(1);
+     expect(post.mock.calls[0][0]).toBe('/extension/pair/init');
+-    expect(post.mock.calls[0][1]).toEqual({ chosen_platform: 'truecoach' });
++    expect(post.mock.calls[0][1]).toEqual({ chosen_platform: 'truecoach', setup_nonce: NONCE });
+     // R19: the key travels as a header, never in the body or the path.
+     expect(post.mock.calls[0][2]).toEqual({ headers: { 'Idempotency-Key': IDEM_KEY } });
+     expect(res.data).toEqual({ pairing_code: '123456', expires_at: '2026-07-14T12:05:00Z' });
+@@ -55,7 +59,7 @@ describe('extensionPairApi.init', () => {
+ 
+   it('omits the /api prefix (baseURL already carries it) and sends no query string', async () => {
+     post.mockResolvedValue({ data: { pairing_code: '000000', expires_at: 'x' } });
+-    await extensionPairApi.init('custom', IDEM_KEY);
++    await extensionPairApi.init('custom', IDEM_KEY, NONCE);
+     const path = post.mock.calls[0][0] as string;
+     expect(path.startsWith('/api/')).toBe(false);
+     expect(path).not.toContain('?');
+@@ -63,51 +67,88 @@ describe('extensionPairApi.init', () => {
+ 
+   it('propagates a 401 (auth) to the caller — never a fake mint', async () => {
+     post.mockRejectedValue(axiosError(401));
+-    await expect(extensionPairApi.init('everfit', IDEM_KEY)).rejects.toBeInstanceOf(AxiosError);
++    await expect(extensionPairApi.init('everfit', IDEM_KEY, NONCE)).rejects.toBeInstanceOf(AxiosError);
+   });
+ 
+   it('propagates a 404 (server kill-switch off) to the caller', async () => {
+     post.mockRejectedValue(axiosError(404));
+-    await expect(extensionPairApi.init('everfit', IDEM_KEY)).rejects.toBeInstanceOf(AxiosError);
++    await expect(extensionPairApi.init('everfit', IDEM_KEY, NONCE)).rejects.toBeInstanceOf(AxiosError);
+   });
+ 
+   it('propagates a 500 (transient server fault) to the caller', async () => {
+     post.mockRejectedValue(axiosError(500));
+-    await expect(extensionPairApi.init('truecoach', IDEM_KEY)).rejects.toBeInstanceOf(AxiosError);
++    await expect(extensionPairApi.init('truecoach', IDEM_KEY, NONCE)).rejects.toBeInstanceOf(AxiosError);
+   });
+ 
+   it('returns the server-authoritative expires_at untouched (no local clock math)', async () => {
+     const expiresAt = '2026-07-14T12:05:00.000Z';
+     post.mockResolvedValue({ data: { pairing_code: '246810', expires_at: expiresAt } });
+-    const res = await extensionPairApi.init('everfit', IDEM_KEY);
++    const res = await extensionPairApi.init('everfit', IDEM_KEY, NONCE);
+     expect(res.data.expires_at).toBe(expiresAt);
+     expect(res.data.pairing_code).toBe('246810');
+   });
+ 
+   it('sends the exact chosen_platform slug for each distinct platform', async () => {
+     post.mockResolvedValue({ data: { pairing_code: '000000', expires_at: 'x' } });
+-    await extensionPairApi.init('everfit', IDEM_KEY);
+-    await extensionPairApi.init('trainerize', IDEM_KEY);
+-    expect(post.mock.calls[0][1]).toEqual({ chosen_platform: 'everfit' });
+-    expect(post.mock.calls[1][1]).toEqual({ chosen_platform: 'trainerize' });
++    await extensionPairApi.init('everfit', IDEM_KEY, NONCE);
++    await extensionPairApi.init('trainerize', IDEM_KEY, NONCE);
++    expect(post.mock.calls[0][1]).toEqual({ chosen_platform: 'everfit', setup_nonce: NONCE });
++    expect(post.mock.calls[1][1]).toEqual({ chosen_platform: 'trainerize', setup_nonce: NONCE });
+     expect(post).toHaveBeenCalledTimes(2);
+   });
+ 
+   it('replays the caller\'s key verbatim so a retry cannot mint a second session', async () => {
+     post.mockRejectedValueOnce(axiosError(500));
+     post.mockResolvedValueOnce({ data: { pairing_code: '135791', expires_at: 'x' } });
+-    await expect(extensionPairApi.init('everfit', IDEM_KEY)).rejects.toBeInstanceOf(AxiosError);
+-    await extensionPairApi.init('everfit', IDEM_KEY);
++    await expect(extensionPairApi.init('everfit', IDEM_KEY, NONCE)).rejects.toBeInstanceOf(AxiosError);
++    await extensionPairApi.init('everfit', IDEM_KEY, NONCE);
+     expect(post.mock.calls[0][2]).toEqual(post.mock.calls[1][2]);
+     const path = post.mock.calls[0][0] as string;
+     expect(path).not.toContain(IDEM_KEY);
+   });
+ 
++  it('sends the setup_nonce in the BODY only — never the path, query, or headers', async () => {
++    post.mockResolvedValue({ data: { pairing_code: '000000', expires_at: 'x' } });
++    await extensionPairApi.init('truecoach', IDEM_KEY, NONCE);
++    const [path, body, config] = post.mock.calls[0];
++    expect(path).not.toContain(NONCE);
++    expect((body as { setup_nonce: string }).setup_nonce).toBe(NONCE);
++    expect(JSON.stringify(config)).not.toContain(NONCE);
++  });
++
++  it('replays the same setup_nonce verbatim on a same-intent retry', async () => {
++    post.mockRejectedValueOnce(axiosError(500));
++    post.mockResolvedValueOnce({ data: { pairing_code: '135791', expires_at: 'x' } });
++    await expect(extensionPairApi.init('everfit', IDEM_KEY, NONCE)).rejects.toBeInstanceOf(AxiosError);
++    await extensionPairApi.init('everfit', IDEM_KEY, NONCE);
++    expect(post.mock.calls[0][1]).toEqual(post.mock.calls[1][1]);
++  });
++
++  it('propagates 409 setup_nonce_conflict untouched (classification is the hook\'s job)', async () => {
++    post.mockRejectedValue(axiosError(409, { code: 'setup_nonce_conflict', message: 'x' }));
++    await expect(extensionPairApi.init('truecoach', IDEM_KEY, NONCE)).rejects.toMatchObject({
++      response: { status: 409, data: { code: 'setup_nonce_conflict' } },
++    });
++  });
++
++  it('propagates 410 setup_challenge_unavailable untouched', async () => {
++    post.mockRejectedValue(axiosError(410, { code: 'setup_challenge_unavailable', message: 'x' }));
++    await expect(extensionPairApi.init('truecoach', IDEM_KEY, NONCE)).rejects.toMatchObject({
++      response: { status: 410, data: { code: 'setup_challenge_unavailable' } },
++    });
++  });
++
++  it('passes an import_intent_id through untouched when the server issues one', async () => {
++    post.mockResolvedValue({ data: { pairing_code: '000000', expires_at: 'x', import_intent_id: 'ii-1' } });
++    const res = await extensionPairApi.init('truecoach', IDEM_KEY, NONCE);
++    expect(res.data.import_intent_id).toBe('ii-1');
++  });
++
+   it('does not swallow a rejection into a resolved value', async () => {
+     post.mockRejectedValue(axiosError(401));
+     const onResolve = jest.fn();
+     const onReject = jest.fn();
+-    await extensionPairApi.init('truecoach', IDEM_KEY).then(onResolve, onReject);
++    await extensionPairApi.init('truecoach', IDEM_KEY, NONCE).then(onResolve, onReject);
+     expect(onResolve).not.toHaveBeenCalled();
+     expect(onReject).toHaveBeenCalledTimes(1);
+   });
+@@ -168,3 +209,53 @@ describe('extensionPairApi.status', () => {
+     expect(post.mock.calls.every((c) => c[0] === '/extension/pair/status')).toBe(true);
+   });
+ });
++
++describe('extensionPairApi.current', () => {
++  it('POSTs /extension/pair/current with an empty body when no nonce is saved', async () => {
++    post.mockResolvedValue({ data: { result: 'no_setup' } });
++    const res = await extensionPairApi.current();
++    expect(post).toHaveBeenCalledTimes(1);
++    expect(post.mock.calls[0][0]).toBe('/extension/pair/current');
++    expect(post.mock.calls[0][1]).toEqual({});
++    expect(res.data).toEqual({ result: 'no_setup' });
++  });
++
++  it('sends a saved setup_nonce in the BODY only (never the path or a query)', async () => {
++    post.mockResolvedValue({ data: { result: 'nonce_unknown' } });
++    await extensionPairApi.current(NONCE);
++    expect(post.mock.calls[0][1]).toEqual({ setup_nonce: NONCE });
++    const path = post.mock.calls[0][0] as string;
++    expect(path).toBe('/extension/pair/current');
++    expect(path).not.toContain(NONCE);
++    expect(path).not.toContain('?');
++  });
++
++  it('returns the raw wire result untouched (decoding fails closed in types/extensionImport)', async () => {
++    post.mockResolvedValue({ data: { result: 'something-unexpected', import_intent_id: 'ii-1' } });
++    const res = await extensionPairApi.current(NONCE);
++    expect(res.data).toEqual({ result: 'something-unexpected', import_intent_id: 'ii-1' });
++  });
++
++  it.each([401, 404, 500])('propagates a %s to the caller', async (status) => {
++    post.mockRejectedValue(axiosError(status));
++    await expect(extensionPairApi.current(NONCE)).rejects.toBeInstanceOf(AxiosError);
++  });
++});
++
++describe('extensionPairApi surface', () => {
++  it('exposes exactly the bearer-authenticated setup routes and NO redeem (extension-only)', () => {
++    expect(Object.keys(extensionPairApi).sort()).toEqual(['current', 'init', 'status']);
++    expect((extensionPairApi as Record<string, unknown>).redeem).toBeUndefined();
++  });
++
++  it('only ever POSTs (no GET/DELETE: nothing secret-adjacent can enter a URL)', async () => {
++    post.mockResolvedValue({ data: {} });
++    await extensionPairApi.init('truecoach', IDEM_KEY, NONCE);
++    await extensionPairApi.status('123456');
++    await extensionPairApi.current(NONCE);
++    expect(jest.mocked(api.get)).not.toHaveBeenCalled();
++    expect(jest.mocked(api.delete)).not.toHaveBeenCalled();
++    expect(post).toHaveBeenCalledTimes(3);
++    for (const [path] of post.mock.calls) expect(path).not.toContain('?');
++  });
++});
+diff --git a/src/api/extensionPairApi.ts b/src/api/extensionPairApi.ts
+index 8849657..0ec855e 100644
+--- a/src/api/extensionPairApi.ts
++++ b/src/api/extensionPairApi.ts
+@@ -1,23 +1,37 @@
+ /**
+- * extensionPairApi — typed mobile client for the two coach-callable endpoints
+- * of the v0.3 extension-import pairing contract (backend OpenAPI slice frozen in
+- * growth-project-backend PR #504). These are the ONLY import endpoints a mobile
+- * client may call: `pair/redeem` and every `scout/*` route are extension-only
+- * writers, and no mobile-readable import-progress contract exists.
++ * extensionPairApi — typed mobile client for the coach-callable endpoints of
++ * the extension-import pairing contract, consumer-frozen (S7-2′) at
++ * `2.0.0-c1-s1.1` / backend `a0ea1bea` (see src/types/extensionImport.ts and
++ * the fixture under src/types/__fixtures__/). Mobile calls ONLY the bearer-
++ * authenticated setup routes: `pair/init`, `pair/status`, `pair/current`.
++ * `pair/redeem` is UNAUTHENTICATED and exchanges the code for coach-bound
++ * tokens — it is an extension-only route and this module deliberately has no
++ * method for it. `pair/session` and every `scout/*` route are not wired here.
+  *
+  * Paths are relative to the axios `baseURL`, which already carries the backend
+  * `/api` global prefix (see src/config/env.ts), so the wire paths resolve to
+- * `/api/extension/pair/init` and `/api/extension/pair/status`.
++ * `/api/extension/pair/init`, `/api/extension/pair/status` and
++ * `/api/extension/pair/current`.
+  *
+  * This module is a thin transport seam only: it never inspects, logs, or stores
+- * the pairing code or any token — error classification and retry policy live in
++ * the pairing code, the setup nonce, or any token. Every secret-adjacent value
++ * travels in the POST BODY (never a path or query string, which would leak into
++ * proxy logs / history / APM) — error classification and retry policy live in
+  * the useExtensionPairing hook.
+  */
+ import api from '../services/api';
+-import type { PairInitResponse, PairStatusResponse } from '../types/extensionImport';
++import type {
++  PairCurrentRequest,
++  PairCurrentResponse,
++  PairInitRequest,
++  PairInitResponse,
++  PairStatusRequest,
++  PairStatusResponse,
++} from '../types/extensionImport';
+ 
+ const PAIR_INIT_PATH = '/extension/pair/init';
+ const PAIR_STATUS_PATH = '/extension/pair/status';
++const PAIR_CURRENT_PATH = '/extension/pair/current';
+ 
+ export const extensionPairApi = {
+   /**
+@@ -25,18 +39,38 @@ export const extensionPairApi = {
+    *
+    * `idempotencyKey` is Rule 19: the caller mints it once per coach intent and
+    * replays the same value on every retry. The current backend does not read
+-   * the header; a lost response — a dropped connection, or the OS killing the
+-   * app between the request and its reply — still cannot leave the coach with
+-   * two live server-side sessions because /pair/init expires any prior live
+-   * code for the coach. Sent for correlation and forward compatibility.
++   * the header; it is sent for correlation and forward compatibility.
++   *
++   * `setupNonce` is the C1 `setup_nonce` (uuid) — the client-saved recovery key
++   * the caller persists BEFORE the first attempt and replays on a same-intent
++   * retry, so the server can hand back the coach's own attempt instead of
++   * minting a second one. It authorises nothing. The contract answers a nonce
++   * reused for another platform with 409 `setup_nonce_conflict` and a nonce
++   * whose challenge is gone with 410 `setup_challenge_unavailable`; both
++   * propagate to the caller untouched.
+    */
+-  init: (chosenPlatform: string, idempotencyKey: string) =>
+-    api.post<PairInitResponse>(
+-      PAIR_INIT_PATH,
+-      { chosen_platform: chosenPlatform },
+-      { headers: { 'Idempotency-Key': idempotencyKey } },
+-    ),
++  init: (chosenPlatform: string, idempotencyKey: string, setupNonce: string) => {
++    const body: PairInitRequest = { chosen_platform: chosenPlatform, setup_nonce: setupNonce };
++    return api.post<PairInitResponse>(PAIR_INIT_PATH, body, {
++      headers: { 'Idempotency-Key': idempotencyKey },
++    });
++  },
+ 
+   /** Poll the lifecycle of a code the caller minted. Body-only (never a query). */
+-  status: (code: string) => api.post<PairStatusResponse>(PAIR_STATUS_PATH, { code }),
++  status: (code: string) => {
++    const body: PairStatusRequest = { code };
++    return api.post<PairStatusResponse>(PAIR_STATUS_PATH, body);
++  },
++
++  /**
++   * Read the coach's owned setup. With a saved `setupNonce` the server returns
++   * that exact owned attempt; with none it returns the current setup. Setup
++   * correlation only: the response never carries a code or token and never
++   * means accepted Start or import completion. Decode the reply through
++   * `decodePairCurrentResponse` (fails closed to `'unknown'`), never cast it.
++   */
++  current: (setupNonce?: string) => {
++    const body: PairCurrentRequest = setupNonce ? { setup_nonce: setupNonce } : {};
++    return api.post<PairCurrentResponse>(PAIR_CURRENT_PATH, body);
++  },
+ };
+diff --git a/src/hooks/__tests__/useExtensionPairing.test.tsx b/src/hooks/__tests__/useExtensionPairing.test.tsx
+index c1bed41..262b902 100644
+--- a/src/hooks/__tests__/useExtensionPairing.test.tsx
++++ b/src/hooks/__tests__/useExtensionPairing.test.tsx
+@@ -37,7 +37,7 @@ jest.mock('../useCurrentUser', () => ({
+ }));
+ 
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+-import { useExtensionPairing } from '../useExtensionPairing';
++import { PAIRING_REASON_COPY, useExtensionPairing } from '../useExtensionPairing';
+ import { extensionPairApi } from '../../api/extensionPairApi';
+ import { AnalyticsEvents } from '../../analytics/events';
+ import {
+@@ -60,16 +60,18 @@ async function seedMirror(userId: string, over: Record<string, unknown> = {}) {
+       code: '482913',
+       expiresAt: '2026-07-27T10:15:00.000Z',
+       idempotencyKey: 'seeded-key-0001',
++      setupNonce: 'seeded-nonce-0001',
+       ...over,
+     }),
+   );
+ }
+ 
+-function axiosError(status: number): AxiosError {
++/** AxiosError with an optional C1 error-envelope body (`{ code }`). */
++function axiosError(status: number, data: Record<string, unknown> = {}): AxiosError {
+   return new AxiosError(`status ${status}`, 'ERR', undefined, undefined, {
+     status,
+     statusText: String(status),
+-    data: {},
++    data,
+     headers: {},
+     config: { headers: new AxiosHeaders() },
+   });
+@@ -142,7 +144,7 @@ describe('useExtensionPairing — mint', () => {
+       result.current.start();
+     });
+ 
+-    expect(mockInit).toHaveBeenCalledWith('truecoach', expect.any(String));
++    expect(mockInit).toHaveBeenCalledWith('truecoach', expect.any(String), expect.any(String));
+     expect(result.current.status).toBe('waiting');
+     expect(result.current.code).toBe('482913');
+     const names = mockTrack.mock.calls.map((c) => c[0]);
+@@ -828,6 +830,7 @@ describe('useExtensionPairing — durable pairing session (M5-C)', () => {
+       // Rule 16: the server's stamp is kept verbatim, never re-derived locally.
+       expiresAt: '2026-07-27T10:15:00.000Z',
+       idempotencyKey: mockInit.mock.calls[0][1],
++      setupNonce: mockInit.mock.calls[0][2],
+     });
+   });
+ 
+@@ -993,6 +996,7 @@ describe('useExtensionPairing — durable pairing session (M5-C)', () => {
+ 
+   it.each<[string, Record<string, unknown>]>([
+     ['a drifted schema version', { version: IMPORT_PAIRING_MIRROR_VERSION + 1 }],
++    ['a v1 payload (no setup nonce)', { version: 1, setupNonce: undefined }],
+     ['a cross-user payload', { userId: 'coach-2' }],
+     ['an empty code', { code: '' }],
+   ])('ignores %s and stays idle', async (_label, over) => {
+@@ -1437,3 +1441,348 @@ describe('useExtensionPairing — idempotency key (R19)', () => {
+     expect(result.current.status).toBe('expired');
+   });
+ });
++
++/**
++ * C1 setup correlation (UX-03b; contract 2.0.0-c1-s1.1 @ a0ea1bea). The
++ * `setup_nonce` is minted with the Rule 19 key, persisted BEFORE /pair/init and
++ * replayed on a same-intent retry; the two contract error codes map to
++ * contract-named reasons; `import_intent_id` is correlation only. Code and
++ * nonce never reach analytics.
++ */
++describe('useExtensionPairing — C1 setup_nonce / import_intent_id correlation', () => {
++  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
++
++  it('sends a uuid setup_nonce distinct from the idempotency key on every mint', async () => {
++    mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++    });
++    const [, key, nonce] = mockInit.mock.calls[0];
++    expect(nonce).toMatch(UUID_V4);
++    expect(nonce).not.toBe(key);
++  });
++
++  it('persists the nonce BEFORE /pair/init is answered (pre-init record, code null)', async () => {
++    let resolveInit: (v: unknown) => void = () => {};
++    mockInit.mockImplementationOnce(() => new Promise((resolve) => { resolveInit = resolve; }));
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(result.current.status).toBe('minting');
++    expect(mockInit).toHaveBeenCalledTimes(1);
++    const preInit = await readImportPairingMirror('coach-1');
++    expect(preInit).toEqual({
++      version: IMPORT_PAIRING_MIRROR_VERSION,
++      userId: 'coach-1',
++      platformId: 'truecoach',
++      code: null,
++      expiresAt: null,
++      idempotencyKey: mockInit.mock.calls[0][1],
++      setupNonce: mockInit.mock.calls[0][2],
++    });
++
++    await act(async () => {
++      resolveInit({ data: { pairing_code: '482913', expires_at: 'x' } });
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(result.current.code).toBe('482913');
++    expect((await readImportPairingMirror('coach-1'))?.setupNonce).toBe(mockInit.mock.calls[0][2]);
++  });
++
++  it('replays the SAME nonce (and key) when retrying after a transient failure', async () => {
++    mockInit.mockRejectedValueOnce(new Error('connection reset'));
++    mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++    });
++    expect(result.current.status).toBe('failed');
++    expect(result.current.reason).toBeNull();
++    await act(async () => {
++      result.current.retry();
++    });
++    expect(mockInit).toHaveBeenCalledTimes(2);
++    expect(mockInit.mock.calls[1][2]).toBe(mockInit.mock.calls[0][2]);
++    expect(mockInit.mock.calls[1][1]).toBe(mockInit.mock.calls[0][1]);
++  });
++
++  it('mints a FRESH nonce after a genuinely new intent (cancel, then start)', async () => {
++    mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++    });
++    await act(async () => {
++      result.current.cancel();
++    });
++    await act(async () => {
++      result.current.start();
++    });
++    expect(mockInit).toHaveBeenCalledTimes(2);
++    expect(mockInit.mock.calls[1][2]).not.toBe(mockInit.mock.calls[0][2]);
++  });
++
++  it('E01: a pre-init record left by a kill between init and its reply replays the nonce on relaunch', async () => {
++    await seedMirror('coach-1', {
++      code: null,
++      expiresAt: null,
++      idempotencyKey: 'key-survived-the-kill',
++      setupNonce: 'nonce-survived-the-kill',
++    });
++    mockInit.mockResolvedValue({ data: { pairing_code: '555555', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start(); // the panel's mount start, racing hydration
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(mockInit).toHaveBeenCalledTimes(1);
++    expect(mockInit).toHaveBeenCalledWith('truecoach', 'key-survived-the-kill', 'nonce-survived-the-kill');
++    expect(result.current.status).toBe('waiting');
++    expect(result.current.code).toBe('555555');
++    // Nothing was restored (there was no code), so no RESTORED event is claimed.
++    expect(mockTrack.mock.calls.map((c) => c[0])).not.toContain(AnalyticsEvents.IMPORT_PAIRING_RESTORED);
++    // The new code is now on disk under the same intent.
++    expect((await readImportPairingMirror('coach-1'))?.code).toBe('555555');
++  });
++
++  it('a pre-init record for ANOTHER platform is discarded, not replayed', async () => {
++    await seedMirror('coach-1', {
++      code: null,
++      expiresAt: null,
++      platformId: 'trainerize',
++      setupNonce: 'other-platform-nonce',
++    });
++    mockInit.mockResolvedValue({ data: { pairing_code: '555555', expires_at: 'x' } });
++    mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++      await jest.advanceTimersByTimeAsync(0);
++    });
++    expect(mockInit).toHaveBeenCalledTimes(1);
++    expect(mockInit.mock.calls[0][2]).not.toBe('other-platform-nonce');
++    expect(result.current.code).toBe('555555');
++  });
++
++  describe('409 setup_nonce_conflict', () => {
++    it('discards the nonce, fails with reason conflict, and the retry is a new intent', async () => {
++      mockInit.mockRejectedValueOnce(axiosError(409, { code: 'setup_nonce_conflict', message: 'x' }));
++      mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x' } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.status).toBe('failed');
++      expect(result.current.reason).toBe('conflict');
++      expect(result.current.code).toBeNull();
++      expect(await readImportPairingMirror('coach-1')).toBeNull();
++
++      await act(async () => {
++        result.current.retry();
++      });
++      expect(mockInit).toHaveBeenCalledTimes(2);
++      expect(mockInit.mock.calls[1][2]).not.toBe(mockInit.mock.calls[0][2]);
++      expect(mockInit.mock.calls[1][1]).not.toBe(mockInit.mock.calls[0][1]);
++      expect(result.current.status).toBe('waiting');
++      expect(result.current.reason).toBeNull();
++    });
++
++    it('tracks a failed event with reason conflict and no nonce or code', async () => {
++      mockInit.mockRejectedValue(axiosError(409, { code: 'setup_nonce_conflict' }));
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      const failed = mockTrack.mock.calls.find((c) => c[0] === AnalyticsEvents.IMPORT_PAIRING_FAILED);
++      expect(failed?.[1]).toEqual({ platform: 'truecoach', reason: 'conflict' });
++      const nonce = mockInit.mock.calls[0][2] as string;
++      expect(JSON.stringify(mockTrack.mock.calls)).not.toContain(nonce);
++    });
++
++    it('a 409 WITHOUT the contracted code is a generic failure that keeps the intent', async () => {
++      mockInit.mockRejectedValueOnce(axiosError(409));
++      mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x' } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.status).toBe('failed');
++      expect(result.current.reason).toBeNull();
++      await act(async () => {
++        result.current.retry();
++      });
++      expect(mockInit.mock.calls[1][2]).toBe(mockInit.mock.calls[0][2]);
++    });
++  });
++
++  describe('410 setup_challenge_unavailable', () => {
++    it('is expired-class: status expired with reason challengeUnavailable, mirror cleared, nonce retired', async () => {
++      mockInit.mockRejectedValueOnce(axiosError(410, { code: 'setup_challenge_unavailable' }));
++      mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x' } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.status).toBe('expired');
++      expect(result.current.reason).toBe('challengeUnavailable');
++      expect(result.current.code).toBeNull();
++      expect(await readImportPairingMirror('coach-1')).toBeNull();
++      const names = mockTrack.mock.calls.map((c) => c[0]);
++      expect(names).toContain(AnalyticsEvents.IMPORT_PAIRING_EXPIRED);
++      expect(names).not.toContain(AnalyticsEvents.IMPORT_PAIRING_FAILED);
++
++      await act(async () => {
++        result.current.retry();
++      });
++      expect(mockInit).toHaveBeenCalledTimes(2);
++      expect(mockInit.mock.calls[1][2]).not.toBe(mockInit.mock.calls[0][2]);
++      expect(result.current.status).toBe('waiting');
++    });
++
++    it('a 410 WITHOUT the contracted code is a generic failure', async () => {
++      mockInit.mockRejectedValue(axiosError(410));
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.status).toBe('failed');
++      expect(result.current.reason).toBeNull();
++    });
++  });
++
++  it('exposes fact → remedy copy for each contract-named reason', () => {
++    expect(PAIRING_REASON_COPY.challengeUnavailable.message).toBe(
++      'Your code is no longer valid; your setup is kept',
++    );
++    expect(PAIRING_REASON_COPY.challengeUnavailable.remedy).toBe('Get a new code');
++    expect(PAIRING_REASON_COPY.conflict.remedy).toBe('Get a new code');
++    expect(Object.keys(PAIRING_REASON_COPY).sort()).toEqual(['challengeUnavailable', 'conflict']);
++  });
++
++  describe('import_intent_id (correlation only)', () => {
++    it('captures the id from the init reply, mirrors it, and never lets it drive status', async () => {
++      mockInit.mockResolvedValue({
++        data: { pairing_code: '482913', expires_at: 'x', import_intent_id: 'ii-0001' },
++      });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.status).toBe('waiting');
++      expect(result.current.importIntentId).toBe('ii-0001');
++      expect((await readImportPairingMirror('coach-1'))?.importIntentId).toBe('ii-0001');
++    });
++
++    it('captures the id from a status reply and keeps polling on pending', async () => {
++      mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x' } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending', import_intent_id: 'ii-0002' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.importIntentId).toBeNull();
++      await act(async () => {
++        await jest.advanceTimersByTimeAsync(2000);
++      });
++      expect(result.current.status).toBe('waiting');
++      // Snapshot publishes on the next transition; the ref already holds it.
++      await act(async () => {
++        result.current.cancel();
++      });
++      expect(result.current.status).toBe('cancelled');
++      expect(result.current.importIntentId).toBe('ii-0002');
++    });
++
++    it('an import_intent_id alone never promotes to paired (fail closed)', async () => {
++      mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x', import_intent_id: 'ii-0003' } });
++      mockStatus.mockResolvedValue({ data: { import_intent_id: 'ii-0003' } }); // no status
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      await act(async () => {
++        await jest.advanceTimersByTimeAsync(2000);
++      });
++      expect(result.current.status).toBe('waiting');
++    });
++
++    it('a malformed id is dropped, not surfaced', async () => {
++      mockInit.mockResolvedValue({ data: { pairing_code: '482913', expires_at: 'x', import_intent_id: 42 } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.importIntentId).toBeNull();
++      expect((await readImportPairingMirror('coach-1'))?.importIntentId).toBeUndefined();
++    });
++
++    it('is reset for a new intent', async () => {
++      mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x', import_intent_id: 'ii-0004' } });
++      mockInit.mockResolvedValueOnce({ data: { pairing_code: '999999', expires_at: 'x' } });
++      mockStatus.mockResolvedValue({ data: { status: 'pending' } });
++      const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.importIntentId).toBe('ii-0004');
++      await act(async () => {
++        result.current.cancel();
++      });
++      await act(async () => {
++        result.current.start();
++      });
++      expect(result.current.code).toBe('999999');
++      expect(result.current.importIntentId).toBeNull();
++    });
++  });
++
++  it('never emits the nonce, key, or code in any tracked event across the whole flow', async () => {
++    mockInit.mockRejectedValueOnce(axiosError(409, { code: 'setup_nonce_conflict' }));
++    mockInit.mockResolvedValueOnce({ data: { pairing_code: '482913', expires_at: 'x', import_intent_id: 'ii-9' } });
++    mockStatus.mockResolvedValue({ data: { status: 'paired' } });
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    await act(async () => {
++      result.current.start();
++    });
++    await act(async () => {
++      result.current.retry();
++    });
++    await act(async () => {
++      await jest.advanceTimersByTimeAsync(2000);
++    });
++    expect(result.current.status).toBe('paired');
++    const serialized = JSON.stringify(mockTrack.mock.calls);
++    for (const call of mockInit.mock.calls) {
++      expect(serialized).not.toContain(call[1]);
++      expect(serialized).not.toContain(call[2]);
++    }
++    expect(serialized).not.toContain('482913');
++    expect(serialized).not.toContain('ii-9');
++  });
++
++  it('keeps the public return shape the panel destructures', async () => {
++    const { result } = await renderHook(() => useExtensionPairing('truecoach', true));
++    const { status, code, supportReference, start, retry, cancel } = result.current;
++    expect(status).toBe('idle');
++    expect(code).toBeNull();
++    expect(supportReference).toBeNull();
++    expect(typeof start).toBe('function');
++    expect(typeof retry).toBe('function');
++    expect(typeof cancel).toBe('function');
++    expect(result.current.importIntentId).toBeNull();
++    expect(result.current.reason).toBeNull();
++  });
++});
+diff --git a/src/hooks/useExtensionPairing.ts b/src/hooks/useExtensionPairing.ts
+index d7db463..e32b56a 100644
+--- a/src/hooks/useExtensionPairing.ts
++++ b/src/hooks/useExtensionPairing.ts
+@@ -56,12 +56,39 @@
+  * guards prevent both duplicate mint intents and concurrent /status polls (a
+  * foreground resume mid-poll never issues a second request). No token or code is
+  * ever logged, stored, or emitted in telemetry.
++ *
++ * C1 setup correlation (UX-03b; contract `2.0.0-c1-s1.1` @ backend `a0ea1bea`,
++ * consumer-frozen pair surface — see types/extensionImport.ts):
++ *   • A `setup_nonce` (uuid) is minted alongside the Rule 19 key, PERSISTED to
++ *     the mirror BEFORE /pair/init is sent (a pre-init record with `code: null`),
++ *     and replayed on a same-intent retry — including after a process death
++ *     between the request and its reply (E01). It lets the server hand back the
++ *     coach's OWN attempt instead of minting a second one; it authorises nothing.
++ *   • 409 `setup_nonce_conflict` (nonce already used for another platform):
++ *     the nonce is DISCARDED and the state is `failed` with `reason: 'conflict'`;
++ *     the remedy is "Get a new code" (a retry is a genuinely new intent).
++ *   • 410 `setup_challenge_unavailable` (challenge gone): expired-class state
++ *     `expired` with `reason: 'challengeUnavailable'` and the copy "Your code is
++ *     no longer valid; your setup is kept" — the server's durable setup survives
++ *     challenge expiry; nothing here claims what the extension did.
++ *   • `import_intent_id` from init/status replies is captured into
++ *     `importIntentId` as CORRELATION ONLY (support, `pair/session` lookup). It
++ *     never drives eligibility, `paired`, Start, connection, or result state.
++ *   • Mobile never calls `pair/redeem`; there is no revocation or disconnect
++ *     endpoint and no such claim is made. Code and nonce never enter a URL,
++ *     log, analytics, or telemetry payload.
++ *   The public return shape is additive: `importIntentId` and `reason` are new
++ *   optional members; every pre-existing member and status is unchanged.
+  */
+ import { useCallback, useEffect, useRef, useState } from 'react';
+ import { AppState, type AppStateStatus } from 'react-native';
+ import { AxiosError } from 'axios';
+ import { extensionPairApi } from '../api/extensionPairApi';
+-import { decodePairStatus } from '../types/extensionImport';
++import {
++  decodeImportIntentId,
++  decodePairInitErrorCode,
++  decodePairStatus,
++} from '../types/extensionImport';
+ import { featureFlags } from '../config/featureFlags';
+ import { track } from '../analytics/posthog.service';
+ import { AnalyticsEvents } from '../analytics/events';
+@@ -89,6 +116,26 @@ export type PairingStatus =
+   /** Coach identity never resolved within the bounded wait; nothing was minted. */
+   | 'identityUnavailable';
+ 
++/**
++ * Contract-named cause of the CURRENT `failed` / `expired` state, when the C1
++ * pair/init contract supplied one. Null for every other transition. Presentation
++ * may map it to copy (see PAIRING_REASON_COPY); it is never a server truth claim.
++ */
++export type PairingReason = 'conflict' | 'challengeUnavailable';
++
++/** Fact → remedy copy for each contract-named reason (A11Y-07 pattern). */
++export const PAIRING_REASON_COPY: Readonly<Record<PairingReason, { message: string; remedy: string }>> =
++  Object.freeze({
++    conflict: Object.freeze({
++      message: 'This setup was started for a different platform, so it can’t be reused here.',
++      remedy: 'Get a new code',
++    }),
++    challengeUnavailable: Object.freeze({
++      message: 'Your code is no longer valid; your setup is kept',
++      remedy: 'Get a new code',
++    }),
++  });
++
+ export interface PairingState {
+   status: PairingStatus;
+   /** 6-digit code shown to the coach to read into the extension. Never logged. */
+@@ -100,6 +147,15 @@ export interface PairingState {
+    * none. Showing it is not a diagnosis (Rule 18).
+    */
+   supportReference: string | null;
++  /**
++   * Server `import_intent_id` for the CURRENT intent, when the init/status
++   * reply carried one. CORRELATION ONLY (support, `pair/session`): never read
++   * as eligibility, connection, Start, or result truth. Optional so existing
++   * panel doubles that predate it stay type-compatible.
++   */
++  importIntentId?: string | null;
++  /** Contract-named cause of the current failed/expired state, if any. */
++  reason?: PairingReason | null;
+ }
+ 
+ export interface UseExtensionPairing extends PairingState {
+@@ -126,12 +182,19 @@ const MAX_POLL_FAILURES = 5;
+  */
+ export const IDENTITY_WAIT_MS = 8000;
+ 
+-type FailReason = 'auth' | 'unavailable' | 'network' | 'identity';
++type FailReason = 'auth' | 'unavailable' | 'network' | 'identity' | 'conflict';
+ 
+ function axiosStatus(err: unknown): number | undefined {
+   return err instanceof AxiosError ? err.response?.status : undefined;
+ }
+ 
++/** Domain `code` from a C1 error envelope body, or undefined. Never the message. */
++function axiosErrorCode(err: unknown): unknown {
++  if (!(err instanceof AxiosError)) return undefined;
++  const data: unknown = err.response?.data;
++  return data && typeof data === 'object' ? (data as { code?: unknown }).code : undefined;
++}
++
+ /**
+  * @param platformSlug lowercase source-platform slug (`chosen_platform`).
+  * @param enabled network is only ever touched when the caller passes a truthy,
+@@ -146,6 +209,8 @@ export function useExtensionPairing(
+     status: 'idle',
+     code: null,
+     supportReference: null,
++    importIntentId: null,
++    reason: null,
+   });
+ 
+   const mountedRef = useRef(true);
+@@ -165,6 +230,10 @@ export function useExtensionPairing(
+   userIdRef.current = userId;
+   /** Rule 19 key for the CURRENT coach intent; replayed across retries of it. */
+   const idempotencyKeyRef = useRef<string | null>(null);
++  /** C1 `setup_nonce` for the CURRENT intent; persisted pre-init, replayed on retry. */
++  const setupNonceRef = useRef<string | null>(null);
++  /** Server `import_intent_id` for the CURRENT intent. Correlation only. */
++  const importIntentIdRef = useRef<string | null>(null);
+   /**
+    * False until the durable mirror has been consulted for a RESOLVED coach id.
+    * Stays false while the identity is still unknown, so `start()` defers.
+@@ -203,6 +272,25 @@ export function useExtensionPairing(
+     identityTimerRef.current = null;
+   }, []);
+ 
++  /** Publish a state snapshot; `importIntentId` always mirrors the current intent's ref. */
++  const emit = useCallback(
++    (
++      status: PairingStatus,
++      code: string | null,
++      supportReference: string | null = null,
++      reason: PairingReason | null = null,
++    ) => {
++      setState({
++        status,
++        code,
++        supportReference,
++        importIntentId: importIntentIdRef.current,
++        reason,
++      });
++    },
++    [],
++  );
++
+   /**
+    * Move to a codeless terminal/reset status and tear down timers.
+    * `supportReference` is the server's correlation id for the request that
+@@ -210,7 +298,7 @@ export function useExtensionPairing(
+    * it so a stale reference can never be attached to a later failure.
+    */
+   const go = useCallback(
+-    (next: PairingStatus, supportReference: string | null = null) => {
++    (next: PairingStatus, supportReference: string | null = null, reason: PairingReason | null = null) => {
+       clearTimers();
+       // Ending this session frees the poll single-flight guard so the next
+       // session can poll; a still-outstanding poll from the old session is
+@@ -222,18 +310,27 @@ export function useExtensionPairing(
+       mintInFlightRef.current = false;
+       codeRef.current = null;
+       // No status reached here still owns a code, so the durable mirror is stale
+-      // by definition — including 'minting', where a fresh mint supersedes it.
++      // by definition — EXCEPT 'minting': start() immediately overwrites the
++      // record with this intent's pre-init (nonce) record, and a same-intent
++      // retry must not lose the nonce it is about to replay.
+       const uid = userIdRef.current;
+-      if (uid) void clearImportPairingMirror(uid);
+-      // Retire the Rule 19 key on every outcome EXCEPT a transient network
+-      // 'failed' (and the 'minting' transition): a retry after a lost response is
+-      // the SAME coach intent and must replay the same key, whereas a retry after
+-      // paired/expired/cancelled/auth/unavailable is a genuinely new intent.
+-      if (next !== 'failed' && next !== 'minting') idempotencyKeyRef.current = null;
++      if (uid && next !== 'minting') void clearImportPairingMirror(uid);
++      // Retire the Rule 19 key AND the setup nonce on every outcome EXCEPT a
++      // transient 'failed' (and the 'minting' transition): a retry after a lost
++      // response is the SAME coach intent and must replay the same key + nonce,
++      // whereas a retry after paired/expired/cancelled/auth/unavailable is a
++      // genuinely new intent. (A 409 conflict discards them explicitly.)
++      if (next !== 'failed' && next !== 'minting') {
++        idempotencyKeyRef.current = null;
++        setupNonceRef.current = null;
++      }
++      // A new intent has no correlation id yet; every other transition keeps
++      // the current intent's id for support (it is never UI truth).
++      if (next === 'minting') importIntentIdRef.current = null;
+       statusRef.current = next;
+-      if (mountedRef.current) setState({ status: next, code: null, supportReference });
++      if (mountedRef.current) emit(next, null, supportReference, reason);
+     },
+-    [clearTimers],
++    [clearTimers, emit],
+   );
+ 
+   const emitFailed = useCallback((reason: FailReason) => {
+@@ -255,6 +352,10 @@ export function useExtensionPairing(
+       // Discard a late/stale result: unmounted, session moved off 'waiting', or
+       // the code was abandoned/re-minted (cancel→retry) while this poll was out.
+       if (!mountedRef.current || statusRef.current !== 'waiting' || codeRef.current !== code) return;
++      // Correlation only: remember the server's setup id when it names one.
++      // It never influences which branch below is taken.
++      const intent = decodeImportIntentId(res.data?.import_intent_id);
++      if (intent) importIntentIdRef.current = intent;
+       const decoded = decodePairStatus(res.data?.status ?? '');
+       if (decoded === 'paired') {
+         go('paired');
+@@ -315,7 +416,7 @@ export function useExtensionPairing(
+       // may settle it again.
+       if (statusRef.current === 'identityUnavailable') {
+         statusRef.current = 'idle';
+-        setState({ status: 'idle', code: null, supportReference: null });
++        emit('idle', null);
+       }
+       // Bounded wait: only while the identity has NEVER resolved on this mount
+       // (cold start / failed hydration). The A→null sign-out window is a
+@@ -328,25 +429,29 @@ export function useExtensionPairing(
+           if (statusRef.current !== 'idle') return;
+           pendingStartRef.current = false;
+           statusRef.current = 'identityUnavailable';
+-          setState({ status: 'identityUnavailable', code: null, supportReference: null });
++          emit('identityUnavailable', null);
+           emitFailed('identity');
+         }, IDENTITY_WAIT_MS);
+       }
+       return;
+     }
+     let key = idempotencyKeyRef.current;
+-    if (!key) {
++    let nonce = setupNonceRef.current;
++    if (!key || !nonce) {
+       try {
+-        key = generateIdempotencyKey();
++        key = key ?? generateIdempotencyKey();
++        nonce = nonce ?? generateIdempotencyKey();
+       } catch (err) {
+-        // No CSPRNG means no safe retry key; minting anyway risks a duplicate
+-        // session, so fail visibly instead (Rule 19 has no soft fallback).
++        // No CSPRNG means no safe retry key or nonce; minting anyway risks a
++        // duplicate session, so fail visibly instead (Rule 19 has no soft
++        // fallback). Never log the values themselves.
+         logger.warn('[useExtensionPairing] idempotency key unavailable', err);
+         go('failed');
+         emitFailed('network');
+         return;
+       }
+       idempotencyKeyRef.current = key;
++      setupNonceRef.current = nonce;
+     }
+     // The mint belongs to the coach signed in NOW; a response that lands after
+     // the identity changed is discarded, never mirrored under the new coach.
+@@ -365,20 +470,56 @@ export function useExtensionPairing(
+     mintInFlightRef.current = true;
+     track(AnalyticsEvents.IMPORT_PAIRING_STARTED, { platform: slug });
+     try {
+-      const res = await extensionPairApi.init(slug, key);
+-      // Late result of a superseded attempt → discard (no HTTP abort).
+-      if (stale()) return;
++      // Persist the nonce BEFORE the request (E01): if the OS kills the app
++      // between /pair/init and its reply, the relaunch finds this pre-init
++      // record and replays the same nonce, so the server can hand back the
++      // coach's own attempt instead of a blind second mint. A write failure is
++      // logged and the flow continues — degraded durability, not a dead flow;
++      // the stale record it could not overwrite is cleared so an OLD code
++      // cannot be restored under this new intent.
++      const uid = owner;
++      if (uid) {
++        try {
++          await writeImportPairingMirror({
++            version: IMPORT_PAIRING_MIRROR_VERSION,
++            userId: uid,
++            platformId: slug,
++            code: null,
++            expiresAt: null,
++            idempotencyKey: key,
++            setupNonce: nonce,
++          });
++        } catch (err) {
++          logger.warn('[useExtensionPairing] pre-init mirror write failed', err);
++          void clearImportPairingMirror(uid);
++        }
++        if (stale()) {
++          if (userIdRef.current !== owner) void clearImportPairingMirror(uid);
++          return;
++        }
++      }
++      const res = await extensionPairApi.init(slug, key, nonce);
++      // Late result of a superseded attempt → discard (no HTTP abort). If the
++      // coach changed meanwhile, the pre-init record THIS attempt wrote is
++      // removed too (same rule as the post-write branch below): nothing this
++      // attempt put on disk survives an owner change.
++      if (stale()) {
++        if (uid && userIdRef.current !== owner) void clearImportPairingMirror(uid);
++        return;
++      }
+       const code = res.data?.pairing_code ?? null;
+       if (!code) {
+         go('failed');
+         emitFailed('network');
+         return;
+       }
++      // Server setup correlation, when issued. Captured only; never drives state.
++      const intent = decodeImportIntentId(res.data?.import_intent_id);
++      importIntentIdRef.current = intent;
+       // Persist BEFORE showing the code: the coach's next action is to leave the
+       // app, so a code on screen that is not on disk is exactly the state that
+       // an OS kill turns into an orphaned server-side session. A write failure
+       // is logged and the flow continues — degraded durability, not a dead flow.
+-      const uid = owner;
+       if (uid) {
+         try {
+           await writeImportPairingMirror({
+@@ -389,6 +530,8 @@ export function useExtensionPairing(
+             // Stored verbatim for provenance/support only; never clock-compared.
+             expiresAt: res.data?.expires_at ?? '',
+             idempotencyKey: key,
++            setupNonce: nonce,
++            ...(intent ? { importIntentId: intent } : {}),
+           });
+         } catch (err) {
+           logger.warn('[useExtensionPairing] mirror write failed', err);
+@@ -408,7 +551,7 @@ export function useExtensionPairing(
+       pollDelayRef.current = POLL_BASE_MS;
+       failureCountRef.current = 0;
+       statusRef.current = 'waiting';
+-      setState({ status: 'waiting', code, supportReference: null });
++      emit('waiting', code);
+       track(AnalyticsEvents.IMPORT_PAIRING_CODE_READY, { platform: slug });
+       pollTimerRef.current = setTimeout(doPoll, POLL_BASE_MS);
+     } catch (err) {
+@@ -417,13 +560,31 @@ export function useExtensionPairing(
+       if (stale()) return;
+       const s = axiosStatus(err);
+       const ref = extractRequestId(err);
++      const domainCode = decodePairInitErrorCode(axiosErrorCode(err));
+       if (s === 401 || s === 403) {
+         go('authExpired', ref);
+         emitFailed('auth');
+       } else if (s === 404) {
+         go('unavailable', ref);
+         emitFailed('unavailable');
++      } else if (s === 409 && domainCode === 'setup_nonce_conflict') {
++        // The nonce names an attempt the server already bound to ANOTHER
++        // platform ("no mutation"). Discard it — and the Rule 19 key with it —
++        // so the coach's retry is a genuinely new intent ("Get a new code").
++        setupNonceRef.current = null;
++        idempotencyKeyRef.current = null;
++        go('failed', ref, 'conflict');
++        emitFailed('conflict');
++      } else if (s === 410 && domainCode === 'setup_challenge_unavailable') {
++        // The challenge behind this nonce is gone. Expired-class: the code is no
++        // longer valid; the server keeps the durable setup. `go('expired')`
++        // retires key + nonce, so the retry mints a fresh challenge rather than
++        // replaying a nonce the server just refused.
++        go('expired', ref, 'challengeUnavailable');
++        track(AnalyticsEvents.IMPORT_PAIRING_EXPIRED, { platform: slug });
+       } else {
++        // Includes 400 `code_mint_failed`, a 409/410 without its contracted
++        // code, 429 and transport faults: generic retryable failure, same intent.
+         go('failed', ref);
+         emitFailed('network');
+       }
+@@ -432,7 +593,7 @@ export function useExtensionPairing(
+       // attempt must not free a guard a newer attempt now holds.
+       if (mintEpochRef.current === attempt) mintInFlightRef.current = false;
+     }
+-  }, [enabled, go, doPoll, emitFailed]);
++  }, [enabled, go, doPoll, emit, emitFailed]);
+ 
+   startRef.current = start;
+ 
+@@ -466,8 +627,10 @@ export function useExtensionPairing(
+         mintInFlightRef.current = false;
+         codeRef.current = null;
+         idempotencyKeyRef.current = null;
++        setupNonceRef.current = null;
++        importIntentIdRef.current = null;
+         statusRef.current = 'idle';
+-        setState({ status: 'idle', code: null, supportReference: null });
++        emit('idle', null);
+         if (hadLive) pendingStartRef.current = true;
+       }
+       hydratedRef.current = false;
+@@ -480,7 +643,7 @@ export function useExtensionPairing(
+     // arriving: return to idle so the deferred intent below can proceed.
+     if (statusRef.current === 'identityUnavailable') {
+       statusRef.current = 'idle';
+-      setState({ status: 'idle', code: null, supportReference: null });
++      emit('idle', null);
+       pendingStartRef.current = true;
+     }
+     let abandoned = false;
+@@ -492,11 +655,25 @@ export function useExtensionPairing(
+         if (restored.platformId === slug) {
+           hydratedRef.current = true;
+           idempotencyKeyRef.current = restored.idempotencyKey;
++          setupNonceRef.current = restored.setupNonce;
++          importIntentIdRef.current = restored.importIntentId ?? null;
++          if (restored.code === null) {
++            // Pre-init record (E01): /pair/init never replied before the kill.
++            // There is nothing to show and nothing to poll; the key + nonce are
++            // now in memory, so the start() that follows (the panel's mount
++            // start, or one that raced this read) REPLAYS the same intent
++            // instead of minting blind. No restored event: no code was restored.
++            if (pendingStartRef.current) {
++              pendingStartRef.current = false;
++              startRef.current?.();
++            }
++            return;
++          }
+           codeRef.current = restored.code;
+           pollDelayRef.current = POLL_BASE_MS;
+           failureCountRef.current = 0;
+           statusRef.current = 'waiting';
+-          setState({ status: 'waiting', code: restored.code, supportReference: null });
++          emit('waiting', restored.code);
+           track(AnalyticsEvents.IMPORT_PAIRING_RESTORED, { platform: restored.platformId });
+           pollTimerRef.current = setTimeout(doPoll, 0);
+           return;
+@@ -523,7 +700,7 @@ export function useExtensionPairing(
+     return () => {
+       abandoned = true;
+     };
+-  }, [enabled, doPoll, clearTimers, clearIdentityTimer, userId]);
++  }, [enabled, doPoll, clearTimers, clearIdentityTimer, emit, userId]);
+ 
+   const cancel = useCallback(() => {
+     const wasActive = statusRef.current === 'minting' || statusRef.current === 'waiting';
+diff --git a/src/storage/__tests__/importPairingMirror.test.ts b/src/storage/__tests__/importPairingMirror.test.ts
+index 3fdb351..89b7f75 100644
+--- a/src/storage/__tests__/importPairingMirror.test.ts
++++ b/src/storage/__tests__/importPairingMirror.test.ts
+@@ -34,6 +34,7 @@ function session(over: Partial<MirroredPairingSession> = {}): MirroredPairingSes
+     code: '482913',
+     expiresAt: '2026-07-27T10:15:00.000Z',
+     idempotencyKey: 'b0a1c2d3-e4f5-4607-8899-aabbccddeeff',
++    setupNonce: '7f1e2d3c-4b5a-4968-8776-655443322110',
+     ...over,
+   };
+ }
+@@ -128,6 +129,8 @@ describe('malformed payloads are discarded, not half-trusted', () => {
+     ['an empty code', { code: '' }],
+     ['an empty platform', { platformId: '' }],
+     ['an empty idempotency key', { idempotencyKey: '' }],
++    ['an empty setup nonce', { setupNonce: '' }],
++    ['an empty import intent id', { importIntentId: '' }],
+     ['an empty user id', { userId: '' }],
+   ])('discards %s and deletes the key', async (_label, over) => {
+     await AsyncStorage.setItem(
+@@ -138,7 +141,7 @@ describe('malformed payloads are discarded, not half-trusted', () => {
+     expect(await AsyncStorage.getItem(importPairingMirrorKey('coach-1'))).toBeNull();
+   });
+ 
+-  it.each(['version', 'platformId', 'code', 'expiresAt', 'idempotencyKey'])(
++  it.each(['version', 'platformId', 'code', 'expiresAt', 'idempotencyKey', 'setupNonce'])(
+     'discards a record missing %s',
+     async (field) => {
+       const partial: Record<string, unknown> = { ...session() };
+@@ -150,6 +153,64 @@ describe('malformed payloads are discarded, not half-trusted', () => {
+       expect(await readImportPairingMirror('coach-1')).toBeNull();
+     },
+   );
++
++  it('discards a v1 record (schema before the setup nonce) by the version rule', async () => {
++    // Exactly what a coach upgrading from the v1 build has on disk: no
++    // migration, a logged discard, and a fresh mint on the next start.
++    const v1: Record<string, unknown> = { ...session(), version: 1 };
++    delete v1.setupNonce;
++    await AsyncStorage.setItem(importPairingMirrorKey('coach-1'), JSON.stringify(v1));
++    expect(await readImportPairingMirror('coach-1')).toBeNull();
++    expect(await AsyncStorage.getItem(importPairingMirrorKey('coach-1'))).toBeNull();
++  });
++
++  it.each<[string, Record<string, unknown>]>([
++    ['a code with no expiry stamp', { code: '482913', expiresAt: null }],
++    ['a non-string import intent id', { importIntentId: 7 }],
++    ['a non-string code', { code: 482913 }],
++  ])('discards %s', async (_label, over) => {
++    await AsyncStorage.setItem(
++      importPairingMirrorKey('coach-1'),
++      JSON.stringify({ ...session(), ...over }),
++    );
++    expect(await readImportPairingMirror('coach-1')).toBeNull();
++  });
++});
++
++/**
++ * C1 (UX-03b, schema v2): the setup nonce is persisted BEFORE /pair/init, so a
++ * record may legitimately exist with no code yet; the server's import intent id
++ * rides along as optional correlation.
++ */
++describe('v2: pre-init record and import intent id', () => {
++  it('round-trips a pre-init record (code and expiry null, nonce present)', async () => {
++    const preInit = session({ code: null, expiresAt: null });
++    await writeImportPairingMirror(preInit);
++    expect(await readImportPairingMirror('coach-1')).toEqual(preInit);
++  });
++
++  it('round-trips an optional import intent id', async () => {
++    const withIntent = session({ importIntentId: 'ii-0001' });
++    await writeImportPairingMirror(withIntent);
++    expect(await readImportPairingMirror('coach-1')).toEqual(withIntent);
++  });
++
++  it('a record without an import intent id reads back without the key', async () => {
++    await writeImportPairingMirror(session());
++    const read = await readImportPairingMirror('coach-1');
++    expect(read).not.toBeNull();
++    expect('importIntentId' in (read as object)).toBe(false);
++  });
++
++  it('a pre-init record is superseded by the full record of the same intent', async () => {
++    await writeImportPairingMirror(session({ code: null, expiresAt: null }));
++    await writeImportPairingMirror(session({ code: '482913' }));
++    expect((await readImportPairingMirror('coach-1'))?.code).toBe('482913');
++  });
++
++  it('the schema version is 2', () => {
++    expect(IMPORT_PAIRING_MIRROR_VERSION).toBe(2);
++  });
+ });
+ 
+ describe('clear', () => {
+diff --git a/src/storage/importPairingMirror.ts b/src/storage/importPairingMirror.ts
+index 0ef7c2b..d180be8 100644
+--- a/src/storage/importPairingMirror.ts
++++ b/src/storage/importPairingMirror.ts
+@@ -27,6 +27,19 @@
+  * /pair/init expires the coach's prior live code server-side. Replaying the key
+  * keeps the client side deterministic and forward compatible.
+  *
++ * C1 setup correlation (UX-03b, schema v2): `setupNonce` is the C1
++ * `setup_nonce` — a client-minted uuid persisted BEFORE the first /pair/init so
++ * that a process death between the request and its reply (E01) still leaves
++ * the coach able to recover their OWN attempt by replaying it. A record may
++ * therefore exist with `code: null` ("we asked, no reply yet"). `importIntentId`
++ * is the server's `import_intent_id`, kept as correlation only — never read as
++ * eligibility, connection, Start, or result truth. Like the code, the nonce is
++ * never logged and never sent to telemetry: it names an owned attempt.
++ *
++ * Version rule: v1 payloads (no nonce) fail the shape guard and are discarded
++ * on read — the coach simply re-mints. This is the existing, designed discard
++ * mechanism, not a migration.
++ *
+  * Rule 18 (no fabricated confirmations): restoring a record is NOT a claim the
+  * session is still live. It only says "we asked for this and never saw it
+  * finish" — the server decides what the session actually is.
+@@ -43,7 +56,7 @@ import { logger } from '../utils/logger';
+ export const IMPORT_PAIRING_MIRROR_KEY_PREFIX = 'import_pairing_session:';
+ 
+ /** Schema version — bump to discard incompatible on-disk payloads on read. */
+-export const IMPORT_PAIRING_MIRROR_VERSION = 1;
++export const IMPORT_PAIRING_MIRROR_VERSION = 2;
+ 
+ /** Build the per-user mirror key. Exported so the shape lives in one place. */
+ export function importPairingMirrorKey(userId: string): string {
+@@ -53,8 +66,10 @@ export function importPairingMirrorKey(userId: string): string {
+ /**
+  * One pairing session the coach started and we have not yet seen reach a
+  * terminal state. Holds everything needed to pick the flow back up after a
+- * process death: which platform they chose, the code they were told to type,
+- * the server's own expiry stamp, and the idempotency key replayed on re-mint.
++ * process death: which platform they chose, the code they were told to type
++ * (null while /pair/init is still unanswered), the server's own expiry stamp,
++ * the idempotency key and the setup nonce replayed on re-mint, and the
++ * server's setup correlation id when it has issued one.
+  */
+ export interface MirroredPairingSession {
+   version: number;
+@@ -62,12 +77,27 @@ export interface MirroredPairingSession {
+   userId: string;
+   /** `chosen_platform` slug the session was minted for. */
+   platformId: string;
+-  /** The 6-digit code shown to the coach. Never logged, never sent to telemetry. */
+-  code: string;
+-  /** Server-authoritative ISO-8601 expiry, stored verbatim. Never compared locally. */
+-  expiresAt: string;
++  /**
++   * The 6-digit code shown to the coach, or null while the first /pair/init of
++   * this intent has not replied (pre-init record). Never logged, never sent to
++   * telemetry.
++   */
++  code: string | null;
++  /**
++   * Server-authoritative ISO-8601 expiry, stored verbatim; null on a pre-init
++   * record. Never compared locally.
++   */
++  expiresAt: string | null;
+   /** Rule 19 key, replayed on every re-mint of this same intent. */
+   idempotencyKey: string;
++  /** C1 `setup_nonce` for this intent, persisted before init. Never logged. */
++  setupNonce: string;
++  /** Server `import_intent_id` — correlation only, never UI truth. Optional. */
++  importIntentId?: string;
++}
++
++function isNonEmptyString(v: unknown): v is string {
++  return typeof v === 'string' && v.length > 0;
+ }
+ 
+ function isMirroredPairingSession(
+@@ -75,17 +105,24 @@ function isMirroredPairingSession(
+ ): value is MirroredPairingSession {
+   if (!value || typeof value !== 'object') return false;
+   const v = value as Record<string, unknown>;
++  // A code, when present, is a non-empty string; null means "init unanswered".
++  // An absent (undefined) or empty code is a malformed record, not a pre-init one.
++  const codeOk = v.code === null || isNonEmptyString(v.code);
++  const expiresOk = v.expiresAt === null || typeof v.expiresAt === 'string';
++  // Pre-init records carry no expiry; a record WITH a code must carry the
++  // server's stamp (verbatim string) exactly as v1 did.
++  const codeExpiryCoherent = v.code === null || typeof v.expiresAt === 'string';
++  const intentOk = v.importIntentId === undefined || isNonEmptyString(v.importIntentId);
+   return (
+     v.version === IMPORT_PAIRING_MIRROR_VERSION &&
+-    typeof v.userId === 'string' &&
+-    v.userId.length > 0 &&
+-    typeof v.platformId === 'string' &&
+-    v.platformId.length > 0 &&
+-    typeof v.code === 'string' &&
+-    v.code.length > 0 &&
+-    typeof v.expiresAt === 'string' &&
+-    typeof v.idempotencyKey === 'string' &&
+-    v.idempotencyKey.length > 0
++    isNonEmptyString(v.userId) &&
++    isNonEmptyString(v.platformId) &&
++    codeOk &&
++    expiresOk &&
++    codeExpiryCoherent &&
++    isNonEmptyString(v.idempotencyKey) &&
++    isNonEmptyString(v.setupNonce) &&
++    intentOk
+   );
+ }
+ 
+diff --git a/src/types/__fixtures__/c1PairSurface.a0ea1bea.json b/src/types/__fixtures__/c1PairSurface.a0ea1bea.json
+new file mode 100644
+index 0000000..7a58890
+--- /dev/null
++++ b/src/types/__fixtures__/c1PairSurface.a0ea1bea.json
+@@ -0,0 +1,862 @@
++{
++  "$fixture": {
++    "extraction": {
++      "method": "exact copy of the five listed path items; transitive closure of every #/components/schemas/* $ref reachable from them; security schemes named by their `security` requirements; JSON re-serialised with sorted keys and 2-space indent",
++      "paths": [
++        "/api/extension/pair/init",
++        "/api/extension/pair/status",
++        "/api/extension/pair/current",
++        "/api/extension/pair/session",
++        "/api/extension/pair/redeem"
++      ],
++      "schemas": [
++        "ErrorEnvelope",
++        "PairCurrentDto",
++        "PairInitDto",
++        "PairInitResult",
++        "PairRedeemDto",
++        "PairRedeemResult",
++        "PairSessionDto",
++        "PairSessionResult",
++        "PairStatusDto",
++        "PairStatusResult",
++        "RateLimitError"
++      ],
++      "securitySchemes": [
++        "bearer"
++      ]
++    },
++    "name": "c1-pair-surface",
++    "purpose": "S7-2' consumer-frozen pair surface of the C1 importer contract, mechanically projected for the TGP mobile consumer contract test. Do not hand-edit; regenerate with execution/cf8ff737/ux03b/extract_pair_surface_fixture.py.",
++    "source": {
++      "artifact": "docs/contracts/importer-openapi.json",
++      "commit": "a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992",
++      "contract_version": "2.0.0-c1-s1.1",
++      "openapi": "3.1.0",
++      "repository": "growth-project-backend",
++      "sha256": "bdb022dd6c4fb64cdf291fdde3796b99e4b23004f676b7cb46a58460526ba4e5"
++    }
++  },
++  "components": {
++    "schemas": {
++      "ErrorEnvelope": {
++        "properties": {
++          "code": {
++            "description": "Machine-readable failure discriminant, present only when the handler set one (e.g. `extension_refresh_invalid`, `invalid`). Absent for generic validation/guard errors.",
++            "example": "invalid",
++            "type": "string"
++          },
++          "error": {
++            "description": "Short error class name (Nest default), e.g. `Bad Request`, `Unauthorized`.",
++            "example": "Bad Request",
++            "type": "string"
++          },
++          "message": {
++            "description": "Human-readable message. A single string for most errors; an array of strings when the global ValidationPipe reports one entry per failed constraint.",
++            "example": "Invalid pairing code.",
++            "oneOf": [
++              {
++                "type": "string"
++              },
++              {
++                "items": {
++                  "type": "string"
++                },
++                "type": "array"
++              }
++            ]
++          },
++          "path": {
++            "description": "Request path the error occurred on.",
++            "example": "/api/scout/ingest",
++            "type": "string"
++          },
++          "request_id": {
++            "description": "Correlation id from RequestIdMiddleware; omitted when absent.",
++            "example": "5f2c9b1e-6d3a-4c8b-9f0e-1a2b3c4d5e6f",
++            "type": "string"
++          },
++          "statusCode": {
++            "description": "HTTP status code, echoed in the body.",
++            "example": 400,
++            "type": "number"
++          },
++          "timestamp": {
++            "description": "ISO-8601 instant the error envelope was built.",
++            "example": "2026-07-13T18:30:00.000Z",
++            "format": "date-time",
++            "type": "string"
++          }
++        },
++        "required": [
++          "statusCode",
++          "message",
++          "error",
++          "timestamp",
++          "path"
++        ],
++        "type": "object"
++      },
++      "PairCurrentDto": {
++        "properties": {
++          "setup_nonce": {
++            "description": "Optional saved setup nonce: recover this owned attempt instead of the current setup.",
++            "format": "uuid",
++            "type": "string"
++          }
++        },
++        "type": "object"
++      },
++      "PairInitDto": {
++        "properties": {
++          "chosen_platform": {
++            "description": "Source coaching platform the coach is migrating from. Lowercase slug driven by the extension ROADMAP matrix (truecoach, trainerize, mypthub, …).",
++            "example": "truecoach",
++            "type": "string"
++          },
++          "setup_nonce": {
++            "description": "Optional saved setup nonce: recover this owned attempt instead of the current setup.",
++            "format": "uuid",
++            "type": "string"
++          }
++        },
++        "required": [
++          "chosen_platform"
++        ],
++        "type": "object"
++      },
++      "PairInitResult": {
++        "properties": {
++          "expires_at": {
++            "description": "ISO-8601 instant the code expires (short TTL, DESIGN §4).",
++            "example": "2026-07-09T18:35:00.000Z",
++            "format": "date-time",
++            "type": "string"
++          },
++          "import_intent_id": {
++            "description": "Server-issued setup correlation, not authorization or accepted Start. Absent on legacy unbound rows.",
++            "format": "uuid",
++            "type": "string"
++          },
++          "pairing_code": {
++            "description": "6-digit numeric pairing code the coach reads out to the extension.",
++            "example": "142856",
++            "type": "string"
++          }
++        },
++        "required": [
++          "pairing_code",
++          "expires_at"
++        ],
++        "type": "object"
++      },
++      "PairRedeemDto": {
++        "properties": {
++          "code": {
++            "description": "6-digit numeric pairing code minted by POST /api/extension/pair/init.",
++            "example": "142856",
++            "type": "string"
++          }
++        },
++        "required": [
++          "code"
++        ],
++        "type": "object"
++      },
++      "PairRedeemResult": {
++        "properties": {
++          "access_token": {
++            "description": "Coach-bound Supabase access token.",
++            "type": "string"
++          },
++          "chosen_platform": {
++            "description": "Source platform the code was minted for (echoed to the extension).",
++            "example": "truecoach",
++            "type": "string"
++          },
++          "import_intent_id": {
++            "description": "Server-issued setup correlation, not authorization or accepted Start. Absent on legacy unbound rows.",
++            "format": "uuid",
++            "type": "string"
++          },
++          "refresh_token": {
++            "description": "Coach-bound Supabase refresh token.",
++            "type": "string"
++          }
++        },
++        "required": [
++          "access_token",
++          "refresh_token",
++          "chosen_platform"
++        ],
++        "type": "object"
++      },
++      "PairSessionDto": {
++        "properties": {
++          "import_intent_id": {
++            "description": "Server-issued import_intent_id saved from pairing init.",
++            "format": "uuid",
++            "type": "string"
++          }
++        },
++        "required": [
++          "import_intent_id"
++        ],
++        "type": "object"
++      },
++      "PairSessionResult": {
++        "properties": {
++          "chosen_platform": {
++            "description": "Source platform selected at pairing, not proof of any imported data.",
++            "type": "string"
++          },
++          "import_intent_id": {
++            "description": "Persisted server-issued setup correlation.",
++            "format": "uuid",
++            "type": "string"
++          },
++          "status": {
++            "description": "Lifecycle state of the polled code.",
++            "enum": [
++              "pending",
++              "paired",
++              "expired"
++            ],
++            "example": "pending",
++            "type": "string"
++          }
++        },
++        "required": [
++          "import_intent_id",
++          "status",
++          "chosen_platform"
++        ],
++        "type": "object"
++      },
++      "PairStatusDto": {
++        "properties": {
++          "code": {
++            "description": "6-digit numeric pairing code to poll (the code the caller minted).",
++            "example": "142856",
++            "type": "string"
++          }
++        },
++        "required": [
++          "code"
++        ],
++        "type": "object"
++      },
++      "PairStatusResult": {
++        "properties": {
++          "import_intent_id": {
++            "description": "Server-issued setup correlation, not authorization or accepted Start. Absent on legacy unbound rows.",
++            "format": "uuid",
++            "type": "string"
++          },
++          "status": {
++            "description": "Lifecycle state of the polled code.",
++            "enum": [
++              "pending",
++              "paired",
++              "expired"
++            ],
++            "example": "pending",
++            "type": "string"
++          }
++        },
++        "required": [
++          "status"
++        ],
++        "type": "object"
++      },
++      "RateLimitError": {
++        "properties": {
++          "error": {
++            "description": "Always `Too Many Requests`.",
++            "example": "Too Many Requests",
++            "type": "string"
++          },
++          "message": {
++            "description": "Generic backoff message (never echoes input or which limit fired).",
++            "example": "Too many attempts. Please wait before trying again.",
++            "type": "string"
++          },
++          "retryAfter": {
++            "description": "Seconds to wait before retrying; matches the `Retry-After` header.",
++            "example": 3600,
++            "type": "number"
++          },
++          "statusCode": {
++            "description": "Always 429.",
++            "example": 429,
++            "type": "number"
++          }
++        },
++        "required": [
++          "statusCode",
++          "error",
++          "message",
++          "retryAfter"
++        ],
++        "type": "object"
++      }
++    },
++    "securitySchemes": {
++      "bearer": {
++        "bearerFormat": "JWT",
++        "description": "Supabase-issued JWT. Send as `Authorization: Bearer <token>`. Tokens are verified against the Supabase JWKS in JwtAuthGuard.",
++        "scheme": "bearer",
++        "type": "http"
++      }
++    }
++  },
++  "info": {
++    "description": "Frozen public contract for the tgp-importer Chrome extension + mobile pairing surface. Generated from the backend @nestjs/swagger document — do not hand-edit. Run `npm run contract:importer` to regenerate.",
++    "title": "Growth Project API — Importer Contract",
++    "version": "2.0.0-c1-s1.1"
++  },
++  "openapi": "3.1.0",
++  "paths": {
++    "/api/extension/pair/current": {
++      "post": {
++        "description": "Empty body reads current setup; saved setup_nonce reads that exact owned attempt. Never creates a setup, issues tokens, or authorizes Start. Setup only; no-store.",
++        "operationId": "ExtensionPairController_current",
++        "parameters": [],
++        "requestBody": {
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PairCurrentDto"
++              }
++            }
++          },
++          "required": true
++        },
++        "responses": {
++          "200": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/PairSessionResult"
++                }
++              }
++            },
++            "description": "Owned setup."
++          },
++          "400": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Invalid nonce or extra body fields."
++          },
++          "401": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Bearer authentication required."
++          },
++          "403": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Coach/owner role required."
++          },
++          "404": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "No owned setup or feature disabled."
++          },
++          "429": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/RateLimitError"
++                }
++              }
++            },
++            "description": "Authenticated user throttle."
++          }
++        },
++        "security": [
++          {
++            "bearer": []
++          }
++        ],
++        "summary": "Recover owned setup without knowing its server ID",
++        "tags": [
++          "extension-pair"
++        ]
++      }
++    },
++    "/api/extension/pair/init": {
++      "post": {
++        "description": "Mobile-authenticated coach mints a 6-digit code bound to their account + chosen source platform. Optional setup_nonce gives account-scoped retry recovery without extending challenge expiry. Returns pairing_code, expires_at and server import_intent_id. Returns 404 when FEATURE_EXTENSION_PAIRING is off.",
++        "operationId": "ExtensionPairController_init",
++        "parameters": [],
++        "requestBody": {
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PairInitDto"
++              }
++            }
++          },
++          "required": true
++        },
++        "responses": {
++          "201": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/PairInitResult"
++                }
++              }
++            },
++            "description": "Pairing code minted."
++          },
++          "400": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "allOf": [
++                    {
++                      "$ref": "#/components/schemas/ErrorEnvelope"
++                    },
++                    {
++                      "properties": {
++                        "code": {
++                          "enum": [
++                            "code_mint_failed"
++                          ],
++                          "type": "string"
++                        }
++                      },
++                      "type": "object"
++                    }
++                  ]
++                }
++              }
++            },
++            "description": "Rejected init. Standard HttpExceptionFilter envelope. Two sources: the domain path sets `code: \"code_mint_failed\"` when the mint-retry budget is exhausted; a malformed body (chosen_platform failing the slug/length rules) is rejected by the global ValidationPipe with NO `code` and `message` as a string ARRAY of constraint violations. `code` is therefore optional here and pinned to `code_mint_failed` only when present."
++          },
++          "401": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Missing or invalid bearer token (global JwtAuthGuard runs before role checks)."
++          },
++          "403": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Caller is not a coach."
++          },
++          "404": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Pairing feature disabled (uniform R-DARK-1 404)."
++          },
++          "409": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "allOf": [
++                    {
++                      "$ref": "#/components/schemas/ErrorEnvelope"
++                    },
++                    {
++                      "properties": {
++                        "code": {
++                          "enum": [
++                            "setup_nonce_conflict"
++                          ],
++                          "type": "string"
++                        }
++                      },
++                      "required": [
++                        "code"
++                      ],
++                      "type": "object"
++                    }
++                  ]
++                }
++              }
++            },
++            "description": "Same nonce used for another platform; no mutation."
++          },
++          "410": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "allOf": [
++                    {
++                      "$ref": "#/components/schemas/ErrorEnvelope"
++                    },
++                    {
++                      "properties": {
++                        "code": {
++                          "enum": [
++                            "setup_challenge_unavailable"
++                          ],
++                          "type": "string"
++                        }
++                      },
++                      "required": [
++                        "code"
++                      ],
++                      "type": "object"
++                    }
++                  ]
++                }
++              }
++            },
++            "description": "Challenge unavailable. Read current with saved setup_nonce to recover the owned intent."
++          },
++          "429": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/RateLimitError"
++                }
++              }
++            },
++            "description": "Rate limit exceeded. This route carries no explicit @Throttle, so it is governed by the global authenticated default (UserThrottlerGuard, keyed by user id). Documented for parity with the other throttled importer routes."
++          }
++        },
++        "security": [
++          {
++            "bearer": []
++          }
++        ],
++        "summary": "Mint a pairing code (mobile app → extension bridge)",
++        "tags": [
++          "extension-pair"
++        ]
++      }
++    },
++    "/api/extension/pair/redeem": {
++      "post": {
++        "description": "UNAUTHENTICATED. The extension exchanges a 6-digit code for a coach-bound Supabase token pair + chosen_platform, with stored import_intent_id for new pairings (legacy rows omit it). Single-use: a second redeem of the same code returns 410 already_used. Expired → 410 expired; unknown/malformed → 400 invalid. After too many failed attempts a code is hard-locked → 410 locked. Rate-limited per IP. Returns 404 when FEATURE_EXTENSION_PAIRING is off.",
++        "operationId": "ExtensionPairController_redeem",
++        "parameters": [],
++        "requestBody": {
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PairRedeemDto"
++              }
++            }
++          },
++          "required": true
++        },
++        "responses": {
++          "200": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/PairRedeemResult"
++                }
++              }
++            },
++            "description": "Token pair issued."
++          },
++          "400": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "allOf": [
++                    {
++                      "$ref": "#/components/schemas/ErrorEnvelope"
++                    },
++                    {
++                      "properties": {
++                        "code": {
++                          "enum": [
++                            "invalid"
++                          ],
++                          "type": "string"
++                        }
++                      },
++                      "type": "object"
++                    }
++                  ]
++                }
++              }
++            },
++            "description": "Rejected pairing code. Standard HttpExceptionFilter envelope. Two sources: the domain path sets `code: \"invalid\"` with a string `message`; a malformed body (not 6 digits) is rejected by the global ValidationPipe with NO `code` and `message` as a string ARRAY of constraint violations. `code` is therefore optional here and pinned to `invalid` only when present."
++          },
++          "404": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Pairing feature disabled (uniform R-DARK-1 404)."
++          },
++          "410": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "allOf": [
++                    {
++                      "$ref": "#/components/schemas/ErrorEnvelope"
++                    },
++                    {
++                      "properties": {
++                        "code": {
++                          "enum": [
++                            "expired",
++                            "already_used",
++                            "locked"
++                          ],
++                          "type": "string"
++                        }
++                      },
++                      "required": [
++                        "code"
++                      ],
++                      "type": "object"
++                    }
++                  ]
++                }
++              }
++            },
++            "description": "Code expired, already used, or locked. Standard envelope with a required `code` from the redeem 410 enum."
++          },
++          "429": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/RateLimitError"
++                }
++              }
++            },
++            "description": "Rate limit exceeded (per-IP redeem throttle)."
++          },
++          "500": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Session mint failed before code claim (upstream auth error); retry the unexpired code. Standard HttpExceptionFilter envelope; no domain `code` is guaranteed."
++          }
++        },
++        "summary": "Redeem a pairing code (extension bootstrap)",
++        "tags": [
++          "extension-pair"
++        ]
++      }
++    },
++    "/api/extension/pair/session": {
++      "post": {
++        "description": "Body-only lookup; durable setup survives challenge expiry and retirement. Setup only, never accepted Start or import completion. Global authenticated user throttle applies. No codes or tokens returned.",
++        "operationId": "ExtensionPairController_session",
++        "parameters": [],
++        "requestBody": {
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PairSessionDto"
++              }
++            }
++          },
++          "required": true
++        },
++        "responses": {
++          "200": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/PairSessionResult"
++                }
++              }
++            },
++            "description": "Owned pairing setup."
++          },
++          "400": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Invalid UUID or extra body fields."
++          },
++          "401": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Bearer authentication required."
++          },
++          "403": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Coach or owner role required."
++          },
++          "404": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Unknown, foreign, inactive owner, legacy unbound, or feature disabled."
++          },
++          "429": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/RateLimitError"
++                }
++              }
++            },
++            "description": "Global authenticated per-user limit exceeded."
++          }
++        },
++        "security": [
++          {
++            "bearer": []
++          }
++        ],
++        "summary": "Retrieve owned durable pairing setup by server intent",
++        "tags": [
++          "extension-pair"
++        ]
++      }
++    },
++    "/api/extension/pair/status": {
++      "post": {
++        "description": "Mobile-authenticated coach polls their OWN code. The code travels in the POST body (never a query string, which would leak into logs/history/APM). Returns setup status and stored import_intent_id when bound (absent on legacy rows). A code the caller did not mint reads as `expired` (never confirms another coach's code). Returns 404 when FEATURE_EXTENSION_PAIRING is off.",
++        "operationId": "ExtensionPairController_status",
++        "parameters": [],
++        "requestBody": {
++          "content": {
++            "application/json": {
++              "schema": {
++                "$ref": "#/components/schemas/PairStatusDto"
++              }
++            }
++          },
++          "required": true
++        },
++        "responses": {
++          "200": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/PairStatusResult"
++                }
++              }
++            },
++            "description": "Pairing code status."
++          },
++          "400": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Malformed body (global ValidationPipe). The 6-digit code field uses the same `@Matches(/^[0-9]{6}$/)` rule as redeem; constraint failures yield a standard envelope with `message` as a string ARRAY and no domain `code`."
++          },
++          "401": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Missing or invalid bearer token (global JwtAuthGuard runs before role checks)."
++          },
++          "403": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Caller is not a coach."
++          },
++          "404": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/ErrorEnvelope"
++                }
++              }
++            },
++            "description": "Pairing feature disabled (uniform R-DARK-1 404)."
++          },
++          "429": {
++            "content": {
++              "application/json": {
++                "schema": {
++                  "$ref": "#/components/schemas/RateLimitError"
++                }
++              }
++            },
++            "description": "Rate limit exceeded. Like init, status carries no explicit @Throttle and is governed by the global authenticated default (UserThrottlerGuard, keyed by user id). Documented for parity with the other throttled importer routes."
++          }
++        },
++        "security": [
++          {
++            "bearer": []
++          }
++        ],
++        "summary": "Poll a pairing code status",
++        "tags": [
++          "extension-pair"
++        ]
++      }
++    }
++  }
++}
+diff --git a/src/types/__tests__/extensionImport.contract.test.ts b/src/types/__tests__/extensionImport.contract.test.ts
+index 37c14c9..34683ec 100644
+--- a/src/types/__tests__/extensionImport.contract.test.ts
++++ b/src/types/__tests__/extensionImport.contract.test.ts
+@@ -4,7 +4,12 @@
+  * advertises the honest, contract-backed subset of import phases.
+  */
+ import {
++  PAIR_INIT_ERROR_CODES,
+   SUPPORTED_IMPORT_PHASES,
++  UNKNOWN_PAIR_CURRENT,
++  decodeImportIntentId,
++  decodePairCurrentResponse,
++  decodePairInitErrorCode,
+   decodePairStatus,
+   decodeTerminalStatus,
+ } from '../extensionImport';
+@@ -18,8 +23,14 @@ import type {
+   PairInitResponse,
+   PairStatusRequest,
+   PairStatusResponse,
++  PairCurrentRequest,
++  PairCurrentResponse,
++  PairSessionRequest,
+   ImportErrorEnvelope,
+ } from '../extensionImport';
++// S7-2′ consumer-frozen pair surface, mechanically projected (see the describe
++// block at the bottom of this file for provenance pins).
++import fixture from '../__fixtures__/c1PairSurface.a0ea1bea.json';
+ 
+ describe('extensionImport contract', () => {
+   it('supported phases are exactly the honest funnel subset (no complete/progress claims)', () => {
+@@ -219,3 +230,302 @@ describe('extensionImport contract', () => {
+     expect(s.message.length).toBeGreaterThan(0);
+   });
+ });
++
++/**
++ * S7-2′ consumer-frozen pair surface (UX-03b). The fixture is a MECHANICAL
++ * projection of the backend `docs/contracts/importer-openapi.json` at
++ * `2.0.0-c1-s1.1` / a0ea1bea (five pair paths + transitive schema closure; see
++ * `$fixture.extraction`). These tests decode fixture-derived examples through
++ * the real mobile decoders so that a contract drift on the frozen surface, or
++ * a decoder that stops failing closed, breaks here first. No network, no
++ * Node crypto: the source hash is pinned as a literal.
++ */
++
++type JsonSchema = {
++  type?: string;
++  enum?: string[];
++  format?: string;
++  example?: unknown;
++  required?: string[];
++  properties?: Record<string, JsonSchema>;
++  $ref?: string;
++  allOf?: JsonSchema[];
++  oneOf?: JsonSchema[];
++  items?: JsonSchema;
++};
++
++type PathItem = {
++  post: {
++    security?: Array<Record<string, unknown[]>>;
++    requestBody?: { content: { 'application/json': { schema: JsonSchema } } };
++    responses: Record<string, { content?: { 'application/json': { schema: JsonSchema } } }>;
++  };
++};
++
++const PAIR_SURFACE_PATHS = [
++  '/api/extension/pair/init',
++  '/api/extension/pair/status',
++  '/api/extension/pair/current',
++  '/api/extension/pair/session',
++  '/api/extension/pair/redeem',
++] as const;
++
++const schemas = fixture.components.schemas as unknown as Record<string, JsonSchema>;
++const paths = fixture.paths as unknown as Record<string, PathItem>;
++
++function resolve(ref: string): JsonSchema {
++  const prefix = '#/components/schemas/';
++  expect(ref.startsWith(prefix)).toBe(true);
++  const name = ref.slice(prefix.length);
++  const s = schemas[name];
++  expect(s).toBeDefined();
++  return s;
++}
++
++function schemaOf(node: JsonSchema): JsonSchema {
++  return node.$ref ? resolve(node.$ref) : node;
++}
++
++/** Collect every `$ref` string in a JSON tree. */
++function collectRefs(node: unknown, out: string[] = []): string[] {
++  if (Array.isArray(node)) node.forEach((n) => collectRefs(n, out));
++  else if (node && typeof node === 'object') {
++    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
++      if (k === '$ref' && typeof v === 'string') out.push(v);
++      else collectRefs(v, out);
++    }
++  }
++  return out;
++}
++
++/**
++ * Build a minimal example object from a schema: every REQUIRED property gets
++ * its `example`, first enum member, or a type-appropriate placeholder.
++ */
++function exampleOf(schema: JsonSchema): Record<string, unknown> {
++  const out: Record<string, unknown> = {};
++  for (const name of schema.required ?? []) {
++    const p = schema.properties?.[name];
++    expect(p).toBeDefined();
++    if (p?.example !== undefined) out[name] = p.example;
++    else if (p?.enum) out[name] = p.enum[0];
++    else if (p?.format === 'uuid') out[name] = `00000000-0000-4000-8000-${name.length.toString().padStart(12, '0')}`;
++    else if (p?.type === 'string') out[name] = `${name}-example`;
++    else out[name] = null;
++  }
++  return out;
++}
++
++function successSchema(path: string): JsonSchema {
++  const responses = paths[path].post.responses;
++  const ok = responses['200'] ?? responses['201'];
++  expect(ok?.content).toBeDefined();
++  return schemaOf(ok!.content!['application/json'].schema);
++}
++
++function errorCodeEnum(path: string, status: string): { codes: string[]; required: boolean } {
++  const schema = paths[path].post.responses[status]?.content?.['application/json'].schema;
++  expect(schema?.allOf).toBeDefined();
++  const refs = schema!.allOf!.filter((s) => s.$ref);
++  expect(refs.map((s) => s.$ref)).toEqual(['#/components/schemas/ErrorEnvelope']);
++  const inline = schema!.allOf!.find((s) => !s.$ref)!;
++  return {
++    codes: inline.properties?.code?.enum ?? [],
++    required: (inline.required ?? []).includes('code'),
++  };
++}
++
++describe('C1 pair surface — consumer contract (fixture c1PairSurface.a0ea1bea)', () => {
++  describe('fixture provenance', () => {
++    it('is projected from the parent-recorded contract artifact (sha256 + commit pinned)', () => {
++      expect(fixture.$fixture.source.sha256).toBe(
++        'bdb022dd6c4fb64cdf291fdde3796b99e4b23004f676b7cb46a58460526ba4e5',
++      );
++      expect(fixture.$fixture.source.commit).toBe('a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992');
++      expect(fixture.$fixture.source.artifact).toBe('docs/contracts/importer-openapi.json');
++      expect(fixture.info.version).toBe('2.0.0-c1-s1.1');
++      expect(fixture.openapi).toBe('3.1.0');
++    });
++
++    it('carries exactly the five frozen pair paths, all POST-only', () => {
++      expect(Object.keys(paths).sort()).toEqual([...PAIR_SURFACE_PATHS].sort());
++      expect(fixture.$fixture.extraction.paths).toEqual([...PAIR_SURFACE_PATHS]);
++      for (const p of PAIR_SURFACE_PATHS) expect(Object.keys(paths[p])).toEqual(['post']);
++    });
++
++    it('is self-contained: every $ref resolves inside the fixture', () => {
++      const refs = collectRefs(fixture);
++      expect(refs.length).toBeGreaterThan(0);
++      for (const ref of refs) expect(() => resolve(ref)).not.toThrow();
++      expect(Object.keys(schemas).sort()).toEqual([...fixture.$fixture.extraction.schemas].sort());
++    });
++
++    it('declares only the bearer security scheme', () => {
++      expect(Object.keys(fixture.components.securitySchemes)).toEqual(['bearer']);
++    });
++  });
++
++  describe('authority split: coach routes are bearer-guarded, redeem is extension-only', () => {
++    it.each(['/api/extension/pair/init', '/api/extension/pair/status', '/api/extension/pair/current', '/api/extension/pair/session'])(
++      '%s requires bearer',
++      (p) => {
++        expect(paths[p].post.security).toEqual([{ bearer: [] }]);
++      },
++    );
++
++    it('pair/redeem is unauthenticated and returns coach-bound tokens — mobile must never call it', () => {
++      expect(paths['/api/extension/pair/redeem'].post.security).toBeUndefined();
++      const result = successSchema('/api/extension/pair/redeem');
++      expect(result.required).toEqual(expect.arrayContaining(['access_token', 'refresh_token']));
++    });
++
++    it('no coach-callable success payload carries a token', () => {
++      for (const p of ['/api/extension/pair/init', '/api/extension/pair/status', '/api/extension/pair/current', '/api/extension/pair/session']) {
++        const props = Object.keys(successSchema(p).properties ?? {});
++        expect(props).not.toContain('access_token');
++        expect(props).not.toContain('refresh_token');
++      }
++    });
++  });
++
++  describe('pair/init', () => {
++    it('request: chosen_platform required, setup_nonce an OPTIONAL uuid (mobile sends it in the body)', () => {
++      const dto = schemaOf(paths['/api/extension/pair/init'].post.requestBody!.content['application/json'].schema);
++      expect(dto.required).toEqual(['chosen_platform']);
++      expect(dto.properties?.setup_nonce).toMatchObject({ type: 'string', format: 'uuid' });
++      const req: PairInitRequest = { chosen_platform: 'truecoach', setup_nonce: '7f1e2d3c-4b5a-4968-8776-655443322110' };
++      expect(Object.keys(req).sort()).toEqual(Object.keys(dto.properties ?? {}).sort());
++    });
++
++    it('201: pairing_code + expires_at required, import_intent_id optional (legacy rows omit it)', () => {
++      const result = successSchema('/api/extension/pair/init');
++      expect(result.required).toEqual(['pairing_code', 'expires_at']);
++      expect(result.properties?.import_intent_id).toMatchObject({ type: 'string', format: 'uuid' });
++      const example = exampleOf(result) as unknown as PairInitResponse;
++      expect(example.pairing_code).toMatch(/^[0-9]{6}$/);
++      expect(decodeImportIntentId(example.import_intent_id)).toBeNull();
++      expect(decodeImportIntentId('11111111-2222-4333-8444-555555555555')).toBe('11111111-2222-4333-8444-555555555555');
++    });
++
++    it('409 setup_nonce_conflict and 410 setup_challenge_unavailable are REQUIRED codes the mobile decoder names', () => {
++      const conflict = errorCodeEnum('/api/extension/pair/init', '409');
++      const gone = errorCodeEnum('/api/extension/pair/init', '410');
++      expect(conflict).toEqual({ codes: ['setup_nonce_conflict'], required: true });
++      expect(gone).toEqual({ codes: ['setup_challenge_unavailable'], required: true });
++      expect(decodePairInitErrorCode(conflict.codes[0])).toBe('setup_nonce_conflict');
++      expect(decodePairInitErrorCode(gone.codes[0])).toBe('setup_challenge_unavailable');
++    });
++
++    it('400 code_mint_failed is an OPTIONAL code (ValidationPipe 400s carry none)', () => {
++      const bad = errorCodeEnum('/api/extension/pair/init', '400');
++      expect(bad).toEqual({ codes: ['code_mint_failed'], required: false });
++      expect(decodePairInitErrorCode('code_mint_failed')).toBe('code_mint_failed');
++    });
++
++    it('the mobile error-code set is exactly the codes the contract pins on pair/init', () => {
++      const pinned = ['400', '409', '410']
++        .flatMap((s) => errorCodeEnum('/api/extension/pair/init', s).codes)
++        .sort();
++      expect([...PAIR_INIT_ERROR_CODES].sort()).toEqual(pinned);
++    });
++
++    it.each([undefined, null, '', 'SETUP_NONCE_CONFLICT', 'expired', 'already_used', 42, {}])(
++      'decodePairInitErrorCode fails closed to unknown for %p',
++      (raw) => {
++        expect(decodePairInitErrorCode(raw)).toBe('unknown');
++      },
++    );
++  });
++
++  describe('pair/status', () => {
++    it('request is body-only code; result status is the closed enum with import_intent_id optional', () => {
++      const dto = schemaOf(paths['/api/extension/pair/status'].post.requestBody!.content['application/json'].schema);
++      expect(dto.required).toEqual(['code']);
++      const result = successSchema('/api/extension/pair/status');
++      expect(result.required).toEqual(['status']);
++      expect(result.properties?.status.enum).toEqual(['pending', 'paired', 'expired']);
++      expect(result.properties?.import_intent_id?.format).toBe('uuid');
++    });
++
++    it('every enum member decodes to itself; a non-member fails closed', () => {
++      const members = successSchema('/api/extension/pair/status').properties!.status.enum!;
++      for (const m of members) expect(decodePairStatus(m)).toBe(m);
++      expect(decodePairStatus('bound')).toBe('unknown');
++    });
++  });
++
++  describe('pair/current + pair/session (owned-setup readers)', () => {
++    it('current takes an optional uuid setup_nonce; session takes a required import_intent_id', () => {
++      const cur = schemaOf(paths['/api/extension/pair/current'].post.requestBody!.content['application/json'].schema);
++      expect(cur.required).toBeUndefined();
++      expect(cur.properties?.setup_nonce).toMatchObject({ type: 'string', format: 'uuid' });
++      const ses = schemaOf(paths['/api/extension/pair/session'].post.requestBody!.content['application/json'].schema);
++      expect(ses.required).toEqual(['import_intent_id']);
++      const a: PairCurrentRequest = {};
++      const b: PairCurrentRequest = { setup_nonce: '7f1e2d3c-4b5a-4968-8776-655443322110' };
++      const c: PairSessionRequest = { import_intent_id: '11111111-2222-4333-8444-555555555555' };
++      expect([a, b, c]).toHaveLength(3);
++    });
++
++    it('both return the same PairSessionResult (all three fields required, status closed enum)', () => {
++      const cur = paths['/api/extension/pair/current'].post.responses['200'].content!['application/json'].schema;
++      const ses = paths['/api/extension/pair/session'].post.responses['200'].content!['application/json'].schema;
++      expect(cur.$ref).toBe('#/components/schemas/PairSessionResult');
++      expect(ses.$ref).toBe(cur.$ref);
++      const result = resolve(cur.$ref!);
++      expect([...(result.required ?? [])].sort()).toEqual(['chosen_platform', 'import_intent_id', 'status']);
++      expect(result.properties?.status.enum).toEqual(['pending', 'paired', 'expired']);
++      expect(Object.keys(result.properties ?? {})).not.toContain('pairing_code');
++    });
++
++    it('decodePairCurrentResponse decodes a schema-derived example for every enum member', () => {
++      const result = successSchema('/api/extension/pair/current');
++      for (const status of result.properties!.status.enum!) {
++        const example = { ...exampleOf(result), status } as unknown as PairCurrentResponse;
++        const decoded = decodePairCurrentResponse(example);
++        expect(decoded.status).toBe(status);
++        expect(decoded.importIntentId).toBe(example.import_intent_id);
++        expect(decoded.chosenPlatform).toBe(example.chosen_platform);
++      }
++    });
++
++    it('an unrecognised status decodes to unknown while keeping the correlation fields', () => {
++      const example = { ...exampleOf(successSchema('/api/extension/pair/current')), status: 'bound' };
++      const decoded = decodePairCurrentResponse(example);
++      expect(decoded.status).toBe('unknown');
++      expect(decoded.importIntentId).toBe(example.import_intent_id);
++    });
++
++    it.each<[string, unknown]>([
++      ['null', null],
++      ['undefined', undefined],
++      ['a string', 'paired'],
++      ['an array', [{ status: 'paired' }]],
++      ['an empty object', {}],
++      ['a missing import_intent_id', { status: 'paired', chosen_platform: 'truecoach' }],
++      ['an empty import_intent_id', { import_intent_id: '', status: 'paired', chosen_platform: 'truecoach' }],
++      ['a missing chosen_platform', { import_intent_id: 'ii-1', status: 'paired' }],
++      ['a missing status', { import_intent_id: 'ii-1', chosen_platform: 'truecoach' }],
++      ['a non-string status', { import_intent_id: 'ii-1', status: 1, chosen_platform: 'truecoach' }],
++    ])('fails closed to UNKNOWN_PAIR_CURRENT for %s (never paired)', (_label, raw) => {
++      const decoded = decodePairCurrentResponse(raw);
++      expect(decoded).toEqual(UNKNOWN_PAIR_CURRENT);
++      expect(decoded.status).not.toBe('paired');
++    });
++
++    it('UNKNOWN_PAIR_CURRENT is frozen and codeless', () => {
++      expect(Object.isFrozen(UNKNOWN_PAIR_CURRENT)).toBe(true);
++      expect(UNKNOWN_PAIR_CURRENT).toEqual({ status: 'unknown', importIntentId: null, chosenPlatform: null });
++    });
++  });
++
++  describe('import_intent_id decoding', () => {
++    it.each<[unknown]>([[undefined], [null], [''], [42], [{}], [[]]])('drops %p to null', (raw) => {
++      expect(decodeImportIntentId(raw)).toBeNull();
++    });
++
++    it('returns the server string verbatim, never coerced', () => {
++      expect(decodeImportIntentId('ii-0001')).toBe('ii-0001');
++    });
++  });
++});
+diff --git a/src/types/extensionImport.ts b/src/types/extensionImport.ts
+index 38f1149..8f98ede 100644
+--- a/src/types/extensionImport.ts
++++ b/src/types/extensionImport.ts
+@@ -1,22 +1,39 @@
+ /**
+  * Frozen typed boundary for the v0.3 browser-extension import flow. Mirrors the
+- * backend OpenAPI slice frozen in growth-project-backend PR #504; these shapes
+- * are the single source of truth the mobile client codes against, not invented.
++ * backend OpenAPI pair surface, consumer-frozen (S7-2′) at contract version
++ * `2.0.0-c1-s1.1`, backend commit `a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992`,
++ * artifact `docs/contracts/importer-openapi.json`. The mechanically extracted
++ * pair-surface subset lives in `./__fixtures__/c1PairSurface.a0ea1bea.json`
++ * with the recorded source sha; the consumer contract test decodes it through
++ * the functions below. These shapes are the single source of truth the mobile
++ * client codes against, not invented.
+  *
+- * Mobile-callable: POST /api/extension/pair/init, POST /api/extension/pair/status.
+- * Extension-only (never mobile-readable): pair/redeem, scout/ingest,
+- * scout/progress, scout/ingest/complete. There is NO mobile-readable import
+- * progress endpoint, so the UI never claims live progress or completion.
++ * Mobile-callable (bearer): POST /api/extension/pair/init, pair/status,
++ * pair/current, pair/session. Extension-only (never mobile-callable):
++ * pair/redeem (UNAUTHENTICATED; exchanges the code for coach-bound tokens),
++ * scout/ingest, scout/progress, scout/ingest/complete. There is NO
++ * mobile-readable import progress endpoint, so the UI never claims live
++ * progress or completion.
++ *
++ * `import_intent_id` is server-issued SETUP CORRELATION only — never
++ * authorization, eligibility, accepted Start, connection, or result state.
++ * `setup_nonce` is a client-saved recovery key for an owned attempt; it
++ * authorises nothing. Neither the pairing code nor the nonce may ever enter a
++ * URL, log, analytics event, or telemetry payload.
+  */
+ 
+ export interface PairInitRequest {
+   chosen_platform: string;
++  /** Optional saved setup nonce (uuid): recover this owned attempt on retry. */
++  setup_nonce?: string;
+ }
+ 
+ /** `expires_at` is server-authoritative ISO-8601; derive any countdown from it. */
+ export interface PairInitResponse {
+   pairing_code: string;
+   expires_at: string;
++  /** Server-issued setup correlation. Absent on legacy unbound rows. */
++  import_intent_id?: string;
+ }
+ 
+ export interface PairStatusRequest {
+@@ -40,12 +57,100 @@ export type DecodedPairStatus = PairStatus | 'unknown';
+ 
+ export interface PairStatusResponse {
+   status: string; // raw wire value — decode via decodePairStatus, never cast
++  /** Server-issued setup correlation when bound. Absent on legacy rows. */
++  import_intent_id?: string;
+ }
+ 
+ export function decodePairStatus(raw: string): DecodedPairStatus {
+   return raw === 'pending' || raw === 'paired' || raw === 'expired' ? raw : 'unknown';
+ }
+ 
++/**
++ * `import_intent_id` as it appears on the wire (uuid string, optional). Any
++ * absent, empty, or non-string value decodes to null — a correlation handle is
++ * either the server's exact string or nothing, never a coerced placeholder.
++ */
++export function decodeImportIntentId(raw: unknown): string | null {
++  return typeof raw === 'string' && raw.length > 0 ? raw : null;
++}
++
++/** POST /api/extension/pair/current body. Empty reads the current owned setup. */
++export interface PairCurrentRequest {
++  setup_nonce?: string;
++}
++
++/** POST /api/extension/pair/session body (owned durable setup by server id). */
++export interface PairSessionRequest {
++  import_intent_id: string;
++}
++
++/**
++ * Wire shape of the backend `PairSessionResult`, returned by BOTH
++ * pair/current and pair/session. Setup only: it never carries a code or a
++ * token and never means accepted Start or import completion. Decode via
++ * decodePairCurrentResponse, never cast.
++ */
++export interface PairCurrentResponse {
++  import_intent_id: string;
++  status: string; // raw wire value — decode via decodePairStatus
++  chosen_platform: string;
++}
++export type PairSessionResponse = PairCurrentResponse;
++
++/**
++ * Decoded owned-setup reading. `status` fails closed to `'unknown'` — for an
++ * unrecognised enum value AND for a payload that is not the contracted shape
++ * (missing/empty required field, wrong type, non-object). `'unknown'` never
++ * reads as paired. `importIntentId` and `chosenPlatform` are correlation /
++ * display inputs only, never eligibility or connection truth.
++ */
++export interface DecodedPairCurrent {
++  status: DecodedPairStatus;
++  importIntentId: string | null;
++  chosenPlatform: string | null;
++}
++
++export const UNKNOWN_PAIR_CURRENT: Readonly<DecodedPairCurrent> = Object.freeze({
++  status: 'unknown' as const,
++  importIntentId: null,
++  chosenPlatform: null,
++});
++
++export function decodePairCurrentResponse(raw: unknown): DecodedPairCurrent {
++  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return UNKNOWN_PAIR_CURRENT;
++  const v = raw as Record<string, unknown>;
++  const importIntentId = decodeImportIntentId(v.import_intent_id);
++  const chosenPlatform =
++    typeof v.chosen_platform === 'string' && v.chosen_platform.length > 0 ? v.chosen_platform : null;
++  if (importIntentId === null || chosenPlatform === null || typeof v.status !== 'string') {
++    // Every field is `required` in the contract; a partial payload is not an
++    // owned setup we can reason about, so the whole reading fails closed.
++    return UNKNOWN_PAIR_CURRENT;
++  }
++  return { status: decodePairStatus(v.status), importIntentId, chosenPlatform };
++}
++
++/**
++ * Domain `code` discriminants the pair/init contract pins on its error
++ * envelopes: 400 `code_mint_failed` (optional — a ValidationPipe 400 carries
++ * no code), 409 `setup_nonce_conflict` (required), 410
++ * `setup_challenge_unavailable` (required). Anything else — including an
++ * absent code — decodes to `'unknown'` and is handled as a generic failure.
++ */
++export const PAIR_INIT_ERROR_CODES = [
++  'code_mint_failed',
++  'setup_nonce_conflict',
++  'setup_challenge_unavailable',
++] as const;
++export type PairInitErrorCode = (typeof PAIR_INIT_ERROR_CODES)[number];
++export type DecodedPairInitErrorCode = PairInitErrorCode | 'unknown';
++
++export function decodePairInitErrorCode(raw: unknown): DecodedPairInitErrorCode {
++  return typeof raw === 'string' && (PAIR_INIT_ERROR_CODES as readonly string[]).includes(raw)
++    ? (raw as PairInitErrorCode)
++    : 'unknown';
++}
++
+ /** Terminal state the extension settles to; mobile cannot read it today. */
+ export type ImportTerminalStatus = 'success' | 'partial' | 'failed';
+ export type DecodedTerminalStatus = ImportTerminalStatus | 'unknown';

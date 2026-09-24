@@ -1,0 +1,23 @@
+2c2
+< # S7-3' R/ready real-PG proof — minimal execution binding (SOURCE ONLY; NOT RUN; NOT GRANTED; pins filled from head df36e33).
+---
+> # S7-3' R/ready real-PG proof — minimal execution binding (SOURCE ONLY; NOT RUN; NOT GRANTED; pins filled from head 7d2895e, closure 1).
+26,28c26,28
+< EXPECT_HEAD=df36e3310d4088501c93bcac3ce07617d02c749d
+< EXPECT_TREE=74ddf4dd57657300d96b9a7b0cdd6e6237a52abd
+< EXPECT_SPEC_BLOB=a6f3f166774fd8cb8cb639b99affcc1d7add81ee                 # test/rls-g2-r-ready.spec.ts at the R head
+---
+> EXPECT_HEAD=7d2895e1fe03ea82353e8ce0b07aacaf66af74c8
+> EXPECT_TREE=95cdfadc1ae993db23d0d1310ee8029c7867d147
+> EXPECT_SPEC_BLOB=0ae7b76489460dac33dff5434503a361a0acd063                 # test/rls-g2-r-ready.spec.ts at the R head
+45c45
+<        G2_R_DATA_DIRECTORY=$BDIR/pg-data G2_R_SERVER_VERSION=170006 \
+---
+>        G2_R_DATA_DIRECTORY=$RDIR/pg-data G2_R_SERVER_VERSION=170006 \
+74,75c74,76
+< grep -q lefthook "$W/.git/hooks/pre-commit" 2>/dev/null && grep -q lefthook "$W/.git/hooks/commit-msg" 2>/dev/null \
+<   || { log "PRECONDITION_FAIL .git/hooks/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }
+---
+> H=$(git -C "$W" rev-parse --git-path hooks); case "$H" in /*) ;; *) H="$W/$H";; esac
+> grep -q lefthook "$H/pre-commit" 2>/dev/null && grep -q lefthook "$H/commit-msg" 2>/dev/null \
+>   || { log "PRECONDITION_FAIL $H/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }

@@ -1,0 +1,6 @@
+39a40,44
+> # closure 1 (review A B-2/B-3, review B B-1): the R data directory is the R lane, and hooks are
+> # resolved through git (linked worktree: .git is a file; hooks live in the common dir).
+> ('G2_R_DATA_DIRECTORY=$BDIR/pg-data','G2_R_DATA_DIRECTORY=$RDIR/pg-data'),
+> ('grep -q lefthook "$W/.git/hooks/pre-commit" 2>/dev/null && grep -q lefthook "$W/.git/hooks/commit-msg" 2>/dev/null \\\n  || { log "PRECONDITION_FAIL .git/hooks/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }',
+>  'H=$(git -C "$W" rev-parse --git-path hooks); case "$H" in /*) ;; *) H="$W/$H";; esac\ngrep -q lefthook "$H/pre-commit" 2>/dev/null && grep -q lefthook "$H/commit-msg" 2>/dev/null \\\n  || { log "PRECONDITION_FAIL $H/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }'),

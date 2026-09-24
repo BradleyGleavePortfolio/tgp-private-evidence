@@ -79,3 +79,13 @@ B/drain is ACCEPTED at `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c` (`B_DRAIN_LOCA
 A blocks only the affected product path. B blocks only the invalid proof, with minimum closure followed by execution. C records, qualifies and continues without independently generating a cycle.
 
 Following B/drain: R → N/Q1 → C → remaining S7 → S8 native writers → S9 relationships/reconciliation → S10 unseen-source induction → S11 full customer/multi-host journey → S12 pilot acceptance. Eligible UX runs in parallel under nonoverlapping ownership. Product movement, not audit volume, is the objective.
+
+
+## Owner amendment: autonomous landing (16:26Z)
+
+See `OWNER_AMENDMENT_AUTONOMOUS_LANDING.md`.
+
+- Push and merge of accepted, dependency-valid work are now routine.
+- Backend `main` auto-deploys to production (Fly) and runs migrations. Backend work therefore lands on the non-production branch `integration/importer`, and the `main` merge remains the owner deployment boundary.
+- Mobile and extension `main` have no deploy trigger, so their merges are ordinary landing.
+- This supersedes the earlier "no product remote push/merge" line for non-deploying merges.

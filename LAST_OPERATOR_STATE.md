@@ -38,6 +38,9 @@ J3 acceptance is mocked component-interaction coverage only, not device/browser/
 | UX-07 extension presentation | `6fd7e4a95ec2bc400cb8bec62a95955280a31f12` | Accepted bounded presentation leaf |
 | UX-01 local account state | `8fd4cf759c2a8dd3f9ef9772f6dadb2035d93820` | Accepted dual final; 55 transferred passes plus two r2 cases, not 57 together |
 | Pure mobile composition | `716a606e9d23c77a6d705beccb8cefc6e8228284` | Accepted exact 18-path union; no new runtime claimed |
+| UX-03a paired-state truth | `797be96806745624e09b949fae10831e52e7078b` | Accepted: 137/137 mocked tests, independent T2 ACCEPT; landed on mobile main |
+| UX-03b C1 correlation consumer | `519b01227f2855fc7968994d389094008f222e20` | Accepted: tsc/eslint rc0, 396/396 mocked tests, dual T4 ACCEPT; lands through UX-03c |
+| B/drain | `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c` | Accepted: v5 real PG 19/19, dual T4 ACCEPT; landed on backend integration/importer |
 | J3 r5 source selection | `9ff749c35f64068e156400d2ed37c0b144c2d56d` | Exact frozen test-only correction, full ordered mocked 50/50 proof, independent final closure; no device/browser/E2E claim |
 
 Original failures, packets, attestations and qualifications remain immutable in their existing execution paths. The predecessor complete state is preserved in Git at `50684d66a2961453415c4ff02ba5725deea8699e:LAST_OPERATOR_STATE.md`. Recovery does not repurchase accepted evidence.
@@ -54,9 +57,34 @@ R is ACTIVE under `execution/cf8ff737/R_IDENTITY_READY_BUILD_GRANT.md` (T4, sole
 
 B/drain continuation: exact recovery and any necessary minimum environment closure → stage-2 remainder with genuine hooks/affected gates/exact-tree commit → filled PG binding → two independent continuation actual-head/binding attestations → separately granted single B-only PG proof → final attestations/acceptance.
 
-No product remote push/merge, deployment, production/customer enablement, live source-account use, security/governance change, destructive production action, external commitment or new spending is authorized. Private evidence publication is parent-owned, Bradley author/committer, no AI trailers/force push, fresh remote-tip reconciliation.
+**Owner amendment, 16:26Z.** Push and merge of accepted, dependency-valid product work are routine and autonomous (`execution/cf8ff737/OWNER_AMENDMENT_AUTONOMOUS_LANDING.md`). Still reserved to the owner:
+
+- production deployment and customer enablement
+- live source-account use
+- security or governance change, including branch-protection changes
+- destructive production action
+- external commitment
+- new spending
+
+**Backend `main` auto-deploys to production.** It deploys to Fly `backend-spring-lake-3890` and runs `prisma migrate deploy`. Accepted backend work therefore lands on the non-production branch `integration/importer`. The merge from `integration/importer` to `main` is the owner deploy decision, tracked in draft PR #530.
+
+**Mobile `main` does not deploy.** Merging to it is ordinary landing.
+
+**Extension `main` does not deploy, but it is protected.** A merge needs one non-author approval, which is an owner step.
+
+Private evidence publication stays with the parent: Bradley as author and committer, no AI trailers, no force push, and a fresh reconciliation against the remote tip.
 
 All five mains matched the owner baseline at recon: backend `c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7`; mobile `a5933fd6de5616493de75f0db907098b149b955c`; extension `0111be661922234d670bbf23e23d270eec1b4a4e`; context `1ebbed76188e33c970fc17c1e7b252f535d040d0`; private `50684d66a2961453415c4ff02ba5725deea8699e` before this publication. No product remote writes occurred.
+
+**Landed, 16:44–16:46Z** (`execution/cf8ff737/LANDING_LEDGER.md`):
+
+- **Mobile `main`:** `797be96806745624e09b949fae10831e52e7078b`. This is J3 plus UX-03a, and contains S6, UX-02/07, UX-01 and the pure composition.
+- **Backend `integration/importer`:** `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c`. This contains S1, S2, S3, S5, the S7 foundation, C1 and B. Backend `main` is unchanged at `c23b9d9f`.
+
+**Staged:**
+
+- **Extension S4** `91990ae9`: PR #27 is waiting for the owner's approval.
+- **Extension UX-07** `6fd7e4a9`: waiting for the UX-07-on-S4 composition.
 
 ## Mission and automatic continuation
 

@@ -1,0 +1,956 @@
+diff --git a/src/components/coach/ExtensionPairingPanel.tsx b/src/components/coach/ExtensionPairingPanel.tsx
+index d9535ca..26f583b 100644
+--- a/src/components/coach/ExtensionPairingPanel.tsx
++++ b/src/components/coach/ExtensionPairingPanel.tsx
+@@ -1,18 +1,24 @@
+ /**
+  * ExtensionPairingPanel — the live pairing surface of the v0.3 import flow
+- * (PR-M2). Mounted only once the coach has opened their prior platform's login
+- * page (ImportDataScreen `awaitingExtension`). It mints a pairing code, shows it
+- * for the coach to read into the browser extension, and reflects honest,
+- * contract-backed lifecycle states via useExtensionPairing.
++ * (PR-M2, corrected UX-03a). Mounted only once the coach has opened their
++ * prior platform's login page (ImportDataScreen `awaitingExtension`). It
++ * mints a pairing code, shows it for the coach to read into the browser
++ * extension, and reflects honest, contract-backed lifecycle states via
++ * useExtensionPairing.
+  *
+- * Honesty guardrails: the mobile contract has no import-progress read, so the
+- * terminal this panel can truthfully show is `paired` ("running in the
+- * extension") — it never renders importing/partial/complete or any page/entity
+- * count. Once paired, the panel offers a truthful, roster-derived review: the
+- * ONLY progress it reports is how many clients have appeared in the coach's
+- * authoritative roster since the import started (useRosterReviewDelta), plus a
+- * typed CTA into the existing Clients list. Cancel is a local abandon (no server
+- * cancel exists).
++ * Honesty guardrails (UX-03a paired-state truth correction): the mobile
++ * contract has no import-progress read, and `pair/status` returning `paired`
++ * proves only that this code was redeemed for this coach's account — nothing
++ * about install, capability, or a previous platform (brief §2 row 4). The
++ * `paired` view therefore shows a calm confirmation ("Connected to your
++ * computer") and a truthful, server-owned-identity checklist. It NEVER shows
++ * roster delta, "reconstructed so far", per-family counts, or any claim that
++ * an import is "running" — those were borrowed progress the accepted contract
++ * cannot back. "Review clients" remains a neutral secondary link with no
++ * count or progress claim (Q1). The primary action is purely instructional
++ * ("Continue on your computer") and carries no URL or locator — no
++ * non-authorizing setup locator exists in accepted source (brief §2 row 2).
++ * Cancel remains a local abandon (no server cancel exists).
+  *
+  * Accessibility + copy (M5-F): the code is rendered at 34pt with 6pt letter
+  * spacing, which at large accessibility text sizes used to clip mid-code — and
+@@ -22,11 +28,18 @@
+  * backed by a copy control, because reading six digits back and forth to a
+  * browser is exactly the task that motor and vision impairments make hardest.
+  * The copy confirmation reflects the ACTUAL clipboard result (Rule 18) — a
+- * failed write says so rather than claiming success.
++ * failed write says so rather than claiming success. The 6-digit code never
++ * enters a URL, log, analytics event, or any new storage.
+  *
+  * Support correlation (M5-D): when the backend supplies a request id on a
+  * failure, the panel shows it as a quotable reference. It is displayed only
+  * when real, and never presented as an explanation of what went wrong.
++ *
++ * Every other status (`minting`, `waiting`, `expired`, `authExpired`,
++ * `unavailable`, `failed`, `cancelled`, `identityUnavailable`) keeps its
++ * existing behaviour; copy is adjusted only to fit the fact → remedy →
++ * retained-setup pattern, and makes no retirement, revocation, or disconnect
++ * claim (there is no such endpoint — brief §2 row 5).
+  */
+ import React, { useCallback, useEffect, useRef, useState } from 'react';
+ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+@@ -42,12 +55,7 @@ import { useTheme } from '../../theme/useTheme';
+ import type { ThemeColors } from '../../theme/ThemeProvider';
+ import type { CoachTabParamList, ClientsStackParamList } from '../../navigation/CoachNavigator';
+ import { useExtensionPairing } from '../../hooks/useExtensionPairing';
+-import { useRosterReviewDelta } from '../../hooks/useRosterReviewDelta';
+-import {
+-  useReconstructCounts,
+-  type ReconstructFamilyCounts,
+-} from '../../hooks/useReconstructCounts';
+-import { FAMILY_LABELS } from '../../types/importReview';
++import { useCurrentUser } from '../../hooks/useCurrentUser';
+ import { track } from '../../analytics/posthog.service';
+ import { AnalyticsEvents } from '../../analytics/events';
+ 
+@@ -68,7 +76,7 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+   const navigation = useNavigation<ReviewNav>();
+   const pairing = useExtensionPairing(platformId);
+   const { status, code, supportReference, start, retry, cancel } = pairing;
+-  const { delta } = useRosterReviewDelta();
++  const currentUser = useCurrentUser();
+   const startedRef = useRef(false);
+   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+ 
+@@ -177,35 +185,45 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+   }
+ 
+   if (status === 'paired') {
+-    // Roster truth is the ONLY progress source: delta > 0 states the real number
+-    // of new clients since journey start; delta == 0 is a calm message that
+-    // does not assert the extension is still running (S6 R3: `paired` means
+-    // the code was accepted, not that an import is in progress). Neither ever
+-    // claims imported/complete/partial/%.
+-    const reviewCopy =
+-      delta > 0
+-        ? `${delta} new ${delta === 1 ? 'client' : 'clients'} since you started this import`
+-        : 'No new clients have arrived yet. If the import is running in the browser extension, they will appear here as they arrive.';
++    // Truth boundary (brief §2 row 4): `pair/status` returning `paired` proves
++    // only that this code was redeemed for this coach's account. It is NOT
++    // installed-and-running, capability-known, or previous-platform-connected.
++    // Every checklist line beyond the redemption fact and the server-owned
++    // identity therefore reads "Not yet known" rather than inferring anything.
++    // Server-owned identity comes from useCurrentUser only (Q2) — never a
++    // client-edited field — and falls back to email when no display name has
++    // resolved yet.
++    const identityLabel = currentUser?.name || currentUser?.email || 'your account';
+     return (
+       <View style={[styles.card, styles.cardOk]} accessibilityLiveRegion="polite" testID="pairing-paired">
+         <Ionicons name="checkmark-circle-outline" size={22} color={colors.primary} />
+-        <Text style={styles.title}>Paired</Text>
+-        <Text style={styles.body} testID="pairing-review-delta">
+-          {reviewCopy}
+-        </Text>
+-        <Text style={styles.body}>
+-          Your import runs in the browser extension — this app can’t see its progress. Your
+-          client roster is the source of truth — open it to review new clients as they arrive.
+-        </Text>
+-        <ReconstructCountsSection />
++        <Text style={styles.title}>Connected to your computer</Text>
++        <View style={styles.checklist} testID="pairing-checklist">
++          <ChecklistRow styles={styles} colors={colors} label="Importer available" testID="pairing-check-importer" />
++          <ChecklistRow
++            styles={styles}
++            colors={colors}
++            label={`Connected to TGP as ${identityLabel}`}
++            testID="pairing-check-identity"
++          />
++          <ChecklistRow
++            styles={styles}
++            colors={colors}
++            label="Previous platform"
++            value="Not yet known"
++            testID="pairing-check-platform"
++            pending
++          />
++        </View>
++        <Text style={styles.body}>Continue on your computer</Text>
+         <TouchableOpacity
+-          style={styles.primaryBtn}
++          style={styles.secondaryBtn}
+           onPress={openReview}
+           accessibilityRole="button"
+           accessibilityLabel="Review clients"
+           testID="pairing-review-cta"
+         >
+-          <Text style={styles.primaryBtnText}>Review clients</Text>
++          <Text style={styles.secondaryBtnText}>Review clients</Text>
+         </TouchableOpacity>
+       </View>
+     );
+@@ -213,16 +231,16 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+ 
+   // Terminal, retryable/attention states share one honest, calm layout.
+   //
+-  // Copy truthfulness (S6 R3): mobile has no import-progress or server-cancel
+-  // contract, so no state here may assert what the extension did or did not
+-  // do. `failed` is reached both before a code exists (mint failed) and after
+-  // one was shown (status polling failed), and `cancelled` only stops THIS
+-  // device from checking — a code already entered in the extension may still
+-  // be running there. The messages say exactly that and no more.
++  // Copy truthfulness (S6 R3, reaffirmed by brief §4): mobile has no
++  // import-progress or server-cancel contract, so no state here may assert
++  // what the extension did or did not do, or that anything was retired,
++  // revoked, or disconnected — no such endpoint exists (brief §2 row 5). Each
++  // message follows fact → remedy → retained-setup: state what happened, what
++  // to do next, and that the coach's setup/attempt is kept, not discarded.
+   const recoverable: Record<string, { title: string; message: string; cta: string | null }> = {
+     expired: {
+-      title: 'That code expired',
+-      message: 'Pairing codes are short-lived for your security. Generate a new one to continue.',
++      title: 'This code expired',
++      message: 'Your setup is kept — get a new code to continue.',
+       cta: 'Get a new code',
+     },
+     failed: {
+@@ -287,127 +305,36 @@ export default function ExtensionPairingPanel({ platformId }: Props): React.Reac
+   );
+ }
+ 
+-// PR-M4 per-family counts/reasons block inside the paired panel. Page-local
+-// counts + stable reasons only — never a total/percentage/ETA/completion.
+-// Renders nothing when the kill switch is off (hook fails closed).
+-function ReconstructCountsSection(): React.ReactElement | null {
+-  const { colors } = useTheme();
+-  const styles = makeStyles(colors);
+-  const { enabled, families } = useReconstructCounts();
+-  if (!enabled) return null;
+-  return (
+-    <View
+-      style={styles.reviewBlock}
+-      accessibilityLiveRegion="polite"
+-      testID="reconstruct-counts"
+-    >
+-      <Text style={styles.label}>What we’ve reconstructed so far</Text>
+-      {families.map((f) => (
+-        <ReconstructFamilyRow
+-          key={f.family}
+-          family={f}
+-          styles={styles}
+-          colors={colors}
+-        />
+-      ))}
+-    </View>
+-  );
+-}
+-
+-function ReconstructFamilyRow({
+-  family,
++// Truthful checklist row for the `paired` state (UX-03a). Each row states
++// either a known fact (checkmark) or an explicit "Not yet known" — never an
++// inferred or borrowed claim.
++function ChecklistRow({
+   styles,
+   colors,
++  label,
++  value,
++  pending = false,
++  testID,
+ }: {
+-  family: ReconstructFamilyCounts;
+   styles: ReturnType<typeof makeStyles>;
+   colors: ThemeColors;
++  label: string;
++  value?: string;
++  pending?: boolean;
++  testID: string;
+ }): React.ReactElement {
+-  const {
+-    family: name,
+-    count,
+-    reasons,
+-    isLoading,
+-    isRefreshing,
+-    errorKind,
+-    hasData,
+-    hasMore,
+-    fetchMore,
+-    retry,
+-  } = family;
+-  const label = FAMILY_LABELS[name];
+-
+-  // First load, nothing to show yet.
+-  if (isLoading && !hasData) {
+-    return (
+-      <View style={styles.familyRow} testID={`reconstruct-${name}-loading`}>
+-        <Text style={styles.familyLabel}>{label}</Text>
+-        <ActivityIndicator
+-          color={colors.primary}
+-          accessibilityRole="progressbar"
+-          accessibilityLabel={`Loading ${label}`}
+-        />
+-      </View>
+-    );
+-  }
+-
+-  // Hard failure with no prior data → explicit error + retry (never a silent
+-  // zero that would read as "nothing to import").
+-  if (errorKind && !hasData) {
+-    return (
+-      <View style={styles.familyRow} testID={`reconstruct-${name}-error`}>
+-        <Text style={styles.familyLabel}>{label}</Text>
+-        <View style={styles.familyErrorRow}>
+-          <Text style={styles.familyMuted}>Couldn’t load. </Text>
+-          <TouchableOpacity
+-            onPress={retry}
+-            accessibilityRole="button"
+-            accessibilityLabel={`Retry ${label}`}
+-            testID={`reconstruct-${name}-retry`}
+-          >
+-            <Text style={styles.linkText}>Try again</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    );
+-  }
+-
+-  // Page-local truth only: "N loaded so far" (never a total/percentage), or a
+-  // calm "None yet" when the loaded pages are empty.
+-  const countLabel = count === 0 ? 'None yet' : `${count} loaded so far`;
+   return (
+-    <View style={styles.familyRow} testID={`reconstruct-${name}`}>
+-      <View style={styles.familyHeader}>
+-        <Text style={styles.familyLabel}>{label}</Text>
+-        <Text style={styles.familyCount} testID={`reconstruct-${name}-count`}>
+-          {countLabel}
+-          {isRefreshing ? ' · refreshing…' : ''}
+-        </Text>
+-      </View>
+-      {reasons.map((r) => (
+-        <Text
+-          key={r.code}
+-          style={styles.familyReason}
+-          testID={`reconstruct-${name}-reason`}
+-        >
+-          {r.message}
+-        </Text>
+-      ))}
+-      {errorKind && hasData ? (
+-        <Text style={styles.familyMuted} testID={`reconstruct-${name}-stale`}>
+-          Couldn’t refresh just now — showing what loaded earlier.
+-        </Text>
+-      ) : null}
+-      {hasMore ? (
+-        <TouchableOpacity
+-          onPress={fetchMore}
+-          accessibilityRole="button"
+-          accessibilityLabel={`Load more ${label}`}
+-          testID={`reconstruct-${name}-more`}
+-        >
+-          <Text style={styles.linkText}>Load more</Text>
+-        </TouchableOpacity>
+-      ) : null}
++    <View style={styles.checklistRow} testID={testID}>
++      {pending ? (
++        <Ionicons name="ellipse-outline" size={16} color={colors.textMuted} />
++      ) : (
++        <Ionicons name="checkmark" size={16} color={colors.primary} />
++      )}
++      <Text style={styles.checklistLabel}>
++        {label}
++        {pending ? '' : ' ✓'}
++      </Text>
++      {value ? <Text style={styles.checklistValue}>{value}</Text> : null}
+     </View>
+   );
+ }
+@@ -448,23 +375,16 @@ function makeStyles(colors: ThemeColors) {
+     },
+     secondaryBtn: { paddingVertical: 12, alignItems: 'center' },
+     secondaryBtnText: { color: colors.textSecondary, fontSize: 15, fontWeight: '600' },
+-    reviewBlock: {
++    checklist: {
+       gap: 8,
+       paddingTop: 12,
+       marginTop: 4,
+       borderTopWidth: StyleSheet.hairlineWidth,
+       borderTopColor: colors.border,
+     },
+-    familyRow: { gap: 4 },
+-    familyHeader: {
+-      flexDirection: 'row',
+-      alignItems: 'center',
+-      justifyContent: 'space-between',
+-    },
+-    familyErrorRow: { flexDirection: 'row', alignItems: 'center' },
+-    familyLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+-    familyCount: { fontSize: 13, color: colors.textSecondary },
+-    familyReason: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
++    checklistRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
++    checklistLabel: { fontSize: 14, color: colors.textPrimary, flexShrink: 1 },
++    checklistValue: { fontSize: 14, color: colors.textMuted },
+     familyMuted: { fontSize: 13, color: colors.textMuted },
+     linkText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+   });
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx
+index 3955ed9..98742d1 100644
+--- a/src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.a11y.test.tsx
+@@ -41,11 +41,8 @@ jest.mock('../../../hooks/useExtensionPairing', () => ({
+     cancel: jest.fn(),
+   }),
+ }));
+-jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+-  useRosterReviewDelta: () => ({ delta: 0, refresh: jest.fn() }),
+-}));
+-jest.mock('../../../hooks/useReconstructCounts', () => ({
+-  useReconstructCounts: () => ({ enabled: false, families: [], refresh: jest.fn() }),
++jest.mock('../../../hooks/useCurrentUser', () => ({
++  useCurrentUser: () => ({ id: 'coach-1', email: 'coach@example.com', name: 'Jordan Coach' }),
+ }));
+ jest.mock('@react-navigation/native', () => ({
+   useNavigation: () => ({ navigate: jest.fn() }),
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
+index 0beaf7b..612f3bd 100644
+--- a/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.copy.test.tsx
+@@ -1,10 +1,16 @@
+ /**
+- * ExtensionPairingPanel — truthful copy (S6 R3 reimplementation).
++ * ExtensionPairingPanel — truthful copy (S6 R3 reimplementation; UX-03a
++ * paired-state truth correction).
+  *
+  * R2 finding S6-R2-A-02: the `failed` and `cancelled` states asserted outcomes
+  * mobile cannot know ("Nothing was imported", "No import was started") — there
+  * is no import-progress or server-cancel contract. These tests pin the honest
+- * replacements and the new `identityUnavailable` terminal.
++ * replacements and the `identityUnavailable` terminal.
++ *
++ * UX-03a additionally pins that no state — including the corrected `paired`
++ * confirmation — ever claims a retirement, revocation, or disconnect, since no
++ * such endpoint exists (brief §2 row 5), and that `expired` follows the
++ * fact → remedy → retained-setup pattern (brief §4).
+  */
+ import React from 'react';
+ import { render, fireEvent, cleanup } from '@testing-library/react-native';
+@@ -26,11 +32,8 @@ let mockHookState: { status: string; code: string | null; supportReference?: str
+ jest.mock('../../../hooks/useExtensionPairing', () => ({
+   useExtensionPairing: () => ({ ...mockHookState, start: mockStart, retry: mockRetry, cancel: mockCancel }),
+ }));
+-jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+-  useRosterReviewDelta: () => ({ delta: 0, refresh: jest.fn() }),
+-}));
+-jest.mock('../../../hooks/useReconstructCounts', () => ({
+-  useReconstructCounts: () => ({ enabled: false, families: [], refresh: jest.fn() }),
++jest.mock('../../../hooks/useCurrentUser', () => ({
++  useCurrentUser: () => ({ id: 'coach-1', email: 'coach@example.com', name: 'Jordan Coach' }),
+ }));
+ jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate: jest.fn() }) }));
+ jest.mock('../../../analytics/posthog.service', () => ({ track: jest.fn() }));
+@@ -43,6 +46,10 @@ const FORBIDDEN_CLAIMS = [
+   /import (is )?complete/i,
+   /imported \d+/i,
+   /\d+%/,
++  /revoked/i,
++  /disconnected/i,
++  /retired/i,
++  /\bsigned out\b/i,
+ ];
+ 
+ function allText(tree: Awaited<ReturnType<typeof render>>): string {
+@@ -57,8 +64,8 @@ beforeEach(() => {
+ afterEach(() => cleanup());
+ 
+ describe('ExtensionPairingPanel — copy never asserts what the extension did', () => {
+-  it.each(['failed', 'cancelled', 'identityUnavailable', 'expired', 'authExpired', 'unavailable'])(
+-    '%s state makes no import-outcome claim',
++  it.each(['failed', 'cancelled', 'identityUnavailable', 'expired', 'authExpired', 'unavailable', 'paired'])(
++    '%s state makes no import-outcome, retirement, revocation, or disconnect claim',
+     async (status) => {
+       mockHookState = { status, code: null, supportReference: null };
+       const tree = await render(<ExtensionPairingPanel platformId="truecoach" />);
+@@ -98,12 +105,22 @@ describe('ExtensionPairingPanel — copy never asserts what the extension did',
+     expect(mockRetry).toHaveBeenCalledTimes(1);
+   });
+ 
+-  it('paired copy still distinguishes "paired" from a running import claim it cannot verify', async () => {
++  it('expired: fact → remedy → retained-setup — states the code expired, the setup is kept, and offers a new code', async () => {
++    mockHookState = { status: 'expired', code: null, supportReference: null };
++    const { getByText } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    expect(getByText('This code expired')).toBeTruthy();
++    expect(getByText(/setup is kept/i)).toBeTruthy();
++    fireEvent.press(getByText('Get a new code'));
++    expect(mockRetry).toHaveBeenCalledTimes(1);
++  });
++
++  it('paired: shows only the redemption fact — a calm confirmation, never a running-import claim it cannot verify', async () => {
+     mockHookState = { status: 'paired', code: null, supportReference: null };
+     const tree = await render(<ExtensionPairingPanel platformId="truecoach" />);
+     const text = allText(tree);
+-    expect(text).toMatch(/Paired/);
++    expect(text).toMatch(/Connected to your computer/);
+     expect(text).not.toMatch(/import (is )?complete/i);
+     expect(text).not.toMatch(/\d+%/);
++    expect(text).not.toMatch(/running/i);
+   });
+ });
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx
+index 781ae5a..f8e2542 100644
+--- a/src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.reconstruct.test.tsx
+@@ -1,21 +1,26 @@
+ /**
+- * ExtensionPairingPanel — PR-M4 reconstruct counts section.
++ * ExtensionPairingPanel — reconstruct/roster claim absence (UX-03a
++ * paired-state truth correction).
+  *
+- * Mounts the panel in the `paired` state and drives useReconstructCounts through
+- * every state to assert the honest, page-local rendering:
+- *   - hidden entirely when the hook is disabled (kill switch off / no coach),
+- *   - per-family loading, empty ("None yet"), counted ("N loaded so far"),
+- *     reasons, refreshing, stale-after-refresh-error (prior data kept visible),
+- *     hard-error + retry, and Load-more pagination affordance,
+- *   - NEVER a percentage, total, ETA, or a completion/success claim,
+- *   - accessible: the section announces via a polite live region.
+- *
+- * useReconstructCounts is mocked so states are deterministic; the hook's own
+- * behaviour is covered in useReconstructCounts.test.tsx.
++ * This suite formerly drove the PR-M4 `useReconstructCounts` section and the
++ * PR-M3 roster review delta through every state inside the panel's `paired`
++ * view. UX-03a removes both: `pair/status` returning `paired` proves only
++ * that the code was redeemed for this coach's account (brief §2 row 4), and
++ * no per-family count, roster delta, or "reconstructed so far" claim is
++ * backed by that fact. Per the grant, this file is rewritten — not
++ * deleted — to assert the absence is real and durable:
++ *   - the panel source no longer imports useRosterReviewDelta or
++ *     useReconstructCounts,
++ *   - the rendered `paired` tree contains neither the reconstruct section nor
++ *     any roster-delta test id or copy,
++ *   - the panel still renders correctly even if those hooks were to be
++ *     called elsewhere in the module graph (defence in depth: mocking them
++ *     with non-empty state must have zero effect on the panel's output).
+  */
++import fs from 'fs';
++import path from 'path';
+ import React from 'react';
+-import { render, fireEvent, cleanup } from '@testing-library/react-native';
+-import type { ReconstructFamilyCounts } from '../../../hooks/useReconstructCounts';
++import { render, cleanup } from '@testing-library/react-native';
+ 
+ jest.mock('../../../theme/useTheme', () => ({
+   useTheme: () => ({
+@@ -37,17 +42,37 @@ jest.mock('../../../hooks/useExtensionPairing', () => ({
+   }),
+ }));
+ 
+-jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+-  useRosterReviewDelta: () => ({ delta: 0, refresh: jest.fn() }),
++jest.mock('../../../hooks/useCurrentUser', () => ({
++  useCurrentUser: () => ({ id: 'coach-1', email: 'coach@example.com', name: 'Jordan Coach' }),
+ }));
+ 
+-let mockReconstruct: {
+-  enabled: boolean;
+-  families: ReconstructFamilyCounts[];
+-  refresh: () => void;
+-};
++// Defence in depth: even if these hooks were still reachable from the module
++// graph and returned non-empty "progress", the panel must not surface it —
++// because it no longer imports or calls either hook. jest.mock is safe to
++// keep here (it no-ops if unresolved by the bundler in a future cleanup) and
++// proves the panel's independence from their return values.
++jest.mock('../../../hooks/useRosterReviewDelta', () => ({
++  useRosterReviewDelta: () => ({ delta: 999, refresh: jest.fn() }),
++}));
+ jest.mock('../../../hooks/useReconstructCounts', () => ({
+-  useReconstructCounts: () => mockReconstruct,
++  useReconstructCounts: () => ({
++    enabled: true,
++    families: [
++      {
++        family: 'workouts',
++        count: 4137,
++        reasons: [{ code: 'partial', message: 'Some sessions were unreadable.' }],
++        isLoading: false,
++        isRefreshing: false,
++        errorKind: null,
++        hasData: true,
++        hasMore: true,
++        fetchMore: jest.fn(),
++        retry: jest.fn(),
++      },
++    ],
++    refresh: jest.fn(),
++  }),
+ }));
+ 
+ jest.mock('@react-navigation/native', () => ({
+@@ -57,175 +82,89 @@ jest.mock('../../../analytics/posthog.service', () => ({ track: jest.fn() }));
+ 
+ import ExtensionPairingPanel from '../ExtensionPairingPanel';
+ 
+-const mockFetchMore = jest.fn();
+-const mockRetry = jest.fn();
+-
+-function fam(overrides: Partial<ReconstructFamilyCounts> = {}): ReconstructFamilyCounts {
+-  return {
+-    family: 'workouts',
+-    count: 0,
+-    reasons: [],
+-    isLoading: false,
+-    isRefreshing: false,
+-    errorKind: null,
+-    hasData: true,
+-    hasMore: false,
+-    fetchMore: mockFetchMore,
+-    retry: mockRetry,
+-    ...overrides,
+-  };
+-}
+-
+ function renderPaired() {
+   return render(<ExtensionPairingPanel platformId="truecoach" />);
+ }
+ 
+-beforeEach(() => {
+-  mockFetchMore.mockClear();
+-  mockRetry.mockClear();
+-  mockReconstruct = { enabled: true, families: [], refresh: jest.fn() };
+-});
+-
+ afterEach(() => cleanup());
+ 
+-describe('reconstruct section — visibility', () => {
+-  it('renders nothing when the hook is disabled', async () => {
+-    mockReconstruct = { enabled: false, families: [], refresh: jest.fn() };
+-    const { queryByTestId } = await renderPaired();
+-    expect(queryByTestId('reconstruct-counts')).toBeNull();
++describe('ExtensionPairingPanel source — import absence proof', () => {
++  it('does not import useRosterReviewDelta', () => {
++    const source = fs.readFileSync(
++      path.join(__dirname, '..', 'ExtensionPairingPanel.tsx'),
++      'utf8',
++    );
++    expect(source).not.toMatch(/useRosterReviewDelta/);
+   });
+ 
+-  it('announces the section via a polite live region', async () => {
+-    mockReconstruct.families = [fam({ count: 2 })];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-counts').props.accessibilityLiveRegion).toBe('polite');
++  it('does not import useReconstructCounts', () => {
++    const source = fs.readFileSync(
++      path.join(__dirname, '..', 'ExtensionPairingPanel.tsx'),
++      'utf8',
++    );
++    expect(source).not.toMatch(/useReconstructCounts/);
+   });
+ });
+ 
+-describe('reconstruct section — per-family states', () => {
+-  it('shows a per-family loading state on first load', async () => {
+-    mockReconstruct.families = [fam({ isLoading: true, hasData: false })];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-loading')).toBeTruthy();
+-  });
+-
+-  it('gives the first-load spinner an accessible label naming the family', async () => {
+-    mockReconstruct.families = [fam({ isLoading: true, hasData: false })];
+-    const { getByLabelText } = await renderPaired();
+-    const spinner = getByLabelText('Loading Workouts');
+-    expect(spinner.props.accessibilityRole).toBe('progressbar');
+-  });
+-
+-  it('shows a calm "None yet" when loaded pages are empty', async () => {
+-    mockReconstruct.families = [fam({ count: 0 })];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).toHaveTextContent('None yet');
++describe('reconstruct section — removed', () => {
++  it('never renders the reconstruct-counts section, even when the (unused) hook reports enabled families', async () => {
++    const { queryByTestId } = await renderPaired();
++    expect(queryByTestId('reconstruct-counts')).toBeNull();
++    expect(queryByTestId('reconstruct-workouts')).toBeNull();
++    expect(queryByTestId('reconstruct-workouts-count')).toBeNull();
++    expect(queryByTestId('reconstruct-workouts-more')).toBeNull();
+   });
+ 
+-  it('reports page-local count as "N loaded so far" — never a total or percentage', async () => {
+-    mockReconstruct.families = [fam({ count: 5 })];
+-    const { getByTestId, toJSON } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).toHaveTextContent('5 loaded so far');
++  it('never renders the honest reconstruct heading text', async () => {
++    const { toJSON } = await renderPaired();
+     const s = JSON.stringify(toJSON());
+-    expect(s).not.toMatch(/\b\d{1,3}%/);
+-    expect(s).not.toMatch(/of \d+|total|complete|imported|finished|\bdone\b|success/i);
++    expect(s).not.toMatch(/reconstructed so far/i);
+   });
+ 
+-  it('renders stable reasons verbatim', async () => {
+-    mockReconstruct.families = [
+-      fam({ count: 1, reasons: [{ code: 'partial', message: 'Some sessions were unreadable.' }] }),
+-    ];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-reason')).toHaveTextContent(
+-      'Some sessions were unreadable.',
+-    );
+-  });
+-
+-  it('shows a subtle refreshing marker while re-fetching with data visible', async () => {
+-    mockReconstruct.families = [fam({ count: 3, isRefreshing: true })];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).toHaveTextContent(/refreshing/);
+-  });
+-
+-  it('keeps prior data visible and notes a failed refresh (stale) rather than blanking', async () => {
+-    mockReconstruct.families = [fam({ count: 3, errorKind: 'network', hasData: true })];
+-    const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).toHaveTextContent('3 loaded so far');
+-    expect(getByTestId('reconstruct-workouts-stale')).toBeTruthy();
+-  });
+-
+-  it('shows an explicit error + retry when the first load fails (no silent zero)', async () => {
+-    mockReconstruct.families = [fam({ errorKind: 'server', hasData: false })];
+-    const { getByTestId, queryByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-error')).toBeTruthy();
+-    expect(queryByTestId('reconstruct-workouts-count')).toBeNull();
+-    fireEvent.press(getByTestId('reconstruct-workouts-retry'));
+-    expect(mockRetry).toHaveBeenCalledTimes(1);
+-  });
+-
+-  it('exposes a Load more affordance when an opaque cursor remains', async () => {
+-    mockReconstruct.families = [fam({ count: 20, hasMore: true })];
+-    const { getByTestId } = await renderPaired();
+-    fireEvent.press(getByTestId('reconstruct-workouts-more'));
+-    expect(mockFetchMore).toHaveBeenCalledTimes(1);
++  it('never renders a per-family loaded-so-far count, even with a large mocked count', async () => {
++    const { toJSON } = await renderPaired();
++    const s = JSON.stringify(toJSON());
++    expect(s).not.toMatch(/4137/);
++    expect(s).not.toMatch(/loaded so far/i);
+   });
+ 
+-  it('renders both canonical families with neutral, source-agnostic labels', async () => {
+-    mockReconstruct.families = [
+-      fam({ family: 'workouts', count: 2 }),
+-      fam({ family: 'client_history', count: 4 }),
+-    ];
+-    const { getByTestId, toJSON } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts')).toBeTruthy();
+-    expect(getByTestId('reconstruct-client_history')).toBeTruthy();
++  it('never renders the mocked family reason text', async () => {
++    const { toJSON } = await renderPaired();
+     const s = JSON.stringify(toJSON());
+-    expect(s).toMatch(/Workouts/);
+-    expect(s).toMatch(/Client history/);
+-    // No source-specific label ever leaks into the counts section.
+-    expect(s).not.toMatch(/truecoach|trainerize/i);
++    expect(s).not.toMatch(/Some sessions were unreadable/i);
+   });
++});
+ 
+-  it('omits the refreshing marker and stale note while healthy', async () => {
+-    mockReconstruct.families = [fam({ count: 3 })];
+-    const { getByTestId, queryByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).not.toHaveTextContent(/refreshing/);
+-    expect(queryByTestId('reconstruct-workouts-stale')).toBeNull();
++describe('roster review delta — removed', () => {
++  it('never renders the pairing-review-delta test id', async () => {
++    const { queryByTestId } = await renderPaired();
++    expect(queryByTestId('pairing-review-delta')).toBeNull();
+   });
+ 
+-  it('never renders the raw errorKind token in the stale state', async () => {
+-    mockReconstruct.families = [fam({ count: 3, errorKind: 'network', hasData: true })];
++  it('never renders "since you started this import" even with a non-zero mocked delta', async () => {
+     const { toJSON } = await renderPaired();
+     const s = JSON.stringify(toJSON());
+-    // The coarse machine label is for telemetry, not the coach's eyes.
+-    expect(s).not.toMatch(/\bnetwork\b|errorKind/);
+-  });
+-
+-  it('gives the retry control an accessible button role and label', async () => {
+-    mockReconstruct.families = [fam({ errorKind: 'server', hasData: false })];
+-    const { getByTestId } = await renderPaired();
+-    const retry = getByTestId('reconstruct-workouts-retry');
+-    expect(retry.props.accessibilityRole).toBe('button');
+-    expect(retry.props.accessibilityLabel).toMatch(/Workouts/);
++    expect(s).not.toMatch(/since you started this import/i);
+   });
+ 
+-  it('gives the Load more control an accessible label naming the family', async () => {
+-    mockReconstruct.families = [fam({ count: 20, hasMore: true })];
+-    const { getByTestId } = await renderPaired();
+-    const more = getByTestId('reconstruct-workouts-more');
+-    expect(more.props.accessibilityLabel).toMatch(/Workouts/);
++  it('never renders a "new clients" roster-delta claim', async () => {
++    const { toJSON } = await renderPaired();
++    const s = JSON.stringify(toJSON());
++    expect(s).not.toMatch(/\d+ new clients?/i);
+   });
+ 
+-  it('never emits a percentage/ETA/completion word even with a large count', async () => {
+-    mockReconstruct.families = [fam({ count: 4137, hasMore: true })];
+-    const { getByTestId, toJSON } = await renderPaired();
+-    expect(getByTestId('reconstruct-workouts-count')).toHaveTextContent('4137 loaded so far');
++  it('never claims the import is "running" in the browser extension', async () => {
++    const { toJSON } = await renderPaired();
+     const s = JSON.stringify(toJSON());
+-    expect(s).not.toMatch(/%|percent|\bETA\b|remaining|of \d+|complete|imported|finished|success/i);
++    expect(s).not.toMatch(/\brunning\b/i);
+   });
++});
+ 
+-  it('titles the section with an honest, page-local heading', async () => {
+-    mockReconstruct.families = [fam({ count: 1 })];
++describe('paired state — what actually renders instead', () => {
++  it('shows the truthful confirmation and checklist in place of the removed sections', async () => {
+     const { getByTestId } = await renderPaired();
+-    expect(getByTestId('reconstruct-counts')).toHaveTextContent(/reconstructed so far/);
++    expect(getByTestId('pairing-paired')).toHaveTextContent('Connected to your computer', { exact: false });
++    expect(getByTestId('pairing-checklist')).toBeTruthy();
++    expect(getByTestId('pairing-check-platform')).toHaveTextContent('Not yet known', { exact: false });
+   });
+ });
+diff --git a/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx b/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
+index 07232c9..c921e12 100644
+--- a/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
++++ b/src/components/coach/__tests__/ExtensionPairingPanel.test.tsx
+@@ -1,13 +1,16 @@
+ /**
+- * ExtensionPairingPanel — behavioral tests (v0.3 import, PR-M2).
++ * ExtensionPairingPanel — behavioral tests (v0.3 import, PR-M2; UX-03a
++ * paired-state truth correction).
+  *
+  * The useExtensionPairing hook is mocked so we can drive each lifecycle state
+  * deterministically and assert the panel's honest rendering:
+  *   - auto-mints exactly once on mount (single-flight guard is the hook's job),
+  *   - minting spinner, waiting (code + cancel — no client-clock countdown),
+- *     paired (NO progress or completion claim), and the shared recoverable
+- *     /attention layout,
+- *   - the paired copy never claims import progress/percentage/entity counts,
++ *     paired (a calm "Connected to your computer" confirmation with a
++ *     truthful checklist — no roster/reconstruct progress or completion
++ *     claim), and the shared recoverable/attention layout,
++ *   - the paired state names the server-owned identity from useCurrentUser
++ *     and never claims more than "pair/status" proves,
+  *   - cancel and retry are wired to the hook,
+  *   - Quiet-Luxury doctrine: no 700/800 font weights,
+  *   - accessibility: polite live regions, spaced code label, button roles.
+@@ -43,22 +46,12 @@ jest.mock('../../../hooks/useExtensionPairing', () => ({
+   }),
+ }));
+ 
+-// PR-M3: the roster-derived review delta is mocked so we can drive the paired
+-// review copy deterministically; the hook's own behaviour is covered in
+-// useRosterReviewDelta.test.tsx.
+-let mockDelta = 0;
+-const mockRefresh = jest.fn();
+-jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+-  useRosterReviewDelta: () => ({ delta: mockDelta, refresh: mockRefresh }),
+-}));
+-
+-// PR-M4: the reconstruct counts hook is mocked. It defaults to DISABLED so the
+-// counts section renders nothing, keeping every PR-M2/PR-M3 assertion here
+-// unchanged; the section's own states are covered in
+-// ExtensionPairingPanel.reconstruct.test.tsx and useReconstructCounts.test.tsx.
+-let mockReconstruct: { enabled: boolean; families: unknown[]; refresh: () => void };
+-jest.mock('../../../hooks/useReconstructCounts', () => ({
+-  useReconstructCounts: () => mockReconstruct,
++// UX-03a: server-owned identity for the paired checklist comes only from
++// useCurrentUser (never a client-edited field). Mocked so the identity line
++// is deterministic; the hook's own behaviour is covered elsewhere.
++let mockCurrentUser: { id: string; email: string; name?: string } | null;
++jest.mock('../../../hooks/useCurrentUser', () => ({
++  useCurrentUser: () => mockCurrentUser,
+ }));
+ 
+ const mockNavigate = jest.fn();
+@@ -78,12 +71,10 @@ beforeEach(() => {
+   mockStart.mockClear();
+   mockRetry.mockClear();
+   mockCancel.mockClear();
+-  mockRefresh.mockClear();
+   mockNavigate.mockClear();
+   mockTrack.mockClear();
+-  mockDelta = 0;
+   mockHookState = { status: 'idle', code: null, supportReference: null };
+-  mockReconstruct = { enabled: false, families: [], refresh: jest.fn() };
++  mockCurrentUser = { id: 'coach-1', email: 'coach@example.com', name: 'Jordan Coach' };
+ });
+ 
+ afterEach(() => {
+@@ -134,58 +125,58 @@ describe('ExtensionPairingPanel — lifecycle rendering', () => {
+     expect(mockCancel).toHaveBeenCalledTimes(1);
+   });
+ 
+-  it('shows an HONEST paired state — no progress, percentage, or entity counts', async () => {
++  it('shows an HONEST paired state — a calm confirmation, no progress, percentage, or entity counts', async () => {
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId, toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+     expect(getByTestId('pairing-paired')).toBeTruthy();
+     const serialized = JSON.stringify(toJSON());
+-    expect(serialized).toMatch(/runs in the browser extension/i);
++    expect(serialized).toMatch(/Connected to your computer/);
+     expect(serialized).not.toMatch(/\b\d{1,3}%/);
+     expect(serialized).not.toMatch(/imported successfully|import complete|\b\d+ (records|entities|pages)\b/i);
+   });
+ 
+-  it('renders the roster-derived delta copy (3→5 = 2) in the paired review', async () => {
+-    mockDelta = 2;
++  it('names the server-owned identity from useCurrentUser in the checklist', async () => {
++    mockCurrentUser = { id: 'coach-1', email: 'coach@example.com', name: 'Jordan Coach' };
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+-    expect(getByTestId('pairing-review-delta')).toHaveTextContent(
+-      '2 new clients since you started this import',
+-    );
++    expect(getByTestId('pairing-check-identity')).toHaveTextContent('Jordan Coach', { exact: false });
+   });
+ 
+-  it('uses the singular form when exactly one new client has arrived', async () => {
+-    mockDelta = 1;
++  it('falls back to email when no display name has resolved', async () => {
++    mockCurrentUser = { id: 'coach-1', email: 'coach@example.com' };
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+-    expect(getByTestId('pairing-review-delta')).toHaveTextContent(
+-      '1 new client since you started this import',
+-    );
++    expect(getByTestId('pairing-check-identity')).toHaveTextContent('coach@example.com', { exact: false });
+   });
+ 
+-  it('renders a calm copy when no new clients yet (3→3 = 0) — never claims completion or that the import is running', async () => {
+-    mockDelta = 0;
++  it('shows the truthful checklist: importer available, identity, and previous platform not yet known', async () => {
++    mockHookState = { status: 'paired', code: null };
++    const { getByTestId } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    expect(getByTestId('pairing-check-importer')).toHaveTextContent('Importer available', { exact: false });
++    expect(getByTestId('pairing-check-platform')).toHaveTextContent('Not yet known', { exact: false });
++  });
++
++  it('shows the instructional primary action with no URL or locator', async () => {
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId, toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+-    expect(getByTestId('pairing-review-delta')).toHaveTextContent(
+-      'No new clients have arrived yet. If the import is running in the browser extension, they will appear here as they arrive.',
+-    );
++    expect(getByTestId('pairing-paired')).toHaveTextContent('Continue on your computer', { exact: false });
+     const serialized = JSON.stringify(toJSON());
+-    expect(serialized).not.toMatch(/imported successfully|import complete|completed|\bsuccess\b|\b\d{1,3}%/i);
++    expect(serialized).not.toMatch(/https?:\/\//);
+   });
+ 
+-  it('exposes a typed, reachable CTA to the existing ClientsList and fires review analytics', async () => {
+-    mockDelta = 2;
++  it('exposes a typed, reachable "Review clients" link with no count or progress claim, and fires review analytics', async () => {
+     mockHookState = { status: 'paired', code: null };
+-    const { getByTestId } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++    const { getByTestId, toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+     fireEvent.press(getByTestId('pairing-review-cta'));
+     expect(mockNavigate).toHaveBeenCalledWith('ClientsStack', { screen: 'ClientsList' });
+     expect(mockTrack).toHaveBeenCalledWith(AnalyticsEvents.IMPORT_REVIEW_OPENED, {
+       platform: 'truecoach',
+     });
++    const serialized = JSON.stringify(toJSON());
++    expect(serialized).not.toMatch(/\b\d+ (new )?clients?\b/i);
+   });
+ 
+   it('review analytics payload carries ONLY the platform slug — no counts, IDs, or PII', async () => {
+-    mockDelta = 4;
+     mockHookState = { status: 'paired', code: null };
+     const { getByTestId } = await render(<ExtensionPairingPanel platformId="trainerize" />);
+     fireEvent.press(getByTestId('pairing-review-cta'));
+@@ -252,6 +243,16 @@ describe('ExtensionPairingPanel — lifecycle rendering', () => {
+       expect(serialized).not.toMatch(/imported successfully|import complete|\b\d+ (clients|records|entities|pages)\b/i);
+     },
+   );
++
++  it.each(['expired', 'failed', 'authExpired', 'unavailable', 'cancelled'])(
++    'never claims a retirement, revocation, or disconnect in the %s attention state',
++    async (status) => {
++      mockHookState = { status, code: null };
++      const { toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
++      const serialized = JSON.stringify(toJSON());
++      expect(serialized).not.toMatch(/revoked|disconnected|retired/i);
++    },
++  );
+ });
+ 
+ describe('ExtensionPairingPanel — doctrine + accessibility', () => {
+@@ -294,12 +295,13 @@ describe('ExtensionPairingPanel — doctrine + accessibility', () => {
+     expect(getByTestId(testId).props.accessibilityLiveRegion).toBe('polite');
+   });
+ 
+-  it('titles the paired card honestly as "Paired" (not "Complete"/"Imported")', async () => {
++  it('titles the paired card honestly as "Connected to your computer" (not "Complete"/"Imported"/"Paired")', async () => {
+     mockHookState = { status: 'paired', code: null };
+     const { toJSON } = await render(<ExtensionPairingPanel platformId="truecoach" />);
+     const serialized = JSON.stringify(toJSON());
+-    expect(serialized).toMatch(/Paired/);
++    expect(serialized).toMatch(/Connected to your computer/);
+     expect(serialized).not.toMatch(/complete|imported|finished|done/i);
++    expect(serialized).not.toMatch(/\bPaired\b/);
+   });
+ 
+   it('gives the cancel control a button role and label', async () => {
