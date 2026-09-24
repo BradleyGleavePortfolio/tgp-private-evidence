@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-Updated 2026-09-24 05:36 UTC by EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`. **RESUMED by Bradley's September 23 22:35 PDT EXECUTE; intake accepted and recon closed.** Current scope is `execution/95633079/SCOPE.md`; live owners are in `execution/DISPATCHES.md`.
+EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`; latest runtime cursor `2026-09-24T05:53:33Z`. **RESUMED by Bradley's September 23 22:35 PDT EXECUTE; intake accepted and recon closed.** Current scope is `execution/95633079/SCOPE.md`; live owners are in `execution/DISPATCHES.md`.
 
 ## Authority
 
@@ -28,17 +28,19 @@ Targeted intake verified unchanged mains: backend `c23b9d9f3fcc106b92c061ceb7d04
 
 C1 source and both full source reviews are complete/grantable with no open source A/B. Frozen tree `87798e742c7b48f56b05e9b5c30efa877180a9b3`, first parent `5c760b774598532e90d5d217e15adc9285c3c3f4`, second parent `881c4c791727adef8d423931e1cca83a0ffbb9c9`; original state 18 staged/0 unstaged/0 untracked.
 
-Frozen launcher `a57c224c6e8e9364393318efaa99c33f4a90877287d7e1a7e370b1c75b220448` and approved message `288048d7b7e908f8803d3d70e57465f52cfc9f102bb4bc4b1dba30143ce7cb83` have not executed. Contract is `2.0.0-c1-s1.1`, artifact `bdb022dd6c4fb64cdf291fdde3796b99e4b23004f676b7cb46a58460526ba4e5`, not consumer-frozen.
+Frozen launcher `a57c224c6e8e9364393318efaa99c33f4a90877287d7e1a7e370b1c75b220448` ran once: Lefthook installation raw0, then `RC=71 STAGE=hooks-missing` at05:53:33Z before commit. Approved message `288048d7b7e908f8803d3d70e57465f52cfc9f102bb4bc4b1dba30143ce7cb83` remains unused. Contract is `2.0.0-c1-s1.1`, artifact `bdb022dd6c4fb64cdf291fdde3796b99e4b23004f676b7cb46a58460526ba4e5`, not consumer-frozen.
 
-Recovered portable bundle `a238a7b1…` and patch `a413891a…` plus all source/review/preparation manifests verify. Fresh independent A completed the unfinished execution-binding review: GRANTABLE_WITH_RECORDED_PRECONDITIONS, A0/B0. Executor recovered exact writable18paths/tree87798e74/parents at05:44:09Z and is installing absent pinned dependencies; unchanged launcher follows only after exact environment guards. The existing 22-case PG preparation is complete but the minimum fixture variant remains unbuilt.
+Exact writable18paths/tree87798e74/parents and missing environment pins are recovered. Reviewer A confirmed both installed native Lefthook hooks are genuine; the detector demanded the npm-wrapper path instead. C06/A0/B0 qualifies that conservative false-negative, not the successful installation or source. Preserve the failed09 receipt and continue only the unexecuted post-install guards, ordinary commit and targeted Jest through additive receipts. Existing22-case PG preparation is complete; fixture variant remains unbuilt.
 
-All eight former workers are stopped/finished and no old grant is inherited. C1 executor owns sole heavy runtime; A awaits later fixture/results inputs. ROMAN-DONOR comparison is complete and the same writer now owns source-only mobile presentation on acceptedbc7. Existing extension CSS candidate130afa99 is under targeted T1 source review. UX-07 detail packet is complete with advisory/actual-contrast clarification. No UX runtime/commit or PG fixture/cluster/run is authorized yet; actual C1 validation claims await receipts.
+The exact remaining-stage proposal is frozen at `execution/95633079/c1-execution/10-validate-continue.sh`, SHA-256 `47c27fb9c700c797c55e7216378581d193dd8de63ec9f85aff08534f5d81bb1c`. Reviewer A is completing the narrow continuation-binding disposition within the existing review; no launch is granted until that disposition. Original failed `09-*` evidence and the successful hook-install result are preserved in `execution/95633079/c1-execution/09-hooks-missing-evidence/`.
 
-This sandbox lacks old worktrees/dependencies/PG; missing-tool recovery is allowed only at recorded pins and does not reopen accepted S5. The master pause file's clean-foundation/exact-patch restoration clarification controls, not its donor RESTORE.md's conflicted-merge route.
+All eight former workers remain stopped/finished. C1 executor alone owns heavy runtime; A handles the remaining binding and later actual results. Mobile tree377e4b7a on acceptedbc7 is independently source-grantable, A0/B0; J3 waits for UX-01's truthful Later/persistence contract, not Bradley. Extension tree3750a2ea is source-grantable after a one-line border-contrast A01 closure. UX-07 details are complete. No UX runtime/commit or PG fixture/cluster/run is authorized yet.
+
+This sandbox began without old worktrees/dependencies/PG; only C1's necessary source/tooling is now recovered. Missing-tool recovery does not reopen accepted S5. The master pause file's clean-foundation/exact-patch restoration route was followed; no conflicted merge was repeated.
 
 ## Continuation
 
-Current ordered sequence: binding review → exact writable recovery → frozen real-hook commit/targeted Jest → minimum reviewed fixture → existing C1-only22 PG proof → same-review dual actual-head/results attestations → C1 ACCEPTED. Then B/drain → R → N/Q1 → C and remaining S7; reuse accepted E/T-Q0.
+Next: ordinary commit/targeted Jest remainder using genuine installed hooks → minimum reviewed fixture → existing C1-only22 PG proof → same-review dual actual-head/results attestations → C1 ACCEPTED. Then B/drain → R → N/Q1 → C and remaining S7; reuse accepted E/T-Q0.
 
 Continue S8 native writers, S9 relationships/reconciliation, S10 unseen-source induction, S11 complete customer/multi-host journey and S12 real acceptance/pilot. Universal mission is AI-assisted autonomous site/browser-agnostic acquisition through data-only PlatformBlueprints and deterministic native reconstruction; NEW SOURCE → CORE DIFF = 0, TrueCoach only a conformance target.
 

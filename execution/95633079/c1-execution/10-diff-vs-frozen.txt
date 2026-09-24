@@ -1,0 +1,85 @@
+2,9c2,13
+< # S7-2 C1 validation binding: install real hooks (offline lefthook), ordinary hooked commit of the frozen
+< # formatted candidate with the parent-approved message, then the existing targeted Jest suites only.
+< # Same persistent-launch/timeout pattern as s7-foundation-format/08-commit-launch-r2.sh: absolute paths,
+< # guards stop on mismatch (rc 70/71/72), each child bounded `timeout -k 30 600`, sentinel marks terminal.
+< # NOT to be launched before the dual source grants + explicit transfer. Launch (then):
+< #   setsid nohup bash /home/user/workspace/execution/e7d2385c/s7-c1-formatted/09-validate-launch.sh \
+< #     > /home/user/workspace/execution/e7d2385c/s7-c1-formatted/logs/09-launcher.out 2>&1 &
+< #   poll /home/user/workspace/execution/e7d2385c/s7-c1-formatted/logs/09-validate.sentinel
+---
+> # S7-2 C1 remaining-stage continuation after the frozen launcher's benign hook-path detector stop
+> # (09-validate.sentinel RC=71 STAGE=hooks-missing, Lefthook install child raw rc=0, hooks genuinely installed).
+> # Scope: ONLY the unexecuted remainder — original lines 46-47 (skipped post-install guards), stage 2 (ordinary
+> # hooked commit) and stage 3 (existing targeted Jest), unchanged commands/bounds/status handling/first-failure stop.
+> # NOT done here: lefthook install (already completed, raw rc 0), hook rewrite, source/env recovery, new tests, retry.
+> # The frozen launcher a57c224c… is unchanged and is NOT called. Its receipts (logs/09-*, sentinel) are preserved.
+> # Line 45's third predicate is replaced by an assertion on the ACTUAL installed native Lefthook route; the
+> # genuine-hook boundary is retained, not removed (executable pre-commit + commit-msg, real callable Lefthook
+> # 2.1.9 native binary referenced by both hooks, no bypass env, hooksPath unset).
+> # Launch: setsid nohup bash /home/user/workspace/execution/95633079/c1-execution/10-validate-continue.sh \
+> #   > /home/user/workspace/execution/e7d2385c/s7-c1-formatted/logs/10-launcher.out 2>&1 &
+> #   poll /home/user/workspace/execution/e7d2385c/s7-c1-formatted/logs/10-validate-continue.sentinel
+13c17
+< mkdir -p "$L"; log=$L/09-validate.log; sent=$L/09-validate.sentinel
+---
+> mkdir -p "$L"; log=$L/10-validate-continue.log; sent=$L/10-validate-continue.sentinel
+15c19
+< echo "START $(date -u +%FT%TZ) pid=$$ NODE_OPTIONS=$NODE_OPTIONS bound=600s/kill30 node=$(node -v)" > "$log"
+---
+> echo "START $(date -u +%FT%TZ) pid=$$ NODE_OPTIONS=$NODE_OPTIONS bound=600s/kill30 node=$(node -v) continuation-of=09-validate.sentinel(RC=71,STAGE=hooks-missing)" > "$log"
+18c22
+< # --- preconditions: exact candidate / identity / manifest / message guards (rc 70) ---
+---
+> # --- preconditions: unchanged rc70 guard set from the frozen launcher (lines 19-37) ---
+37a42,44
+> # frozen launcher and its failed first receipt must still be present and unmodified
+> [ "$(sha256sum "$P/09-validate-launch.sh" | cut -c1-64)" = a57c224c6e8e9364393318efaa99c33f4a90877287d7e1a7e370b1c75b220448 ] || stop precondition-frozen-launcher 70
+> grep -q '^RC=71 STAGE=hooks-missing ' "$L/09-validate.sentinel" || stop precondition-prior-receipt 70
+40,45c47,65
+< # --- stage 1: real hooks via the existing offline lefthook (no fetch: binary already in node_modules/lefthook-linux-x64) ---
+< echo "HOOKS_START $(date -u +%FT%TZ)" >> "$log"
+< timeout -k 30 600 ./node_modules/.bin/lefthook install >> "$log" 2>&1; rc=$?
+< echo "HOOKS_END $(date -u +%FT%TZ) rc=$rc" >> "$log"
+< [ $rc = 0 ] || stop hooks-install "$rc"
+< [ -x .git/hooks/pre-commit ] && [ -x .git/hooks/commit-msg ] && grep -q "$W/node_modules/.bin/lefthook" .git/hooks/pre-commit || stop hooks-missing 71
+---
+> # --- stage 1R: genuine-hook boundary bound to the ACTUAL installed route (no install, no hook rewrite) ---
+> # replaces frozen line 45's `.bin/lefthook` string predicate only; all other hook requirements retained.
+> echo "HOOKS_VERIFY_START $(date -u +%FT%TZ)" >> "$log"
+> [ -x .git/hooks/pre-commit ] && [ -x .git/hooks/commit-msg ] || stop hooks-missing 71
+> [ "$(sha256sum .git/hooks/pre-commit | cut -c1-64)" = a868b3a9ee25a048ca80c26b875e2b41b829f7d7fe325b2c3b585e3a368aef46 ] || stop hooks-pre-commit-bytes 71
+> [ "$(sha256sum .git/hooks/commit-msg | cut -c1-64)" = a46fa3984a49a61212e9ed239cde4e0e6642cc89a708c92e766cbd0fc64686f8 ] || stop hooks-commit-msg-bytes 71
+> grep -q "$W/node_modules/lefthook-linux-x64/bin/lefthook" .git/hooks/pre-commit || stop hooks-native-path-pre-commit 71
+> grep -q "$W/node_modules/lefthook-linux-x64/bin/lefthook" .git/hooks/commit-msg || stop hooks-native-path-commit-msg 71
+> grep -q 'call_lefthook run "pre-commit"' .git/hooks/pre-commit || stop hooks-run-pre-commit 71
+> grep -q 'call_lefthook run "commit-msg"' .git/hooks/commit-msg || stop hooks-run-commit-msg 71
+> [ -x node_modules/lefthook-linux-x64/bin/lefthook ] || stop hooks-native-binary 71
+> [ "$(sha256sum node_modules/lefthook-linux-x64/bin/lefthook | cut -c1-64)" = 974486e94169a44b38d60e4d26491ed205416ca16c93621f8f69b52d401c3a79 ] || stop hooks-native-binary-bytes 71
+> [ "$(timeout -k 30 60 node_modules/lefthook-linux-x64/bin/lefthook version)" = 2.1.9 ] || stop hooks-native-version 71
+> # no-bypass context: the generated hooks honour LEFTHOOK / LEFTHOOK_BIN and PATH discovery before their native fallback
+> [ -z "${LEFTHOOK:-}" ] || stop hooks-bypass-LEFTHOOK 71
+> [ -z "${LEFTHOOK_BIN:-}" ] || stop hooks-bypass-LEFTHOOK_BIN 71
+> command -v lefthook >/dev/null 2>&1 && stop hooks-path-shadow 71
+> [ ! -e lefthook-local.yml ] && [ ! -e .lefthook-local.yml ] || stop hooks-local-override 71
+> # frozen lines 46-47, skipped by the first launch, now executed unchanged
+47a68
+> echo "HOOKS_VERIFY_OK $(date -u +%FT%TZ) pre-commit=a868b3a9 commit-msg=a46fa398 native=lefthook-linux-x64 2.1.9" >> "$log"
+49c70
+< # --- stage 2: ordinary hooked commit (real pre-commit + commit-msg; no --no-verify) ---
+---
+> # --- stage 2: ordinary hooked commit (real pre-commit + commit-msg; no --no-verify) — unchanged from frozen lines 50-61 ---
+63c84
+< # --- stage 3: existing targeted Jest only (default config; test/rls-*.spec.ts is ignored by that config) ---
+---
+> # --- stage 3: existing targeted Jest only (default config; test/rls-*.spec.ts is ignored by that config) — unchanged from frozen lines 64-70 ---
+65c86
+< timeout -k 30 600 ./node_modules/.bin/jest --ci --runInBand test/contracts/importer-contract.spec.ts src/extension-pair/__tests__ > "$L/09-jest.log" 2>&1; rc=$?
+---
+> timeout -k 30 600 ./node_modules/.bin/jest --ci --runInBand test/contracts/importer-contract.spec.ts src/extension-pair/__tests__ > "$L/10-jest.log" 2>&1; rc=$?
+67,68c88,89
+< grep -E '^(Test Suites|Tests|Snapshots|Time):' "$L/09-jest.log" >> "$log" 2>/dev/null
+< grep -E '^(PASS|FAIL) ' "$L/09-jest.log" >> "$log" 2>/dev/null
+---
+> grep -E '^(Test Suites|Tests|Snapshots|Time):' "$L/10-jest.log" >> "$log" 2>/dev/null
+> grep -E '^(PASS|FAIL) ' "$L/10-jest.log" >> "$log" 2>/dev/null

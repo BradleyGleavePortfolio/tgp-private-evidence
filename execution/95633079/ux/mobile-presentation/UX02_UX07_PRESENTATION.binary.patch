@@ -1,0 +1,1074 @@
+diff --git a/src/screens/coach/SettingsScreen.tsx b/src/screens/coach/SettingsScreen.tsx
+index 77c5749..c8bcb5f 100644
+--- a/src/screens/coach/SettingsScreen.tsx
++++ b/src/screens/coach/SettingsScreen.tsx
+@@ -365,7 +365,7 @@ export default function SettingsScreen() {
+               testID="settings-import-data"
+             >
+               <Ionicons name="cloud-download-outline" size={20} color={colors.textSecondary} />
+-              <Text style={styles.rowLabel}>Import Data</Text>
++              <Text style={styles.rowLabel}>Import my records</Text>
+               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+             </TouchableOpacity>
+             <View style={styles.divider} />
+diff --git a/src/screens/coach/import-journey/ImportOfferCard.tsx b/src/screens/coach/import-journey/ImportOfferCard.tsx
+new file mode 100644
+index 0000000..f20456f
+--- /dev/null
++++ b/src/screens/coach/import-journey/ImportOfferCard.tsx
+@@ -0,0 +1,54 @@
++import React from 'react';
++import { StyleSheet, Text, View } from 'react-native';
++import { useTheme } from '../../../theme/useTheme';
++import { radius, spacing, typography } from '../../../theme/tokens';
++import { ImportAddressForm, importJourneyCopy as t, importOfferQuestion } from './importJourneyCopy';
++import { ImportJourneyAction, ImportJourneyPortrait, ui, useImportHeadingFocus } from './importJourneyUI';
++
++type OfferPresentation = {
++  romanEnabled: boolean;
++  addressForm?: ImportAddressForm;
++  /** Only true for entry caused by an explicit user action, never a home impression. */
++  focusOnMount?: boolean;
++};
++
++export type ImportOfferCardProps = OfferPresentation & (
++  | { variant: 'question'; onYes: () => void; onStartingFresh: () => void; onLater: () => void }
++  | { variant: 'value'; onImportRecords: () => void; onBack: () => void; onLater: () => void }
++  | { variant: 'resume'; onResume: () => void }
++);
++
++/** Controlled inline card. Its host supplies scrolling and owns all decisions. */
++export function ImportOfferCard(props: ImportOfferCardProps) {
++  const { semanticColors: c } = useTheme();
++  const headingRef = useImportHeadingFocus(props.variant, props.focusOnMount ?? false);
++  return (
++    <View style={[styles.card, props.variant === 'resume' && styles.resume, { backgroundColor: c.bgSurface, borderColor: c.border }]}>
++      {props.romanEnabled && <ImportJourneyPortrait />}
++      {props.variant !== 'resume' && (
++        <Text ref={headingRef} accessibilityRole="header" style={[typography.h2, ui.text, { color: c.textPrimary }]}>
++          {props.variant === 'question' ? importOfferQuestion(props.romanEnabled, props.addressForm) : t('offer.value')}
++        </Text>
++      )}
++      <View style={[ui.actions, props.variant === 'resume' && styles.resumeAction]}>
++        {props.variant === 'question' && <>
++          <ImportJourneyAction primary label={t('offer.yes')} onPress={props.onYes} />
++          <ImportJourneyAction label={t('offer.fresh')} onPress={props.onStartingFresh} />
++          <ImportJourneyAction label={t('common.later')} onPress={props.onLater} />
++        </>}
++        {props.variant === 'value' && <>
++          <ImportJourneyAction primary label={t('common.importRecords')} onPress={props.onImportRecords} />
++          <ImportJourneyAction label={t('common.later')} onPress={props.onLater} />
++          <ImportJourneyAction label={t('common.back')} onPress={props.onBack} />
++        </>}
++        {props.variant === 'resume' && <ImportJourneyAction label={t('offer.resume')} onPress={props.onResume} />}
++      </View>
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  resume: { flexDirection: 'row', alignItems: 'center' },
++  resumeAction: { flex: 1 },
++  card: { padding: spacing.lg, gap: spacing.lg, borderWidth: 1, borderRadius: radius.lg, width: '100%', maxWidth: 560, alignSelf: 'center' },
++});
+diff --git a/src/screens/coach/import-journey/ImportSetupView.tsx b/src/screens/coach/import-journey/ImportSetupView.tsx
+new file mode 100644
+index 0000000..2358478
+--- /dev/null
++++ b/src/screens/coach/import-journey/ImportSetupView.tsx
+@@ -0,0 +1,176 @@
++import React, { useState } from 'react';
++import { I18nManager, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
++import { useSafeAreaInsets } from 'react-native-safe-area-context';
++import { CUSTOM_PLATFORM_ID, IMPORT_PLATFORMS, findImportPlatform } from '../../../constants/importPlatforms';
++import { useTheme } from '../../../theme/useTheme';
++import { radius, spacing, typography } from '../../../theme/tokens';
++import { safeImportLoginUrl } from '../../../utils/safeImportLoginUrl';
++import { importJourneyCopy as t } from './importJourneyCopy';
++import { ImportJourneyAction, ImportJourneyPortrait, ui, useImportHeadingFocus } from './importJourneyUI';
++
++type SetupPresentation = {
++  romanEnabled: boolean;
++  onBack: () => void;
++  onLater: () => void;
++  /** Explicit user entry only; a rerender does not request focus again. */
++  focusOnMount?: boolean;
++};
++type SourceInputs = {
++  selectedSourceId: string | null;
++  customSourceUrl: string;
++  validation: 'idle' | 'invalid';
++  onSourceChange: (id: string) => void;
++  onCustomSourceChange: (text: string) => void;
++  onCustomSourceBlur: () => void;
++  onContinue: () => void;
++};
++
++/** UI inputs only. These are not backend DTOs, setup states, or eligibility. */
++export type ImportSetupViewProps = SetupPresentation & (
++  | ({ step: 'source' } & SourceInputs)
++  | ({ step: 'customSource' } & SourceInputs & { selectedSourceId: typeof CUSTOM_PLATFORM_ID })
++  | { step: 'computerHandoff'; selectedSourceId: string }
++);
++
++export function ImportSetupView(props: ImportSetupViewProps) {
++  const { semanticColors: c } = useTheme();
++  const insets = useSafeAreaInsets();
++  const headingRef = useImportHeadingFocus(props.step, props.focusOnMount ?? false);
++  const [inputFocused, setInputFocused] = useState(false);
++  const selected = props.selectedSourceId ? findImportPlatform(props.selectedSourceId) : undefined;
++  const customValid = props.step === 'customSource' && safeImportLoginUrl(props.customSourceUrl) !== null;
++  const canContinue = props.step === 'source' ? selected != null : customValid;
++  const invalid = props.step === 'customSource' && props.validation === 'invalid' && !customValid;
++
++  return (
++    <KeyboardAvoidingView
++      style={[styles.shell, { backgroundColor: c.bgPrimary }]}
++      enabled={props.step === 'customSource'}
++      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
++    >
++      <ScrollView
++        contentContainerStyle={styles.scrollContent}
++        keyboardShouldPersistTaps="handled"
++        keyboardDismissMode="on-drag"
++        automaticallyAdjustContentInsets={false}
++        contentInsetAdjustmentBehavior="never"
++      >
++        <View style={[styles.content, {
++          paddingTop: Math.max(insets.top, spacing.lg),
++          paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.lg,
++          paddingStart: Math.max(I18nManager.isRTL ? insets.right : insets.left, spacing.xl),
++          paddingEnd: Math.max(I18nManager.isRTL ? insets.left : insets.right, spacing.xl),
++        }]}>
++          <View style={styles.header}>
++            <View style={styles.back}><ImportJourneyAction label={t('common.back')} onPress={props.onBack} /></View>
++            <Text style={[typography.bodyMd, styles.headerTitle, ui.text, { color: c.textPrimary }]}>{t('common.setupTitle')}</Text>
++          </View>
++          <View style={styles.introduction}>
++            {props.romanEnabled && <ImportJourneyPortrait />}
++            <Text ref={headingRef} accessibilityRole="header" style={[typography.h1, ui.text, { color: c.textPrimary }]}>
++              {t(props.step === 'computerHandoff' ? 'handoff.title' : 'source.title')}
++            </Text>
++            {props.step === 'computerHandoff' && selected && (
++              <Text style={[typography.bodyMd, ui.text, { color: c.textPrimary }]}>
++                {t('handoff.source', { sourceName: selected.label })}
++              </Text>
++            )}
++            <Text style={[typography.body, ui.text, { color: c.textPrimary }]}>
++              {t(props.step === 'computerHandoff' ? 'handoff.body' : 'source.body')}
++            </Text>
++          </View>
++          {props.step === 'computerHandoff' ? <>
++            <View style={styles.steps}>
++              {(['handoff.stepOne', 'handoff.stepTwo', 'handoff.stepThree'] as const).map((key, index) => (
++                <View key={key} style={styles.instruction}>
++                  <Text accessible={false} importantForAccessibility="no" style={[typography.bodyMd, { color: c.textMuted }]}>{index + 1}</Text>
++                  <Text style={[typography.body, styles.flexText, ui.text, { color: c.textPrimary }]}>{t(key)}</Text>
++                </View>
++              ))}
++            </View>
++            <ImportJourneyAction label={t('handoff.noComputer')} onPress={props.onLater} />
++          </> : <>
++            <View accessibilityRole="radiogroup" style={ui.actions}>
++              {IMPORT_PLATFORMS.map((platform) => (
++                <SourceChoice key={platform.id} label={platform.label} selected={props.selectedSourceId === platform.id} onPress={() => props.onSourceChange(platform.id)} />
++              ))}
++            </View>
++            {props.step === 'customSource' && (
++              <View style={styles.custom}>
++                <Text nativeID="import-site-label" style={[typography.bodyMd, ui.text, { color: c.textPrimary }]}>{t('source.customLabel')}</Text>
++                <View style={[ui.focusFrame, { borderColor: inputFocused ? c.textPrimary : 'transparent' }]}>
++                  <TextInput
++                    accessibilityLabel={t('source.customLabel')}
++                    accessibilityLabelledBy="import-site-label"
++                    accessibilityHint={t(invalid ? 'source.invalid' : 'source.customHint')}
++                    value={props.customSourceUrl}
++                    onChangeText={props.onCustomSourceChange}
++                    onFocus={() => setInputFocused(true)}
++                    onBlur={() => { setInputFocused(false); props.onCustomSourceBlur(); }}
++                    keyboardType="url"
++                    autoCapitalize="none"
++                    autoCorrect={false}
++                    spellCheck={false}
++                    autoComplete="off"
++                    multiline
++                    scrollEnabled={false}
++                    style={[typography.body, styles.input, { color: c.textPrimary, backgroundColor: c.bgSurface, borderColor: c.textMuted }]}
++                  />
++                </View>
++                <Text style={[typography.bodySmall, ui.text, { color: c.textMuted }]}>{t('source.customHint')}</Text>
++                <Text style={[typography.bodySmall, ui.text, { color: c.textMuted }]}>{t('source.noCredentials')}</Text>
++                {invalid && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[typography.bodySmall, ui.text, { color: c.textPrimary }]}>{t('source.invalid')}</Text>}
++              </View>
++            )}
++            <Text style={[typography.bodySmall, ui.text, { color: c.textMuted }]}>{t('source.note')}</Text>
++            <View style={ui.actions}>
++              <ImportJourneyAction primary label={t('source.continue')} disabled={!canContinue} hint={!canContinue ? t(props.step === 'customSource' ? (invalid ? 'source.invalid' : 'source.customHint') : 'source.body') : undefined} onPress={props.onContinue} />
++              <ImportJourneyAction label={t('common.later')} onPress={props.onLater} />
++            </View>
++          </>}
++        </View>
++      </ScrollView>
++    </KeyboardAvoidingView>
++  );
++}
++
++function SourceChoice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
++  const { semanticColors: c } = useTheme();
++  const [focused, setFocused] = useState(false);
++  return (
++    <View style={[ui.focusFrame, { borderColor: focused ? c.textPrimary : 'transparent' }]}>
++      <Pressable
++        accessibilityRole="radio"
++        accessibilityLabel={label}
++        accessibilityState={{ checked: selected, selected }}
++        onPress={onPress}
++        onFocus={() => setFocused(true)}
++        onBlur={() => setFocused(false)}
++        style={({ pressed }) => [styles.source, { backgroundColor: pressed ? c.disabledBg : c.bgSurface, borderColor: selected ? c.textPrimary : c.textMuted }]}
++      >
++        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.radio, { borderColor: c.textPrimary }]}>
++          {selected && <View style={[styles.radioDot, { backgroundColor: c.textPrimary }]} />}
++        </View>
++        <Text style={[typography.bodyMd, styles.flexText, ui.text, { color: c.textPrimary }]}>{label}</Text>
++      </Pressable>
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  shell: { flex: 1 },
++  scrollContent: { flexGrow: 1, alignItems: 'center' },
++  content: { width: '100%', maxWidth: 560, gap: spacing.xl },
++  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
++  back: { maxWidth: '45%', flexShrink: 1 },
++  headerTitle: { flex: 1 },
++  introduction: { gap: spacing.md },
++  source: { minHeight: 56, minWidth: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.lg, padding: spacing.lg, borderWidth: 1, borderRadius: radius.lg },
++  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
++  radioDot: { width: 8, height: 8, borderRadius: 4 },
++  flexText: { flex: 1, flexShrink: 1 },
++  custom: { gap: spacing.sm },
++  input: { minHeight: 48, minWidth: 48, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, textAlign: 'left', writingDirection: 'ltr' },
++  steps: { gap: spacing.xl },
++  instruction: { flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start' },
++});
+diff --git a/src/screens/coach/import-journey/README.md b/src/screens/coach/import-journey/README.md
+new file mode 100644
+index 0000000..c30fc35
+--- /dev/null
++++ b/src/screens/coach/import-journey/README.md
+@@ -0,0 +1,99 @@
++# Roman importer — private P1 presentation
++
++Controlled leaf views only. **Not registered, production-reachable, integrated,
++reviewed, or product-accepted.** This directory does not replace the live importer.
++The test host is confined to `__tests__/ImportJourney.navigation.test.tsx`.
++
++## Inputs and ownership
++
++- `ImportOfferCard`: `question`, `value`, or compact `resume`; explicit
++  `romanEnabled`, optional `addressForm` (neutral by default); separate host
++  callbacks. `sir` only changes the question when Roman is enabled. First-person
++  action labels are the coach's choices, not Roman's claims. Roman-off removes
++  the portrait. No component owns eligibility or a persisted offer decision.
++- `ImportSetupView`: `source`, `customSource`, or instructional
++  `computerHandoff`. Selection, custom text and feedback are controlled inputs.
++  `validation="invalid"` requests feedback after blur; validity/Continue uses
++  the unchanged `safeImportLoginUrl`. It is format feedback, not compatibility,
++  DNS resolution, origin permission, credential safety or migration authority.
++- Selecting a row invokes `onSourceChange(id)` only. The test host switches to
++  `customSource` when Custom / Other is selected; a source view with Custom
++  selected can Continue back to that input. The host determines Back behavior
++  and preserves selection/text. Header Back only calls `onBack`; a future
++  authorized host must bind hardware/gesture Back to that same callback.
++- Handoff uses the existing catalog's human label (including Custom / Other),
++  never the custom URL/path/query. It renders three instructions and Back/Later
++  only. No issued link, code, waiting state, saved preference or completion is
++  invented. `onLater` does not mean a preference was saved.
++- `focusOnMount` defaults false. Set it only for explicit user entry. A controlled
++  step/variant change requests heading accessibility focus once; same-state
++  rerenders do not. Real VoiceOver/TalkBack behavior still needs device proof.
++- `ImportOfferCard` expects a scrollable host. `ImportSetupView` owns a single
++  scroll area, keyboard avoidance and safe-area/header spacing. Mount it in a
++  `SafeAreaProvider` with no second consuming header/inset wrapper. The app's
++  existing font/theme providers remain host responsibilities; this module does
++  not mount identity/preferences providers. URL text remains LTR; surrounding
++  spacing uses start/end and respects RTL safe-area ordering.
++
++`importJourneyUI.tsx` contains only shared leaf styling, actions, portrait and
++heading-focus behavior. It introduces no task/provider/store architecture.
++English copy is centralized in `i18n/en.json` with typed lookup and a typed sole
++placeholder; initial English-only authoring is not translation coverage. There
++are no P1 counters/plurals because run/result presentation is not this slice.
++
++## Reused inputs
++
++[Mobile base a5933fd](https://github.com/BradleyGleavePortfolio/growth-project-mobile/commit/a5933fd6de5616493de75f0db907098b149b955c):
++`RomanAvatar` neutral/48 and bundled fallback; `theme/useTheme` semantic colors;
++`theme/tokens` spacing, typography, forest/pressed fill and geometry;
++`constants/importPlatforms`; `utils/safeImportLoginUrl`; feature-local typed
++English lookup convention from `screens/day-one/i18n/strings.ts`.
++
++[Canonical G01–G22](https://github.com/BradleyGleavePortfolio/tgp-agent-context/blob/160928b98c57a6034cd8b7bcfba537e81c63f054/AGENT_RULES.md)
++supersedes stale generic quota/review ceremony in mobile doctrine. The approved
++P1 mandate deliberately leaves these leaves unreachable and confines module
++documentation here; it does not authorize navigator or shared README changes.
++
++## Verification
++
++```sh
++npm test -- --runInBand src/screens/coach/import-journey/__tests__
++npx --no-install eslint src/screens/coach/import-journey --ext .ts,.tsx
++npm run typecheck
++git diff --check
++```
++
++Tests target controlled callback isolation, all local traversal/actions,
++header/hardware Back, catalog names/selection, invalid and valid custom input,
++exact copy, explicit voice, monogram fallback, minimum target declarations,
++focus styles, actual semantic contrast pairs, and scalable trees under width,
++font-scale, RTL and +40% pseudo-copy fixtures. Shared CJS test guards throw on
++known API/pairing/auth/storage/analytics/Linking/Clipboard/Share/network calls;
++a negative control verifies those guards. The theme hook is injected, not a live
++identity/preferences provider. Guards are not a claim about the existing app's
++provider initialization or every possible native side effect.
++
++Verification completed on the unchanged committed lock with CI's Node 22.13.0:
++focused RNTL/Jest (4 suites, 69 tests), scoped repository ESLint and whole-repo
++TypeScript pass. Initial missing-tool/global-ESLint failures were environment
++failures, not a broken committed lock; `npm ci --ignore-scripts --no-audit --no-fund`
++succeeded without manifest or lock changes. See the external handoff evidence
++for exact commands, versions, exits and intermediate builder fixes.
++
++An external test-only harness rendered these actual TSX components using the
++installed React Native Web adapter, real fonts/assets, an injected theme hook
++and zero safe-area insets. Chromium checks at 320/375/430, light/dark and CSS
++1x/2x text found no measured horizontal overflow or sub-48px targets; final
++actions remained scroll-reachable. Representative screenshots include RTL and
++Roman-off. Local rendered traversal also passes. CSS doubled text is **not**
++native OS 200% text, and browser geometry is **not** Yoga/device proof. The hook
++skips `findNodeHandle` on web because RNWeb throws for that native-only API;
++web heading-focus equivalence is not claimed. Native focus-request policy is
++unit-tested with mocked handles, not delivered to a real screen reader.
++
++**Unverified hold:** native 320/375/430 layout, OS 200% text, iOS/Android keyboard
++avoidance, notches/landscape, native RTL and pseudo-localization clipping,
++VoiceOver/TalkBack order/focus/announcements, and reduced-motion device behavior
++remain pending. No emulator or physical-device screenshots are claimed. The
++Tier 1 independent review is also pending. This is a private source candidate,
++not integrated functionality, product acceptance or release authorization.
+diff --git a/src/screens/coach/import-journey/__tests__/ImportJourney.navigation.test.tsx b/src/screens/coach/import-journey/__tests__/ImportJourney.navigation.test.tsx
+new file mode 100644
+index 0000000..04c9a42
+--- /dev/null
++++ b/src/screens/coach/import-journey/__tests__/ImportJourney.navigation.test.tsx
+@@ -0,0 +1,152 @@
++import './sideEffectGuards.cjs';
++import React, { useEffect, useState } from 'react';
++import { BackHandler, ScrollView, Text } from 'react-native';
++import { act, cleanup, fireEvent, render } from '@testing-library/react-native';
++import { ImportOfferCard } from '../ImportOfferCard';
++import { ImportSetupView } from '../ImportSetupView';
++import { findImportPlatform } from '../../../../constants/importPlatforms';
++import { safeImportLoginUrl } from '../../../../utils/safeImportLoginUrl';
++const guards = require('./sideEffectGuards.cjs');
++
++type LocalStep = 'question' | 'value' | 'source' | 'customSource' | 'computerHandoff' | 'home';
++/** Test-only, in-memory host; never exported or registered in a navigator. */
++function LocalTraversalHost({ onExit }: { onExit: (reason: 'fresh' | 'later') => void }) {
++  const [step, setStep] = useState<LocalStep>('question');
++  const [selectedSourceId, setSource] = useState<string | null>(null);
++  const [customSourceUrl, setUrl] = useState('');
++  const [validation, setValidation] = useState<'idle' | 'invalid'>('idle');
++  const [deferred, setDeferred] = useState(false);
++  const back = () => {
++    if (step === 'computerHandoff') setStep(selectedSourceId === 'custom' ? 'customSource' : 'source');
++    else if (step === 'customSource') setStep('source');
++    else if (step === 'source') setStep('value');
++    else if (step === 'value') setStep('question');
++    else setStep('home');
++  };
++  useEffect(() => {
++    const listener = BackHandler.addEventListener('hardwareBackPress', () => {
++      if (step === 'home') return false;
++      back();
++      return true;
++    });
++    return () => listener.remove();
++  });
++  const exit = (reason: 'fresh' | 'later') => {
++    setDeferred(reason === 'later');
++    setStep('home');
++    onExit(reason);
++  };
++  const onLater = () => exit('later');
++  if (step === 'home') return <ScrollView>
++    <Text>Mock coaching home</Text>
++    {deferred && <ImportOfferCard variant="resume" romanEnabled onResume={() => setStep('source')} />}
++  </ScrollView>;
++  if (step === 'question' || step === 'value') return <ScrollView>
++    {step === 'question'
++      ? <ImportOfferCard variant="question" romanEnabled onYes={() => setStep('value')} onStartingFresh={() => exit('fresh')} onLater={onLater} />
++      : <ImportOfferCard variant="value" romanEnabled onImportRecords={() => setStep('source')} onBack={back} onLater={onLater} />}
++  </ScrollView>;
++  if (step === 'computerHandoff') return <ImportSetupView step="computerHandoff" selectedSourceId={selectedSourceId!} romanEnabled focusOnMount onBack={back} onLater={onLater} />;
++  const inputs = {
++    romanEnabled: true, focusOnMount: true, selectedSourceId, customSourceUrl, validation,
++    onBack: back, onLater,
++    onSourceChange: (id: string) => { setSource(id); setStep(id === 'custom' ? 'customSource' : 'source'); },
++    onCustomSourceChange: (text: string) => { setUrl(text); setValidation('idle'); },
++    onCustomSourceBlur: () => setValidation(safeImportLoginUrl(customSourceUrl) ? 'idle' : 'invalid'),
++    onContinue: () => {
++      if (step === 'source' && selectedSourceId === 'custom') setStep('customSource');
++      else if (selectedSourceId && findImportPlatform(selectedSourceId) && (selectedSourceId !== 'custom' || safeImportLoginUrl(customSourceUrl))) setStep('computerHandoff');
++    },
++  };
++  return step === 'customSource'
++    ? <ImportSetupView {...inputs} step="customSource" selectedSourceId="custom" />
++    : <ImportSetupView {...inputs} step="source" />;
++}
++
++let hardwareBack: (() => boolean | null | undefined) | undefined;
++beforeEach(() => {
++  guards.installGuards();
++  hardwareBack = undefined;
++  jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, callback) => {
++    hardwareBack = callback;
++    return { remove: jest.fn() };
++  });
++});
++afterEach(async () => {
++  await cleanup();
++  try { guards.assertNoSideEffects(); } finally { jest.restoreAllMocks(); }
++});
++
++it('verifies that every forbidden side-effect guard really throws', () => guards.exerciseGuards());
++
++it('traverses Yes → value → source → handoff, with equivalent header/hardware Back and retained selection', async () => {
++  const onExit = jest.fn();
++  const view = await render(<LocalTraversalHost onExit={onExit} />);
++  const press = async (name: string) => fireEvent.press(view.getByRole('button', { name }));
++  await press('Yes');
++  expect(view.getByRole('header')).toHaveTextContent('Would you like to bring your clients and coaching history into TGP?');
++  await press('Import my records');
++  await fireEvent.press(view.getByRole('radio', { name: 'TrueCoach' }));
++  await press('Continue');
++  expect(view.getByRole('header')).toHaveTextContent('Continue on a computer');
++  await press('Back');
++  expect(view.getByRole('radio', { name: 'TrueCoach' }).props.accessibilityState.checked).toBe(true);
++  await press('Continue');
++  await act(() => { expect(hardwareBack?.()).toBe(true); });
++  expect(view.getByRole('radio', { name: 'TrueCoach' }).props.accessibilityState.checked).toBe(true);
++  await press('Back');
++  expect(view.getByRole('header')).toHaveTextContent('Would you like to bring your clients and coaching history into TGP?');
++  await press('Back');
++  expect(view.getByRole('header')).toHaveTextContent('Have you coached on another platform before?');
++  expect(onExit).not.toHaveBeenCalled();
++});
++
++it('retains custom input, gives inline feedback, and only advances a valid address to instructions', async () => {
++  const view = await render(<LocalTraversalHost onExit={jest.fn()} />);
++  for (const name of ['Yes', 'Import my records']) await fireEvent.press(view.getByRole('button', { name }));
++  await fireEvent.press(view.getByRole('radio', { name: 'Custom / Other' }));
++  await fireEvent.changeText(view.getByLabelText('Site address'), 'http://127.0.0.1');
++  await fireEvent(view.getByLabelText('Site address'), 'blur');
++  expect(view.getByRole('alert')).toHaveTextContent('Enter a valid public HTTPS address.');
++  expect(view.getByRole('button', { name: 'Continue' })).toBeDisabled();
++  const address = 'https://coaching.example.com/login?private=never-display-in-handoff';
++  await fireEvent.changeText(view.getByLabelText('Site address'), address);
++  await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  expect(view.getByRole('header')).toHaveTextContent('Continue on a computer');
++  expect(view.queryByText(/never-display/)).toBeNull();
++  await fireEvent.press(view.getByRole('button', { name: 'Back' }));
++  expect(view.getByLabelText('Site address').props.value).toBe(address);
++  await fireEvent.press(view.getByRole('button', { name: 'Back' }));
++  expect(view.queryByLabelText('Site address')).toBeNull();
++  expect(view.getByRole('radio', { name: 'Custom / Other' }).props.accessibilityState.checked).toBe(true);
++  await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  expect(view.getByLabelText('Site address').props.value).toBe(address);
++});
++
++it.each(['question', 'value', 'source', 'customSource', 'computerHandoff'] as const)('Later exits %s only to the mock host, with no saved claim', async target => {
++  const onExit = jest.fn();
++  const view = await render(<LocalTraversalHost onExit={onExit} />);
++  if (target !== 'question') await fireEvent.press(view.getByRole('button', { name: 'Yes' }));
++  if (!['question', 'value'].includes(target)) await fireEvent.press(view.getByRole('button', { name: 'Import my records' }));
++  if (target === 'customSource') await fireEvent.press(view.getByRole('radio', { name: 'Custom / Other' }));
++  if (target === 'computerHandoff') {
++    await fireEvent.press(view.getByRole('radio', { name: 'Everfit' }));
++    await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  }
++  await fireEvent.press(view.getByRole('button', { name: target === 'computerHandoff' ? 'I will use a computer later' : 'Later' }));
++  expect(view.getByText('Mock coaching home')).toBeTruthy();
++  expect(onExit.mock.calls).toEqual([['later']]);
++  expect(view.queryByText(/saved|copied|running|complete/i)).toBeNull();
++  await fireEvent.press(view.getByRole('button', { name: 'Continue import setup' }));
++  expect(view.getByRole('header')).toHaveTextContent('Where are your records?');
++  expect(onExit.mock.calls).toEqual([['later']]);
++});
++
++it('starting fresh exits once and leaves normal mock coaching home, without a promotion', async () => {
++  const onExit = jest.fn();
++  const view = await render(<LocalTraversalHost onExit={onExit} />);
++  await fireEvent.press(view.getByRole('button', { name: 'I am starting fresh' }));
++  expect(view.getByText('Mock coaching home')).toBeTruthy();
++  expect(view.queryByRole('button')).toBeNull();
++  expect(onExit.mock.calls).toEqual([['fresh']]);
++});
+diff --git a/src/screens/coach/import-journey/__tests__/ImportOfferCard.test.tsx b/src/screens/coach/import-journey/__tests__/ImportOfferCard.test.tsx
+new file mode 100644
+index 0000000..cbaa44c
+--- /dev/null
++++ b/src/screens/coach/import-journey/__tests__/ImportOfferCard.test.tsx
+@@ -0,0 +1,112 @@
++import './sideEffectGuards.cjs';
++import React from 'react';
++import { StyleSheet, Text } from 'react-native';
++import { cleanup, fireEvent, render, renderHook } from '@testing-library/react-native';
++import { ImportOfferCard } from '../ImportOfferCard';
++import { ImportJourneyAction, useImportHeadingFocus } from '../importJourneyUI';
++import { darkTokens, lightTokens } from '../../../../theme/tokens';
++const guards = require('./sideEffectGuards.cjs');
++const Native = require('react-native') as typeof import('react-native');
++
++beforeEach(() => guards.installGuards());
++afterEach(async () => {
++  await cleanup();
++  try { guards.assertNoSideEffects(); } finally { jest.restoreAllMocks(); }
++});
++
++it.each([
++  [true, undefined, 'Have you coached on another platform before?'],
++  [true, 'neutral', 'Have you coached on another platform before?'],
++  [true, 'sir', 'Have you coached on another platform before, sir?'],
++  [false, 'sir', 'Have you coached on another platform before?'],
++] as const)('uses explicit voice preference: Roman=%s address=%s', async (romanEnabled, addressForm, question) => {
++  const view = await render(<ImportOfferCard variant="question" romanEnabled={romanEnabled} addressForm={addressForm} onYes={jest.fn()} onStartingFresh={jest.fn()} onLater={jest.fn()} />);
++  expect(view.getByRole('header')).toHaveTextContent(question);
++  expect(view.queryAllByRole('image', { name: 'Roman' })).toHaveLength(romanEnabled ? 1 : 0);
++});
++
++it('dispatches Yes, starting fresh, and Later separately, without changing controlled state', async () => {
++  const onYes = jest.fn(), onStartingFresh = jest.fn(), onLater = jest.fn();
++  const view = await render(<ImportOfferCard variant="question" romanEnabled onYes={onYes} onStartingFresh={onStartingFresh} onLater={onLater} />);
++  await fireEvent.press(view.getByRole('button', { name: 'Yes' }));
++  expect([onYes.mock.calls.length, onStartingFresh.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 0, 0]);
++  expect(view.getByRole('header')).toHaveTextContent('Have you coached on another platform before?');
++  await fireEvent.press(view.getByRole('button', { name: 'I am starting fresh' }));
++  expect([onYes.mock.calls.length, onStartingFresh.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 1, 0]);
++  await fireEvent.press(view.getByRole('button', { name: 'Later' }));
++  expect([onYes.mock.calls.length, onStartingFresh.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 1, 1]);
++});
++
++it('dispatches every value and resume action exactly once, without a saved/result claim', async () => {
++  const onImportRecords = jest.fn(), onBack = jest.fn(), onLater = jest.fn(), onResume = jest.fn();
++  const view = await render(<ImportOfferCard variant="value" romanEnabled={false} onImportRecords={onImportRecords} onBack={onBack} onLater={onLater} />);
++  expect(view.getByRole('header')).toHaveTextContent('Would you like to bring your clients and coaching history into TGP?');
++  for (const name of ['Import my records', 'Back', 'Later']) await fireEvent.press(view.getByRole('button', { name }));
++  expect([onImportRecords.mock.calls.length, onBack.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 1, 1]);
++  await view.rerender(<ImportOfferCard variant="resume" romanEnabled={false} onResume={onResume} />);
++  expect(view.getAllByRole('button')).toHaveLength(1);
++  await fireEvent.press(view.getByRole('button', { name: 'Continue import setup' }));
++  expect(onResume.mock.calls).toEqual([[]]);
++  expect(view.queryByText(/saved|copied|complete|running|ready/i)).toBeNull();
++});
++
++it.each(['light', 'dark'])('keeps %s controls readable, focus-visible, static and at least 48 logical pixels', async mode => {
++  guards.theme.mode = mode;
++  const c = mode === 'dark' ? darkTokens : lightTokens;
++  const view = await render(<ImportJourneyAction primary label="Import my records" onPress={jest.fn()} />);
++  const button = view.getByRole('button');
++  expect(StyleSheet.flatten(button.props.style)).toMatchObject({ minHeight: 48, minWidth: 48, borderColor: c.textMuted });
++  expect(StyleSheet.flatten(view.getByText('Import my records').props.style)).toMatchObject({ color: c.textOnAccent });
++  await fireEvent(button, 'focus');
++  expect(view.container.queryAll(node => node.type === 'View').some(node => { const style = StyleSheet.flatten(node.props.style); return style?.borderWidth === 2 && style.borderColor === c.textPrimary; })).toBe(true);
++  await fireEvent(button, 'blur');
++  expect(view.container.queryAll(node => node.type === 'View').some(node => { const style = StyleSheet.flatten(node.props.style); return style?.borderWidth === 2 && style.borderColor === c.textPrimary; })).toBe(false);
++  await view.rerender(<ImportJourneyAction primary disabled label="Continue" onPress={jest.fn()} />);
++  expect(view.getByRole('button')).toBeDisabled();
++  expect(StyleSheet.flatten(view.getByRole('button').props.style).backgroundColor).toBe(c.disabledBg);
++  expect(StyleSheet.flatten(view.getByText('Continue').props.style).color).toBe(c.textOnDisabled);
++});
++
++it('keeps one Roman announcement if the existing neutral portrait falls back to its monogram', async () => {
++  const view = await render(<ImportOfferCard variant="resume" romanEnabled onResume={jest.fn()} />);
++  const image = view.container.queryAll(node => node.props.onError && node.props.source)[0];
++  expect(StyleSheet.flatten(image.props.style)).toMatchObject({ width: 48, height: 48 });
++  await fireEvent(image, 'error');
++  expect(view.queryAllByRole('image', { name: 'Roman' })).toHaveLength(1);
++});
++
++// Request policy only: mocked handles do not establish real screen-reader delivery.
++it('requests native heading focus for explicit entry and transitions, not ordinary rerenders', async () => {
++  const handle = jest.spyOn(Native, 'findNodeHandle').mockReturnValue(17);
++  const focus = jest.spyOn(Native.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => {});
++  const hook = await renderHook<ReturnType<typeof useImportHeadingFocus>, { step: string; explicit: boolean }>(({ step, explicit }) => {
++    const ref = useImportHeadingFocus(step, explicit);
++    ref.current = {} as Text;
++    return ref;
++  }, { initialProps: { step: 'question', explicit: false } });
++  expect(handle).not.toHaveBeenCalled();
++  await hook.rerender({ step: 'question', explicit: true });
++  expect(handle).not.toHaveBeenCalled();
++  await hook.rerender({ step: 'value', explicit: false });
++  expect(focus.mock.calls).toEqual([[17]]);
++  await hook.rerender({ step: 'value', explicit: false });
++  expect(focus).toHaveBeenCalledTimes(1);
++  await hook.unmount();
++  await renderHook(() => {
++    const ref = useImportHeadingFocus('source', true);
++    ref.current = {} as Text;
++    return ref;
++  });
++  expect(focus.mock.calls).toEqual([[17], [17]]);
++});
++
++it('does not call the native-only focus API on web', async () => {
++  jest.replaceProperty(Native.Platform, 'OS', 'web');
++  const handle = jest.spyOn(Native, 'findNodeHandle').mockImplementation(() => { throw new Error('native-only API'); });
++  await renderHook(() => {
++    const ref = useImportHeadingFocus('source', true);
++    ref.current = {} as Text;
++    return ref;
++  });
++  expect(handle).not.toHaveBeenCalled();
++});
+diff --git a/src/screens/coach/import-journey/__tests__/ImportSetupView.test.tsx b/src/screens/coach/import-journey/__tests__/ImportSetupView.test.tsx
+new file mode 100644
+index 0000000..9255cf7
+--- /dev/null
++++ b/src/screens/coach/import-journey/__tests__/ImportSetupView.test.tsx
+@@ -0,0 +1,135 @@
++import './sideEffectGuards.cjs';
++import React from 'react';
++import { Dimensions, I18nManager, ScrollView, StyleSheet, View } from 'react-native';
++import { cleanup, fireEvent, render } from '@testing-library/react-native';
++import { ImportSetupView, ImportSetupViewProps } from '../ImportSetupView';
++import { ImportOfferCard } from '../ImportOfferCard';
++import * as copy from '../importJourneyCopy';
++import { IMPORT_PLATFORMS } from '../../../../constants/importPlatforms';
++const guards = require('./sideEffectGuards.cjs');
++const dimensions = Dimensions.get('window');
++const inputProps = () => ({
++  romanEnabled: false, selectedSourceId: null, customSourceUrl: '', validation: 'idle' as const,
++  onBack: jest.fn(), onLater: jest.fn(), onSourceChange: jest.fn(),
++  onCustomSourceChange: jest.fn(), onCustomSourceBlur: jest.fn(), onContinue: jest.fn(),
++});
++beforeEach(() => guards.installGuards());
++afterEach(async () => {
++  await cleanup();
++  Dimensions.set({ window: dimensions });
++  try { guards.assertNoSideEffects(); } finally { jest.restoreAllMocks(); }
++});
++
++it('renders the real catalog without a default, support badge, or enabled Continue', async () => {
++  const props = inputProps();
++  const view = await render(<ImportSetupView {...props} step="source" />);
++  expect(view.getAllByRole('radio').map(row => row.props.accessibilityLabel)).toEqual(IMPORT_PLATFORMS.map(p => p.label));
++  expect(view.getByRole('button', { name: 'Continue' })).toBeDisabled();
++  await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  expect(props.onContinue).not.toHaveBeenCalled();
++  expect(view.getByText('Choose a shortcut, or enter another site. Available records are checked on your computer.')).toBeTruthy();
++  expect(view.getByText('A listed site is a shortcut, not a guarantee that every record can be imported.')).toBeTruthy();
++  expect(view.queryByText(/supported|fully compatible/i)).toBeNull();
++});
++
++it.each(IMPORT_PLATFORMS)('selects $label only by callback and renders the controlled selection', async platform => {
++  const props = inputProps();
++  const view = await render(<ImportSetupView {...props} step="source" />);
++  const row = view.getByRole('radio', { name: platform.label });
++  await fireEvent.press(row);
++  expect(props.onSourceChange.mock.calls).toEqual([[platform.id]]);
++  expect(props.onContinue).not.toHaveBeenCalled();
++  expect(row.props.accessibilityState).toEqual({ checked: false, selected: false });
++  await view.rerender(<ImportSetupView {...props} step="source" selectedSourceId={platform.id} />);
++  expect(view.getByRole('radio', { name: platform.label }).props.accessibilityState).toEqual({ checked: true, selected: true });
++  expect(StyleSheet.flatten(view.getByRole('radio', { name: platform.label }).props.style)).toMatchObject({ minHeight: 56, minWidth: 48 });
++  await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  expect(props.onContinue.mock.calls).toEqual([[]]);
++});
++
++it.each(['not a url', 'http://example.com', 'https://user:password@example.com', 'https://localhost', 'https://127.0.0.1', 'https://10.0.0.1', 'https://[::1]'])('keeps an invalid custom address intact: %s', async address => {
++  const props = inputProps();
++  const view = await render(<ImportSetupView {...props} step="customSource" selectedSourceId="custom" customSourceUrl={address} validation="invalid" />);
++  expect(view.getByLabelText('Site address').props.value).toBe(address);
++  expect(view.getByRole('alert')).toHaveTextContent('Enter a valid public HTTPS address.');
++  expect(view.getByRole('button', { name: 'Continue' })).toBeDisabled();
++  await fireEvent.press(view.getByRole('button', { name: 'Continue' }));
++  expect(props.onContinue).not.toHaveBeenCalled();
++});
++
++it('dispatches custom change, blur, continue, Back and Later with no external action', async () => {
++  const props = inputProps();
++  const view = await render(<ImportSetupView {...props} step="customSource" selectedSourceId="custom" />);
++  const input = view.getByLabelText('Site address');
++  expect(input.props).toMatchObject({ keyboardType: 'url', autoCapitalize: 'none', autoCorrect: false, multiline: true, scrollEnabled: false });
++  expect(view.queryByRole('alert')).toBeNull();
++  await fireEvent(input, 'focus');
++  await fireEvent.changeText(input, 'https://coaching.example.com/login');
++  await fireEvent(input, 'blur');
++  expect(props.onCustomSourceChange.mock.calls).toEqual([['https://coaching.example.com/login']]);
++  expect(props.onCustomSourceBlur.mock.calls).toEqual([[]]);
++  await view.rerender(<ImportSetupView {...props} step="customSource" selectedSourceId="custom" customSourceUrl="https://coaching.example.com/login" />);
++  expect(view.getByRole('button', { name: 'Continue' })).toBeEnabled();
++  for (const name of ['Continue', 'Back', 'Later']) await fireEvent.press(view.getByRole('button', { name }));
++  expect([props.onContinue.mock.calls.length, props.onBack.mock.calls.length, props.onLater.mock.calls.length]).toEqual([1, 1, 1]);
++});
++
++it.each(IMPORT_PLATFORMS)('handoff for $label is instructional only', async platform => {
++  const onBack = jest.fn(), onLater = jest.fn();
++  const view = await render(<ImportSetupView step="computerHandoff" selectedSourceId={platform.id} romanEnabled onBack={onBack} onLater={onLater} />);
++  expect(view.getByRole('header')).toHaveTextContent('Continue on a computer');
++  expect(view.getByText(`Selected site: \u2068${platform.label}\u2069`)).toBeTruthy();
++  expect(view.getByText('You will need Chrome on a computer. Keep this setup open while you connect the TGP extension.')).toBeTruthy();
++  expect(view.getAllByRole('button').map(b => b.props.accessibilityLabel)).toEqual(['Back', 'I will use a computer later']);
++  expect(view.queryByText(/copied|saved|paired|running|waiting|ready to use|https:\/\//i)).toBeNull();
++  for (const name of ['Back', 'I will use a computer later']) await fireEvent.press(view.getByRole('button', { name }));
++  expect([onBack.mock.calls.length, onLater.mock.calls.length]).toEqual([1, 1]);
++});
++
++// These are test-renderer trees, NOT Yoga layout, screenshots or device proof.
++const environments = [320, 375, 430].flatMap(width => ['light', 'dark'].flatMap(mode => [1, 2].flatMap(fontScale => [false, true].map(rtl => ({ width, mode, fontScale, rtl })))));
++it.each(environments)('declares scalable scroll content at $width / $mode / $fontScale / RTL=$rtl (tree only)', async ({ width, mode, fontScale, rtl }) => {
++  guards.theme.mode = mode;
++  jest.replaceProperty(I18nManager, 'isRTL', rtl);
++  Dimensions.set({ window: { width, height: 568, scale: 1, fontScale } });
++  const props = inputProps();
++  const states: ImportSetupViewProps[] = [
++    { ...props, step: 'source' },
++    { ...props, step: 'customSource', selectedSourceId: 'custom', customSourceUrl: 'https://example.com/a-long-path', validation: 'idle' },
++    { ...props, step: 'computerHandoff', selectedSourceId: 'truecoach' },
++  ];
++  for (const state of states) {
++    const view = await render(<View style={{ width, flex: 1 }}><ImportSetupView {...state} /></View>);
++    expect(view.container.queryAll(node => node.props.keyboardShouldPersistTaps === 'handled')).toHaveLength(1);
++    for (const text of view.container.queryAll(node => /Text$/.test(node.type))) {
++      expect(text.props.allowFontScaling).not.toBe(false);
++      expect(text.props.maxFontSizeMultiplier).toBeUndefined();
++      expect(text.props.numberOfLines).toBeUndefined();
++    }
++    for (const input of view.container.queryAll(node => node.props.keyboardType === 'url')) expect(input.props.multiline).toBe(true);
++    await view.unmount();
++  }
++  for (const variant of ['question', 'value', 'resume'] as const) {
++    const actions = { onYes: jest.fn(), onStartingFresh: jest.fn(), onLater: jest.fn(), onBack: jest.fn(), onImportRecords: jest.fn(), onResume: jest.fn() };
++    const view = await render(<ScrollView style={{ width }}><ImportOfferCard variant={variant} romanEnabled {...actions} /></ScrollView>);
++    for (const text of view.container.queryAll(node => /Text$/.test(node.type))) expect(text.props.numberOfLines).toBeUndefined();
++    await view.unmount();
++  }
++});
++
++// Pseudo-localization checks tree growth permissions, not rendered clipping.
++it('keeps expanded +40% copy and every action in the tree without truncation props', async () => {
++  const original = copy.importJourneyCopy;
++  const expand = (text: string) => `[${text}${'·'.repeat(Math.ceil(text.length * 0.4))}]`;
++  jest.spyOn(copy, 'importJourneyCopy').mockImplementation(((key: copy.ImportJourneyCopyKey, vars?: { sourceName: string }) =>
++    expand(key === 'handoff.source' ? original(key, vars!) : original(key))) as typeof original);
++  const props = inputProps();
++  const view = await render(<ImportSetupView {...props} step="customSource" selectedSourceId="custom" customSourceUrl="https://example.com" />);
++  expect(view.getByRole('header')).toHaveTextContent(expand('Where are your records?'));
++  await fireEvent.press(view.getByRole('button', { name: expand('Continue') }));
++  expect(props.onContinue.mock.calls).toEqual([[]]);
++  for (const text of view.container.queryAll(node => /Text$/.test(node.type))) {
++    expect(text.props.numberOfLines).toBeUndefined();
++    expect(text.props.maxFontSizeMultiplier).toBeUndefined();
++  }
++});
+diff --git a/src/screens/coach/import-journey/__tests__/importJourneyCopy.test.ts b/src/screens/coach/import-journey/__tests__/importJourneyCopy.test.ts
+new file mode 100644
+index 0000000..904c7e0
+--- /dev/null
++++ b/src/screens/coach/import-journey/__tests__/importJourneyCopy.test.ts
+@@ -0,0 +1,49 @@
++import en from '../i18n/en.json';
++import { importJourneyCopy as t, importOfferQuestion, ImportJourneyCopyKey } from '../importJourneyCopy';
++import { brand, colors, darkTokens, lightTokens } from '../../../../theme/tokens';
++
++it('resolves every authored P1 string and requires the only placeholder variable', () => {
++  for (const [group, entries] of Object.entries(en)) {
++    for (const [name, value] of Object.entries(entries)) {
++      const key = `${group}.${name}` as ImportJourneyCopyKey;
++      const result = key === 'handoff.source' ? t(key, { sourceName: 'TrueCoach' }) : t(key);
++      expect(result).toBe(key === 'handoff.source' ? 'Selected site: \u2068TrueCoach\u2069' : value);
++      expect(result).not.toMatch(/\{\w+\}/);
++    }
++  }
++  expect(Object.keys(en)).toEqual(['common', 'offer', 'source', 'handoff', 'accessibility']);
++  // P1 deliberately contains no run counters, pairing, link delivery or result copy.
++  expect(JSON.stringify(en)).not.toMatch(/\{count\}|copied|saved|paired|imported successfully/);
++});
++
++it('pins neutral, explicit sir, and Roman-off wording', () => {
++  expect(importOfferQuestion(true)).toBe('Have you coached on another platform before?');
++  expect(importOfferQuestion(true, 'sir')).toBe('Have you coached on another platform before, sir?');
++  expect(importOfferQuestion(false, 'sir')).toBe('Have you coached on another platform before?');
++  expect(t('offer.value')).toBe('Would you like to bring your clients and coaching history into TGP?');
++  expect(t('handoff.body')).toBe('You will need Chrome on a computer. Keep this setup open while you connect the TGP extension.');
++});
++
++it('interpolates a whole sentence as literal text, including replacement metacharacters', () => {
++  expect(t('handoff.source', { sourceName: '$& {literal} <plain text>' })).toBe('Selected site: \u2068$& {literal} <plain text>\u2069');
++});
++
++function contrast(a: string, b: string) {
++  const luminance = (hex: string) => {
++    const rgb = hex.slice(1).match(/../g)!.map(h => parseInt(h, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
++    return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
++  };
++  const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
++  return (values[0] + 0.05) / (values[1] + 0.05);
++}
++
++it.each([['light', lightTokens], ['dark', darkTokens]] as const)('measures actual %s text and control-boundary token pairs', (_mode, c) => {
++  for (const bg of [c.bgPrimary, c.bgSurface, c.disabledBg]) expect(contrast(c.textPrimary, bg)).toBeGreaterThanOrEqual(4.5);
++  for (const bg of [c.bgPrimary, c.bgSurface]) {
++    expect(contrast(c.textMuted, bg)).toBeGreaterThanOrEqual(4.5);
++    expect(contrast(c.textPrimary, bg)).toBeGreaterThanOrEqual(3);
++  }
++  expect(contrast(c.textOnAccent, colors.forest)).toBeGreaterThanOrEqual(4.5);
++  expect(contrast(c.textOnAccent, brand[800])).toBeGreaterThanOrEqual(4.5);
++  expect(contrast(c.textOnDisabled, c.disabledBg)).toBeGreaterThanOrEqual(4.5);
++});
+diff --git a/src/screens/coach/import-journey/__tests__/sideEffectGuards.cjs b/src/screens/coach/import-journey/__tests__/sideEffectGuards.cjs
+new file mode 100644
+index 0000000..834b6a1
+--- /dev/null
++++ b/src/screens/coach/import-journey/__tests__/sideEffectGuards.cjs
+@@ -0,0 +1,60 @@
++// Imported before the views. The real app ThemeProvider reads preferences and
++// identity; these leaf tests inject only its semantic-token result, never mount it.
++const mockForbidden = jest.fn(() => { throw new Error('P1 attempted a forbidden side effect'); });
++const forbiddenModule = new Proxy(mockForbidden, {
++  get: (_target, key) => key === '__esModule' ? true : key === 'then' ? undefined : forbiddenModule,
++});
++const mockTheme = { mode: 'light' };
++jest.mock('../../../../theme/useTheme', () => ({
++  useTheme: () => {
++    const tokens = require('../../../../theme/tokens');
++    return { semanticColors: mockTheme.mode === 'dark' ? tokens.darkTokens : tokens.lightTokens };
++  },
++}));
++jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
++jest.mock('../../../../services/api', () => forbiddenModule);
++jest.mock('../../../../api/extensionPairApi', () => forbiddenModule);
++jest.mock('../../../../hooks/useExtensionPairing', () => forbiddenModule);
++jest.mock('../../../../services/authActions', () => forbiddenModule);
++jest.mock('../../../../utils/supabaseAuth', () => forbiddenModule);
++jest.mock('../../../../lib/analytics', () => forbiddenModule);
++jest.mock('../../../../analytics/posthog.service', () => forbiddenModule);
++jest.mock('@react-native-async-storage/async-storage', () => forbiddenModule);
++jest.mock('expo-secure-store', () => forbiddenModule);
++jest.mock('expo-clipboard', () => forbiddenModule);
++jest.mock('expo-sharing', () => forbiddenModule);
++
++exports.theme = mockTheme;
++exports.installGuards = () => {
++  mockTheme.mode = 'light';
++  mockForbidden.mockClear();
++  const { Linking, Share } = require('react-native');
++  jest.spyOn(Linking, 'openURL').mockImplementation(mockForbidden);
++  jest.spyOn(Linking, 'canOpenURL').mockImplementation(mockForbidden);
++  jest.spyOn(Share, 'share').mockImplementation(mockForbidden);
++  jest.spyOn(global, 'fetch').mockImplementation(mockForbidden);
++};
++exports.assertNoSideEffects = () => expect(mockForbidden).not.toHaveBeenCalled();
++exports.exerciseGuards = () => {
++  const { Linking, Share } = require('react-native');
++  const calls = [
++    () => require('../../../../services/api').default.post('/forbidden'),
++    () => require('../../../../api/extensionPairApi').init(),
++    () => require('../../../../hooks/useExtensionPairing').useExtensionPairing(),
++    () => require('../../../../services/authActions').signOut(),
++    () => require('../../../../utils/supabaseAuth').signIn(),
++    () => require('../../../../lib/analytics').track('forbidden'),
++    () => require('../../../../analytics/posthog.service').track('forbidden'),
++    () => require('@react-native-async-storage/async-storage').setItem('forbidden', 'value'),
++    () => require('expo-secure-store').setItemAsync('forbidden', 'value'),
++    () => require('expo-clipboard').setStringAsync('forbidden'),
++    () => require('expo-sharing').shareAsync('forbidden'),
++    () => Linking.openURL('https://example.com'),
++    () => Linking.canOpenURL('https://example.com'),
++    () => Share.share({ message: 'forbidden' }),
++    () => global.fetch('https://example.com'),
++  ];
++  calls.forEach(call => expect(call).toThrow('P1 attempted a forbidden side effect'));
++  expect(mockForbidden).toHaveBeenCalledTimes(calls.length);
++  mockForbidden.mockClear();
++};
+diff --git a/src/screens/coach/import-journey/i18n/en.json b/src/screens/coach/import-journey/i18n/en.json
+new file mode 100644
+index 0000000..7768128
+--- /dev/null
++++ b/src/screens/coach/import-journey/i18n/en.json
+@@ -0,0 +1,38 @@
++{
++  "common": {
++    "later": "Later",
++    "importRecords": "Import my records",
++    "back": "Back",
++    "setupTitle": "Import setup"
++  },
++  "offer": {
++    "question": "Have you coached on another platform before?",
++    "questionSir": "Have you coached on another platform before, sir?",
++    "yes": "Yes",
++    "fresh": "I am starting fresh",
++    "value": "Would you like to bring your clients and coaching history into TGP?",
++    "resume": "Continue import setup"
++  },
++  "source": {
++    "title": "Where are your records?",
++    "body": "Choose a shortcut, or enter another site. Available records are checked on your computer.",
++    "note": "A listed site is a shortcut, not a guarantee that every record can be imported.",
++    "continue": "Continue",
++    "customLabel": "Site address",
++    "customHint": "Enter the secure web address you use to sign in.",
++    "invalid": "Enter a valid public HTTPS address.",
++    "noCredentials": "Do not include a password or sign-in code."
++  },
++  "handoff": {
++    "title": "Continue on a computer",
++    "body": "You will need Chrome on a computer. Keep this setup open while you connect the TGP extension.",
++    "source": "Selected site: {sourceName}",
++    "stepOne": "Open this setup on your computer.",
++    "stepTwo": "Connect the official TGP extension.",
++    "stepThree": "Sign in to your source and review Start.",
++    "noComputer": "I will use a computer later"
++  },
++  "accessibility": {
++    "roman": "Roman"
++  }
++}
+diff --git a/src/screens/coach/import-journey/importJourneyCopy.ts b/src/screens/coach/import-journey/importJourneyCopy.ts
+new file mode 100644
+index 0000000..4c09b1b
+--- /dev/null
++++ b/src/screens/coach/import-journey/importJourneyCopy.ts
+@@ -0,0 +1,35 @@
++import en from './i18n/en.json';
++
++type Leaves<T, P extends string = ''> = {
++  [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
++}[keyof T & string];
++
++export type ImportJourneyCopyKey = Leaves<typeof en>;
++export type ImportAddressForm = 'neutral' | 'sir';
++type PlainKey = Exclude<ImportJourneyCopyKey, 'handoff.source'>;
++
++// Feature-local English only, matching day-one/i18n; not a new i18n runtime.
++export function importJourneyCopy(key: PlainKey): string;
++export function importJourneyCopy(key: 'handoff.source', vars: { sourceName: string }): string;
++export function importJourneyCopy(
++  key: ImportJourneyCopyKey,
++  vars?: { sourceName: string },
++): string {
++  let value: unknown = en;
++  for (const part of key.split('.')) {
++    value = (value as Record<string, unknown>)[part];
++  }
++  if (typeof value !== 'string') throw new Error('Missing import journey copy');
++  return value.replace(/\{(\w+)\}/g, (_match, name: string) => {
++    if (name !== 'sourceName' || !vars) throw new Error('Missing import journey copy variable');
++    // Isolate catalog names when the surrounding UI uses RTL layout.
++    return `\u2068${vars.sourceName}\u2069`;
++  });
++}
++
++export function importOfferQuestion(
++  romanEnabled: boolean,
++  addressForm: ImportAddressForm = 'neutral',
++): string {
++  return importJourneyCopy(romanEnabled && addressForm === 'sir' ? 'offer.questionSir' : 'offer.question');
++}
+diff --git a/src/screens/coach/import-journey/importJourneyUI.tsx b/src/screens/coach/import-journey/importJourneyUI.tsx
+new file mode 100644
+index 0000000..3f1fb60
+--- /dev/null
++++ b/src/screens/coach/import-journey/importJourneyUI.tsx
+@@ -0,0 +1,85 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
++import RomanAvatar from '../../../components/roman/RomanAvatar';
++import { useTheme } from '../../../theme/useTheme';
++import { brand, colors, radius, spacing, typography } from '../../../theme/tokens';
++import { importJourneyCopy as t } from './importJourneyCopy';
++
++/** Local presentation primitives only; no provider or task authority. */
++export function ImportJourneyAction({
++  label, onPress, primary = false, disabled = false, hint,
++}: {
++  label: string;
++  onPress: () => void;
++  primary?: boolean;
++  disabled?: boolean;
++  hint?: string;
++}) {
++  const { semanticColors: c } = useTheme();
++  const [focused, setFocused] = useState(false);
++  return (
++    <View style={[ui.focusFrame, { borderColor: focused ? c.textPrimary : 'transparent' }]}>
++      <Pressable
++        accessibilityRole="button"
++        accessibilityLabel={label}
++        accessibilityHint={hint}
++        accessibilityState={{ disabled }}
++        disabled={disabled}
++        onPress={() => onPress()}
++        onFocus={() => setFocused(true)}
++        onBlur={() => setFocused(false)}
++        style={({ pressed }) => [ui.action, {
++          backgroundColor: disabled ? c.disabledBg : primary ? (pressed ? brand[800] : colors.forest) : (pressed ? c.disabledBg : 'transparent'),
++          borderColor: primary ? c.textMuted : 'transparent',
++        }]}
++      >
++        <Text style={[typography.bodyMd, ui.actionLabel, {
++          color: disabled ? c.textOnDisabled : primary ? c.textOnAccent : c.textPrimary,
++          textDecorationLine: primary ? 'none' : 'underline',
++        }]}>{label}</Text>
++      </Pressable>
++    </View>
++  );
++}
++
++export function ImportJourneyPortrait() {
++  // One localized announcement, including the existing avatar's image-failure fallback.
++  return (
++    <View accessible accessibilityRole="image" accessibilityLabel={t('accessibility.roman')} style={ui.portrait}>
++      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
++        <RomanAvatar crop="neutral" size={48} />
++      </View>
++    </View>
++  );
++}
++
++/** Focus only on a step/variant transition, or an explicitly requested initial entry. */
++export function useImportHeadingFocus(key: string, focusOnMount: boolean) {
++  const ref = useRef<Text>(null);
++  const previous = useRef(key);
++  const mounted = useRef(false);
++  useEffect(() => {
++    const shouldFocus = mounted.current ? previous.current !== key : focusOnMount;
++    mounted.current = true;
++    previous.current = key;
++    // RNWeb explicitly throws from findNodeHandle. Native focus remains native;
++    // the optional web preview does not claim equivalent heading focus delivery.
++    if (Platform.OS !== 'web' && shouldFocus && ref.current) {
++      const target = findNodeHandle(ref.current);
++      if (target != null) AccessibilityInfo.setAccessibilityFocus(target);
++    }
++  }, [key, focusOnMount]);
++  return ref;
++}
++
++export const ui = StyleSheet.create({
++  action: {
++    minHeight: 48, minWidth: 48, paddingVertical: spacing.md, paddingHorizontal: spacing.lg,
++    borderWidth: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center',
++  },
++  actionLabel: { textAlign: 'center', flexShrink: 1 },
++  focusFrame: { borderWidth: 2, padding: 2, alignSelf: 'stretch' },
++  portrait: { width: 48, height: 48 },
++  actions: { gap: spacing.sm },
++  text: { textAlign: 'auto' },
++});
