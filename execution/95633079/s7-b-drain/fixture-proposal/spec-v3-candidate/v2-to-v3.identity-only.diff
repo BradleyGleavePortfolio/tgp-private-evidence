@@ -1,0 +1,69 @@
+--- frozen-v2/files/test/rls-g2-b-drain.spec.ts	2026-09-24 07:11:22.900630514 +0000
++++ fixture-proposal/spec-v3-candidate/test/rls-g2-b-drain.spec.ts	2026-09-24 07:21:10.836630514 +0000
+@@ -47,8 +47,8 @@
+   targets,
+   upFile,
+   worker,
+-} from './utils/g2-pg17-harness';
+-import { G2_PG17_CLUSTER_MARKER, G2_PG17_DATABASE_MARKER } from './utils/g2-pg17-db';
++} from './utils/g2-b-drain-pg-harness';
++import { G2_B_CLUSTER_MARKER, G2_B_DATABASE_MARKER } from './utils/g2-b-drain-db';
+ import {
+   B_MIGRATION,
+   bDownFile,
+@@ -107,7 +107,7 @@
+     (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
+     (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
+   expect(identity).toMatchObject({
+-    database: 'g2_s5_etq0_disposable',
++    database: 'g2_b_drain_disposable',
+     address: '127.0.0.1',
+     port: target.port,
+     directory,
+@@ -119,13 +119,13 @@
+   expect(Number(identity.version)).toBe(expectedVersion);
+   expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
+   expect(Number(identity.version)).toBeLessThan(180000);
+-  expect(directory).toMatch(/\/pg17\/clusters\/s5$/);
+-  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_PG17_CLUSTER_MARKER);
++  expect(directory).toMatch(/\/pg17\/clusters\/b-drain\/pg-data$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_B_CLUSTER_MARKER);
+   expect(
+     sql(
+       `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
+     ),
+-  ).toBe(G2_PG17_DATABASE_MARKER);
++  ).toBe(G2_B_DATABASE_MARKER);
+   console.warn('PG17_DATABASE', JSON.stringify(identity));
+   // Fresh S5-shaped bootstrap: full O history, no E, no B, no fence.
+   expect(appliedMigrations()).toBe('164');
+--- frozen-v2/files/test/utils/g2-b-drain-harness.ts	2026-09-24 07:11:22.908630514 +0000
++++ fixture-proposal/spec-v3-candidate/test/utils/g2-b-drain-harness.ts	2026-09-24 07:21:10.836630514 +0000
+@@ -1,5 +1,6 @@
+ /**
+- * G2-B live-proof helpers layered on the accepted S5 harness (test/utils/g2-pg17-harness.ts).
++ * G2-B live-proof helpers layered on the B-only derivative (test/utils/g2-b-drain-pg-harness.ts)
++ * of the accepted S5 harness (test/utils/g2-pg17-harness.ts, unchanged).
+  * Adds only what the B/drain stage needs: the B migration files, fence/catalog observation,
+  * NULL-provenance fixture shaping (UPDATE only: the fence blocks NULL INSERTs by design) and an
+  * in-process runtime-role Prisma client whose query log is captured for shape assertions.
+@@ -8,8 +9,8 @@
+ import { PrismaClient } from '@prisma/client';
+ import { readFileSync } from 'fs';
+ import { resolve } from 'path';
+-import { json, quote, root, sql, target } from './g2-pg17-harness';
+-import { G2_PG17_RUNTIME_ROLE, withFixturePassword } from './g2-pg17-db';
++import { json, quote, root, sql, target } from './g2-b-drain-pg-harness';
++import { G2_B_RUNTIME_ROLE, withFixturePassword } from './g2-b-drain-db';
+ 
+ export const B_MIGRATION = '20270119000000_scout_ledger_obsolete_writer_fence';
+ export const bDir = resolve(root, 'prisma/migrations', B_MIGRATION);
+@@ -64,7 +65,7 @@
+  */
+ export function runtimeClient(name: string) {
+   const url = new URL(
+-    withFixturePassword(target.prismaUrl, process.env.G2_PG17_PASSWORD, G2_PG17_RUNTIME_ROLE),
++    withFixturePassword(target.prismaUrl, process.env.G2_B_PASSWORD, G2_B_RUNTIME_ROLE),
+   );
+   url.searchParams.set('application_name', name);
+   const queries: string[] = [];
