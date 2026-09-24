@@ -6,7 +6,7 @@ Read `LAST_OPERATOR_STATE.md`, `execution/DISPATCHES.md` and `execution/95633079
 
 ## Current cursor
 
-Fresh independent reviewer A is completing the frozen C1 execution-binding review only. Both completed source verdicts remain applicable and are not repeated. Exact writable recovery is next; no product checkout, hook installation, commit, targeted test or PG run has yet begun in this fresh sandbox.
+Fresh independent reviewer A completed the frozen C1 execution-binding review: GRANTABLE_WITH_RECORDED_PRECONDITIONS, A0/B0. Both completed source verdicts remain applicable and are not repeated. Sole T4 executor is now assigned exact writable recovery, missing pinned tools and the unchanged local launcher after exact guards; actual hook/commit/test claims await receipts. PG remains ungranted.
 
 C1 tree `87798e742c7b48f56b05e9b5c30efa877180a9b3`, parents `5c760b77` then `881c4c79`, approved message `288048d7…`, launcher `a57c224c…`; portable parent bundle `a238a7b1…`, exact patch `a413891a…`. All packet manifests verified in intake. Use the master guide's clean-foundation/patch/merge-metadata recovery correction, never reconstruct the source merge.
 
@@ -16,7 +16,7 @@ The existing 22-case C1 proof preparation is complete; its required fixture vari
 
 S1–S6 and S7 foundation are ACCEPTED at frozen boundaries. S5 realPG51/51 and E/T-Q0 evidence are reused, S6 receipt qualifications stay C, and S7 foundation does not imply lifecycle completion. No redo of S5/S6 diagnostics, hooks, foundation composition, C1 source review or completed UX journey planning.
 
-Disjoint ROMAN-DONOR comparison and outstanding UX-07 design/a11y details are active; all eight old workers stay stopped/finished. No heavy-runtime owner or product writer has been assigned yet. Workers own only their fresh directories and never mutate this private checkout.
+Disjoint ROMAN-DONOR comparison and existing extension HTML/CSS source work are active; UX-07 design/a11y detail is delivered with a minimal clarification pending. All eight old workers stay stopped/finished. C1 executor alone owns heavy runtime; workers own only their fresh directories and never mutate this private checkout.
 
 ## Continuity and limits
 

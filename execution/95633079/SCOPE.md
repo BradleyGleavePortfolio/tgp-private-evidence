@@ -15,14 +15,16 @@ S1–S6, S7 foundation and completed C1 source reviews remain accepted at record
 | Slice | Tier / requested route | Scope and frozen completion |
 |---|---|---|
 | C1 A execution-binding continuation | T4; parent-model inheritance | Exact frozen launcher review only; carry A source verdict forward, no peer conclusions; append fixture/results later |
+| C1 exact recovery / frozen local validation | T4; Claude Fable 5 / High requested | Sole recovery/writer/executor; reviewed binding's exact pins, real hooks, ordinary frozen-message commit, targeted Jest only; stop on first failure, no PG yet |
 | ROMAN-DONOR comparison | T2 source-only; Claude Sonnet 5 / High requested | Exact PR293/294 comparison against accepted S6, actionable reuse and minimal early UX slices; no product changes, install or runtime |
 | UX-07.design outstanding details | T2 planning-only; Claude Sonnet 5 / High requested | Token reuse/exclusions, accessibility checks and focused test plan/popup styling; do not repeat journey/map/matrix |
+| UX-07.extension presentation | T1; GPT 5.6 Terra / Medium requested | Existing HTML/CSS source only, no protocol/JS/visibility behavior/new panels; exact extension base0111be66; freeze for targeted review, no runtime/commit yet |
 
 Requested routing is not observed model/effort telemetry. No silent downgrade of a required route is authorized.
 
 ## Ownership and execution limits
 
-All prior workers are historical. Fresh workers write only their listed directories; none writes this private checkout. One writer per mutable product surface and generator; one canonical heavy-runtime slot at `execution/test-validation.lock`. No heavy slot is granted yet.
+All prior workers are historical. Fresh workers write only their listed directories; none writes this private checkout. One writer per mutable product surface and generator; one canonical heavy-runtime slot at `execution/test-validation.lock`, granted only to `c1_exact_recovery_and_validation_muf3sel1` for missing pinned tools followed by the unchanged local launcher after exact preconditions. No PG run is granted yet.
 
 This sandbox has no inherited product worktrees, dependencies or PostgreSQL directory. Only absent tooling may be rehydrated to recorded pins after appropriate binding disposition; absence does not reopen accepted S5 or require rebuilding its old cluster.
 

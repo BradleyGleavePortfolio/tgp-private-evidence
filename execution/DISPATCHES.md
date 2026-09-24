@@ -6,12 +6,14 @@ All eight e7d2385c workers remain stopped/finished. Their immutable terminal ass
 
 | Slice | Fresh worker | Tier / requested route | Sole writable area | Current state |
 |---|---|---|---|---|
-| C1 independent A continuation | `c1_review_a_continuation_muf3n97a` | T4 / parent inheritance | `execution/95633079/audits/c1-a/**` | ACTIVE unfinished execution-binding review only; source verdict preserved; no runtime |
+| C1 independent A continuation | `c1_review_a_continuation_muf3n97a` | T4 / parent inheritance | `execution/95633079/audits/c1-a/**` | COMPLETE binding GRANTABLE_WITH_RECORDED_PRECONDITIONS, A0/B0; source verdict preserved; later fixture/results phases pending |
+| C1 exact recovery / frozen local validation | `c1_exact_recovery_and_validation_muf3sel1` | T4 / Claude Fable 5, High requested | `worktrees/s7-c1/**`, copied old execution packets/new receipts, named Prettier tooling, `execution/95633079/c1-execution/**` | ACTIVE sole recovery/product writer and exclusive heavy-slot owner; conditional unchanged launcher grant after exact pins |
 | Roman donor reuse comparison | `roman_donor_reuse_comparison_muf3n97e` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/roman-donor/**` | ACTIVE exact PR293/294 vs accepted S6 comparison; no product worktree/install/test |
-| UX-07 outstanding detail work | `ux_07_accessibility_detail_muf3n97i` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/design-system/**` | ACTIVE new token/a11y/popup details only; no repeat journey planning or product writes |
+| UX-07 outstanding detail work | `ux_07_accessibility_detail_muf3n97i` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/design-system/**` | DELIVERED; minimal advisory/actual-contrast clarification in progress; no product writes |
+| UX-07 extension presentation | `ux_07_extension_presentation_muf3to6z` | T1 / GPT 5.6 Terra, Medium requested | `worktrees/ux07-extension/**`, `execution/95633079/ux/extension-style/**` | ACTIVE existing HTML/CSS source-only; no protocol/logic/new panels, runtime/install/commit not granted |
 
-Requested route is not observed runtime identity/effort. C1 writable recovery, executor, fixture builder and reviewer B continuation are not yet activated; no product writer or heavy-runtime owner is active.
+Requested route is not observed runtime identity/effort. C1 executor alone owns the canonical heavy slot for absent pinned tooling and the frozen local launcher. Fixture builder/PG execution and reviewer B continuation are not yet activated; extension is source-only and disjoint.
 
 S1–S6 and S7 foundation remain ACCEPTED at exact recorded boundaries. C1 tree `87798e74` and both source reviews remain frozen; launcher `a57c224c` has never run. Minimum fixture variant is unbuilt; existing 22-case PG proof remains unexecuted.
 
-Next: finish A binding review → delegate exact writable recovery → reviewed frozen local validation → minimum reviewed fixture → existing C1 PG proof → two same-review actual-head/result attestations → C1 acceptance → B/drain and canonical continuation. A/B blocks only its affected path/proof; C never starts another cycle.
+Next: exact writable recovery → reviewed frozen local validation → minimum reviewed fixture → existing C1 PG proof → two same-review actual-head/result attestations → C1 acceptance → B/drain and canonical continuation. A/B blocks only its affected path/proof; C never starts another cycle.
