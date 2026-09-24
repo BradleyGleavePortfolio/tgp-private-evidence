@@ -44,18 +44,3 @@ hooked commit, pin fill). Promotion stage is its own, after C is accepted (D-C2)
 ## What the runner does NOT do
 No retry, no inherited-proof replay, no `prisma generate` outside the old root, no lock other than the single canonical
 holder, no destroy (data dir retained; `s8b-fixture.sh destroy` is a separate marker-gated grant).
-
-## Phase 2 (C accepted at 1b6cc661; S8-B head committed edd6dc6b) — pins FILLED, NOT RUN
-- `derive-s8b-pg-proof.py` updated (sha `60e18f23fa19923fb5ee6ad8ace95f03df11cf863f40240601a618a5662bf1f9`): OLD_HEAD → 1b6cc661, the two N/Q1 blob pins moved to their
-  29e60705/1b6cc661 values (pg-harness d51267f2, spec a9338260), the eight accepted C blob pins added at the marked slot.
-  Its output is kept as `s8b-pg-proof.sh.phase2-unfilled` (`8be755b8cce2f274a4f89d5052a7df735062742149c1be5395fcbf68bc22f478`).
-- `s8b-pg-proof.sh` filled (`3fbdcdb17a3885174b450ea8e668787b6ebb1c0ca3f0c83065f5eb072f11c59a`): header word + seven pin lines only — recorded in
-  `s8b-pg-proof.sh.diff-unfilled-to-filled`. No `__` placeholder remains; `bash -n` ok.
-- phase-1 files retained: `PINS.txt.phase1`, `README.md.phase1`, `BINDING.sha256.phase1`; the whole phase-1 binding is
-  also under `../phase1-snapshot/binding-phase1/`.
-
-## B-1 closure (head 8a0075de, parent edd6dc6b; one-line spec fix: `tally()` carries `intent_id: 'intent'`)
-- Runner re-pinned: `EXPECT_HEAD=8a0075de…`, `EXPECT_TREE=b8aab8e6…`, `EXPECT_SPEC_BLOB=0af1709f…` (header word + three
-  pin lines; delta in `s8b-pg-proof.sh.diff-edd6dc6b-to-8a0075de`). BOOTSTRAP, FIXTURE, NM_CLIENT, NM_LOCK, OLD_HEAD unchanged.
-- filled sha now `be7981ebea205195e0aeecf4438a32f390be8167a29b8462bf21c5054f8ab3b9`; the edd6dc6b filled form kept as `s8b-pg-proof.sh.phase2-filled-edd6dc6b`
-  (`3fbdcdb1…`), with `PINS.txt.phase2-edd6dc6b` and `BINDING.sha256.phase2-edd6dc6b`.

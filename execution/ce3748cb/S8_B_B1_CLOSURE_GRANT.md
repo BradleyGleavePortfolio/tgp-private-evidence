@@ -1,0 +1,3 @@
+# S8-B B-1 closure grant — parent
+Both independent attesters (A and B, separately) found the same deterministic B-1: spec `tally()` (L101) omits `intent_id` while the real `reconstruct()` returns it and the spec uses `toEqual` → stage-1 failure cascades. Harm: the single PG run fails with nothing learned. Blocks: S8-B PG grant only. Migration/down/schema/client content GO from both.
+Minimum closure: one new hooked Bradley commit on `s8-b` (no amend) adding `intent_id: 'intent'` (the fixture's actual intent value) to `tally`. No other change. Re-fill EXPECT_HEAD/TREE/SPEC_BLOB, reseal BINDING.sha256, re-export, `s8b/SOURCE_READY_B1.md`, stop. Then both attesters delta-check that hunk + pins.

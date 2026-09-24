@@ -81,3 +81,7 @@ The landing census found that GitHub's rebase-merge rewrites the committer to `G
 | ~22:40Z | backend `integration/importer` bddb3bd3 → 5e26d131 | S7-L0 decision 7f14a304 | PR #535, CI green | ce3748cb/s7l/L0_REVIEW.md |
 | ~22:45Z | extension `land/s4-r6` aa0abd83 → 8901d5f5 (PR #27 staged) | UX E1 no-run copy | FF; CI-proof #29 green, closed | ce3748cb/ux-e1/REVIEW.md |
 | ~00:20Z | backend `integration/importer` 5e26d131 → 7325e8cb | S7-C 1b6cc661 | PR #536, CI green incl. migration dry-run/reversibility | ce3748cb/C_LOCAL_ACCEPTANCE.md |
+| 22:1xZ | backend `integration/importer` 7325e8cb → 3f043405 | S8-A 2db062b0 | PR #537, CI green | ce3748cb/S8_A_ACCEPTANCE.md |
+| 22:4xZ | backend `integration/importer` 3f043405 → 93389265 | S8-B 8a0075de | PR #538, CI green incl. migration dry-run | ce3748cb/S8_B_LOCAL_ACCEPTANCE.md |
+
+Correction (C): the four ce3748cb rows above timed "~22:10Z / ~22:40Z / ~22:45Z / ~00:20Z" were parent estimates, not observed times; the actual order is correct and all occurred before 22:05Z on 2026-09-24. GitHub push/PR timestamps are authoritative. Original rows kept unchanged.

@@ -1,4 +1,15 @@
-# S7-L1 PG binding — substitution-only DRAFT (NOT RUN, NOT GRANTED, pins UNFILLED)
+# S7-L1 PG binding — pins FILLED to the S7-L2 head (NOT RUN, PG run NOT GRANTED)
+
+**Status 2026-09-24 (SOURCE_READY):** S7-L1 (`0ef55965`) and S7-L2 (`7ab9cc37` + follow-up `12de0bbd`, tree `28a7400b`) are committed on `s7-l` through
+lefthook. `s7l-pg-proof.sh` now carries the filled pins (OLD_HEAD = accepted C head `1b6cc661`, EXPECT_HEAD/TREE/SPEC/BOOTSTRAP,
+fixture and generated-client sha256, N/Q1 blobs re-pinned to their `1b6cc661` values, the accepted C blob block added at the
+marked slot). Filled sha256: `ed85a5a4700cf3c3359ad51a806ae060ae9e54953c2930bba05b48083197fd35` (see `PINS.txt`; the substitution-only
+form `d351870c…` is what `derive-s7l-pg-proof.py` describes). Still NOT executed against PostgreSQL. The runner runs only under a
+separate single-run PG grant; if S8-B lands on `integration/importer` first, re-pin OLD_HEAD (runner + committed harness) per
+POST_C_SEQUENCING before that run.
+
+---
+*Original draft README follows.*
 
 Source-only work under `execution/ce3748cb/s7l/**` (S7L_L0_L1_GRANT). Nothing here has been executed against
 PostgreSQL; no PostgreSQL process, lock, cluster directory or worktree git state was touched by drafting (the derivation

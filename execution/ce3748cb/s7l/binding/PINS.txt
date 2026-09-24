@@ -1,7 +1,13 @@
-status=UNFILLED (S7-L1 source-only draft; SQL/harness uncommitted; no schema hunk; no generate; no PG run)
-substitution_only_sha=d351870c34c99e2e7c4e2608bda177aa1a79f3488e9d0901f65d5a85c95d3a1c
-filled_sha=__FILL_AFTER_COMMIT__
+status=FILLED (S7-L1 0ef55965 + S7-L2 7ab9cc37 + follow-up 12de0bbd committed on s7-l via lefthook; pins point at the S7-L2 head; NO PG RUN yet; PG run not granted)
+substitution_only_sha=d351870c34c99e2e7c4e2608bda177aa1a79f3488e9d0901f65d5a85c95d3a1c   # unfilled form as derived from C (derive-s7l-pg-proof.py)
+filled_sha=ed85a5a4700cf3c3359ad51a806ae060ae9e54953c2930bba05b48083197fd35   # after pin fill (OLD_HEAD re-pin, EXPECT_* fill, N/Q1 re-pin, C blob block); the derive script's assertions describe the unfilled form only, as C recorded
 fixture_sha=6b3a76f499038b61fe6ee650a157f3798f1e441824a873630d1d9e929e379566
-OLD_HEAD=61b93cff7900b24c17011d481fd6c31f5abb59e4   # S7-L base while drafting (N/Q1 v1); re-pin to the accepted C head on the mechanical rebase (EXPECTED_MIGRATIONS 169 -> 170)
-HEAD=__FILL_AFTER_COMMIT__ TREE=__FILL_AFTER_COMMIT__ SPEC=__FILL_AFTER_COMMIT__ BOOTSTRAP=__FILL_AFTER_COMMIT__
-NM_CLIENT=__FILL_AFTER_GENERATE__   # sha256 of node_modules/.prisma/client/index.d.ts after the S7-L1-only prisma generate (receipt 03); the copied tree today carries the N client 92d42c56...
+OLD_HEAD=1b6cc66164b3398d573ba92f0c8f6b039494be24   # accepted C head = S7-L base (EXPECTED_MIGRATIONS/HISTORY 170); if S8-B is accepted before the PG run, re-pin OLD_HEAD here + runner + g2-s7l-{bootstrap,old-root}.sh + g2-s7l-pg-harness.ts (POST_C_SEQUENCING)
+HEAD=12de0bbd7514f21cd6abe2a0480976592d3ab2e1 TREE=28a7400ba4d2e10650ff71175120c2a9aaac2446
+L2_HEAD=7ab9cc379e6d06187bb912cfd3442f28570ae46f L2_TREE=44384a90cd03fda458b50cf1886ee69882f11e36
+L1_HEAD=0ef55965688ee0221d59ac200a393b22c1386b47 L1_TREE=ef14cf77ec72146b0d835b4aedab3ea4a5007d78
+SPEC=af199dbfba4f63f8554eef07ba3ecc5cc0189d9b BOOTSTRAP=60ec9fc3950d2e99fad13a8f217ac95a495b52ca
+NM_CLIENT=f9797c301a6cbea98f37540e91e18ccb11bd878ec08d84ef206d93c7f6c5bfe9   # node_modules/.prisma/client/index.d.ts after the S7-L1 prisma generate (receipt 03); verified identical at pin-fill time
+NM_LOCK=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
+NQ1_REPINS=test/utils/g2-nq1-pg-harness.ts:d51267f2 test/rls-g2-nq1.spec.ts:a9338260   # changed by C's 29e60705; other five N/Q1 blobs unchanged
+C_PINS=g2-c-db.ts:2d282024 g2-c-pg-harness.ts:378e0110 g2-c-harness.ts:5186c351 g2-c-bootstrap.sh:54ad1352 g2-c-old-root.sh:0f7d1401 g2-c-db-guard.spec.ts:78fd72c9 rls-g2-c-contract.spec.ts:6c40544d migdir-20270121:35a0cdab

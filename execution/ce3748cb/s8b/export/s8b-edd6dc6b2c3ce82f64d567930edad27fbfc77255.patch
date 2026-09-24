@@ -1,0 +1,2241 @@
+From edd6dc6b2c3ce82f64d567930edad27fbfc77255 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 22:04:46 +0000
+Subject: [PATCH] feat(importer): expand the native provenance ledger and type
+ the reconstruction target
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+S8-B of the native contract (docs/decisions/2026-09-24-s8-native-contract.md,
+§3.3 with the A2 closure): migration 20270122000000_scout_native_provenance_expand
+creates ImportNativeProvenance, one row per (coach_id, source_namespace,
+entity_type, source_id) recording which native TGP object a canonical source
+entity became (native_kind, native_id) or why it did not (outcome unresolved,
+native_id NULL, reason required). Closed CHECKs on native_kind and outcome, a
+composite RESTRICT foreign key to ImportIntent, RLS forced with service_role the
+only writer, and anon/authenticated denied by privilege and by policy.
+ScoutReconstructionLedger gains a nullable target_kind, closed by CHECK and
+requiring a target_id; the N/Q1/C writer never names it and keeps working
+unchanged on the expanded schema.
+
+down.sql refuses once any provenance row or typed ledger row exists (forward
+repair only) and otherwise removes exactly what this migration added.
+
+Schema-only: no writer code. The disposable PG 17 proof (test/rls-g2-s8b.spec.ts
+with its g2-s8b-* helpers, lane s8-b, port 55511) covers expand exactness, rerun
+refusal, mixed-version OLD/candidate writers, constraint and role refusals, and
+the refusing down; it runs only under its own explicit fixture and is excluded
+from the default Jest project.
+---
+ .../down.sql                                  |  87 +++
+ .../migration.sql                             | 196 ++++++
+ prisma/schema.prisma                          |  33 +
+ test/rls-g2-s8b.spec.ts                       | 641 ++++++++++++++++++
+ test/scout/g2-s8b-db-guard.spec.ts            | 124 ++++
+ test/utils/g2-s8b-bootstrap.sh                | 269 ++++++++
+ test/utils/g2-s8b-db.ts                       | 117 ++++
+ test/utils/g2-s8b-harness.ts                  | 284 ++++++++
+ test/utils/g2-s8b-old-root.sh                 | 102 +++
+ test/utils/g2-s8b-pg-harness.ts               | 255 +++++++
+ 10 files changed, 2108 insertions(+)
+ create mode 100644 prisma/migrations/20270122000000_scout_native_provenance_expand/down.sql
+ create mode 100644 prisma/migrations/20270122000000_scout_native_provenance_expand/migration.sql
+ create mode 100644 test/rls-g2-s8b.spec.ts
+ create mode 100644 test/scout/g2-s8b-db-guard.spec.ts
+ create mode 100755 test/utils/g2-s8b-bootstrap.sh
+ create mode 100644 test/utils/g2-s8b-db.ts
+ create mode 100644 test/utils/g2-s8b-harness.ts
+ create mode 100755 test/utils/g2-s8b-old-root.sh
+ create mode 100644 test/utils/g2-s8b-pg-harness.ts
+
+diff --git a/prisma/migrations/20270122000000_scout_native_provenance_expand/down.sql b/prisma/migrations/20270122000000_scout_native_provenance_expand/down.sql
+new file mode 100644
+index 00000000..bba4571a
+--- /dev/null
++++ b/prisma/migrations/20270122000000_scout_native_provenance_expand/down.sql
+@@ -0,0 +1,87 @@
++-- Reverse of 20270122000000_scout_native_provenance_expand (G2-S8-B).
++-- Disposable/pre-use only. Returns the catalog to the accepted N/Q1 (+C) shape: drops
++-- ONLY the two ledger target_kind CHECK constraints, the ledger target_kind column and
++-- the ImportNativeProvenance table (with its own indexes, constraints, FK and policies).
++-- Every ledger row, every ledger value, both ledger identity keys, the canonical CHECK,
++-- the ledger RLS flags and its three policies are untouched. Refuses to erase even one
++-- recorded native provenance fact: once any ImportNativeProvenance row exists OR any
++-- ledger row carries a typed target, the schema is retained and repair is forward-only
++-- (same doctrine as the C1 and S7-L1 downs). Refuses when S8-B is absent or not exactly
++-- as shipped, so raw reruns fail atomically; the recorded migration history is not
++-- rewritten here.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++-- Do not certify emptiness from an RLS-filtered view, even for a table owner.
++-- This setting rejects filtered queries; it does not disable or bypass RLS.
++SET LOCAL row_security = off;
++LOCK TABLE public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++BEGIN
++  -- S8-B exactly as shipped: the provenance table (RLS enabled+forced) with its four validated
++  -- CHECKs, its validated composite FK to ImportIntent, its identity key and two indexes, its
++  -- three policies; the ledger target_kind column with both validated CHECKs. Anything else
++  -- (absent, partial, decoy) is refused. The table's presence is tested first (by name, no
++  -- regclass cast) so a pre-S8-B database or a rerun receives this fixed text, not a raw
++  -- undefined-table error; the table lock is taken only once the relation is known to exist.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_class t
++    WHERE t.oid = to_regclass('public."ImportNativeProvenance"')
++      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++  ) THEN
++    RAISE EXCEPTION 'G2-S8B provenance absent';
++  END IF;
++  LOCK TABLE public."ImportNativeProvenance" IN ACCESS EXCLUSIVE MODE;
++  IF (
++    SELECT count(*) FROM pg_catalog.pg_constraint c
++    WHERE c.conrelid = 'public."ImportNativeProvenance"'::regclass AND c.contype = 'c' AND c.convalidated
++      AND c.conname IN ('ImportNativeProvenance_native_kind_check', 'ImportNativeProvenance_outcome_check',
++                        'ImportNativeProvenance_native_id_shape_check', 'ImportNativeProvenance_unresolved_reason_check')
++  ) <> 4 OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_constraint c
++    WHERE c.conrelid = 'public."ImportNativeProvenance"'::regclass AND c.contype = 'f' AND c.convalidated
++      AND c.conname = 'ImportNativeProvenance_import_intent_id_coach_id_fkey'
++      AND c.confrelid = to_regclass('public."ImportIntent"')
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_index i
++    WHERE i.indexrelid = to_regclass('public."ImportNativeProvenance_identity_key"')
++      AND i.indrelid = 'public."ImportNativeProvenance"'::regclass
++      AND i.indisunique AND i.indisvalid AND i.indpred IS NULL
++      AND pg_get_indexdef(i.indexrelid) =
++        'CREATE UNIQUE INDEX "ImportNativeProvenance_identity_key" ON public."ImportNativeProvenance" USING btree (coach_id, source_namespace, entity_type, source_id)'
++  ) OR (
++    SELECT count(*) FROM pg_catalog.pg_index i
++    WHERE i.indrelid = 'public."ImportNativeProvenance"'::regclass AND i.indisvalid
++      AND i.indexrelid IN (to_regclass('public."ImportNativeProvenance_coach_id_native_kind_native_id_idx"'),
++                           to_regclass('public."ImportNativeProvenance_coach_id_import_intent_id_idx"'))
++  ) <> 2 OR (
++    SELECT count(*) FROM pg_catalog.pg_policy p
++    WHERE p.polrelid = 'public."ImportNativeProvenance"'::regclass
++      AND p.polname IN ('p_import_native_provenance_service_role_all', 'deny_all_anon_import_native_provenance',
++                        'deny_all_authenticated_import_native_provenance')
++  ) <> 3 OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass AND a.attname = 'target_kind'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
++  ) OR (
++    SELECT count(*) FROM pg_catalog.pg_constraint c
++    WHERE c.conrelid = 'public."ScoutReconstructionLedger"'::regclass AND c.contype = 'c' AND c.convalidated
++      AND c.conname IN ('ScoutReconstructionLedger_target_kind_check', 'ScoutReconstructionLedger_target_kind_shape_check')
++  ) <> 2 THEN
++    RAISE EXCEPTION 'G2-S8B provenance absent';
++  END IF;
++  -- Refuse to erase recorded native provenance facts. Fixed, identifier-free text; nothing is named.
++  IF EXISTS (SELECT 1 FROM public."ImportNativeProvenance")
++    OR EXISTS (SELECT 1 FROM public."ScoutReconstructionLedger" WHERE "target_kind" IS NOT NULL) THEN
++    RAISE EXCEPTION 'Native provenance state exists; retain schema and use compatible forward repair';
++  END IF;
++END $$;
++
++ALTER TABLE public."ScoutReconstructionLedger" DROP CONSTRAINT "ScoutReconstructionLedger_target_kind_shape_check";
++ALTER TABLE public."ScoutReconstructionLedger" DROP CONSTRAINT "ScoutReconstructionLedger_target_kind_check";
++ALTER TABLE public."ScoutReconstructionLedger" DROP COLUMN "target_kind";
++-- No CASCADE: any dependent object makes the drop refuse atomically. Policies, indexes, the FK
++-- and the CHECKs of the table go with it.
++DROP TABLE public."ImportNativeProvenance";
++COMMIT;
+diff --git a/prisma/migrations/20270122000000_scout_native_provenance_expand/migration.sql b/prisma/migrations/20270122000000_scout_native_provenance_expand/migration.sql
+new file mode 100644
+index 00000000..0e026270
+--- /dev/null
++++ b/prisma/migrations/20270122000000_scout_native_provenance_expand/migration.sql
+@@ -0,0 +1,196 @@
++-- G2-S8-B only: the native provenance ledger expand
++-- (docs/decisions/2026-09-24-s8-native-contract.md §3.3, D-S8-3). Additive and
++-- metadata-only: ONE new table ImportNativeProvenance keyed on the D-S8-3 identity
++-- (coach_id, source_namespace, entity_type, source_id), with closed CHECKs on
++-- native_kind and outcome, native_id NULL exactly when outcome = 'unresolved', a
++-- reason on every unresolved record, and a composite owner-scoped FK to
++-- ImportIntent(id, coach_id) (nullable until S7-L L4 binds Scout runs to server
++-- intents); plus ONE nullable column ScoutReconstructionLedger.target_kind with a
++-- closed CHECK, so a ledger target is typed without adding columns to every native
++-- table (CQ-14). No data is rewritten, renamed or dropped; every existing ledger row
++-- keeps target_kind NULL. Ledger RLS (ENABLE+FORCE, the three 20261223000200
++-- policies), both identity keys, the canonical CHECK and the NOT NULL provenance
++-- are untouched. NOT a writer/reader/route change: the N/Q1 (+C) writer keeps
++-- upserting the five-field ledger identity and never names target_kind; S8-C is the
++-- first code that writes a provenance row. Separate release artifact; own
++-- promotion stage after C (D-C2); order-independent of 20270123000000 (S7-L1).
++--
++-- Entry gate (refuses, never derives, deletes or repairs): the accepted ledger
++-- shape (RLS enabled+forced, the R wide identity key and canonical CHECK exactly
++-- as shipped, source_platform NOT NULL TEXT, status NOT NULL TEXT, target_id
++-- nullable TEXT without default), the C1 FK target ImportIntent(id, coach_id)
++-- exactly as shipped, and none of the objects this file creates (raw rerun,
++-- partial state or a decoy holding one of the names). Raw reruns fail atomically.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++LOCK TABLE public."ImportIntent" IN SHARE ROW EXCLUSIVE MODE;
++
++DO $$
++BEGIN
++  -- Accepted ledger identity: the R wide key on an RLS-forced table, exactly as shipped, and the
++  -- validated canonical CHECK keyed on source_platform alone.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_index i
++    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++    WHERE i.indexrelid = to_regclass('public."ScoutReconstructionLedger_identity_key"')
++      AND i.indrelid = to_regclass('public."ScoutReconstructionLedger"')
++      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++      AND pg_get_indexdef(i.indexrelid) =
++        'CREATE UNIQUE INDEX "ScoutReconstructionLedger_identity_key" ON public."ScoutReconstructionLedger" USING btree (coach_id, intent_id, entity_type, source_platform, source_id)'
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_constraint c
++    JOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attname = 'source_platform'
++    WHERE c.conname = 'ScoutReconstructionLedger_source_platform_canonical'
++      AND c.conrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND c.contype = 'c' AND c.convalidated AND c.conkey = ARRAY[a.attnum]
++  ) THEN
++    RAISE EXCEPTION 'G2-S8B unexpected ledger identity prerequisite';
++  END IF;
++  -- Ledger outcome columns exactly as shipped: status NOT NULL TEXT, target_id nullable TEXT
++  -- without default, source_platform NOT NULL TEXT (R).
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass AND a.attname = 'status'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass AND a.attname = 'target_id'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass AND a.attname = 'source_platform'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
++  ) THEN
++    RAISE EXCEPTION 'G2-S8B unexpected ledger column prerequisite';
++  END IF;
++  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_index i
++    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
++      AND i.indrelid = to_regclass('public."ImportIntent"')
++      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++      AND pg_get_indexdef(i.indexrelid) =
++        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
++      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
++  ) THEN
++    RAISE EXCEPTION 'G2-S8B unexpected intent prerequisite';
++  END IF;
++  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
++  IF to_regclass('public."ImportNativeProvenance"') IS NOT NULL
++    OR to_regclass('public."ImportNativeProvenance_pkey"') IS NOT NULL
++    OR to_regclass('public."ImportNativeProvenance_identity_key"') IS NOT NULL
++    OR to_regclass('public."ImportNativeProvenance_coach_id_native_kind_native_id_idx"') IS NOT NULL
++    OR to_regclass('public."ImportNativeProvenance_coach_id_import_intent_id_idx"') IS NOT NULL
++    OR EXISTS (
++      SELECT 1 FROM pg_catalog.pg_constraint
++      WHERE connamespace = 'public'::regnamespace
++        AND conname IN ('ImportNativeProvenance_pkey',
++                        'ImportNativeProvenance_native_kind_check',
++                        'ImportNativeProvenance_outcome_check',
++                        'ImportNativeProvenance_native_id_shape_check',
++                        'ImportNativeProvenance_unresolved_reason_check',
++                        'ImportNativeProvenance_import_intent_id_coach_id_fkey',
++                        'ScoutReconstructionLedger_target_kind_check',
++                        'ScoutReconstructionLedger_target_kind_shape_check')
++    ) OR EXISTS (
++      SELECT 1 FROM pg_catalog.pg_attribute a
++      WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass AND NOT a.attisdropped
++        AND a.attname = 'target_kind'
++    ) THEN
++    RAISE EXCEPTION 'G2-S8B provenance already present';
++  END IF;
++END $$;
++
++-- The native provenance ledger (contract §3.3). One record per native row written (top-level or
++-- nested child, outcome created) and one per unresolved nested child (native_id NULL, outcome
++-- unresolved, §3.7 reason). Identity is the D-S8-3 key; source_namespace equals source_platform
++-- until G3 attribution lands and is an opaque string here (no format CHECK, never parsed).
++-- source_id is unbounded TEXT: wide enough for the injective child encoding
++-- `<n>:<parent source_id>#id:<child id>` / `<n>:<parent source_id>#ord:<ordinal>`.
++-- Audit columns keep database defaults (source timestamps are never written here, §3.3).
++CREATE TABLE public."ImportNativeProvenance" (
++  "id"               TEXT NOT NULL,
++  "coach_id"         TEXT NOT NULL,
++  "import_intent_id" UUID,
++  "source_namespace" TEXT NOT NULL,
++  "entity_type"      TEXT NOT NULL,
++  "source_id"        TEXT NOT NULL,
++  "native_kind"      TEXT NOT NULL,
++  "native_id"        TEXT,
++  "outcome"          TEXT NOT NULL,
++  "reason"           TEXT,
++  "created_at"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  CONSTRAINT "ImportNativeProvenance_pkey" PRIMARY KEY ("id"),
++  -- Closed vocabularies (contract §3.3 minimum native_kind set; §3.2 outcomes). Adding a native
++  -- kind is a core change by design.
++  CONSTRAINT "ImportNativeProvenance_native_kind_check"
++    CHECK ("native_kind" IN ('person', 'scout_entity', 'workout_program', 'workout_plan', 'workout_plan_exercise')),
++  CONSTRAINT "ImportNativeProvenance_outcome_check"
++    CHECK ("outcome" IN ('created', 'already_present', 'unresolved')),
++  -- A2 closure: native_id is NULL exactly when the outcome is unresolved.
++  CONSTRAINT "ImportNativeProvenance_native_id_shape_check"
++    CHECK (("native_id" IS NULL) = ("outcome" = 'unresolved')),
++  -- Every unresolved record carries its §3.7 reason code.
++  CONSTRAINT "ImportNativeProvenance_unresolved_reason_check"
++    CHECK ("outcome" <> 'unresolved' OR "reason" IS NOT NULL),
++  -- Composite owner-scoped FK (the C1 ExtensionPairCode / S7-L1 pattern): a bound intent must
++  -- belong to the same coach and cannot vanish under its provenance. RESTRICT: provenance is a
++  -- durable record; erasure is the L8 seam. Nullable until S7-L L4 binds Scout runs to intents.
++  CONSTRAINT "ImportNativeProvenance_import_intent_id_coach_id_fkey"
++    FOREIGN KEY ("import_intent_id", "coach_id") REFERENCES public."ImportIntent" ("id", "coach_id")
++    ON DELETE RESTRICT ON UPDATE CASCADE
++);
++-- D-S8-3 identity: the only arbiter of native provenance identity (replay converges on it, §3.4).
++CREATE UNIQUE INDEX "ImportNativeProvenance_identity_key"
++  ON public."ImportNativeProvenance" ("coach_id", "source_namespace", "entity_type", "source_id");
++-- Reverse lookup by native target (S8-F readers, §3.5 identity_conflict / native_target_removed).
++CREATE INDEX "ImportNativeProvenance_coach_id_native_kind_native_id_idx"
++  ON public."ImportNativeProvenance" ("coach_id", "native_kind", "native_id");
++-- Per-run counts (PLAN L248 created_native / already_present_verified / unresolved).
++CREATE INDEX "ImportNativeProvenance_coach_id_import_intent_id_idx"
++  ON public."ImportNativeProvenance" ("coach_id", "import_intent_id");
++
++-- RLS: RESTRICTIVE deny-all to anon + authenticated with a service_role bypass, identical posture to
++-- ScoutReconstructionLedger (20261223000200), plus the S1 belt-and-braces REVOKE of the API-role
++-- table privileges Supabase's default privileges would otherwise grant. Native writers run
++-- server-side as service_role; no client principal reads or writes provenance directly.
++ALTER TABLE public."ImportNativeProvenance" ENABLE ROW LEVEL SECURITY;
++ALTER TABLE public."ImportNativeProvenance" FORCE ROW LEVEL SECURITY;
++REVOKE ALL PRIVILEGES ON TABLE public."ImportNativeProvenance" FROM anon, authenticated;
++CREATE POLICY "p_import_native_provenance_service_role_all" ON public."ImportNativeProvenance"
++  AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true);
++COMMENT ON POLICY "p_import_native_provenance_service_role_all" ON public."ImportNativeProvenance" IS 'service_role bypass: native provenance is written/read only via the server-side native writers running as service_role.';
++CREATE POLICY "deny_all_anon_import_native_provenance" ON public."ImportNativeProvenance"
++  AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_anon_import_native_provenance" ON public."ImportNativeProvenance" IS 'RESTRICTIVE deny-all: anon can never read/write native provenance regardless of any permissive policy.';
++CREATE POLICY "deny_all_authenticated_import_native_provenance" ON public."ImportNativeProvenance"
++  AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_authenticated_import_native_provenance" ON public."ImportNativeProvenance" IS 'RESTRICTIVE deny-all: authenticated principals can never read/write native provenance directly; only service_role may (no cross-tenant oracle).';
++
++-- Typed ledger target (contract §3.2): created / already_present are ledger `reconstructed` with a
++-- typed target. Nullable, no default: metadata-only, no row is rewritten, and the N/Q1 (+C) writer
++-- (which never names the column) keeps inserting NULL. workout_plan_exercise is a child-only
++-- native_kind and is deliberately not a ledger target.
++ALTER TABLE public."ScoutReconstructionLedger" ADD COLUMN "target_kind" TEXT;
++ALTER TABLE public."ScoutReconstructionLedger"
++  ADD CONSTRAINT "ScoutReconstructionLedger_target_kind_check"
++  CHECK ("target_kind" IS NULL OR "target_kind" IN ('person', 'scout_entity', 'workout_program', 'workout_plan'));
++-- A kind without a target is meaningless: target_kind is set only beside a target_id.
++ALTER TABLE public."ScoutReconstructionLedger"
++  ADD CONSTRAINT "ScoutReconstructionLedger_target_kind_shape_check"
++  CHECK ("target_kind" IS NULL OR "target_id" IS NOT NULL);
++COMMIT;
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 943945ce..32e44110 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -6769,6 +6769,7 @@ model ImportIntent {
+   paired_at       DateTime?
+   superseded_at   DateTime?
+   challenge       ExtensionPairCode?
++  native_provenance ImportNativeProvenance[]
+ 
+   @@unique([id, coach_id])
+   @@unique([coach_id, setup_nonce])
+@@ -6945,6 +6946,10 @@ model ScoutReconstructionLedger {
+   source_platform String
+   status      String
+   target_id   String?
++  // S8-B (20270122000000_scout_native_provenance_expand): the native kind of target_id, closed by
++  // CHECK (person | scout_entity | workout_program | workout_plan); NULL for every row written by
++  // the N/Q1/C writer, which never names it. A typed target requires a target_id (shape CHECK).
++  target_kind String?
+   reason      String?
+   created_at  DateTime @default(now())
+ 
+@@ -6958,6 +6963,34 @@ model ScoutReconstructionLedger {
+   @@index([coach_id, intent_id])
+ }
+ 
++// S8-B native provenance ledger (docs/decisions/2026-09-24-s8-native-contract.md §3.3; migration
++// 20270122000000_scout_native_provenance_expand). One row per (coach_id, source_namespace, entity_type,
++// source_id): which native TGP object a canonical source entity became, or why it did not
++// (outcome `unresolved` ⇔ native_id NULL, reason required). Child entities encode their parent in
++// source_id (`<len>:<parent>#id:<child>` / `<len>:<parent>#ord:<n>`). The database carries the closed
++// CHECKs on native_kind and outcome and the two shape CHECKs; Prisma cannot express them. Bound to
++// the import intent by the composite (id, coach_id) key with ON DELETE RESTRICT: provenance never
++// silently vanishes with its intent. RLS RESTRICTIVE deny-all to anon + authenticated; service_role
++// only. Written by the S8-C..E native writers; this model ships schema-only.
++model ImportNativeProvenance {
++  id               String        @id @default(uuid())
++  coach_id         String
++  import_intent_id String?       @db.Uuid
++  intent           ImportIntent? @relation(fields: [import_intent_id, coach_id], references: [id, coach_id], onDelete: Restrict, onUpdate: Cascade)
++  source_namespace String
++  entity_type      String
++  source_id        String
++  native_kind      String
++  native_id        String?
++  outcome          String
++  reason           String?
++  created_at       DateTime      @default(now())
++
++  @@unique([coach_id, source_namespace, entity_type, source_id], map: "ImportNativeProvenance_identity_key")
++  @@index([coach_id, native_kind, native_id])
++  @@index([coach_id, import_intent_id])
++}
++
+ // ============================================================
+ // IMPORTER-H — multi-family reconstruction (canonical non-person entities)
+ // ============================================================
+diff --git a/test/rls-g2-s8b.spec.ts b/test/rls-g2-s8b.spec.ts
+new file mode 100644
+index 00000000..bd94ef73
+--- /dev/null
++++ b/test/rls-g2-s8b.spec.ts
+@@ -0,0 +1,641 @@
++// G2-S8-B proof on the isolated PostgreSQL 17 lane (S1-provisioned, synthetic data only).
++// Ordered stages in ONE file, run with --runInBand, on a FRESH bootstrap whose "old" side is
++// a detached checkout of OLD_HEAD (the S8-B base: the accepted C head 1b6cc661), whose
++// `prisma migrate deploy`
++// installed the whole accepted history. The candidate ships EXACTLY ONE migration
++// (20270122000000_scout_native_provenance_expand), applied here through the candidate's own
++// `prisma migrate deploy` (P01, the release mechanism).
++//   1. baseline on the OLD shape: the OLD N writer reconstructs a family; up refuses a decoy
++//      relation, a decoy constraint and a held lock, each leaving nothing;
++//   2. P01 deploy exactness (provenance table columns/CHECKs/FK/indexes/RLS/grants exact; the
++//      ledger gains exactly one nullable column and two CHECKs; ledger RLS byte-equal; ledger
++//      rows untouched), P02 rerun refusal;
++//   3. P05 mixed version (OLD and candidate N writers + readers unchanged on the S8-B schema),
++//      CHECK/FK/identity refusals, the contract's child source_id encoding, P06 API-role denial
++//      (revoked privileges AND policies) and service-role rollback;
++//   4. P03 down refusal with provenance state (fixed text, nothing deleted), P04 down/up shape
++//      identity with ledger rows retained; history never rewritten.
++// Accepted E/T-Q0, B, R, N/Q1 (and C) proofs are neither rerun nor restated. Nothing here
++// claims deployment, S8-C behaviour (no native writer exists yet), or customer acceptance.
++import { execFileSync } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  appliedMigrations,
++  directory,
++  downFile,
++  expectedVersion,
++  holdTransaction,
++  json,
++  OLD_HEAD,
++  oldClient,
++  prisma,
++  prismaMigrateDeploy,
++  quote,
++  refused,
++  refusedFile,
++  root,
++  run,
++  S8B_MIGRATION,
++  sql,
++  sqlAdmin,
++  sqlAs,
++  sqlFile,
++  target,
++  upFile,
++} from './utils/g2-s8b-pg-harness';
++import { G2_S8B_CLUSTER_MARKER, G2_S8B_DATABASE_MARKER } from './utils/g2-s8b-db';
++import {
++  childSourceId,
++  columns,
++  constraints,
++  EXPECTED_FK_DEF,
++  EXPECTED_INDEX_DEFS,
++  EXPECTED_LEDGER_CHECK_DEFS,
++  EXPECTED_LEDGER_TARGET_KIND,
++  EXPECTED_PK_DEF,
++  EXPECTED_PROVENANCE_CHECK_DEFS,
++  EXPECTED_PROVENANCE_COLUMNS,
++  exists,
++  FK_NAME,
++  IDENTITY_INDEX,
++  identityRows,
++  indexes,
++  intent,
++  intentCount,
++  LEDGER,
++  LEDGER_CHECK_NAMES,
++  LEDGER_POLICIES,
++  ledgerCount,
++  ledgerRows,
++  ledgerRowsWithoutTargetKind,
++  ledgerTargetKind,
++  ledgerTypedCount,
++  personCount,
++  PROVENANCE,
++  PROVENANCE_CHECK_NAMES,
++  PROVENANCE_POLICIES,
++  provenanceCount,
++  provenanceInsert,
++  provenanceRows,
++  resetData,
++  rls,
++  settle,
++  shape,
++  shapeWithOids,
++  stage,
++} from './utils/g2-s8b-harness';
++
++jest.setTimeout(240000);
++/** Accepted history installed by the OLD root's deploy: 170 at the accepted C head 1b6cc661. */
++const EXPECTED_HISTORY = 170;
++const ALREADY = 'G2-S8B provenance already present';
++const ABSENT = 'G2-S8B provenance absent';
++const REFUSE_DOWN =
++  'Native provenance state exists; retain schema and use compatible forward repair';
++const byName = (list: any[]) => Object.fromEntries(list.map((entry: any[]) => [entry[0], entry]));
++const tally = (staged: number, reconstructed: number) => ({
++  staged,
++  reconstructed,
++  skipped: 0,
++  failed: 0,
++});
++/** The OLD-shape snapshot (down target) and the S8-B snapshot (up target), both OID-free. */
++let before: ReturnType<typeof shape>;
++let after: ReturnType<typeof shape>;
++let afterOids: ReturnType<typeof shapeWithOids>;
++
++// Teardown authority (S5-R3-A-01), unchanged from the accepted proofs: no mutating cleanup
++// against a fixture whose identity this proof never accepted.
++let teardownAuthorized = false;
++
++beforeAll(() => {
++  const identity =
++    json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
++    'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
++    'version',current_setting('server_version_num'),'user',current_user,'super',
++    (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
++    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
++    (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
++  expect(identity).toMatchObject({
++    database: 'g2_s8b_disposable',
++    address: '127.0.0.1',
++    port: target.port,
++    directory,
++    user: 'postgres',
++    super: false,
++    bypassrls: true,
++    owner: 'postgres',
++  });
++  expect(Number(identity.version)).toBe(expectedVersion);
++  expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
++  expect(Number(identity.version)).toBeLessThan(180000);
++  expect(directory).toMatch(/\/pg17\/clusters\/s8-b\/pg-data$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_S8B_CLUSTER_MARKER);
++  expect(
++    sql(
++      `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++    ),
++  ).toBe(G2_S8B_DATABASE_MARKER);
++  console.warn('PG17_DATABASE', JSON.stringify(identity));
++  // Fresh OLD-shaped bootstrap: the whole accepted history through the OLD root's own
++  // `prisma migrate deploy`; S8-B absent in both catalog and history.
++  expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations" WHERE migration_name=${quote(S8B_MIGRATION)}`),
++  ).toBe('0');
++  expect(exists(PROVENANCE)).toBe(false);
++  expect(ledgerTargetKind()).toEqual([]);
++  for (const name of LEDGER_CHECK_NAMES)
++    expect(byName(constraints(LEDGER))).not.toHaveProperty(name);
++  expect(byName(indexes(LEDGER))).toHaveProperty('ScoutReconstructionLedger_identity_key');
++  // The candidate ships exactly S8-B: its migration tree differs from OLD_HEAD by the two files.
++  expect(
++    execFileSync('git', ['diff', '--name-only', OLD_HEAD, 'HEAD', '--', 'prisma/migrations'], {
++      cwd: root,
++      encoding: 'utf8',
++    })
++      .trim()
++      .split('\n')
++      .sort(),
++  ).toEqual([
++    `prisma/migrations/${S8B_MIGRATION}/down.sql`,
++    `prisma/migrations/${S8B_MIGRATION}/migration.sql`,
++  ]);
++  // The candidate client is S8-B's (provenance model + ledger target_kind); the OLD client is
++  // pre-S8-B (neither), while both carry N's required ledger source_platform.
++  const client = readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8');
++  expect(client).toMatch(/model ImportNativeProvenance \{/);
++  expect(client).toMatch(/model ScoutReconstructionLedger \{[^}]*\n\s+target_kind\s+String\?/);
++  expect(client).toMatch(/model ScoutReconstructionLedger \{[^}]*\n\s+source_platform\s+String\s/);
++  const old = readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8');
++  expect(old).not.toMatch(/model ImportNativeProvenance \{/);
++  expect(old).not.toMatch(/model ScoutReconstructionLedger \{[^}]*\n\s+target_kind\s/);
++  expect(old).toMatch(/model ScoutReconstructionLedger \{[^}]*\n\s+source_platform\s+String\s/);
++  expect(
++    sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
++    FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`),
++  ).toBe('false:false,false:false,false:true');
++  // Read-only gates passed; authorize teardown, then the accepted setup mutations.
++  teardownAuthorized = true;
++  sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
++    GRANT ALL ON public."ScoutImport",public."ScoutIngestEntity",public."ScoutReconstructionLedger",
++      public."Person",public."ScoutReconstructedEntity",public."ImportIntent",public."ExtensionPairCode",
++      public."User" TO service_role,anon,authenticated;`);
++  resetData();
++  settle();
++});
++
++afterAll(() => {
++  if (!teardownAuthorized) {
++    console.warn(
++      'PG17_TEARDOWN_SKIPPED',
++      JSON.stringify({ reason: 'setup refused before first mutation; no DDL/DML issued' }),
++    );
++    return;
++  }
++  // Synthetic rows only; the schema (S8-B applied and recorded) is retained for inspection.
++  resetData();
++});
++
++describe('stage 1: OLD shape baseline and refusing entry gates', () => {
++  it('the OLD N writer reconstructs a family on the pre-S8-B schema (baseline snapshot)', async () => {
++    stage('a');
++    const pass = await run({}, true);
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result).toEqual(tally(1, 1));
++    expect(identityRows()).toEqual([
++      ['clients', 'a', 'truecoach', 'reconstructed', expect.any(String)],
++    ]);
++    expect(personCount()).toBe(1);
++    before = shape();
++    expect(before.provenanceExists).toBe(false);
++    expect(before.ledger.rls).toMatchObject({ enabled: true, forced: true });
++    expect(before.ledger.rls.policies.map((p: any) => p.policyname)).toEqual([...LEDGER_POLICIES]);
++  });
++  it('a decoy relation holding the provenance name refuses up; the decoy and the ledger are untouched', () => {
++    sql(`CREATE TABLE public."${PROVENANCE}" (decoy integer)`);
++    const withDecoy = shapeWithOids();
++    refusedFile(upFile, ALREADY);
++    expect(shapeWithOids()).toEqual(withDecoy);
++    expect(ledgerTargetKind()).toEqual([]);
++    expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
++    // Fixture shaping only: remove the harness's own decoy; the OLD shape is back.
++    sql(`DROP TABLE public."${PROVENANCE}"`);
++    expect(shape()).toEqual(before);
++  });
++  it('a decoy ledger constraint holding an S8-B name refuses up; nothing is created', () => {
++    sql(
++      `ALTER TABLE public."${LEDGER}" ADD CONSTRAINT "ScoutReconstructionLedger_target_kind_check" CHECK (true)`,
++    );
++    const withDecoy = shapeWithOids();
++    refusedFile(upFile, ALREADY);
++    expect(shapeWithOids()).toEqual(withDecoy);
++    expect(exists(PROVENANCE)).toBe(false);
++    sql(
++      `ALTER TABLE public."${LEDGER}" DROP CONSTRAINT "ScoutReconstructionLedger_target_kind_check"`,
++    );
++    expect(shape()).toEqual(before);
++  });
++  it('a held transaction on the ledger makes up hit lock_timeout (55P03); nothing applied; release → free', async () => {
++    const snapshot = shapeWithOids();
++    const holder = holdTransaction(`SELECT count(*) FROM public."${LEDGER}"`);
++    await holder.held;
++    try {
++      let error: unknown;
++      const started = Date.now();
++      try {
++        sqlFile(upFile);
++      } catch (e) {
++        error = e;
++      }
++      const elapsed = Date.now() - started;
++      expect(String(error)).toMatch(/canceling statement due to lock timeout/);
++      // The 5s budget is the file's own SET LOCAL lock_timeout, not the harness timeout.
++      expect(elapsed).toBeGreaterThanOrEqual(4500);
++      expect(elapsed).toBeLessThan(30000);
++      expect(shapeWithOids()).toEqual(snapshot);
++      expect(exists(PROVENANCE)).toBe(false);
++      expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
++      console.warn('PG17_LOCK_TIMEOUT', JSON.stringify({ elapsed }));
++    } finally {
++      holder.release();
++    }
++    for (let n = 0; n < 200; n++) {
++      const held = sqlAdmin(`SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid=l.relation
++        WHERE c.relname=${quote(LEDGER)} AND l.granted AND l.pid<>pg_backend_pid()`);
++      if (held === '0') return;
++      await new Promise((r) => setTimeout(r, 25));
++    }
++    throw new Error('holder did not release the ledger lock');
++  });
++});
++
++describe('stage 2: S8-B through the release mechanism', () => {
++  it('P01: prisma migrate deploy applies exactly S8-B; both catalogs exact; ledger RLS and rows untouched', () => {
++    const ledgerBefore = ledgerRowsWithoutTargetKind();
++    const since = sql('SELECT now()');
++    const output = prismaMigrateDeploy(root);
++    expect(output).toContain(S8B_MIGRATION);
++    expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY + 1);
++    expect(
++      json(`SELECT COALESCE(jsonb_agg(migration_name ORDER BY migration_name),'[]')
++      FROM "_prisma_migrations" WHERE finished_at >= ${quote(since)}::timestamptz`),
++    ).toEqual([S8B_MIGRATION]);
++    // Provenance table: exact columns (names, types, nullability, defaults, order).
++    expect(columns(PROVENANCE)).toEqual(EXPECTED_PROVENANCE_COLUMNS);
++    // Constraints: four validated CHECKs, the composite FK, the PK; nothing else.
++    const cons = byName(constraints(PROVENANCE));
++    for (const name of PROVENANCE_CHECK_NAMES) {
++      expect(cons[name]).toEqual([name, 'c', true, EXPECTED_PROVENANCE_CHECK_DEFS[name]]);
++    }
++    expect(cons[FK_NAME]).toEqual([FK_NAME, 'f', true, EXPECTED_FK_DEF]);
++    expect(cons.ImportNativeProvenance_pkey).toEqual([
++      'ImportNativeProvenance_pkey',
++      'p',
++      true,
++      EXPECTED_PK_DEF,
++    ]);
++    expect(Object.keys(cons).sort()).toEqual(
++      [...PROVENANCE_CHECK_NAMES, FK_NAME, 'ImportNativeProvenance_pkey'].sort(),
++    );
++    // Indexes: PK, the D-S8-3 identity key, the native reverse lookup, the per-intent index.
++    const idx = byName(indexes(PROVENANCE));
++    expect(Object.keys(idx).sort()).toEqual(Object.keys(EXPECTED_INDEX_DEFS).sort());
++    for (const [name, def] of Object.entries(EXPECTED_INDEX_DEFS)) {
++      expect(idx[name]).toEqual([name, name.endsWith('_idx') ? false : true, true, def]);
++    }
++    // RLS: enabled + forced, exactly the three policies, no API-role table privilege (revoked),
++    // service_role privileged.
++    const posture = rls(PROVENANCE);
++    expect(posture).toMatchObject({ enabled: true, forced: true });
++    expect(posture.policies.map((p: any) => p.policyname)).toEqual([...PROVENANCE_POLICIES]);
++    expect(posture.policies.map((p: any) => [p.policyname, p.permissive, p.roles, p.cmd])).toEqual([
++      ['deny_all_anon_import_native_provenance', 'RESTRICTIVE', ['anon'], 'ALL'],
++      ['deny_all_authenticated_import_native_provenance', 'RESTRICTIVE', ['authenticated'], 'ALL'],
++      ['p_import_native_provenance_service_role_all', 'PERMISSIVE', ['service_role'], 'ALL'],
++    ]);
++    const grantees = new Set(posture.grants.map((g: any[]) => g[0]));
++    expect(grantees.has('anon')).toBe(false);
++    expect(grantees.has('authenticated')).toBe(false);
++    expect(grantees.has('service_role')).toBe(true);
++    // Ledger: exactly one nullable TEXT column without default appended, exactly two validated
++    // CHECKs added; indexes, RLS flags, policies and grants byte-equal to the OLD shape.
++    expect(columns(LEDGER)).toEqual([...before.ledger.columns, EXPECTED_LEDGER_TARGET_KIND]);
++    expect(ledgerTargetKind()).toEqual([EXPECTED_LEDGER_TARGET_KIND]);
++    const ledgerCons = byName(constraints(LEDGER));
++    for (const name of LEDGER_CHECK_NAMES) {
++      expect(ledgerCons[name]).toEqual([name, 'c', true, EXPECTED_LEDGER_CHECK_DEFS[name]]);
++    }
++    expect(Object.keys(ledgerCons).sort()).toEqual(
++      [...before.ledger.constraints.map((c: any[]) => c[0]), ...LEDGER_CHECK_NAMES].sort(),
++    );
++    expect(indexes(LEDGER)).toEqual(before.ledger.indexes);
++    expect(rls(LEDGER)).toEqual(before.ledger.rls);
++    // Existing ledger rows: every old column untouched, target_kind NULL on every row.
++    expect(ledgerRowsWithoutTargetKind()).toEqual(ledgerBefore);
++    expect(ledgerTypedCount()).toBe(0);
++    expect(provenanceCount()).toBe(0);
++    after = shape();
++    afterOids = shapeWithOids();
++    console.warn('PG17_S8B_APPLIED', JSON.stringify({ columns: columns(PROVENANCE).length }));
++  });
++  it('P02: a raw rerun of S8-B is refused atomically; OIDs, rows and history unchanged; deploy has nothing pending', () => {
++    const data = ledgerRows();
++    refusedFile(upFile, ALREADY);
++    expect(shapeWithOids()).toEqual(afterOids);
++    expect(ledgerRows()).toEqual(data);
++    expect(provenanceCount()).toBe(0);
++    expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY + 1);
++    const again = prisma(root, ['migrate', 'deploy']);
++    expect(again.ok).toBe(true);
++    expect(again.output).toMatch(/No pending migrations/);
++    expect(shapeWithOids()).toEqual(afterOids);
++  });
++});
++
++describe('stage 3: writers, constraints and API roles on S8-B', () => {
++  it('P05: the OLD image N writer (pre-S8-B client) reconstructs on S8-B unchanged: ledger rows carry target_kind NULL; replay converges', async () => {
++    stage('b');
++    const pass = await run({}, true);
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result).toEqual(tally(2, 2));
++    expect(identityRows()).toEqual([
++      ['clients', 'a', 'truecoach', 'reconstructed', expect.any(String)],
++      ['clients', 'b', 'truecoach', 'reconstructed', expect.any(String)],
++    ]);
++    expect(ledgerTypedCount()).toBe(0);
++    expect(personCount()).toBe(2);
++    expect(provenanceCount()).toBe(0);
++    // Replay from the OLD image: identical tally, no new row, no drift.
++    const first = ledgerRows();
++    const replay = await run({}, true);
++    expect(replay.failure).toBeUndefined();
++    expect(replay.result).toEqual(tally(2, 2));
++    expect(ledgerRows()).toEqual(first);
++    expect(personCount()).toBe(2);
++  });
++  it('P05: the candidate image N writer and both images` roster read behave identically on S8-B', async () => {
++    stage('c');
++    const pass = await run({});
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result).toEqual(tally(3, 3));
++    expect(identityRows().map((r: any[]) => r[1])).toEqual(['a', 'b', 'c']);
++    // The N writer never names target_kind: the candidate image leaves it NULL as well.
++    expect(ledgerTypedCount()).toBe(0);
++    expect(provenanceCount()).toBe(0);
++    const oldRead = await run({ action: 'roster', limit: 10 }, true);
++    const newRead = await run({ action: 'roster', limit: 10 });
++    expect(oldRead.failure).toBeUndefined();
++    expect(newRead.failure).toBeUndefined();
++    expect(newRead.result).toEqual(oldRead.result);
++    // Cross-tenant and unknown intents stay a uniform 404 for both images.
++    const foreignOld = await run({ action: 'roster', coach: 'other', limit: 10 }, true);
++    const foreignNew = await run({ action: 'roster', coach: 'other', limit: 10 });
++    expect(foreignOld.failure).toMatchObject({ status: 404 });
++    expect(foreignNew.failure).toMatchObject({ status: 404 });
++  });
++  it('CHECK/FK refuse every malformed provenance or typed-ledger row for the owner and the runtime role; nothing is written', () => {
++    const data = provenanceRows();
++    const ledger = ledgerRows();
++    const foreign = intent('other');
++    const cases: [string, string][] = [
++      [provenanceInsert({ native_kind: "'client'" }), 'ImportNativeProvenance_native_kind_check'],
++      [provenanceInsert({ native_kind: "'Person'" }), 'ImportNativeProvenance_native_kind_check'],
++      [provenanceInsert({ outcome: "'failed'" }), 'ImportNativeProvenance_outcome_check'],
++      [provenanceInsert({ outcome: "'reconstructed'" }), 'ImportNativeProvenance_outcome_check'],
++      // A2 closure: native_id NULL iff unresolved.
++      [provenanceInsert({ native_id: 'NULL' }), 'ImportNativeProvenance_native_id_shape_check'],
++      [
++        provenanceInsert({ outcome: "'already_present'", native_id: 'NULL' }),
++        'ImportNativeProvenance_native_id_shape_check',
++      ],
++      [
++        provenanceInsert({ outcome: "'unresolved'", reason: "'unresolved:exercise_reference'" }),
++        'ImportNativeProvenance_native_id_shape_check',
++      ],
++      [
++        provenanceInsert({ outcome: "'unresolved'", native_id: 'NULL' }),
++        'ImportNativeProvenance_unresolved_reason_check',
++      ],
++      [provenanceInsert({ import_intent_id: `${quote(foreign)}::uuid` }), FK_NAME],
++      [provenanceInsert({ import_intent_id: 'gen_random_uuid()' }), FK_NAME],
++      [provenanceInsert({ coach_id: 'NULL' }), 'null value in column "coach_id"'],
++      [provenanceInsert({ source_namespace: 'NULL' }), 'null value in column "source_namespace"'],
++      [provenanceInsert({ source_id: 'NULL' }), 'null value in column "source_id"'],
++      [
++        `UPDATE "${LEDGER}" SET target_kind='workout_plan_exercise' WHERE coach_id='coach' AND source_id='a'`,
++        'ScoutReconstructionLedger_target_kind_check',
++      ],
++      [
++        `UPDATE "${LEDGER}" SET target_kind='Person' WHERE coach_id='coach' AND source_id='a'`,
++        'ScoutReconstructionLedger_target_kind_check',
++      ],
++      [
++        `INSERT INTO "${LEDGER}" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id,target_kind,reason)
++         VALUES ('typed-without-target','coach','intent','workouts','w-x','truecoach','skipped',NULL,'workout_plan','unresolved:no_native_client_principal')`,
++        'ScoutReconstructionLedger_target_kind_shape_check',
++      ],
++    ];
++    for (const [statement, constraint] of cases) refused(statement, constraint);
++    // The runtime role (BYPASSRLS service_role) is bound by the same constraints.
++    refused(
++      provenanceInsert({ outcome: "'unresolved'", native_id: 'NULL' }),
++      'ImportNativeProvenance_unresolved_reason_check',
++      'service_role',
++    );
++    refused(
++      provenanceInsert({ import_intent_id: `${quote(foreign)}::uuid` }),
++      FK_NAME,
++      'service_role',
++    );
++    expect(provenanceRows()).toEqual(data);
++    expect(ledgerRows()).toEqual(ledger);
++    expect(shapeWithOids()).toEqual(afterOids);
++    expect(intentCount()).toBeGreaterThanOrEqual(1);
++  });
++  it('D-S8-3 identity, the child source_id encoding and the typed ledger target are accepted exactly once; the bound intent cannot vanish', () => {
++    const owned = intent('coach');
++    // Top-level created record bound to the coach's intent.
++    sql(provenanceInsert({ import_intent_id: `${quote(owned)}::uuid` }));
++    expect(provenanceRows()).toEqual([
++      expect.objectContaining({
++        coach_id: 'coach',
++        import_intent_id: owned,
++        source_namespace: 'truecoach',
++        entity_type: 'workouts',
++        source_id: 'w-1',
++        native_kind: 'workout_plan',
++        native_id: 'plan-1',
++        outcome: 'created',
++        reason: null,
++      }),
++    ]);
++    // The same identity again (any outcome, any native target) is refused by the identity key only.
++    refused(
++      provenanceInsert({ native_id: "'plan-other'", outcome: "'already_present'" }),
++      `duplicate key value violates unique constraint "${IDENTITY_INDEX}"`,
++    );
++    // Another namespace, coach or family with the same source_id is a different identity.
++    sql(provenanceInsert({ source_namespace: "'auto:other.example'" }));
++    sql(provenanceInsert({ coach_id: "'other'", native_id: "'plan-of-other'" }));
++    sql(
++      provenanceInsert({
++        entity_type: "'programs'",
++        native_kind: "'workout_program'",
++        native_id: "'program-1'",
++      }),
++    );
++    // Children (contract §3.3): a written exercise and an unresolved one under the same parent,
++    // the id-bearing and ordinal forms kept apart by their markers; nested ids with `#`/`:` and a
++    // long parent id stay unambiguous through the length prefix.
++    const exercise = (child: { id: string } | { ordinal: number }) =>
++      quote(childSourceId('w-1', child));
++    sql(
++      provenanceInsert({
++        entity_type: "'workouts.exercise'",
++        source_id: exercise({ id: '3' }),
++        native_kind: "'workout_plan_exercise'",
++        native_id: "'exercise-1'",
++      }),
++    );
++    sql(
++      provenanceInsert({
++        entity_type: "'workouts.exercise'",
++        source_id: exercise({ ordinal: 3 }),
++        native_kind: "'workout_plan_exercise'",
++        native_id: 'NULL',
++        outcome: "'unresolved'",
++        reason: "'unresolved:exercise_reference'",
++      }),
++    );
++    expect(childSourceId('w-1', { id: '3' })).toBe('3:w-1#id:3');
++    expect(childSourceId('w-1', { ordinal: 3 })).toBe('3:w-1#ord:3');
++    expect(childSourceId('a#id:b', { id: 'c' })).toBe('6:a#id:b#id:c');
++    expect(childSourceId('a', { id: 'b#id:c' })).toBe('1:a#id:b#id:c');
++    const longParent = 'p'.repeat(4000);
++    sql(
++      provenanceInsert({
++        entity_type: "'workouts.exercise'",
++        source_id: quote(childSourceId(longParent, { id: 'x' })),
++        native_kind: "'workout_plan_exercise'",
++        native_id: "'exercise-long'",
++      }),
++    );
++    expect(
++      sql(
++        `SELECT max(length(source_id)) FROM "${PROVENANCE}" WHERE entity_type='workouts.exercise'`,
++      ),
++    ).toBe(String(childSourceId(longParent, { id: 'x' }).length));
++    expect(provenanceCount()).toBe(7);
++    // Typed ledger target beside an existing target_id is accepted for every ledger kind.
++    sql(
++      `UPDATE "${LEDGER}" SET target_kind='person' WHERE coach_id='coach' AND entity_type='clients'`,
++    );
++    expect(ledgerTypedCount()).toBe(ledgerCount());
++    // RESTRICT: the bound intent cannot vanish under its provenance (owner erasure through the
++    // User cascade therefore fails closed as well while bound provenance exists: the L8 seam).
++    refused(`DELETE FROM "ImportIntent" WHERE id=${quote(owned)}::uuid`, FK_NAME);
++    expect(intentCount()).toBeGreaterThanOrEqual(1);
++    // Fixture shaping only: back to untyped ledger rows for the API-role and down stages.
++    sql(`UPDATE "${LEDGER}" SET target_kind=NULL`);
++    expect(ledgerTypedCount()).toBe(0);
++  });
++  it('P06: anon/authenticated are refused by privilege AND by policy; a service_role transaction that rolls back persists nothing', () => {
++    const data = provenanceRows();
++    for (const role of ['anon', 'authenticated']) {
++      // Belt: the migration revoked the API roles' table privileges.
++      refused(`SET ROLE ${role}; SELECT count(*) FROM "${PROVENANCE}"`, 'permission denied');
++      refused(
++        `SET ROLE ${role}; ${provenanceInsert({ source_id: "'w-api'" })}`,
++        'permission denied',
++      );
++      // Braces: even with privileges granted back (fixture shaping only), the RESTRICTIVE
++      // policies deny every command; the grant is revoked again below.
++      sql(`GRANT ALL ON "${PROVENANCE}" TO ${role}`);
++      expect(sql(`SET ROLE ${role}; SELECT count(*) FROM "${PROVENANCE}"`)).toBe('0');
++      refused(
++        `SET ROLE ${role}; ${provenanceInsert({ source_id: "'w-api'" })}`,
++        'row-level security',
++      );
++      expect(
++        sql(
++          `SET ROLE ${role}; WITH u AS (UPDATE "${PROVENANCE}" SET reason='x' RETURNING id) SELECT count(*) FROM u`,
++        ),
++      ).toBe('0');
++      expect(
++        sql(
++          `SET ROLE ${role}; WITH d AS (DELETE FROM "${PROVENANCE}" RETURNING id) SELECT count(*) FROM d`,
++        ),
++      ).toBe('0');
++      sql(`REVOKE ALL ON "${PROVENANCE}" FROM ${role}`);
++    }
++    expect(provenanceRows()).toEqual(data);
++    expect(rls(PROVENANCE)).toEqual(after.provenance.rls);
++    // Runtime role: a provenance row inside a transaction that rolls back leaves no trace.
++    expect(
++      sqlAs(
++        'service_role',
++        `BEGIN; ${provenanceInsert({ source_id: "'w-rollback'" })}; SELECT count(*) FROM "${PROVENANCE}" WHERE source_id='w-rollback'; ROLLBACK;`,
++      ),
++    ).toBe('1');
++    expect(provenanceRows()).toEqual(data);
++    expect(sqlAs('service_role', `SELECT count(*) FROM "${PROVENANCE}"`)).toBe(String(data.length));
++  });
++});
++
++describe('stage 4: down refuses provenance state; on an empty ledger of facts it removes exactly S8-B', () => {
++  it('P03: down refuses with provenance rows (fixed text); nothing deleted; schema, OIDs and history unchanged', () => {
++    expect(provenanceCount()).toBeGreaterThan(0);
++    const data = provenanceRows();
++    const ledger = ledgerRows();
++    refusedFile(downFile, REFUSE_DOWN);
++    expect(provenanceRows()).toEqual(data);
++    expect(ledgerRows()).toEqual(ledger);
++    expect(shapeWithOids()).toEqual(afterOids);
++    expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY + 1);
++    // A typed ledger target alone refuses down as well (a recorded fact the drop would erase).
++    sql(`DELETE FROM "${PROVENANCE}"`);
++    sql(`UPDATE "${LEDGER}" SET target_kind='person' WHERE coach_id='coach' AND source_id='a'`);
++    refusedFile(downFile, REFUSE_DOWN);
++    expect(shapeWithOids()).toEqual(afterOids);
++    expect(ledgerTypedCount()).toBe(1);
++    // Fixture shaping only: back to no recorded provenance facts.
++    sql(`UPDATE "${LEDGER}" SET target_kind=NULL`);
++    expect(ledgerTypedCount()).toBe(0);
++    expect(provenanceCount()).toBe(0);
++  });
++  it('P04: down removes exactly S8-B and keeps every ledger row and value; the OLD writer continues; a second down refuses', async () => {
++    const keep = ledgerRowsWithoutTargetKind();
++    expect(keep.length).toBeGreaterThanOrEqual(3);
++    sqlFile(downFile);
++    expect(shape()).toEqual(before);
++    expect(exists(PROVENANCE)).toBe(false);
++    expect(ledgerTargetKind()).toEqual([]);
++    expect(ledgerRowsWithoutTargetKind()).toEqual(keep);
++    expect(ledgerRows()).toEqual(keep);
++    // The recorded history is not rewritten by the file (forward repair doctrine).
++    expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY + 1);
++    refusedFile(downFile, ABSENT);
++    expect(shape()).toEqual(before);
++    stage('d');
++    const pass = await run({}, true);
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result).toEqual(tally(4, 4));
++    expect(identityRows().map((r: any[]) => r[1])).toEqual(['a', 'b', 'c', 'd']);
++  });
++  it('re-applying the file restores the identical shape (OIDs aside); ledger rows keep target_kind NULL; a raw rerun is refused again', () => {
++    const keep = ledgerRowsWithoutTargetKind();
++    sqlFile(upFile);
++    expect(shape()).toEqual(after);
++    expect(ledgerRowsWithoutTargetKind()).toEqual(keep);
++    expect(ledgerTypedCount()).toBe(0);
++    expect(provenanceCount()).toBe(0);
++    refusedFile(upFile, ALREADY);
++    expect(shape()).toEqual(after);
++    const again = prisma(root, ['migrate', 'deploy']);
++    expect(again.ok).toBe(true);
++    expect(again.output).toMatch(/No pending migrations/);
++    console.warn('PG17_S8B_DOWN_UP', JSON.stringify({ ledgerRows: ledgerCount() }));
++  });
++});
+diff --git a/test/scout/g2-s8b-db-guard.spec.ts b/test/scout/g2-s8b-db-guard.spec.ts
+new file mode 100644
+index 00000000..361c26bc
+--- /dev/null
++++ b/test/scout/g2-s8b-db-guard.spec.ts
+@@ -0,0 +1,124 @@
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S8B_CLUSTER_MARKER,
++  G2_S8B_DATABASE_MARKER,
++  g2S8bTestTarget,
++  withFixturePassword,
++} from '../utils/g2-s8b-db';
++
++const base = 'postgresql://s8b_super@127.0.0.1:55511/g2_s8b_disposable';
++const ack = 'g2_s8b_disposable:55511';
++
++describe('S8-B PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2S8bTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://s8b_super@127.0.0.1:55511/postgres?connect_timeout=5`,
++      port: 55511,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55511', '5432'),
++    base.replace('55511', '6543'),
++    base.replace('55511', '55439'),
++    base.replace('55511', '70000'),
++    base.replace('55511', '55461'),
++    base.replace('55511', '55471'),
++    base.replace('55511', '55481'),
++    base.replace('55511', '55491'),
++    base.replace('55511', '55501'),
++    base.replace('g2_s8b_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_s8b_disposable', 'g2_r_ready_disposable'),
++    base.replace('g2_s8b_disposable', 'g2_nq1_disposable'),
++    base.replace('g2_s8b_disposable', 'g2_c_disposable'),
++    base.replace('g2_s8b_disposable', 'g2_s7l_disposable'),
++    base.replace('s8b_super@', 'b_super@'),
++    base.replace('s8b_super@', 'r_super@'),
++    base.replace('s8b_super@', 'nq1_super@'),
++    base.replace('s8b_super@', 'c_super@'),
++    base.replace('s8b_super@', 's7l_super@'),
++    base.replace('g2_s8b_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_s8b_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55511', '54325'),
++    base.replace('g2_s8b_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_s8b_disposable', 'postgres'),
++    base.replace('s8b_super@', 'service_role@'),
++    base.replace('s8b_super@', 's8b_super:secret@'),
++    base.replace('s8b_super@', 'postgres@'),
++    base.replace('55511', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2S8bTestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2S8bTestTarget(base)).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_s8b_disposable')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_s8b_disposable:55512')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_tq0_disposable:55511')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_b_drain_disposable:55511')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_r_ready_disposable:55511')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_nq1_disposable:55511')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_c_disposable:55511')).toThrow();
++    expect(() => g2S8bTestTarget(base, 'g2_s7l_disposable:55511')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_S8B_CLUSTER_MARKER).toBe('s8b-disposable-pg17');
++    expect(G2_S8B_DATABASE_MARKER).toBe(
++      's8b-g2-provenance-synthetic-disposable-fixture-safe-to-drop',
++    );
++    for (const marker of [G2_S8B_CLUSTER_MARKER, G2_S8B_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^s8b-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s8b-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_S8B_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_S8B_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://s8b_super:local_fixture@127.0.0.1:55511/g2_s8b_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55511/g2_s8b_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55511/g2_s8b_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      'nq1_super',
++      'c_super',
++      's7l_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++});
+diff --git a/test/utils/g2-s8b-bootstrap.sh b/test/utils/g2-s8b-bootstrap.sh
+new file mode 100755
+index 00000000..55ab8972
+--- /dev/null
++++ b/test/utils/g2-s8b-bootstrap.sh
+@@ -0,0 +1,269 @@
++#!/usr/bin/env bash
++# S8-B G2 proof bootstrap, derived by substitution from the committed N/Q1 bootstrap
++# test/utils/g2-nq1-bootstrap.sh (blob 96b7668d at 61b93cff, unchanged) for the S8-B-only
++# disposable cluster/database. The "old" side is a detached checkout of OLD_HEAD (the S8-B base:
++# the accepted C head 1b6cc661), whose `prisma migrate deploy` installs the whole accepted history so that the S8-B
++# candidate has EXACTLY ONE migration pending (applied later by the spec through the candidate's
++# own `prisma migrate deploy`, P01 — the release mechanism). Validation harness only: it never touches a hosted or
++# application database, never edits schema/migration/generator sources, and
++# stops on the first unexpected state instead of repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_S8B_DATABASE_URL  postgresql://s8b_super@127.0.0.1:<port>/g2_s8b_disposable?schema=public&connection_limit=2
++#   G2_S8B_CONFIRM       g2_s8b_disposable:<port>
++#   G2_S8B_PASSWORD      disposable local fixture password shared by s8b_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_S8B_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_S8B_OLD_ROOT      DETACHED Git checkout of OLD_HEAD (the old-writer side); create/verify it
++#                         offline with test/utils/g2-s8b-old-root.sh (a `git archive` extraction is
++#                         not a repository and cannot pass step 4 below)
++#   G2_S8B_OLD_CLIENT    directory that receives the independently generated OLD Prisma client
++# Optional:
++#   G2_S8B_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# OLD side pin (kept identical in test/utils/g2-s8b-old-root.sh and g2-s8b-pg-harness.ts).
++OLD_HEAD=1b6cc66164b3398d573ba92f0c8f6b039494be24
++R_MIGRATION=20270120000000_scout_identity_ready
++C_MIGRATION=20270121000000_scout_identity_contract
++S8B_MIGRATION=20270122000000_scout_native_provenance_expand
++# 164 base migrations + S1 + C1 + E + B + R tracked by the OLD root (170 once OLD is the C head);
++# the candidate tracks exactly one more (S8-B).
++EXPECTED_MIGRATIONS=170
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++EXPECTED_VERSION="${G2_S8B_SERVER_VERSION:-170006}"
++# Distinctive S8-B fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-s8b-db.ts G2_S8B_CLUSTER_MARKER / G2_S8B_DATABASE_MARKER, kept identical by
++# test/scout/g2-s8b-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's8b-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s8b-disposable-pg17
++DB_MARKER=s8b-g2-provenance-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_S8B_DATABASE_URL G2_S8B_CONFIRM G2_S8B_PASSWORD G2_S8B_PSQL G2_S8B_OLD_ROOT G2_S8B_OLD_CLIENT; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++[[ -x "$G2_S8B_PSQL" ]] || { echo "psql binary not executable: $G2_S8B_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted C1 dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: `prisma generate` must never auto-install anything (B2 finding:
++# an output directory outside a package root made the CLI run `npm i` silently). The OLD client is
++# generated INSIDE the OLD checkout, whose node_modules is the shared symlink to the pinned npm-ci tree,
++# and @prisma/client must resolve from there to exactly $ROOT/node_modules/@prisma/client.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++[[ "$G2_S8B_OLD_CLIENT" == "$G2_S8B_OLD_ROOT"/* ]] \
++  || { echo "G2_S8B_OLD_CLIENT must live inside G2_S8B_OLD_ROOT (pinned package root); got $G2_S8B_OLD_CLIENT" >&2; exit 2; }
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2S8bTestTarget } = require("./test/utils/g2-s8b-db");
++  const t = g2S8bTestTarget(process.env.G2_S8B_DATABASE_URL, process.env.G2_S8B_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  const { withFixturePassword } = require("./test/utils/g2-s8b-db");
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_S8B_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_S8B_PASSWORD"
++
++psql_maint() { "$G2_S8B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_S8B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|generate-only) ;; *) echo "usage: g2-s8b-bootstrap.sh [bootstrap|generate-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S8-B lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S8-B fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_S8B_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_s8b_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s8b_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_s8b_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s8b_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s8b_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s8b_disposable exists without the S8-B disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_s8b_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_s8b_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. OLD source: exact OLD_HEAD, shared dependency tree, the full accepted history; the candidate adds exactly S8-B.
++[[ "$(git -C "$G2_S8B_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_S8B_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between OLD and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -e "$G2_S8B_OLD_ROOT/node_modules" ]] || ln -s "$ROOT/node_modules" "$G2_S8B_OLD_ROOT/node_modules"
++[[ -d "$G2_S8B_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_S8B_OLD_ROOT/prisma/migrations/$R_MIGRATION" && -d "$G2_S8B_OLD_ROOT/prisma/migrations/$C_MIGRATION" ]] \
++  || { echo "old root lacks E, R or C; it is not a descendant of the accepted C head" >&2; exit 4; }
++[[ ! -d "$G2_S8B_OLD_ROOT/prisma/migrations/$S8B_MIGRATION" ]] || { echo "old root unexpectedly contains S8-B" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_S8B_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# The candidate ships exactly S8-B: migration.sql + down.sql of S8B_MIGRATION and nothing else.
++[[ "$(git -C "$ROOT" diff --name-only "$OLD_HEAD" HEAD -- prisma/migrations | sort | tr '\n' ' ')" \
++  == "prisma/migrations/$S8B_MIGRATION/down.sql prisma/migrations/$S8B_MIGRATION/migration.sql " ]] \
++  || { echo "candidate migrations differ from $OLD_HEAD by other than exactly S8-B's two files" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S8B_MIGRATION/migration.sql" && -f "$ROOT/prisma/migrations/$S8B_MIGRATION/down.sql" ]] \
++  || { echo "candidate lacks S8-B's migration.sql/down.sql" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history through the real release mechanism from the OLD root; S8-B is NOT applied here.
++#    Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the cluster superuser.
++(cd "$G2_S8B_OLD_ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='source_platform' AND NOT attisdropped AND attnotnull")" == "1" ]] \
++  || { echo "ledger lacks NOT NULL source_platform after the accepted history (R absent)" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_class WHERE relname IN ('ScoutIngestEntity_identity_key','ScoutReconstructionLedger_identity_key') AND relnamespace='public'::regnamespace")" == "2" ]] \
++  || { echo "wide identity keys absent after the accepted history (R absent)" >&2; exit 5; }
++# S8-B must be ABSENT after the OLD history: the spec applies it (P01) and observes the catalog move.
++[[ "$(psql_db -c "SELECT to_regclass('public.\"ImportNativeProvenance\"') IS NULL")" == "t" ]] \
++  || { echo "ImportNativeProvenance already exists after the OLD history; not a fresh OLD-shaped bootstrap" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='target_kind' AND NOT attisdropped")" == "0" ]] \
++  || { echo "ScoutReconstructionLedger already carries S8-B's target_kind after the OLD history; not a fresh OLD-shaped bootstrap" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S8B_MIGRATION'")" == "0" ]] \
++  || { echo "S8-B already recorded in _prisma_migrations after the OLD history" >&2; exit 5; }
++
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative (S5-R3-A-05 / S5-R3B-02): a missing file is a
++# refusal (exit 6), not an empty field nested inside an echo.
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++# The runtime a generated client actually executes. The default-output candidate client requires
++# `@prisma/client/runtime/library.js` from the pinned package (it has no runtime/ copy of its own);
++# a custom-output client (the T client) receives a copy under <output>/runtime/.
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Independent OLD client generated from the OLD schema (pre-S8-B: no provenance model, no ledger target_kind) into its own directory.
++mkdir -p "$G2_S8B_OLD_CLIENT"
++PINNED_CLIENT_PKG="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/package.json"))')"
++RESOLVED_CLIENT_PKG="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/package.json", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$G2_S8B_OLD_CLIENT")"
++[[ "$RESOLVED_CLIENT_PKG" == "$PINNED_CLIENT_PKG" ]] \
++  || { echo "@prisma/client does not resolve from $G2_S8B_OLD_CLIENT to the pinned tree ($RESOLVED_CLIENT_PKG != $PINNED_CLIENT_PKG); refusing to generate" >&2; exit 6; }
++echo "OLD_CLIENT_RESOLUTION pinned=$PINNED_CLIENT_PKG version=$(node -p 'require(process.argv[1]).version' "$PINNED_CLIENT_PKG") skip_autoinstall=$PRISMA_GENERATE_SKIP_AUTOINSTALL"
++OLD_SCHEMA_COPY="$G2_S8B_OLD_CLIENT/.schema-for-generate.prisma"
++sed "s|provider = \"prisma-client-js\"|provider = \"prisma-client-js\"\n  output   = \"$G2_S8B_OLD_CLIENT\"|" \
++  "$G2_S8B_OLD_ROOT/prisma/schema.prisma" > "$OLD_SCHEMA_COPY"
++(cd "$G2_S8B_OLD_ROOT" && "$ROOT/node_modules/.bin/prisma" generate --schema "$OLD_SCHEMA_COPY" >/dev/null)
++grep -q 'model ScoutReconstructionLedger ' "$G2_S8B_OLD_CLIENT/schema.prisma"
++O_ENGINE_SHA="$(hash_required 'generated OLD client engine' "$G2_S8B_OLD_CLIENT/$ENGINE")"
++[[ "$O_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated OLD client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The OLD client's copied runtime must be the pinned package runtime: identical bytes, or the pinned
++# bytes preceded only by the generator's header (observed 130 B for prisma 6.19.3). Any other
++# difference is a refusal; a false refusal here fails closed and is reported, never skipped.
++O_RUNTIME="$G2_S8B_OLD_CLIENT/runtime/library.js"
++O_RUNTIME_SHA="$(hash_required 'generated OLD client runtime' "$O_RUNTIME")"
++PINNED_RUNTIME_SIZE="$(stat -c %s "$PINNED_RUNTIME")"
++O_RUNTIME_SIZE="$(stat -c %s "$O_RUNTIME")"
++[[ "$O_RUNTIME_SIZE" -ge "$PINNED_RUNTIME_SIZE" ]] && cmp -s <(tail -c "$PINNED_RUNTIME_SIZE" "$O_RUNTIME") "$PINNED_RUNTIME" \
++  || { echo "generated OLD client runtime ($O_RUNTIME_SIZE B, $O_RUNTIME_SHA) does not end with the pinned @prisma/client runtime ($PINNED_RUNTIME_SIZE B, $PINNED_RUNTIME_SHA)" >&2; exit 6; }
++echo "OLD_CLIENT_GENERATED dir=$G2_S8B_OLD_CLIENT engine_sha256=$O_ENGINE_SHA runtime=$O_RUNTIME runtime_sha256=$O_RUNTIME_SHA runtime_header_bytes=$((O_RUNTIME_SIZE - PINNED_RUNTIME_SIZE)) pinned_runtime=$PINNED_RUNTIME pinned_runtime_sha256=$PINNED_RUNTIME_SHA"
++# The OLD client is pre-S8-B: no ImportNativeProvenance model and no ledger target_kind, while it
++# carries N's required ledger source_platform.
++! grep -q 'model ImportNativeProvenance ' "$G2_S8B_OLD_CLIENT/schema.prisma" \
++  || { echo "generated OLD client already carries S8-B's ImportNativeProvenance; it is not the OLD client" >&2; exit 6; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_S8B_OLD_CLIENT/schema.prisma" | grep -Eq '^ +target_kind +' \
++  || { echo "generated OLD client already carries S8-B's ledger target_kind; it is not the OLD client" >&2; exit 6; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_S8B_OLD_CLIENT/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "generated OLD client lacks N's required ledger source_platform" >&2; exit 6; }
++
++# 7. Candidate (S8-B) client in the candidate root: generated once, before commit, in the
++#    isolated copy of the accepted dependency tree (S8-B changes prisma/schema.prisma: the new
++#    ImportNativeProvenance model, the ledger target_kind field and the ImportIntent back-relation) and only
++#    VERIFIED here; no `prisma generate` runs in the bootstrap.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated C1 tree not in place)" >&2; exit 7; }
++grep -q 'model ScoutReconstructionLedger ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client schema lacks ScoutReconstructionLedger; refusing (no regeneration in the bootstrap)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++# The runtime the candidate client actually loads, resolved from the generated client directory.
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++# The generated client must be S8-B's: the ImportNativeProvenance model with its contract fields
++# and the ledger `target_kind` (the schema hunk that lands after C is accepted), not a stale
++# pre-S8-B client.
++grep -q 'model ImportNativeProvenance ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client lacks ImportNativeProvenance; the S8-B client was not generated (schema hunk absent?)" >&2; exit 7; }
++for field in coach_id import_intent_id source_namespace entity_type source_id native_kind native_id outcome reason; do
++  awk '/model ImportNativeProvenance \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq "^ +$field +" \
++    || { echo "candidate client ImportNativeProvenance lacks $field; the S8-B client was not generated (schema hunk absent?)" >&2; exit 7; }
++done
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +target_kind +String\?' \
++  || { echo "candidate client ledger lacks target_kind String?; the S8-B client was not generated (schema hunk absent?)" >&2; exit 7; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "candidate client does not carry N's required ledger source_platform (inherited from N/Q1)" >&2; exit 7; }
++
++if [[ "$MODE" == generate-only ]]; then echo "G2_S8B_GENERATE_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_S8B_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-s8b-db.ts b/test/utils/g2-s8b-db.ts
+new file mode 100644
+index 00000000..6b384f14
+--- /dev/null
++++ b/test/utils/g2-s8b-db.ts
+@@ -0,0 +1,117 @@
++/**
++ * S8-B G2 proof target guard: derived by literal substitution from the committed N/Q1 guard
++ * test/utils/g2-nq1-db.ts (blob dbe10bcb at 61b93cff), which stays byte-identical and keeps
++ * governing the N/Q1 proof (the S7-L1 draft guard is the same derivation on its own lane). One
++ * dedicated disposable database on an S8-B-only disposable PostgreSQL 17 cluster; a NINTH
++ * identity, separate from the E, T/Q0, S5, B, R, N/Q1, C and S7-L targets, so no earlier proof
++ * state is reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_S8B_DATABASE = 'g2_s8b_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      s8b_super    cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy`, S8-B up/down and all harness DDL/data
++ *  - runtime    service_role  BYPASSRLS runtime role used by the old/candidate reconstruct writer processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_S8B_ROLE = 's8b_super';
++export const G2_S8B_ADMIN_ROLE = G2_S8B_ROLE;
++export const G2_S8B_MIGRATION_ROLE = 'postgres';
++export const G2_S8B_RUNTIME_ROLE = 'service_role';
++export const G2_S8B_LOGIN_ROLES = new Set([
++  G2_S8B_ADMIN_ROLE,
++  G2_S8B_MIGRATION_ROLE,
++  G2_S8B_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_S8B_PASSWORD_ENV = 'G2_S8B_PASSWORD';
++/**
++ * Distinctive S8-B fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's8b-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s8b_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-s8b-bootstrap.sh and the S8-B fixture binding under execution/ce3748cb/s8b/ must carry the same literals.
++ */
++export const G2_S8B_CLUSTER_MARKER = 's8b-disposable-pg17';
++export const G2_S8B_DATABASE_MARKER = 's8b-g2-provenance-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
++// S7-L lane.
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++  '55491',
++  '55501',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2S8bTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_S8B_DATABASE}` ||
++    url.username !== G2_S8B_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_S8B_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'S8-B G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('S8-B G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_S8B_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('S8-B G2 proof requires a plain fixture password in the environment');
++  if (!G2_S8B_LOGIN_ROLES.has(username))
++    throw new Error('S8-B G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
+diff --git a/test/utils/g2-s8b-harness.ts b/test/utils/g2-s8b-harness.ts
+new file mode 100644
+index 00000000..02740722
+--- /dev/null
++++ b/test/utils/g2-s8b-harness.ts
+@@ -0,0 +1,284 @@
++/**
++ * G2-S8-B live-proof observations layered on the S8-B-only derivative
++ * (test/utils/g2-s8b-pg-harness.ts) of the committed N/Q1 harness. Adds only what S8-B needs:
++ * the exact catalog of the new ImportNativeProvenance table and of the expanded
++ * ScoutReconstructionLedger (columns, CHECKs, FK, indexes, RLS flags, policies and grants) with
++ * and without OIDs, row snapshots with and without the target_kind column, the contract's child
++ * source_id encoding, and synthetic fixture rows (User → ImportIntent; ScoutImport settled;
++ * ScoutIngestEntity staged; direct provenance INSERTs). No production writer is emulated here:
++ * the N ledger writer runs as the real ScoutReconstructService in the unchanged
++ * test/utils/g2-tq0-worker.cjs. Imported only by the explicitly guarded test/rls-g2-s8b.spec.ts.
++ */
++import { json, quote, sql } from './g2-s8b-pg-harness';
++
++export const PROVENANCE = 'ImportNativeProvenance';
++export const LEDGER = 'ScoutReconstructionLedger';
++export const PROVENANCE_COLUMNS = [
++  'id',
++  'coach_id',
++  'import_intent_id',
++  'source_namespace',
++  'entity_type',
++  'source_id',
++  'native_kind',
++  'native_id',
++  'outcome',
++  'reason',
++  'created_at',
++] as const;
++export const NATIVE_KINDS = [
++  'person',
++  'scout_entity',
++  'workout_program',
++  'workout_plan',
++  'workout_plan_exercise',
++] as const;
++/** Ledger targets: every native kind except the child-only workout_plan_exercise (contract §3.3). */
++export const TARGET_KINDS = ['person', 'scout_entity', 'workout_program', 'workout_plan'] as const;
++export const OUTCOMES = ['created', 'already_present', 'unresolved'] as const;
++export const PROVENANCE_CHECK_NAMES = [
++  'ImportNativeProvenance_native_id_shape_check',
++  'ImportNativeProvenance_native_kind_check',
++  'ImportNativeProvenance_outcome_check',
++  'ImportNativeProvenance_unresolved_reason_check',
++] as const;
++export const LEDGER_CHECK_NAMES = [
++  'ScoutReconstructionLedger_target_kind_check',
++  'ScoutReconstructionLedger_target_kind_shape_check',
++] as const;
++export const FK_NAME = 'ImportNativeProvenance_import_intent_id_coach_id_fkey';
++export const IDENTITY_INDEX = 'ImportNativeProvenance_identity_key';
++export const NATIVE_INDEX = 'ImportNativeProvenance_coach_id_native_kind_native_id_idx';
++export const INTENT_INDEX = 'ImportNativeProvenance_coach_id_import_intent_id_idx';
++export const PROVENANCE_POLICIES = [
++  'deny_all_anon_import_native_provenance',
++  'deny_all_authenticated_import_native_provenance',
++  'p_import_native_provenance_service_role_all',
++] as const;
++export const LEDGER_POLICIES = [
++  'deny_all_anon_scout_reconstruction',
++  'deny_all_authenticated_scout_reconstruction',
++  'p_scout_reconstruction_service_role_all',
++] as const;
++/** Exact expected catalog contribution of S8-B (pg_get_*def renderings, PG 15-17). */
++export const EXPECTED_PROVENANCE_COLUMNS: [string, string, boolean, string | null][] = [
++  ['id', 'text', true, null],
++  ['coach_id', 'text', true, null],
++  ['import_intent_id', 'uuid', false, null],
++  ['source_namespace', 'text', true, null],
++  ['entity_type', 'text', true, null],
++  ['source_id', 'text', true, null],
++  ['native_kind', 'text', true, null],
++  ['native_id', 'text', false, null],
++  ['outcome', 'text', true, null],
++  ['reason', 'text', false, null],
++  ['created_at', 'timestamp(3) without time zone', true, 'CURRENT_TIMESTAMP'],
++];
++export const EXPECTED_LEDGER_TARGET_KIND: [string, string, boolean, string | null] = [
++  'target_kind',
++  'text',
++  false,
++  null,
++];
++const anyOf = (values: readonly string[]) =>
++  `ANY (ARRAY[${values.map((v) => `'${v}'::text`).join(', ')}])`;
++export const EXPECTED_PROVENANCE_CHECK_DEFS: Record<
++  (typeof PROVENANCE_CHECK_NAMES)[number],
++  string
++> = {
++  ImportNativeProvenance_native_id_shape_check:
++    "CHECK (((native_id IS NULL) = (outcome = 'unresolved'::text)))",
++  ImportNativeProvenance_native_kind_check: `CHECK ((native_kind = ${anyOf(NATIVE_KINDS)}))`,
++  ImportNativeProvenance_outcome_check: `CHECK ((outcome = ${anyOf(OUTCOMES)}))`,
++  ImportNativeProvenance_unresolved_reason_check:
++    "CHECK (((outcome <> 'unresolved'::text) OR (reason IS NOT NULL)))",
++};
++export const EXPECTED_LEDGER_CHECK_DEFS: Record<(typeof LEDGER_CHECK_NAMES)[number], string> = {
++  ScoutReconstructionLedger_target_kind_check: `CHECK (((target_kind IS NULL) OR (target_kind = ${anyOf(TARGET_KINDS)})))`,
++  ScoutReconstructionLedger_target_kind_shape_check:
++    'CHECK (((target_kind IS NULL) OR (target_id IS NOT NULL)))',
++};
++export const EXPECTED_FK_DEF = `FOREIGN KEY (import_intent_id, coach_id) REFERENCES "ImportIntent"(id, coach_id) ON UPDATE CASCADE ON DELETE RESTRICT`;
++export const EXPECTED_PK_DEF = 'PRIMARY KEY (id)';
++export const EXPECTED_INDEX_DEFS: Record<string, string> = {
++  ImportNativeProvenance_pkey: `CREATE UNIQUE INDEX "ImportNativeProvenance_pkey" ON public."ImportNativeProvenance" USING btree (id)`,
++  [IDENTITY_INDEX]: `CREATE UNIQUE INDEX "${IDENTITY_INDEX}" ON public."ImportNativeProvenance" USING btree (coach_id, source_namespace, entity_type, source_id)`,
++  [NATIVE_INDEX]: `CREATE INDEX "${NATIVE_INDEX}" ON public."ImportNativeProvenance" USING btree (coach_id, native_kind, native_id)`,
++  [INTENT_INDEX]: `CREATE INDEX "${INTENT_INDEX}" ON public."ImportNativeProvenance" USING btree (coach_id, import_intent_id)`,
++};
++
++const rel = (table: string) => `'public."${table}"'::regclass`;
++export const exists = (table: string) =>
++  sql(`SELECT to_regclass('public."${table}"') IS NOT NULL`) === 't';
++/** Every column of a table in attnum order: name, rendered type, NOT NULL, rendered default. */
++export const columns = (table: string) =>
++  exists(table)
++    ? json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,
++    pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum),'[]')
++  FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
++  WHERE a.attrelid=${rel(table)} AND a.attnum>0 AND NOT a.attisdropped`)
++    : [];
++/** Every constraint of a table (CHECK, FK, PK) by name with validation flag and definition. */
++export const constraints = (table: string, withOids = false) =>
++  exists(table)
++    ? json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(conname,contype,convalidated,pg_get_constraintdef(oid)
++    ${withOids ? ',oid' : ''}) ORDER BY conname),'[]')
++  FROM pg_constraint WHERE conrelid=${rel(table)}`)
++    : [];
++/** Every index of a table by name with its definition (and OID when asked). */
++export const indexes = (table: string, withOids = false) =>
++  exists(table)
++    ? json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(c.relname,i.indisunique,i.indisvalid,pg_get_indexdef(i.indexrelid)
++    ${withOids ? ',i.indexrelid' : ''}) ORDER BY c.relname),'[]')
++  FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE i.indrelid=${rel(table)}`)
++    : [];
++/** RLS posture of a table: flags plus every policy row (pg_policies has no OIDs) and every grant. */
++export const rls = (table: string) =>
++  exists(table)
++    ? json(`SELECT jsonb_build_object(
++  'enabled',(SELECT relrowsecurity FROM pg_class WHERE oid=${rel(table)}),
++  'forced',(SELECT relforcerowsecurity FROM pg_class WHERE oid=${rel(table)}),
++  'policies',(SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY policyname),'[]') FROM pg_policies p
++    WHERE schemaname='public' AND tablename=${quote(table)}),
++  'grants',(SELECT COALESCE(jsonb_agg(jsonb_build_array(grantee,privilege_type) ORDER BY grantee,privilege_type),'[]')
++    FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name=${quote(table)}))`)
++    : null;
++const tableShape = (table: string, withOids: boolean) => ({
++  columns: columns(table),
++  constraints: constraints(table, withOids),
++  indexes: indexes(table, withOids),
++  rls: rls(table),
++  ...(withOids
++    ? {
++        relfilenode: exists(table)
++          ? sql(`SELECT relfilenode FROM pg_class WHERE oid=${rel(table)}`)
++          : null,
++      }
++    : {}),
++});
++/** OID-free shape of both tables (provenance empty when absent). Equal across down → up. */
++export const shape = () => ({
++  ledger: tableShape(LEDGER, false),
++  provenance: tableShape(PROVENANCE, false),
++  provenanceExists: exists(PROVENANCE),
++});
++/** Shape WITH OIDs: equal across a refused up/down proves nothing was recreated. */
++export const shapeWithOids = () => ({
++  ledger: tableShape(LEDGER, true),
++  provenance: tableShape(PROVENANCE, true),
++  provenanceExists: exists(PROVENANCE),
++});
++/** The ledger's target_kind column entry, or [] when absent. */
++export const ledgerTargetKind = () =>
++  (columns(LEDGER) as [string, string, boolean, string | null][]).filter(
++    ([name]) => name === 'target_kind',
++  );
++
++/** Every ledger row, deterministic order (all columns present at the time). */
++export const ledgerRows = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(l) ORDER BY coach_id,intent_id,entity_type,source_platform,source_id,id),'[]')
++  FROM "${LEDGER}" l`);
++/** Every ledger row without target_kind: the "retained across S8-B and its down" proof. */
++export const ledgerRowsWithoutTargetKind = () =>
++  json(`SELECT COALESCE(jsonb_agg((to_jsonb(l) - 'target_kind') ORDER BY coach_id,intent_id,entity_type,source_platform,source_id,id),'[]')
++  FROM "${LEDGER}" l`);
++/** Ledger rows of one scope keyed by the five-field identity, as the N writer leaves them. */
++export const identityRows = (coach = 'coach', intent = 'intent', family?: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_array(entity_type,source_id,source_platform,status,target_id)
++  ORDER BY entity_type,source_id,source_platform),'[]')
++  FROM "${LEDGER}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}
++  ${family ? `AND entity_type=${quote(family)}` : ''}`);
++export const ledgerCount = () => Number(sql(`SELECT count(*) FROM "${LEDGER}"`));
++export const ledgerTypedCount = () =>
++  Number(sql(`SELECT count(*) FROM "${LEDGER}" WHERE target_kind IS NOT NULL`));
++export const personCount = () => Number(sql(`SELECT count(*) FROM "Person"`));
++/** Every provenance row, deterministic order; [] when the table is absent. */
++export const provenanceRows = () =>
++  exists(PROVENANCE)
++    ? json(`SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY coach_id,source_namespace,entity_type,source_id,id),'[]')
++  FROM "${PROVENANCE}" p`)
++    : [];
++export const provenanceCount = () =>
++  exists(PROVENANCE) ? Number(sql(`SELECT count(*) FROM "${PROVENANCE}"`)) : 0;
++export const intentCount = () => Number(sql(`SELECT count(*) FROM "ImportIntent"`));
++
++/** Contract §3.3 child identity: `<n>:<parent>#id:<child>` or `<n>:<parent>#ord:<ordinal>`,
++ *  where <n> is the decimal character length of the parent source_id. */
++export const childSourceId = (parent: string, child: { id: string } | { ordinal: number }) =>
++  `${parent.length}:${parent}#${'id' in child ? `id:${child.id}` : `ord:${child.ordinal}`}`;
++
++/** Synthetic owner row (User is the FK target of ImportIntent.coach_id); no customer data. */
++export function ensureUser(coach: string) {
++  sql(`INSERT INTO "User" (id,supabase_id,email,name,role)
++    VALUES (${quote(coach)},${quote(`sb-${coach}`)},${quote(`${coach}@synthetic.invalid`)},${quote(`Synthetic ${coach}`)},'coach')
++    ON CONFLICT (id) DO NOTHING`);
++}
++/** Synthetic paired setup intent for `coach`; returns its UUID. C1 keeps ONE current setup per
++ *  coach (`ImportIntent_one_current_key`), so any earlier current intent of the coach is superseded
++ *  first (fixture shaping; a superseded intent is still a valid FK target for provenance). */
++export function intent(coach: string, paired = true): string {
++  ensureUser(coach);
++  return sql(`UPDATE "ImportIntent" SET superseded_at=now() WHERE coach_id=${quote(coach)} AND superseded_at IS NULL;
++    INSERT INTO "ImportIntent" (id,coach_id,chosen_platform,paired_at)
++    VALUES (gen_random_uuid(),${quote(coach)},'truecoach',${paired ? 'now()' : 'NULL'})
++    RETURNING id`);
++}
++/** Settled legacy run row: the post-settle gate the reconstruct writer reads (N/Q1 fixture shape). */
++export function settle(coach = 'coach', intent = 'intent') {
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},'settled','success')
++    ON CONFLICT DO NOTHING`);
++}
++/** One staged row (N/Q1 fixture shape): the harness id carries family AND platform. */
++export function stage(
++  source = 'a',
++  family = 'clients',
++  platform = 'truecoach',
++  name = 'Synthetic A',
++  coach = 'coach',
++  intent = 'intent',
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify({ name, client_id: 'client-new' }))})`);
++}
++/** Bulk synthetic staging through generate_series; names are synthetic, no customer data. */
++export function stageMany(
++  count: number,
++  family = 'clients',
++  platform = 'truecoach',
++  coach = 'coach',
++  intent = 'intent',
++  prefix = 's',
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    SELECT ${quote(`${coach}-${intent}-${prefix}`)}||lpad(n::text,5,'0'),${quote(coach)},${quote(intent)},${quote(family)},
++      ${quote(prefix)}||lpad(n::text,5,'0'),${quote(platform)},
++      jsonb_build_object('name','Synthetic '||n,'client_id','client-'||n)
++    FROM generate_series(1,${count}) n`);
++}
++let provenanceSequence = 0;
++/** The INSERT statement of one provenance record (the S8-C writer's shape) with overrides. */
++export const provenanceInsert = (overrides: Partial<Record<string, string>> = {}) => {
++  const v: Record<string, string> = {
++    id: quote(`prov-${++provenanceSequence}`),
++    coach_id: "'coach'",
++    import_intent_id: 'NULL',
++    source_namespace: "'truecoach'",
++    entity_type: "'workouts'",
++    source_id: "'w-1'",
++    native_kind: "'workout_plan'",
++    native_id: "'plan-1'",
++    outcome: "'created'",
++    reason: 'NULL',
++    ...overrides,
++  };
++  const names = Object.keys(v);
++  return `INSERT INTO "${PROVENANCE}" (${names.join(',')}) VALUES (${names.map((n) => v[n]).join(',')})`;
++};
++export function resetData() {
++  sql(`${exists(PROVENANCE) ? `DELETE FROM "${PROVENANCE}";` : ''}
++    DELETE FROM "${LEDGER}"; DELETE FROM "ScoutIngestEntity"; DELETE FROM "Person";
++    DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutImport";
++    DELETE FROM "ExtensionPairCode"; DELETE FROM "ImportIntent";`);
++}
+diff --git a/test/utils/g2-s8b-old-root.sh b/test/utils/g2-s8b-old-root.sh
+new file mode 100755
+index 00000000..72ef344b
+--- /dev/null
++++ b/test/utils/g2-s8b-old-root.sh
+@@ -0,0 +1,102 @@
++#!/usr/bin/env bash
++# S8-B G2 OLD fixture: create (or preflight) the detached checkout of the S8-B base head
++# (OLD_HEAD below: the accepted C head 1b6cc661) that test/utils/g2-s8b-bootstrap.sh
++# step 4 requires. Derived by substitution from the committed N/Q1 helper
++# test/utils/g2-nq1-old-root.sh (blob 4569f5fe at 61b93cff, unchanged): the same clone +
++# detached checkout recipe; the identity gate here requires the OLD root to carry E, R and the
++# pre-S8-B schema (no ImportNativeProvenance model, no ledger target_kind) while the candidate
++# ships exactly S8-B.
++#
++# Why this exists: a `git archive | tar` extraction is NOT a Git repository, so it can
++# never satisfy bootstrap's identity gate (`git rev-parse HEAD` == T and a clean
++# relevant-path diff). The fixture must be a real detached checkout. This script clones
++# the candidate root itself (which must contain the R head in its history) and checks out
++# it detached, changing no ref, worktree
++# metadata or file of the candidate repository. It then runs the exact offline checks
++# bootstrap will repeat, so the recipe is verified before any database or dependency work.
++#
++# Usage: G2_S8B_OLD_ROOT=<path> bash test/utils/g2-s8b-old-root.sh [create|preflight]
++#   create     (default) clone + detached checkout at OLD_HEAD when the path does not exist,
++#              then preflight. Refuses to reuse a path that is not that checkout.
++#   preflight  only verify an existing path.
++# Optional: G2_S8B_OLD_ROOT_SHARED=1 uses `git clone --shared` (objects read through
++#   alternates from the candidate's object store; zero copy). Default is a self-contained
++#   local clone (hardlinked/copied objects) that keeps working if the source moves.
++# Needs git only. Never deletes anything; never touches PostgreSQL, node_modules, hosted
++# or customer resources.
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# OLD side pin (kept identical in test/utils/g2-s8b-bootstrap.sh and g2-s8b-pg-harness.ts).
++OLD_HEAD=1b6cc66164b3398d573ba92f0c8f6b039494be24
++E_MIGRATION=20270118000000_scout_ledger_platform_expand
++R_MIGRATION=20270120000000_scout_identity_ready
++C_MIGRATION=20270121000000_scout_identity_contract
++S8B_MIGRATION=20270122000000_scout_native_provenance_expand
++# 164 base + S1 + C1 + E + B + R + C = 170 at the accepted C head.
++EXPECTED_MIGRATIONS=170
++MODE="${1:-create}"
++[[ -n "${G2_S8B_OLD_ROOT:-}" ]] || { echo "missing G2_S8B_OLD_ROOT" >&2; exit 2; }
++[[ "$MODE" == create || "$MODE" == preflight ]] || { echo "usage: $0 [create|preflight]" >&2; exit 2; }
++case "$G2_S8B_OLD_ROOT" in /*) ;; *) echo "G2_S8B_OLD_ROOT must be absolute" >&2; exit 2;; esac
++[[ "$G2_S8B_OLD_ROOT" != "$ROOT" && "$G2_S8B_OLD_ROOT" != "$ROOT"/* ]] \
++  || { echo "old root must live outside the candidate root $ROOT" >&2; exit 2; }
++
++# The candidate must carry OLD_HEAD in its own history; otherwise the shared node_modules
++# rule in bootstrap (identical package.json/lock) has no basis either.
++git -C "$ROOT" cat-file -e "$OLD_HEAD^{commit}" || { echo "candidate root does not contain the OLD head $OLD_HEAD" >&2; exit 3; }
++git -C "$ROOT" merge-base --is-ancestor "$OLD_HEAD" HEAD || { echo "OLD head $OLD_HEAD is not an ancestor of candidate HEAD" >&2; exit 3; }
++
++if [[ "$MODE" == create ]]; then
++  if [[ -e "$G2_S8B_OLD_ROOT" ]]; then
++    [[ -f "$G2_S8B_OLD_ROOT/.git" || -d "$G2_S8B_OLD_ROOT/.git" ]] \
++      || { echo "$G2_S8B_OLD_ROOT exists but is not a Git checkout (an archive extraction cannot pass the identity gate); remove it" >&2; exit 4; }
++    echo "old root already exists; verifying only"
++  else
++    # --no-checkout + checkout --detach: HEAD is the exact OLD commit, on no branch.
++    # Nothing in the source repository changes either way.
++    if [[ "${G2_S8B_OLD_ROOT_SHARED:-0}" == 1 ]]; then
++      git clone --quiet --shared --no-checkout "$ROOT" "$G2_S8B_OLD_ROOT"
++    else
++      git clone --quiet --no-checkout "$ROOT" "$G2_S8B_OLD_ROOT"
++    fi
++    git -C "$G2_S8B_OLD_ROOT" checkout --quiet --detach "$OLD_HEAD"
++  fi
++fi
++
++# ---- Offline preflight: exactly the bootstrap step-4 gate, plus the spec's byte checks.
++[[ "$(git -C "$G2_S8B_OLD_ROOT" rev-parse HEAD)" == "$OLD_HEAD" ]] || { echo "old root is not $OLD_HEAD" >&2; exit 4; }
++git -C "$G2_S8B_OLD_ROOT" symbolic-ref -q HEAD >/dev/null && { echo "old root HEAD must be detached, not a branch" >&2; exit 4; }
++git -C "$G2_S8B_OLD_ROOT" diff --quiet HEAD -- package.json package-lock.json src prisma \
++  || { echo "old root has uncommitted source/dependency changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$OLD_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ between OLD and candidate; a shared node_modules is unsafe" >&2; exit 4; }
++[[ -d "$G2_S8B_OLD_ROOT/prisma/migrations/$E_MIGRATION" && -d "$G2_S8B_OLD_ROOT/prisma/migrations/$R_MIGRATION" && -d "$G2_S8B_OLD_ROOT/prisma/migrations/$C_MIGRATION" ]] \
++  || { echo "old root lacks E, R or C; it is not a descendant of the accepted C head" >&2; exit 4; }
++[[ ! -d "$G2_S8B_OLD_ROOT/prisma/migrations/$S8B_MIGRATION" ]] || { echo "old root unexpectedly contains S8-B" >&2; exit 4; }
++OLD_COUNT="$(find "$G2_S8B_OLD_ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$OLD_COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "old root has $OLD_COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++# The candidate ships exactly S8-B: its migration tree differs from the OLD root's by
++# migration.sql + down.sql of S8B_MIGRATION and nothing else.
++[[ "$(git -C "$ROOT" diff --name-only "$OLD_HEAD" HEAD -- prisma/migrations | sort | tr '\n' ' ')" \
++  == "prisma/migrations/$S8B_MIGRATION/down.sql prisma/migrations/$S8B_MIGRATION/migration.sql " ]] \
++  || { echo "candidate migrations differ from $OLD_HEAD by other than exactly S8-B's two files" >&2; exit 4; }
++for file in scout-reconstruct.service.ts scout-roster.service.ts scout-entities.service.ts reconstruct/families.ts; do
++  cmp -s "$G2_S8B_OLD_ROOT/src/scout/$file" <(git -C "$ROOT" show "$OLD_HEAD:src/scout/$file") \
++    || { echo "old root src/scout/$file is not byte-identical to $OLD_HEAD" >&2; exit 4; }
++done
++# The OLD schema is the pre-S8-B shape (no provenance model, no ledger target_kind); the candidate adds both.
++grep -q 'model ScoutReconstructionLedger ' "$G2_S8B_OLD_ROOT/prisma/schema.prisma" || { echo "old schema lacks the ScoutReconstructionLedger model" >&2; exit 4; }
++! grep -q 'model ImportNativeProvenance ' "$G2_S8B_OLD_ROOT/prisma/schema.prisma" \
++  || { echo "old schema already carries S8-B's ImportNativeProvenance model" >&2; exit 4; }
++! awk '/model ScoutReconstructionLedger \{/,/\}/' "$G2_S8B_OLD_ROOT/prisma/schema.prisma" | grep -Eq '^ +target_kind +' \
++  || { echo "old ledger model already carries S8-B's target_kind field" >&2; exit 4; }
++# Dependencies are shared read-only by bootstrap through a symlink; report provenance if present.
++if [[ -L "$G2_S8B_OLD_ROOT/node_modules" ]]; then
++  echo "node_modules symlink -> $(readlink "$G2_S8B_OLD_ROOT/node_modules")"
++elif [[ -e "$G2_S8B_OLD_ROOT/node_modules" ]]; then
++  echo "old root has its own node_modules directory (not the shared symlink); bootstrap will not replace it" >&2; exit 4
++fi
++echo "old_root=$G2_S8B_OLD_ROOT head=$(git -C "$G2_S8B_OLD_ROOT" rev-parse HEAD) detached=yes migrations=$OLD_COUNT" \
++  "alternates=$(cat "$(git -C "$G2_S8B_OLD_ROOT" rev-parse --absolute-git-dir)/objects/info/alternates" 2>/dev/null || echo none)"
++echo "G2_S8B_OLD_ROOT_OK"
+diff --git a/test/utils/g2-s8b-pg-harness.ts b/test/utils/g2-s8b-pg-harness.ts
+new file mode 100644
+index 00000000..6a3d80a1
+--- /dev/null
++++ b/test/utils/g2-s8b-pg-harness.ts
+@@ -0,0 +1,255 @@
++/**
++ * S8-B G2 live-proof helpers: derived by substitution from the committed N/Q1 harness
++ * test/utils/g2-nq1-pg-harness.ts (blob c8f6fea8 at 61b93cff), which stays byte-identical. Same
++ * real psql, same real generated Prisma clients in separate OS processes (the committed, unchanged
++ * test/utils/g2-tq0-worker.cjs drives the real ScoutReconstructService writer and the roster /
++ * entities readers), no transaction or query mocks; bound to the S8-B-only identity guard
++ * test/utils/g2-s8b-db.ts and the G2_S8B_* environment. Only test/rls-g2-s8b.spec.ts (via
++ * test/utils/g2-s8b-harness.ts) imports this.
++ *
++ * The "old" process role here is the S8-B base head (OLD_HEAD: the accepted C head 1b6cc661)
++ * with the OLD client generated in
++ * that detached checkout, i.e. an image that knows nothing about ImportNativeProvenance or the
++ * ledger target_kind column. `worker(..., true)` runs it. The barrier/cursor helpers of the N/Q1
++ * harness are deliberately not carried: S8-B proves the provenance expand only.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S8B_ADMIN_ROLE,
++  G2_S8B_MIGRATION_ROLE,
++  G2_S8B_RUNTIME_ROLE,
++  g2S8bTestTarget,
++  withFixturePassword,
++} from './g2-s8b-db';
++
++export const root = resolve(__dirname, '..', '..');
++/** OLD side pin (kept identical in test/utils/g2-s8b-bootstrap.sh and g2-s8b-old-root.sh). */
++export const OLD_HEAD = '1b6cc66164b3398d573ba92f0c8f6b039494be24';
++export const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++
++const raw = process.env.G2_S8B_DATABASE_URL;
++const password = process.env.G2_S8B_PASSWORD;
++export const psql = process.env.G2_S8B_PSQL;
++export const oldRoot = process.env.G2_S8B_OLD_ROOT;
++export const oldClient = process.env.G2_S8B_OLD_CLIENT;
++export const directory = process.env.G2_S8B_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_S8B_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !oldRoot || !oldClient || !directory) {
++  throw new Error(
++    'S8-B G2 proof requires explicit database, password, psql, data directory, OLD source and OLD client',
++  );
++}
++export const target = g2S8bTestTarget(raw, process.env.G2_S8B_CONFIRM);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_S8B_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_S8B_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** The same statement text as another fixture-matrix role (runtime `service_role`, or an API
++ *  role reached through SET ROLE from the owner session in the statement itself). */
++export const sqlAs = (role: string, text: string): string => psqlRun(asRole(role), [], text);
++/** Operator form: `psql -v ON_ERROR_STOP=1 --single-transaction -f <file>`. S8-B's files carry
++ *  their own BEGIN/COMMIT, so --single-transaction is redundant (psql only emits nested-transaction
++ *  WARNINGs); it is kept so the harness runs the same command the CI dry-run and the recovery
++ *  packet document. */
++export const sqlFile = (file: string): string =>
++  psqlRun(migrationUrl, ['--single-transaction', '-f', file]);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string, role?: string): void {
++  let error: unknown;
++  try {
++    if (role) sqlAs(role, statement);
++    else sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++/** Fails when the file applies; used for the refusing entry gates of up and down. */
++export function refusedFile(file: string, message: string): void {
++  let error: unknown;
++  try {
++    sqlFile(file);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL file unexpectedly applied');
++  expect(String(error)).toContain(message);
++}
++
++export const stageSql = resolve(root, 'prisma/migrations', S8B_MIGRATION);
++export const upFile = resolve(stageSql, 'migration.sql');
++export const downFile = resolve(stageSql, 'down.sql');
++export const up = readFileSync(upFile, 'utf8');
++export const down = readFileSync(downFile, 'utf8');
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
++let sequence = 0;
++/** One real service call in an independent OS process with the OLD (pre-S8-B) or the candidate
++ *  generated client. `options.action` ∈ reconstruct (default; the real N ledger writer for
++ *  `options.family`) | `roster` | `entities`; see the unchanged test/utils/g2-tq0-worker.cjs. */
++export function worker(options: Record<string, unknown> = {}, old = false) {
++  const name = `g2b_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_S8B_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root: old ? oldRoot : root,
++    client: old ? oldClient : resolve(root, 'node_modules/.prisma/client'),
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    family: 'clients',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-tq0-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_TQ0_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.done) result = message;
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          old,
++          options,
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return { done, stop: () => child.kill(), name };
++}
++export const run = (options: Record<string, unknown> = {}, old = false) =>
++  worker(options, old).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_S8B_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_S8B_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
+-- 
+2.53.0
+
