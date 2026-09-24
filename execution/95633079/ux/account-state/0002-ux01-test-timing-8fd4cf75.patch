@@ -1,0 +1,42 @@
+From 8fd4cf759c2a8dd3f9ef9772f6dadb2035d93820 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 06:58:02 +0000
+Subject: [PATCH] test(import): control offer-decision read timing
+
+Hold the AsyncStorage read open in the loading-state case so the
+intermediate `loading` state is asserted while the read is pending;
+RNTL's async renderHook otherwise flushes an unheld in-memory read
+before the assertion. Test body only; hook and storage unchanged.
+---
+ src/hooks/__tests__/useImportOfferDecision.test.tsx | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/hooks/__tests__/useImportOfferDecision.test.tsx b/src/hooks/__tests__/useImportOfferDecision.test.tsx
+index 99cd6e1..9c10f11 100644
+--- a/src/hooks/__tests__/useImportOfferDecision.test.tsx
++++ b/src/hooks/__tests__/useImportOfferDecision.test.tsx
+@@ -117,9 +117,21 @@ describe('useImportOfferDecision — inert and unresolved states', () => {
+ 
+ describe('useImportOfferDecision — reading the persisted answer', () => {
+   it('is loading (render nothing) until the read settles, then ready with null when unanswered', async () => {
++    // Hold the read open: RNTL's async renderHook flushes an unheld in-memory
++    // read inside its own act, so the intermediate state is only observable
++    // while getItem is still pending.
++    const held = deferred<string | null>();
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(() => held.promise);
++    spies.push(getSpy);
++
+     const { result } = await renderHook(() => useImportOfferDecision(true));
+     expect(result.current.status).toBe('loading');
+     expect(result.current.decision).toBeNull();
++
++    await act(async () => {
++      held.resolve(null);
++      await flush();
++    });
+     await waitFor(() => expect(result.current.status).toBe('ready'));
+     expect(result.current.decision).toBeNull();
+   });
+-- 
+2.53.0
+

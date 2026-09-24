@@ -1,0 +1,11 @@
+feat(import): account-scoped offer-decision mirror and hook (UX-01)
+
+Persist the coach's answer to the one-time Roman import offer per account
+(import_offer_decision:<userId>, version 1, no timestamp) following the
+accepted #291 user-scoped mirror pattern: cross-user purge on read, exact
+key removed for the signing-out coach, late writes after sign-out removed.
+Expose useImportOfferDecision(enabled) → {status, decision, recordDecision}
+for the Home-card host. No eligibility inference, no intent binding, no
+server copy, no new flag/endpoint/token store. Sign-out clears local app
+state only and makes no claim about the desktop extension connection.
+

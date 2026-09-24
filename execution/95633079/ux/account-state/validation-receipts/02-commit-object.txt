@@ -1,0 +1,15 @@
+tree a33cb8919495ed24e30623188dbb9f59c67df8bd
+parent bc7b4e96fc1db54568bc209dbe1f7a4121501ac9
+author Bradley Gleave <bradley@bradleytgpcoaching.com> 1790232336 +0000
+committer Bradley Gleave <bradley@bradleytgpcoaching.com> 1790232336 +0000
+
+feat(import): account-scoped offer-decision mirror and hook (UX-01)
+
+Persist the coach's answer to the one-time Roman import offer per account
+(import_offer_decision:<userId>, version 1, no timestamp) following the
+accepted #291 user-scoped mirror pattern: cross-user purge on read, exact
+key removed for the signing-out coach, late writes after sign-out removed.
+Expose useImportOfferDecision(enabled) → {status, decision, recordDecision}
+for the Home-card host. No eligibility inference, no intent binding, no
+server copy, no new flag/endpoint/token store. Sign-out clears local app
+state only and makes no claim about the desktop extension connection.

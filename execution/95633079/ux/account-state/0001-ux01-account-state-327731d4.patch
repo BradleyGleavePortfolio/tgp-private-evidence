@@ -1,0 +1,1132 @@
+From 327731d4c6daf9c319fd0a79fc9cf4be9dc2f580 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Thu, 24 Sep 2026 06:45:36 +0000
+Subject: [PATCH] feat(import): account-scoped offer-decision mirror and hook
+ (UX-01)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Persist the coach's answer to the one-time Roman import offer per account
+(import_offer_decision:<userId>, version 1, no timestamp) following the
+accepted #291 user-scoped mirror pattern: cross-user purge on read, exact
+key removed for the signing-out coach, late writes after sign-out removed.
+Expose useImportOfferDecision(enabled) → {status, decision, recordDecision}
+for the Home-card host. No eligibility inference, no intent binding, no
+server copy, no new flag/endpoint/token store. Sign-out clears local app
+state only and makes no claim about the desktop extension connection.
+---
+ .../__tests__/useImportOfferDecision.test.tsx | 461 ++++++++++++++++++
+ src/hooks/useImportOfferDecision.ts           | 168 +++++++
+ src/services/__tests__/authActions.test.ts    |  32 ++
+ src/services/authActions.ts                   |   9 +
+ .../__tests__/importOfferDecision.test.ts     | 206 ++++++++
+ src/storage/importOfferDecision.ts            | 163 +++++++
+ 6 files changed, 1039 insertions(+)
+ create mode 100644 src/hooks/__tests__/useImportOfferDecision.test.tsx
+ create mode 100644 src/hooks/useImportOfferDecision.ts
+ create mode 100644 src/storage/__tests__/importOfferDecision.test.ts
+ create mode 100644 src/storage/importOfferDecision.ts
+
+diff --git a/src/hooks/__tests__/useImportOfferDecision.test.tsx b/src/hooks/__tests__/useImportOfferDecision.test.tsx
+new file mode 100644
+index 0000000..99cd6e1
+--- /dev/null
++++ b/src/hooks/__tests__/useImportOfferDecision.test.tsx
+@@ -0,0 +1,461 @@
++/**
++ * useImportOfferDecision — account-scoped offer-decision state (UX-01 J0/J1).
++ *
++ * Pins the properties a Home-card host relies on:
++ *   - disabled → inert (no storage read, no write, `disabled`),
++ *   - identity unknown → `unresolved`, and an answer is REFUSED, never bound to
++ *     a guessed owner,
++ *   - identity known → `loading` (render nothing) → `ready` with that coach's
++ *     own persisted answer or null,
++ *   - recording an answer reflects immediately, is written under the owner's
++ *     key, and the latest answer is also the last one on disk,
++ *   - account switch on a live mount resets before the new coach's read so the
++ *     previous coach's card never shows, and a stale read for the previous
++ *     coach is discarded,
++ *   - a write that lands after sign-out is removed again and reported false,
++ *   - a failed write keeps the in-memory answer, reports false, and re-offers
++ *     on the next mount (no "saved" claim possible).
++ *
++ * The storage module runs against the AsyncStorage jest mock so persistence and
++ * scoping are exercised end to end, not stubbed. Only identity is mocked.
++ */
++import { act, cleanup, renderHook, waitFor } from '@testing-library/react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++let mockCurrentUserId: string | null = 'coach-1';
++jest.mock('../useCurrentUser', () => ({
++  useCurrentUser: () => (mockCurrentUserId ? { id: mockCurrentUserId, email: 'c@x.io' } : null),
++}));
++
++jest.mock('../../utils/logger', () => ({
++  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn(), log: jest.fn() },
++}));
++
++import { useImportOfferDecision } from '../useImportOfferDecision';
++import {
++  IMPORT_OFFER_DECISION_VERSION,
++  importOfferDecisionKey,
++  readImportOfferDecision,
++  type ImportOfferDecision,
++} from '../../storage/importOfferDecision';
++
++/** Seed an answer as if a previous process had recorded it for `userId`. */
++async function seedDecision(userId: string, decision: ImportOfferDecision) {
++  await AsyncStorage.setItem(
++    importOfferDecisionKey(userId),
++    JSON.stringify({ version: IMPORT_OFFER_DECISION_VERSION, userId, decision }),
++  );
++}
++
++/** A promise the test resolves by hand, to hold a storage call open. */
++function deferred<T>() {
++  let resolve!: (value: T) => void;
++  let reject!: (reason?: unknown) => void;
++  const promise = new Promise<T>((res, rej) => {
++    resolve = res;
++    reject = rej;
++  });
++  return { promise, resolve, reject };
++}
++
++/** Let queued microtasks (a chained write starting, a late clear) run. */
++const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
++
++const spies: Array<{ mockRestore: () => void }> = [];
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++  mockCurrentUserId = 'coach-1';
++});
++
++afterEach(async () => {
++  await cleanup();
++  while (spies.length) spies.pop()?.mockRestore();
++});
++
++describe('useImportOfferDecision — inert and unresolved states', () => {
++  it('is inert when disabled: no storage read, no write, status disabled', async () => {
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem');
++    spies.push(getSpy);
++    const { result } = await renderHook(() => useImportOfferDecision(false));
++    expect(result.current.status).toBe('disabled');
++    expect(result.current.decision).toBeNull();
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      outcome = await result.current.recordDecision('later');
++    });
++    expect(outcome).toBe(false);
++    expect(getSpy).not.toHaveBeenCalled();
++    expect(await AsyncStorage.getAllKeys()).toEqual([]);
++  });
++
++  it('is unresolved while the coach identity is unknown and refuses to record blind', async () => {
++    mockCurrentUserId = null;
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    expect(result.current.status).toBe('unresolved');
++    expect(result.current.decision).toBeNull();
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      outcome = await result.current.recordDecision('starting_fresh');
++    });
++    expect(outcome).toBe(false);
++    // Nothing was bound to a guessed owner.
++    expect(await AsyncStorage.getAllKeys()).toEqual([]);
++    expect(result.current.status).toBe('unresolved');
++  });
++
++  it('defaults to the OFF kill switch (featureFlags.extensionImport is false in test env)', async () => {
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem');
++    spies.push(getSpy);
++    const { result } = await renderHook(() => useImportOfferDecision());
++    expect(result.current.status).toBe('disabled');
++    expect(getSpy).not.toHaveBeenCalled();
++  });
++});
++
++describe('useImportOfferDecision — reading the persisted answer', () => {
++  it('is loading (render nothing) until the read settles, then ready with null when unanswered', async () => {
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    expect(result.current.status).toBe('loading');
++    expect(result.current.decision).toBeNull();
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBeNull();
++  });
++
++  it.each<ImportOfferDecision>(['yes', 'later', 'starting_fresh'])(
++    'returns the persisted answer %s for the signed-in coach',
++    async (decision) => {
++      await seedDecision('coach-1', decision);
++      const { result } = await renderHook(() => useImportOfferDecision(true));
++      await waitFor(() => expect(result.current.status).toBe('ready'));
++      expect(result.current.decision).toBe(decision);
++    },
++  );
++
++  it('never returns another coach\'s answer', async () => {
++    await seedDecision('coach-2', 'starting_fresh');
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBeNull();
++    // The other coach's record is untouched: not ours to read or clear.
++    expect(await readImportOfferDecision('coach-2')).toBe('starting_fresh');
++  });
++
++  it('resolves once the identity arrives asynchronously (null on first render)', async () => {
++    // Production timing: useCurrentUser() is null on first render and resolves
++    // after a storage read; the offer must not be asked before the coach's own
++    // answer has been consulted.
++    await seedDecision('coach-1', 'later');
++    mockCurrentUserId = null;
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    expect(result.current.status).toBe('unresolved');
++
++    mockCurrentUserId = 'coach-1';
++    await act(async () => {
++      await rerender({});
++    });
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBe('later');
++  });
++});
++
++describe('useImportOfferDecision — recording an answer', () => {
++  it('reflects the answer immediately, writes it under the owner key, and reports true', async () => {
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++
++    // Hold the disk write open so "reflected in memory" is observable before
++    // "confirmed on disk".
++    const originalSetItem = AsyncStorage.setItem;
++    const gate = deferred<void>();
++    const setSpy = jest.spyOn(AsyncStorage, 'setItem').mockImplementationOnce(async (key, value) => {
++      await gate.promise;
++      await originalSetItem(key, value);
++    });
++    spies.push(setSpy);
++
++    let pending: Promise<boolean> | undefined;
++    await act(async () => {
++      pending = result.current.recordDecision('later');
++      await flush();
++    });
++    // The tap is a fact for this session before the disk confirms it.
++    expect(result.current.status).toBe('ready');
++    expect(result.current.decision).toBe('later');
++    expect(await AsyncStorage.getAllKeys()).toEqual([]);
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      gate.resolve();
++      outcome = await pending;
++    });
++    expect(outcome).toBe(true);
++    const raw = await AsyncStorage.getItem(importOfferDecisionKey('coach-1'));
++    expect(JSON.parse(raw as string)).toEqual({
++      version: IMPORT_OFFER_DECISION_VERSION,
++      userId: 'coach-1',
++      decision: 'later',
++    });
++    expect(await AsyncStorage.getAllKeys()).toEqual([importOfferDecisionKey('coach-1')]);
++  });
++
++  it('a recorded answer supersedes a read still in flight (the tap is newer than the disk)', async () => {
++    const staleRecord = JSON.stringify({
++      version: IMPORT_OFFER_DECISION_VERSION,
++      userId: 'coach-1',
++      decision: 'later',
++    });
++    const held = deferred<string | null>();
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(() => held.promise);
++    spies.push(getSpy);
++
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    expect(result.current.status).toBe('loading');
++
++    await act(async () => {
++      await result.current.recordDecision('yes');
++    });
++    expect(result.current.decision).toBe('yes');
++    expect(await readImportOfferDecision('coach-1')).toBe('yes');
++
++    // The old read now settles with the stale 'later' record it saw on disk.
++    await act(async () => {
++      held.resolve(staleRecord);
++      await flush();
++    });
++    expect(result.current.status).toBe('ready');
++    expect(result.current.decision).toBe('yes');
++  });
++
++  it('the latest answer is also the last one on disk when writes overlap (later, then yes)', async () => {
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++
++    // Hold the FIRST write open; if writes were not serialized the second
++    // would land first and the slow first write would then overwrite it.
++    const originalSetItem = AsyncStorage.setItem;
++    const firstGate = deferred<void>();
++    let calls = 0;
++    const setSpy = jest.spyOn(AsyncStorage, 'setItem').mockImplementation(async (key, value) => {
++      calls += 1;
++      if (calls === 1) await firstGate.promise;
++      await originalSetItem(key, value);
++    });
++    spies.push(setSpy);
++
++    let first: Promise<boolean> | undefined;
++    let second: Promise<boolean> | undefined;
++    await act(async () => {
++      first = result.current.recordDecision('later');
++      second = result.current.recordDecision('yes');
++      await flush();
++    });
++    expect(result.current.decision).toBe('yes');
++    // Only the first write has started; the second waits its turn.
++    expect(calls).toBe(1);
++
++    let outcomes: boolean[] = [];
++    await act(async () => {
++      firstGate.resolve();
++      outcomes = await Promise.all([first as Promise<boolean>, second as Promise<boolean>]);
++    });
++    expect(outcomes).toEqual([true, true]);
++    expect(calls).toBe(2);
++    expect(await readImportOfferDecision('coach-1')).toBe('yes');
++    expect(result.current.decision).toBe('yes');
++  });
++
++  it('a failed write keeps the answer in memory, reports false, and re-offers on the next mount', async () => {
++    const { result } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++
++    const setSpy = jest
++      .spyOn(AsyncStorage, 'setItem')
++      .mockRejectedValueOnce(new Error('disk full'));
++    spies.push(setSpy);
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      outcome = await result.current.recordDecision('later');
++    });
++    expect(outcome).toBe(false);
++    // This session honours the tap: the card does not linger as unanswered.
++    expect(result.current.status).toBe('ready');
++    expect(result.current.decision).toBe('later');
++    // Nothing is on disk, so no caller can truthfully say "saved".
++    expect(await AsyncStorage.getAllKeys()).toEqual([]);
++
++    // Next entry: the answer is unknown again and the offer may be asked.
++    await cleanup();
++    const next = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(next.result.current.status).toBe('ready'));
++    expect(next.result.current.decision).toBeNull();
++  });
++});
++
++describe('useImportOfferDecision — identity change on a live mount', () => {
++  it('sign-out (A→null) drops the in-memory answer and returns to unresolved', async () => {
++    await seedDecision('coach-1', 'starting_fresh');
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.decision).toBe('starting_fresh'));
++
++    mockCurrentUserId = null;
++    await act(async () => {
++      await rerender({});
++    });
++    expect(result.current.status).toBe('unresolved');
++    expect(result.current.decision).toBeNull();
++    // The record on disk is the signing-out coach's; signOut() removes it, not
++    // this hook (which must not write during sign-out).
++    expect(await readImportOfferDecision('coach-1')).toBe('starting_fresh');
++  });
++
++  it('account switch (A→B) resets BEFORE reading B and never shows A\'s answer', async () => {
++    await seedDecision('coach-1', 'starting_fresh');
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.decision).toBe('starting_fresh'));
++
++    // Hold B's read open so the state between "switched" and "read settled"
++    // is observable: it must already be empty, not still showing A's answer.
++    const heldB = deferred<string | null>();
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(() => heldB.promise);
++    spies.push(getSpy);
++
++    mockCurrentUserId = 'coach-2';
++    await act(async () => {
++      await rerender({});
++    });
++    expect(result.current.status).toBe('loading');
++    expect(result.current.decision).toBeNull();
++
++    await act(async () => {
++      heldB.resolve(null);
++      await flush();
++    });
++    expect(result.current.status).toBe('ready');
++    expect(result.current.decision).toBeNull();
++  });
++
++  it('account switch shows B\'s own answer, not A\'s', async () => {
++    await seedDecision('coach-1', 'starting_fresh');
++    await seedDecision('coach-2', 'later');
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.decision).toBe('starting_fresh'));
++
++    mockCurrentUserId = 'coach-2';
++    await act(async () => {
++      await rerender({});
++    });
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBe('later');
++  });
++
++  it('discards a stale read for the previous coach that settles after the switch', async () => {
++    await seedDecision('coach-1', 'starting_fresh');
++    const heldA = deferred<string | null>();
++    const original = AsyncStorage.getItem;
++    const getSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(() => heldA.promise);
++    spies.push(getSpy);
++
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    expect(result.current.status).toBe('loading');
++
++    // B signs in before A's read has settled; B's read goes straight through.
++    mockCurrentUserId = 'coach-2';
++    await act(async () => {
++      await rerender({});
++    });
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBeNull();
++
++    // A's read finally settles with A's answer: it must be discarded.
++    await act(async () => {
++      heldA.resolve(await original(importOfferDecisionKey('coach-1')));
++    });
++    expect(result.current.status).toBe('ready');
++    expect(result.current.decision).toBeNull();
++  });
++
++  it('a write that lands after sign-out is removed again and reported false', async () => {
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++
++    const originalSetItem = AsyncStorage.setItem;
++    const gate = deferred<void>();
++    const setSpy = jest.spyOn(AsyncStorage, 'setItem').mockImplementationOnce(async (key, value) => {
++      await gate.promise;
++      await originalSetItem(key, value);
++    });
++    spies.push(setSpy);
++
++    let pending: Promise<boolean> | undefined;
++    await act(async () => {
++      pending = result.current.recordDecision('later');
++      await flush();
++    });
++    expect(result.current.decision).toBe('later');
++
++    // Coach signs out while the write is still in flight. (signOut() would
++    // also have removed `import_offer_decision:coach-1` at this point.)
++    mockCurrentUserId = null;
++    await act(async () => {
++      await rerender({});
++    });
++    expect(result.current.status).toBe('unresolved');
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      gate.resolve();
++      outcome = await pending;
++    });
++    expect(outcome).toBe(false);
++    // The late write is cleaned up: sign-out stays a completed local boundary.
++    await waitFor(async () => {
++      expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++    });
++    expect(result.current.status).toBe('unresolved');
++    expect(result.current.decision).toBeNull();
++  });
++
++  it('a write that lands after an account switch is removed and never attributed to the new coach', async () => {
++    const { result, rerender } = await renderHook(() => useImportOfferDecision(true));
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++
++    const originalSetItem = AsyncStorage.setItem;
++    const gate = deferred<void>();
++    const setSpy = jest.spyOn(AsyncStorage, 'setItem').mockImplementationOnce(async (key, value) => {
++      await gate.promise;
++      await originalSetItem(key, value);
++    });
++    spies.push(setSpy);
++
++    let pending: Promise<boolean> | undefined;
++    await act(async () => {
++      pending = result.current.recordDecision('starting_fresh');
++      await flush();
++    });
++    expect(result.current.decision).toBe('starting_fresh');
++
++    mockCurrentUserId = 'coach-2';
++    await act(async () => {
++      await rerender({});
++    });
++    await waitFor(() => expect(result.current.status).toBe('ready'));
++    expect(result.current.decision).toBeNull();
++
++    let outcome: boolean | undefined;
++    await act(async () => {
++      gate.resolve();
++      outcome = await pending;
++    });
++    expect(outcome).toBe(false);
++    await waitFor(async () => {
++      expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++    });
++    // B's view is untouched and B has no record.
++    expect(result.current.decision).toBeNull();
++    expect(await readImportOfferDecision('coach-2')).toBeNull();
++  });
++});
+diff --git a/src/hooks/useImportOfferDecision.ts b/src/hooks/useImportOfferDecision.ts
+new file mode 100644
+index 0000000..ddede72
+--- /dev/null
++++ b/src/hooks/useImportOfferDecision.ts
+@@ -0,0 +1,168 @@
++/**
++ * useImportOfferDecision — account-scoped consumer of the persisted Roman
++ * import-offer answer (`yes` | `later` | `starting_fresh`), UX-01 J0/J1.
++ *
++ * What it is: the minimal, truthful state contract a Home-card host needs to
++ * wire `onYes` / `onLater` / `onStartingFresh` (and to decide which variant of
++ * the offer card, if any, to mount) without owning storage or identity itself.
++ *
++ * What it is NOT: it does not decide eligibility (CQ-01 is server-side and
++ * unresolved; the host still needs a server truth before showing the offer to
++ * real coaches), it does not create or bind an import intent (S7-gated), it
++ * does not mount any UI, poll, time, or emit analytics, and it never presents a
++ * device-local write as a server record.
++ *
++ * Identity binding follows the accepted #291 `useExtensionPairing` posture:
++ *   - the coach id comes from `useCurrentUser()`, which is `null` on first
++ *     render and again after 'logout'; while it is null the hook is
++ *     `unresolved` and records nothing (it never guesses an owner);
++ *   - every read and write is bound to the id resolved at the moment it
++ *     started; a result that settles after the identity changed is discarded,
++ *     and a write that landed after sign-out/switch is removed again (bounded
++ *     residual: a process death between that write and its removal leaves a
++ *     user-scoped, non-secret record only that same coach could read back);
++ *   - identity change on a live mount (A→null, A→B) resets the in-memory answer
++ *     before the new identity's record is read, so account B can never see A's
++ *     card even for one frame.
++ *
++ * Read/write ordering: writes are serialized so the coach's LATEST answer is
++ * also the last one on disk; a read still in flight when an answer is recorded
++ * is superseded and cannot overwrite that answer in memory.
++ */
++
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { featureFlags } from '../config/featureFlags';
++import {
++  clearImportOfferDecision,
++  readImportOfferDecision,
++  writeImportOfferDecision,
++  type ImportOfferDecision,
++} from '../storage/importOfferDecision';
++import { logger } from '../utils/logger';
++import { useCurrentUser } from './useCurrentUser';
++
++export type { ImportOfferDecision } from '../storage/importOfferDecision';
++
++/**
++ * - `disabled`: `enabled` is false (default: the existing `extensionImport`
++ *   flag, OFF by default, same kill switch as `useExtensionPairing`); no
++ *   storage is touched. Render nothing.
++ * - `unresolved`: the coach identity is not (yet) known. Render nothing.
++ * - `loading`: identity known, persisted answer being read. Render nothing
++ *   (never flash the offer before the answer is known).
++ * - `ready`: `decision` is authoritative for this device and account:
++ *   `null` means no recorded answer, otherwise the recorded answer.
++ */
++export type ImportOfferDecisionStatus = 'disabled' | 'unresolved' | 'loading' | 'ready';
++
++export interface ImportOfferDecisionState {
++  status: ImportOfferDecisionStatus;
++  /** Meaningful only when `status === 'ready'`; always `null` otherwise. */
++  decision: ImportOfferDecision | null;
++  /**
++   * Record the coach's answer for the account signed in NOW. The in-memory
++   * `decision` reflects the answer immediately (the tap is a fact for this
++   * session). Resolves `true` only when the answer was durably written on this
++   * device for that same account and the account is still signed in; `false`
++   * when disabled, when no identity was resolved (nothing is recorded), when
++   * the identity changed while writing (the write is removed again), or when
++   * the write itself failed (the offer is simply asked again on the next
++   * entry; no "saved" claim may be shown). Never a server-side claim.
++   */
++  recordDecision: (decision: ImportOfferDecision) => Promise<boolean>;
++}
++
++interface View {
++  status: ImportOfferDecisionStatus;
++  decision: ImportOfferDecision | null;
++}
++
++function initialView(enabled: boolean, userId: string | null): View {
++  if (!enabled) return { status: 'disabled', decision: null };
++  if (!userId) return { status: 'unresolved', decision: null };
++  return { status: 'loading', decision: null };
++}
++
++export function useImportOfferDecision(
++  enabled: boolean = featureFlags.extensionImport,
++): ImportOfferDecisionState {
++  const userId = useCurrentUser()?.id ?? null;
++  const userIdRef = useRef(userId);
++  userIdRef.current = userId;
++  const enabledRef = useRef(enabled);
++  enabledRef.current = enabled;
++  const mountedRef = useRef(true);
++  /**
++   * Monotonic id of the latest identity epoch or recorded answer. A read or
++   * write whose epoch is no longer current acts on nothing.
++   */
++  const epochRef = useRef(0);
++  /** Serializes disk writes so the last answer given is the last one written. */
++  const writeChainRef = useRef<Promise<void>>(Promise.resolve());
++
++  const [view, setView] = useState<View>(() => initialView(enabled, userId));
++
++  useEffect(() => {
++    mountedRef.current = true;
++    return () => {
++      mountedRef.current = false;
++    };
++  }, []);
++
++  useEffect(() => {
++    // Any identity or enablement change supersedes whatever was in flight.
++    const epoch = ++epochRef.current;
++    const next = initialView(enabled, userId);
++    setView((prev) =>
++      prev.status === next.status && prev.decision === next.decision ? prev : next,
++    );
++    if (next.status !== 'loading' || !userId) return;
++    void (async () => {
++      const decision = await readImportOfferDecision(userId);
++      // Superseded by a newer identity, a recorded answer, or unmount → discard.
++      if (!mountedRef.current || epochRef.current !== epoch) return;
++      setView({ status: 'ready', decision });
++    })();
++  }, [enabled, userId]);
++
++  const recordDecision = useCallback(async (decision: ImportOfferDecision): Promise<boolean> => {
++    if (!enabledRef.current) return false;
++    // The answer belongs to the coach signed in NOW. With no resolved identity
++    // there is nothing safe to bind it to: refuse rather than guess an owner.
++    const owner = userIdRef.current;
++    if (!owner) return false;
++    // Supersede any read still in flight: the tap is newer than the disk.
++    epochRef.current += 1;
++    if (mountedRef.current) setView({ status: 'ready', decision });
++
++    let written = false;
++    const run = async () => {
++      try {
++        await writeImportOfferDecision(owner, decision);
++        written = true;
++      } catch (err) {
++        // Degraded durability, not a dead flow: memory keeps the answer for
++        // this session and the offer is asked again on the next entry.
++        logger.warn('[useImportOfferDecision] write failed', err);
++      }
++    };
++    const chained = writeChainRef.current.then(run, run);
++    writeChainRef.current = chained;
++    await chained;
++
++    if (!written) return false;
++    if (userIdRef.current !== owner) {
++      // The write landed AFTER the coach signed out or the account switched,
++      // i.e. after signOut() removed `import_offer_decision:<owner>`. Remove
++      // what we wrote so sign-out remains a completed local-state boundary.
++      void clearImportOfferDecision(owner);
++      return false;
++    }
++    // A newer answer from the same coach may have been recorded while this one
++    // was queued; because writes are serialized, that answer is written after
++    // this one and the disk still ends at the latest answer.
++    return true;
++  }, []);
++
++  return { status: view.status, decision: view.decision, recordDecision };
++}
+diff --git a/src/services/__tests__/authActions.test.ts b/src/services/__tests__/authActions.test.ts
+index 0aa452a..fb3ac27 100644
+--- a/src/services/__tests__/authActions.test.ts
++++ b/src/services/__tests__/authActions.test.ts
+@@ -10,6 +10,10 @@ import {
+   IMPORT_PAIRING_MIRROR_KEY_PREFIX,
+   importPairingMirrorKey,
+ } from '../../storage/importPairingMirror';
++import {
++  IMPORT_OFFER_DECISION_KEY_PREFIX,
++  importOfferDecisionKey,
++} from '../../storage/importOfferDecision';
+ 
+ jest.mock('../api', () => ({
+   usersApi: { updatePushToken: jest.fn(async () => ({ data: {} })) },
+@@ -198,6 +202,34 @@ describe('signOut', () => {
+     );
+   });
+ 
++  // UX-01 (J0/J1) R15 — the per-coach Roman import-offer answer is keyed
++  // `import_offer_decision:<userId>`. It is non-secret and readable only under
++  // the owning coach's key, so sign-out removes the signing-out coach's EXACT
++  // key (like macro_targets:<userId>) and leaves a bystander coach's answer on
++  // a shared device untouched. Sign-out clears local app state only; nothing
++  // here claims the desktop extension connection was revoked.
++  it('removes only the signing-out coach\'s import_offer_decision:<userId> on sign-out', async () => {
++    const signingOutKey = importOfferDecisionKey('user-A'); // readUserCacheSync → user-A
++    expect(signingOutKey.startsWith(IMPORT_OFFER_DECISION_KEY_PREFIX)).toBe(true);
++    await AsyncStorage.setItem(
++      signingOutKey,
++      JSON.stringify({ version: 1, userId: 'user-A', decision: 'later' }),
++    );
++    const bystanderKey = importOfferDecisionKey(BYSTANDER_USER);
++    await AsyncStorage.setItem(
++      bystanderKey,
++      JSON.stringify({ version: 1, userId: BYSTANDER_USER, decision: 'starting_fresh' }),
++    );
++    // Sentinel: the prefix ends in a colon, so a similarly-named key survives.
++    await AsyncStorage.setItem('import_offer_decisionx_unrelated', 'keep');
++
++    await signOut();
++
++    expect(await AsyncStorage.getItem(signingOutKey)).toBeNull();
++    expect(await AsyncStorage.getItem(bystanderKey)).not.toBeNull();
++    expect(await AsyncStorage.getItem('import_offer_decisionx_unrelated')).toBe('keep');
++  });
++
+   // R15 — Audit #2 P1-5 regression coverage. The previous implementation only
+   // swept raw AsyncStorage keys, so MMKV-shim namespaced keys (`prefs:foo`,
+   // `cache:foo`) and native MMKV keys both survived sign-out. The test seeds
+diff --git a/src/services/authActions.ts b/src/services/authActions.ts
+index 8bb68bf..ceb33c4 100644
+--- a/src/services/authActions.ts
++++ b/src/services/authActions.ts
+@@ -20,6 +20,7 @@ import { clearAllStorage, prefsStorage, cacheStorage } from '../storage/mmkv';
+ import { deleteWorkoutLogsForUser } from '../offline/sync/sync-engine';
+ import { AUTOSAVE_MIRROR_KEY_PREFIX } from '../storage/autosaveMirror';
+ import { IMPORT_PAIRING_MIRROR_KEY_PREFIX } from '../storage/importPairingMirror';
++import { IMPORT_OFFER_DECISION_KEY_PREFIX } from '../storage/importOfferDecision';
+ import { useCoachStore } from '../store/coachStore';
+ import { useClientStore } from '../store/clientStore';
+ import { useFastingStore } from '../store/fastingStore';
+@@ -89,6 +90,14 @@ const ASYNC_SIGN_OUT_PREFIXES = [
+ const PER_USER_KEY_PREFIXES = [
+   'fasting:scheduled_notification_id:', // FastingScreen — scheduled push id
+   'macro_targets:', // useMacroTargets — per-user macro cache
++  // Per-coach Roman import-offer answer (UX-01 J0/J1), keyed
++  // `import_offer_decision:<userId>`. Non-secret and readable only under the
++  // owning coach's key, so — like macro_targets — only the signing-out coach's
++  // EXACT key is removed; a bystander coach's answer on a shared device is not
++  // clobbered. Sign-out clears this local answer only; it makes no claim about
++  // the desktop extension connection. Swept via the exported constant so the
++  // literal lives in one place.
++  IMPORT_OFFER_DECISION_KEY_PREFIX,
+ ];
+ 
+ // Belt-and-braces wipe for the cacheStorage MMKV namespace. clearAllStorage()
+diff --git a/src/storage/__tests__/importOfferDecision.test.ts b/src/storage/__tests__/importOfferDecision.test.ts
+new file mode 100644
+index 0000000..004e520
+--- /dev/null
++++ b/src/storage/__tests__/importOfferDecision.test.ts
+@@ -0,0 +1,206 @@
++/**
++ * importOfferDecision — account scoping and hostile-payload discard (UX-01).
++ *
++ * The record exists so the Roman import offer is asked once per account and
++ * "Later" / "I am starting fresh" survive a relaunch. These tests pin the
++ * properties that make it safe to trust on the next Home entry:
++ *   1. it round-trips exactly and the latest answer wins,
++ *   2. it is keyed per coach, so a second coach on a shared device can never
++ *      read (or clear) the first coach's answer,
++ *   3. anything that is not a well-formed, current-version, known-valued,
++ *      same-coach record is DISCARDED and its key deleted — never half-trusted,
++ *      and an unknown answer is never coerced into a known one,
++ *   4. storage failures are truthful: a failed write throws, a failed read is
++ *      "no answer" (re-offer), a failed clear is logged.
++ */
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import {
++  IMPORT_OFFER_DECISIONS,
++  IMPORT_OFFER_DECISION_KEY_PREFIX,
++  IMPORT_OFFER_DECISION_VERSION,
++  clearImportOfferDecision,
++  importOfferDecisionKey,
++  isImportOfferDecision,
++  readImportOfferDecision,
++  writeImportOfferDecision,
++  type PersistedImportOfferDecision,
++} from '../importOfferDecision';
++
++jest.mock('../../utils/logger', () => ({
++  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn(), log: jest.fn() },
++}));
++
++function record(over: Partial<PersistedImportOfferDecision> = {}): PersistedImportOfferDecision {
++  return {
++    version: IMPORT_OFFER_DECISION_VERSION,
++    userId: 'coach-1',
++    decision: 'later',
++    ...over,
++  };
++}
++
++beforeEach(async () => {
++  await AsyncStorage.clear();
++});
++
++describe('key shape', () => {
++  it('namespaces by coach id under the swept prefix', () => {
++    expect(importOfferDecisionKey('coach-1')).toBe(
++      `${IMPORT_OFFER_DECISION_KEY_PREFIX}coach-1`,
++    );
++  });
++
++  it('the prefix ends in a colon so a sweep cannot bleed into similar keys', () => {
++    expect(IMPORT_OFFER_DECISION_KEY_PREFIX.endsWith(':')).toBe(true);
++  });
++});
++
++describe('decision vocabulary', () => {
++  it('accepts exactly the three canonical answers', () => {
++    expect([...IMPORT_OFFER_DECISIONS]).toEqual(['yes', 'later', 'starting_fresh']);
++    for (const d of IMPORT_OFFER_DECISIONS) expect(isImportOfferDecision(d)).toBe(true);
++  });
++
++  it.each<[unknown]>([['declined'], ['YES'], ['complete'], [''], [1], [null], [undefined], [{}]])(
++    'rejects %p',
++    (value) => {
++      expect(isImportOfferDecision(value)).toBe(false);
++    },
++  );
++});
++
++describe('round trip', () => {
++  it('returns the persisted answer and stores version + owner alongside it', async () => {
++    await writeImportOfferDecision('coach-1', 'later');
++    expect(await readImportOfferDecision('coach-1')).toBe('later');
++    const raw = await AsyncStorage.getItem(importOfferDecisionKey('coach-1'));
++    expect(JSON.parse(raw as string)).toEqual(record({ decision: 'later' }));
++  });
++
++  it('stores no timestamp or cadence field (no client clock decides anything)', async () => {
++    await writeImportOfferDecision('coach-1', 'starting_fresh');
++    const raw = await AsyncStorage.getItem(importOfferDecisionKey('coach-1'));
++    expect(Object.keys(JSON.parse(raw as string)).sort()).toEqual(
++      ['decision', 'userId', 'version'],
++    );
++  });
++
++  it('returns null when the coach has not answered', async () => {
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++  });
++
++  it('the latest answer wins (later, then yes)', async () => {
++    await writeImportOfferDecision('coach-1', 'later');
++    await writeImportOfferDecision('coach-1', 'yes');
++    expect(await readImportOfferDecision('coach-1')).toBe('yes');
++  });
++
++  it('clear is idempotent and leaves nothing behind', async () => {
++    await writeImportOfferDecision('coach-1', 'later');
++    await clearImportOfferDecision('coach-1');
++    await clearImportOfferDecision('coach-1');
++    expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++  });
++});
++
++describe('user scoping', () => {
++  it('never hands one coach another coach\'s answer', async () => {
++    await writeImportOfferDecision('coach-1', 'starting_fresh');
++    await writeImportOfferDecision('coach-2', 'later');
++    expect(await readImportOfferDecision('coach-1')).toBe('starting_fresh');
++    expect(await readImportOfferDecision('coach-2')).toBe('later');
++    expect(await readImportOfferDecision('coach-3')).toBeNull();
++  });
++
++  it('clearing one coach leaves the other coach\'s answer intact', async () => {
++    await writeImportOfferDecision('coach-1', 'later');
++    await writeImportOfferDecision('coach-2', 'later');
++    await clearImportOfferDecision('coach-1');
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++    expect(await readImportOfferDecision('coach-2')).toBe('later');
++  });
++
++  it('discards a payload whose userId disagrees with its own key', async () => {
++    // A hand-edited or migrated record. Reconciling it would show coach-1 a
++    // card that reflects coach-2's answer.
++    await AsyncStorage.setItem(
++      importOfferDecisionKey('coach-1'),
++      JSON.stringify(record({ userId: 'coach-2' })),
++    );
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++    expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++  });
++});
++
++describe('malformed payloads are discarded, not half-trusted', () => {
++  it.each<[string, string]>([
++    ['unparseable JSON', '{not json'],
++    ['a JSON primitive', '"later"'],
++    ['null', 'null'],
++    ['an empty object', '{}'],
++    ['an array', '["later"]'],
++  ])('discards %s and deletes the key', async (_label, raw) => {
++    await AsyncStorage.setItem(importOfferDecisionKey('coach-1'), raw);
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++    expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++  });
++
++  it.each<[string, Record<string, unknown>]>([
++    ['a future schema version', { version: IMPORT_OFFER_DECISION_VERSION + 1 }],
++    ['a past schema version', { version: 0 }],
++    ['a string version', { version: String(IMPORT_OFFER_DECISION_VERSION) }],
++    ['an empty user id', { userId: '' }],
++    ['an unknown decision value', { decision: 'declined' }],
++    ['a wrongly-cased decision value', { decision: 'Later' }],
++    ['a non-string decision', { decision: 1 }],
++  ])('discards %s and deletes the key', async (_label, over) => {
++    await AsyncStorage.setItem(
++      importOfferDecisionKey('coach-1'),
++      JSON.stringify({ ...record(), ...over }),
++    );
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++    expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++  });
++
++  it.each(['version', 'userId', 'decision'])('discards a record missing %s', async (field) => {
++    const partial: Record<string, unknown> = { ...record() };
++    delete partial[field];
++    await AsyncStorage.setItem(importOfferDecisionKey('coach-1'), JSON.stringify(partial));
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++    expect(await AsyncStorage.getItem(importOfferDecisionKey('coach-1'))).toBeNull();
++  });
++});
++
++describe('storage failures are truthful', () => {
++  it('a failed write throws rather than pretending the answer is on disk', async () => {
++    const spy = jest.spyOn(AsyncStorage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
++    try {
++      await expect(writeImportOfferDecision('coach-1', 'later')).rejects.toThrow('disk full');
++    } finally {
++      spy.mockRestore();
++    }
++    expect(await readImportOfferDecision('coach-1')).toBeNull();
++  });
++
++  it('a failed read is "no answer", never a fabricated one, and does not delete the key', async () => {
++    await writeImportOfferDecision('coach-1', 'starting_fresh');
++    const spy = jest.spyOn(AsyncStorage, 'getItem').mockRejectedValueOnce(new Error('io'));
++    try {
++      expect(await readImportOfferDecision('coach-1')).toBeNull();
++    } finally {
++      spy.mockRestore();
++    }
++    // The record itself was not touched by the failed read.
++    expect(await readImportOfferDecision('coach-1')).toBe('starting_fresh');
++  });
++
++  it('a failed clear is logged, not thrown', async () => {
++    const spy = jest.spyOn(AsyncStorage, 'removeItem').mockRejectedValueOnce(new Error('io'));
++    try {
++      await expect(clearImportOfferDecision('coach-1')).resolves.toBeUndefined();
++    } finally {
++      spy.mockRestore();
++    }
++  });
++});
+diff --git a/src/storage/importOfferDecision.ts b/src/storage/importOfferDecision.ts
+new file mode 100644
+index 0000000..83118ff
+--- /dev/null
++++ b/src/storage/importOfferDecision.ts
+@@ -0,0 +1,163 @@
++/**
++ * importOfferDecision — durable, account-scoped mirror of the coach's answer
++ * to the one-time Roman import offer (`yes` | `later` | `starting_fresh`).
++ *
++ * Why this exists: the canonical importer journey (UX-01, J0/J1) shows the
++ * post-onboarding offer once per eligible account and persists the answer
++ * per account so that "Later" leaves a compact resume card, "I am starting
++ * fresh" removes the Home reminder, and neither is re-asked on the next launch.
++ * PLAN requires only per-account persistence; the canonical default (CQ-02) is
++ * account-keyed, user-scoped mobile persistence following the accepted #291
++ * `importPairingMirror` pattern. No server endpoint, flag or token store is
++ * introduced here, and nothing in this module infers eligibility (CQ-01 is
++ * server-side and unresolved): the caller decides WHETHER to ask, this module
++ * only remembers WHAT the coach answered.
++ *
++ * Rule 15 (user-scoped): the key is `import_offer_decision:<userId>`. The
++ * signing-out coach's exact key is removed on signOut by
++ * services/authActions.ts, which imports the exported constant so the literal
++ * lives in exactly one place. A second coach on a shared device never inherits
++ * the first coach's answer: their key differs, and a payload whose `userId`
++ * disagrees with its own key is discarded on read (cross-user purge, #291).
++ *
++ * Rule 16 (never trust the client clock): no timestamp is stored. The record
++ * carries no expiry, no "remind me at", and no cadence; nothing here or in any
++ * caller compares anything to Date.now().
++ *
++ * Rule 18 (no fabricated confirmations): a successful write means the answer
++ * is on THIS device for THIS account. It is not a server record and no caller
++ * may present it as "saved to your account". A write failure throws so the
++ * caller can keep its in-memory truth and simply re-offer on the next entry.
++ *
++ * No silent failures: a payload that is unparseable JSON, carries the wrong
++ * `version`, an unknown decision value, or fails the shape guard is DISCARDED
++ * and its key deleted — a logged, deliberate discard, never a half-trusted
++ * record. An unknown decision value is never coerced to a known one.
++ */
++
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { logger } from '../utils/logger';
++
++/** Prefix for per-coach offer-decision keys. Exact key swept on signOut (authActions.ts). */
++export const IMPORT_OFFER_DECISION_KEY_PREFIX = 'import_offer_decision:';
++
++/** Schema version — bump to discard incompatible on-disk payloads on read. */
++export const IMPORT_OFFER_DECISION_VERSION = 1;
++
++/** Build the per-coach decision key. Exported so the shape lives in one place. */
++export function importOfferDecisionKey(userId: string): string {
++  return `${IMPORT_OFFER_DECISION_KEY_PREFIX}${userId}`;
++}
++
++/**
++ * The three canonical answers (PLAN §Entry; journey spec J0/J1). `yes` routes
++ * to source selection, `later` leaves a compact resume card, `starting_fresh`
++ * removes the Home reminder while the Settings entry remains (CQ-16 default).
++ */
++export const IMPORT_OFFER_DECISIONS = ['yes', 'later', 'starting_fresh'] as const;
++export type ImportOfferDecision = (typeof IMPORT_OFFER_DECISIONS)[number];
++
++export function isImportOfferDecision(value: unknown): value is ImportOfferDecision {
++  return (
++    typeof value === 'string' &&
++    (IMPORT_OFFER_DECISIONS as readonly string[]).includes(value)
++  );
++}
++
++/**
++ * One coach's persisted answer. `userId` is also encoded in the key; it is
++ * kept in the payload to detect a mismatch (#291 pattern).
++ */
++export interface PersistedImportOfferDecision {
++  version: number;
++  /** Owning coach. Also encoded in the key; kept here to detect a mismatch. */
++  userId: string;
++  decision: ImportOfferDecision;
++}
++
++function isPersistedImportOfferDecision(
++  value: unknown,
++): value is PersistedImportOfferDecision {
++  if (!value || typeof value !== 'object') return false;
++  const v = value as Record<string, unknown>;
++  return (
++    v.version === IMPORT_OFFER_DECISION_VERSION &&
++    typeof v.userId === 'string' &&
++    v.userId.length > 0 &&
++    isImportOfferDecision(v.decision)
++  );
++}
++
++/**
++ * Persist `decision` for `userId`, overwriting any prior answer for the same
++ * coach — the latest answer wins (for example `later` followed by `yes`).
++ * Throws on a write failure so the caller can decide, rather than believing a
++ * write happened that did not.
++ */
++export async function writeImportOfferDecision(
++  userId: string,
++  decision: ImportOfferDecision,
++): Promise<void> {
++  const record: PersistedImportOfferDecision = {
++    version: IMPORT_OFFER_DECISION_VERSION,
++    userId,
++    decision,
++  };
++  await AsyncStorage.setItem(importOfferDecisionKey(userId), JSON.stringify(record));
++}
++
++/**
++ * Read back the persisted answer for `userId`, or null when there is none.
++ * A corrupt, version-drifted, shape-drifted, unknown-valued, or cross-user
++ * payload is discarded (and its key deleted) rather than returned. A storage
++ * read failure is logged and reported as null: the caller treats "no answer"
++ * as the truthful fallback (the offer may be asked again), never as a
++ * fabricated answer.
++ */
++export async function readImportOfferDecision(
++  userId: string,
++): Promise<ImportOfferDecision | null> {
++  let raw: string | null;
++  try {
++    raw = await AsyncStorage.getItem(importOfferDecisionKey(userId));
++  } catch (err) {
++    logger.warn('[importOfferDecision] read failed', err);
++    return null;
++  }
++  if (raw == null) return null;
++
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(raw);
++  } catch (err) {
++    logger.warn('[importOfferDecision] corrupt JSON discarded', err);
++    await clearImportOfferDecision(userId);
++    return null;
++  }
++  if (!isPersistedImportOfferDecision(parsed)) {
++    logger.warn('[importOfferDecision] shape or version drift discarded');
++    await clearImportOfferDecision(userId);
++    return null;
++  }
++  if (parsed.userId !== userId) {
++    // The key says one coach, the payload says another. Never hand a coach an
++    // answer that is not theirs — discard rather than reconcile.
++    logger.warn('[importOfferDecision] user mismatch discarded');
++    await clearImportOfferDecision(userId);
++    return null;
++  }
++  return parsed.decision;
++}
++
++/**
++ * Drop the persisted answer for `userId`. Idempotent. A failure is logged
++ * rather than thrown: a lingering record is user-scoped, non-secret, and would
++ * be re-validated on its next read anyway.
++ */
++export async function clearImportOfferDecision(userId: string): Promise<void> {
++  try {
++    await AsyncStorage.removeItem(importOfferDecisionKey(userId));
++  } catch (err) {
++    logger.warn('[importOfferDecision] clear failed', err);
++  }
++}
+-- 
+2.53.0
+

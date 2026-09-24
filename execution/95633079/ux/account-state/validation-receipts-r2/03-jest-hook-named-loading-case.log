@@ -1,0 +1,30 @@
+PASS src/hooks/__tests__/useImportOfferDecision.test.tsx
+  useImportOfferDecision — inert and unresolved states
+    ○ skipped is inert when disabled: no storage read, no write, status disabled
+    ○ skipped is unresolved while the coach identity is unknown and refuses to record blind
+    ○ skipped defaults to the OFF kill switch (featureFlags.extensionImport is false in test env)
+  useImportOfferDecision — reading the persisted answer
+    ✓ is loading (render nothing) until the read settles, then ready with null when unanswered (24 ms)
+    ○ skipped returns the persisted answer yes for the signed-in coach
+    ○ skipped returns the persisted answer later for the signed-in coach
+    ○ skipped returns the persisted answer starting_fresh for the signed-in coach
+    ○ skipped never returns another coach's answer
+    ○ skipped resolves once the identity arrives asynchronously (null on first render)
+  useImportOfferDecision — recording an answer
+    ○ skipped reflects the answer immediately, writes it under the owner key, and reports true
+    ○ skipped a recorded answer supersedes a read still in flight (the tap is newer than the disk)
+    ○ skipped the latest answer is also the last one on disk when writes overlap (later, then yes)
+    ○ skipped a failed write keeps the answer in memory, reports false, and re-offers on the next mount
+  useImportOfferDecision — identity change on a live mount
+    ○ skipped sign-out (A→null) drops the in-memory answer and returns to unresolved
+    ○ skipped account switch (A→B) resets BEFORE reading B and never shows A's answer
+    ○ skipped account switch shows B's own answer, not A's
+    ○ skipped discards a stale read for the previous coach that settles after the switch
+    ○ skipped a write that lands after sign-out is removed again and reported false
+    ○ skipped a write that lands after an account switch is removed and never attributed to the new coach
+
+Test Suites: 1 passed, 1 total
+Tests:       18 skipped, 1 passed, 19 total
+Snapshots:   0 total
+Time:        1.245 s, estimated 3 s
+Ran all test suites matching /src\/hooks\/__tests__\/useImportOfferDecision.test.tsx/i with tests matching "is loading \(render nothing\) until the read settles, then ready with null when unanswered".
