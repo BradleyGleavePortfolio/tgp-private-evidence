@@ -1,0 +1,33 @@
+# UX03 handoff prep inputs manifest (2026-09-24T15:36:08Z)
+
+Archive: /tmp/tgp-private-evidence/execution/e7d2385c/evidence/ux-planning-final-7cc0021c-journey-9701ab29.tar.gz
+a6e0a7b2d4da8b0755fb44be69a2bd1f55842b3a19894c67b5185226d1f36876  /tmp/tgp-private-evidence/execution/e7d2385c/evidence/ux-planning-final-7cc0021c-journey-9701ab29.tar.gz
+
+## Files in this directory
+d23c174b9ff82946ae00e3eecb6933d676662c001310f74782a707e37545f1d0  ./INPUTS_MANIFEST.md
+eac6db431fa3634da14200b3bdf94c27778a58e3302e530593ccc7689b5c4da2  ./UX03_HANDOFF_READINESS_BRIEF.md
+a1db6fd21798a13b6733a3cc9b76a65fe57b49530763561a751b0c66a51906c5  ./archive-members/ux-planning/DEPENDENCY_DAG.md
+b010ac647560f176314d8619a24e6b3afc40e850ec119594c2c86b1a9095d78c  ./archive-members/ux-planning/DISPATCH_READY_REGISTER.md
+7cc0021c3aea8d631a4b23c9a67f0af95d40d78fd9b33ae2d1ef64ed9b577579  ./archive-members/ux-planning/MANIFEST.sha256
+1e9bd28b137504212cac49bb26ec9bba91958fa1774c5156ede80aeba59b1dec  ./archive-members/ux-planning/OFFICIAL_UX_JOB_AND_PR_MAP.md
+3bc4a929ec7b5f69a190de32640c6616dda5753e86230244455b9990b2071471  ./archive-members/ux-planning/journey/CANONICAL_MOBILE_JOURNEY_SPEC.md
+d7ae51c2cc505159549a77fb877fb61981842bdf024607a03e46a3cd48eaf714  ./archive-members/ux-planning/journey/CONTRACT_QUESTIONS.md
+9701ab29234bcc39a4eec399fb5def0e7bf288abd99b126d16dc15f000f99170  ./archive-members/ux-planning/journey/MANIFEST.sha256
+b386ba4a38318c4299f6f0b774f0541bf4c40a64abd844ce826853931aeff78a  ./archive-members/ux-planning/journey/STATE_AND_EDGE_CASE_MATRIX.md
+bdb022dd6c4fb64cdf291fdde3796b99e4b23004f676b7cb46a58460526ba4e5  ./c1-a0ea1bea-importer-openapi.json
+
+## Read-only inputs (paths)
+379ea8e4509d55a4750f26d74c5a6d5e410ee91bcd388302600a7cc2940ae609  /home/user/workspace/execution/cf8ff737/UX03_HANDOFF_PREPARATION_GRANT.md
+42705c1435bd844223d3b44cf150dd9f06741d828d6cd27792579a666d85b7ff  /home/user/workspace/execution/cf8ff737/SCOPE.md
+c84a4af42d9b288c15abd524141be4ccae41b98d778445bad2656adb7f71f1af  /home/user/workspace/execution/cf8ff737/DISPATCHES.md
+5871afa0c1ffadbba63635056d7ba2e19daabff791999494854f3de8f22c1dbe  /home/user/workspace/execution/cf8ff737/ux-doctrine/UX_DOCTRINE_APPLICABILITY.md
+434a017f481e02444bac107819f04969dd7ef916d9a55c67e9674fefc759f462  /tmp/tgp-private-evidence/LAST_OPERATOR_STATE.md
+c5d14b14f3237adb76686f095a9c70dcefff1b444e268ac5659ce34dc9891f53  /tmp/tgp-private-evidence/LAST_OEPRATOR_HANDOFF.MD
+edd63115537049e41ada062d35c74b4a1224f1bf784272ca45cf6c61398e173c  /tmp/tgp-agent-context/AGENT_RULES.md
+a8eb2f5643b6c90dd0cb8a037ee9d68f9fd34e3294d5918571e75a833c99027d  /tmp/tgp-private-evidence/execution/95633079/c1-execution/13-C1_ACTUAL_RESULTS_SEAL.md
+d166ee8596093815690a3c0516d6ef0756936c09f27a0b3be25336489ea8fcd9  /tmp/tgp-private-evidence/execution/95633079/audits/c1-a/FINAL_ATTESTATION.md
+8f958b126fd6678dca47eba8fc9a83e468963ebedb5df3f566dac1ecea1c7afb  /tmp/tgp-private-evidence/execution/e7d2385c/s7-mapping/S7_CANONICAL_CONTINUATION_MAP.md
+d65561bf0436fae069adc5f6a9ad6e3ef9814111ed69a9dc665841fb46a93113  /tmp/tgp-private-evidence/execution/95633079/ux/J3_SOURCE_SELECTION_SCOPE_DISPOSITION.md
+f768e8b84219fc4d7c53fd06bb2dbe03e8eb17df34c7dae09dbb3fe7647df7c9  /tmp/tgp-private-evidence/execution/95633079/ux/design-system/EXTENSION_POPUP_STYLE_SPEC.md
+
+Git objects read (no checkout, no write): mobile 716a606e9d23c77a6d705beccb8cefc6e8228284, J3 r5 tree 823b97006f7df9617bad5516d7ef578189095e82 (diff --stat only); backend a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992:docs/contracts/importer-openapi.json (copied here).

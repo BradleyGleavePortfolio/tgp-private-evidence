@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# S7-3' B/drain real-PG proof — PROPOSED minimal execution binding, revision v3 (SOURCE ONLY; NOT RUN; NOT GRANTED).
+# Derived from the accepted C1 binding execution/95633079/c1-pg/c1-pg-proof.sh (sha256 50506175…) with the
+# three B-specific fixture steps the new proof needs (old-root checkout, B bootstrap, B identity) inserted.
+# Runs the NEW spec test/rls-g2-b-drain.spec.ts exactly once via the existing repo jest + jest.rls.config.js.
+# No new test framework, no retry, no inherited-proof replay (etq0 / fresh51 / C1 suites are never invoked).
+# Single canonical lock holder; first nonzero stops; the only cleanup attempted is a bounded fixture stop when
+# this run started the postmaster. No autonomous cleanup is GUARANTEED: if the outer timeout kills bash, the
+# stop does not run. What governs is the observed terminal evidence — the sentinel/log lines, `pgrep -cx postgres`,
+# the port listener count and any survivor pid the stop reports — not this header. Data dir RETAINED after
+# stop (destroy = separate marker-gated grant).
+# Inner stage bounds: init 60 + start 60 + old-root 180 + bootstrap 900 + identity 4x15 + jest 1500 + stop 75 = 2835 s soft sum.
+# Usage (later, under a runtime grant): timeout -k 30 3600 bash .../binding/b-pg-proof.sh   (outer > soft sum + kill graces + cleanup)
+# Pre-steps (each its own receipt, in this order, BEFORE pins are filled): isolated copy of the accepted C1
+# node_modules + verify → ./node_modules/.bin/lefthook install (real hooks) → affected gates (tsc, eslint, prettier
+# --check, check-r75, DB-free jest incl. test/scout/g2-b-drain-db-guard.spec.ts) → ordinary Bradley-authored hooked
+# commit → fill EXPECT_* from the committed head → separate PG grant for this script.
+set -uo pipefail
+D=/home/user/workspace/execution/95633079/s7-b-drain/fixture-proposal-v3/binding
+RT=/home/user/workspace/execution/95633079/s7-b-drain/runtime-v5       # v5 proof: separate receipt/old-root root (first proof runtime/ preserved)
+W=/home/user/workspace/worktrees/s7-b-drain
+R=$RT/run; LOG=$R/b-pg-proof.log; SENT=$R/b-pg-proof.sentinel; JLOG=$R/jest.log
+LOCK=/home/user/workspace/execution/test-validation.lock
+# ---- pins: filled by the parent-approved binding phase AFTER v3 is committed; the script refuses placeholders.
+EXPECT_HEAD=__PENDING_V5_HEAD__
+EXPECT_TREE=d02f9b124bee52107f8ad2f286f8af611b859fe6
+EXPECT_SPEC_BLOB=9b31fd1813d25a1624ab04666e0b1be4743277ab                 # test/rls-g2-b-drain.spec.ts at v3
+EXPECT_BOOTSTRAP_BLOB=b4503eef525baa531eedb148f47828db3a4ade6f       # test/utils/g2-b-drain-bootstrap.sh at v3
+EXPECT_FIXTURE_SHA=4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9           # binding/b-fixture.sh
+EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a   # S1/S2 PG17_PROVENANCE (unchanged)
+EXPECT_INITDB_SHA=b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
+EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44      # C1 node_modules/.package-lock.json
+EXPECT_NM_CLIENT_SHA=bf679a16e50a6f0c39528887b80c2a03c5d0825b816cec3417fcbc94300b72d5    # C1 node_modules/.prisma/client/index.d.ts
+PG17_HOME=/home/user/pg17; DIST=$PG17_HOME/dist
+S5DIR=$PG17_HOME/clusters/s5; C1DIR=$PG17_HOME/clusters/c1-builder; BDIR=$PG17_HOME/clusters/b-drain
+PORT=55461; DBNAME=g2_b_drain_disposable; ADMIN=b_super; FIXPASS=b_local_synthetic
+FIX=$D/b-fixture.sh
+export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1 NODE_OPTIONS=--max-old-space-size=4096 CHECKPOINT_DISABLE=1 \
+       PRISMA_HIDE_UPDATE_MESSAGE=1 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false
+# B-only identity: exactly the G2_B_* names the derived guard/harness/bootstrap read. Nothing G2_PG17_* is exported
+# except G2_PG17_OLD_ROOT for the unchanged, identity-free old-root helper (its only input name).
+export G2_B_DATABASE_URL="postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME?schema=public&connection_limit=4" \
+       G2_B_CONFIRM="$DBNAME:$PORT" G2_B_PASSWORD=$FIXPASS G2_B_PSQL=/usr/bin/psql \
+       G2_B_DATA_DIRECTORY=$BDIR/pg-data G2_B_SERVER_VERSION=170006 \
+       G2_B_OLD_ROOT=$RT/old-root G2_B_OLD_CLIENT=$RT/old-root/.g2-b-old-client
+export B_RUNNER_PID=$$ B_STOP_TIMEOUT=45
+mkdir -p "$R"
+[ -e "$SENT" ] && { echo "REFUSED: $SENT exists; this proof runs once, no retry" >&2; exit 76; }
+exec 9>"$LOCK"; flock -n 9 || { echo "REFUSED: canonical lock busy ($LOCK)" >&2; exit 75; }
+ts(){ date -u +%FT%TZ; }
+log(){ echo "$*" | tee -a "$LOG"; }
+STAGE=preconditions; STARTED=0
+finish(){ local rc=$1
+  echo "RC=$rc STAGE=$STAGE END=$(ts) HEAD=$(git -C "$W" rev-parse HEAD 2>/dev/null)" >"$SENT"
+  log "END rc=$rc stage=$STAGE $(ts)"; exit "$rc"; }
+fail(){ local rc=$1; log "STOP_FIRST_FAILURE stage=$STAGE rc=$rc $(ts)"
+  if [ "$STARTED" = 1 ]; then
+    local src=0; timeout -k 30 60 bash "$FIX" stop >>"$LOG" 2>&1 || src=$?
+    log "CLEANUP_STOP rc=$src postgres_procs=$(pgrep -cx postgres || true) port${PORT}_listeners=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true)"
+  fi
+  finish "$rc"; }
+log "START $(ts) pid=$$ head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA node=$(node --version 2>/dev/null)"
+# ---- preconditions (read-only)
+case "$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_FIXTURE_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage)"; fail 70;; esac
+[ "$(sha256sum "$FIX" | cut -c1-64)" = "$EXPECT_FIXTURE_SHA" ] || { log "PRECONDITION_FAIL fixture sha256 mismatch"; fail 70; }
+[ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL HEAD != $EXPECT_HEAD"; fail 70; }
+[ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] || { log "PRECONDITION_FAIL tree mismatch"; fail 70; }
+[ "$(git -C "$W" rev-parse HEAD:test/rls-g2-b-drain.spec.ts)" = "$EXPECT_SPEC_BLOB" ] || { log "PRECONDITION_FAIL spec blob mismatch"; fail 70; }
+[ "$(git -C "$W" rev-parse HEAD:test/utils/g2-b-drain-bootstrap.sh)" = "$EXPECT_BOOTSTRAP_BLOB" ] || { log "PRECONDITION_FAIL bootstrap blob mismatch"; fail 70; }
+[ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] || { log "PRECONDITION_FAIL worktree not clean"; fail 70; }
+[ ! -e "$W/.git/MERGE_HEAD" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; fail 70; }
+# the committed head must have been produced through the tracked lefthook hooks (installed from the isolated tree)
+grep -q lefthook "$W/.git/hooks/pre-commit" 2>/dev/null && grep -q lefthook "$W/.git/hooks/commit-msg" 2>/dev/null \
+  || { log "PRECONDITION_FAIL .git/hooks/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }
+# accepted S5 donor files must be byte-identical at the committed head (machine check of "S5 files unchanged")
+for pin in "test/utils/g2-pg17-db.ts 0e73d76d8f06328872d09c6a76db20715547ebe0" "test/utils/g2-pg17-harness.ts ab9aaab4ba3e2c55671f66d5f2ee7a23674337be" \
+           "test/utils/g2-pg17-bootstrap.sh 85a636ba75607604032cef7af1d285cb198ca263" "test/scout/g2-pg17-db-guard.spec.ts 4fed8bcd57218b6f1bb174948f1adc6e0e3252ba" \
+           "test/utils/g2-pg17-old-root.sh b9080538b4ba4838db89d03d90e2cc206b3860b7"; do set -- $pin
+  [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL accepted S5 file $1 changed"; fail 70; }; done
+# dependency tree: an ISOLATED copy of the accepted C1 tree (not a symlink into s7-c1, not a fresh npm ci)
+[ -d "$W/node_modules" ] && [ ! -L "$W/node_modules" ] || { log "PRECONDITION_FAIL $W/node_modules absent or a symlink (isolated copy required)"; fail 70; }
+case "$(readlink -f "$W/node_modules")" in "$W"/*) ;; *) log "PRECONDITION_FAIL node_modules resolves outside $W"; fail 70;; esac
+[ "$(sha256sum "$W/node_modules/.package-lock.json" | cut -c1-64)" = "$EXPECT_NM_LOCK_SHA" ] || { log "PRECONDITION_FAIL node_modules/.package-lock.json != C1 record"; fail 70; }
+[ "$(sha256sum "$W/node_modules/.prisma/client/index.d.ts" | cut -c1-64)" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client != C1 record"; fail 70; }
+[ -x "$W/node_modules/.bin/jest" ] && [ -x "$W/node_modules/.bin/ts-node" ] && [ -x "$W/node_modules/.bin/prisma" ] || { log "PRECONDITION_FAIL jest/ts-node/prisma missing"; fail 70; }
+[ -x "$DIST/bin/postgres" ] && [ -x "$DIST/bin/initdb" ] && [ -x "$DIST/bin/pg_ctl" ] || { log "PRECONDITION_FAIL PG17 dist absent at $DIST"; fail 70; }
+[ "$(sha256sum "$DIST/bin/postgres" | cut -c1-64)" = "$EXPECT_POSTGRES_SHA" ] || { log "PRECONDITION_FAIL postgres binary sha256 != recorded"; fail 70; }
+[ "$(sha256sum "$DIST/bin/initdb" | cut -c1-64)" = "$EXPECT_INITDB_SHA" ] || { log "PRECONDITION_FAIL initdb binary sha256 != recorded"; fail 70; }
+PGV=$(LD_LIBRARY_PATH=$DIST/lib "$DIST/bin/postgres" --version 2>/dev/null); [ "${PGV##* }" = 17.6 ] || { log "PRECONDITION_FAIL server not 17.6: $PGV"; fail 70; }
+[ -x /usr/bin/psql ] || { log "PRECONDITION_FAIL /usr/bin/psql absent"; fail 70; }
+[ "$(readlink -f "$PG17_HOME")" = "$PG17_HOME" ] || { log "PRECONDITION_FAIL $PG17_HOME is not a real path"; fail 70; }
+git -C "$W" merge-base --is-ancestor 925780e0a1906593e5383c618311b6b17364b8dc HEAD || { log "PRECONDITION_FAIL O 925780e0 not an ancestor (old-root fixture impossible)"; fail 70; }
+log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$(/usr/bin/psql --version)' jest=$(cd "$W" && ./node_modules/.bin/jest --version) pg17_provenance='$(grep -E '^(postgres_sha256|result)=' "$PG17_HOME/PROVENANCE.txt" 2>/dev/null | tr '\n' ' ')'"
+# ---- step 1 preflight (read-only): B lane absent; S5 absent recorded as-is; retained C1 cluster hashed, never started
+STAGE=preflight
+[ ! -e "$BDIR" ] || { log "PREFLIGHT_FAIL $BDIR exists (fresh init only; never adopt)"; fail 71; }
+[ ! -e "$RT/old-root" ] || { log "PREFLIGHT_FAIL $RT/old-root exists (once-only fixture; no reuse)"; fail 71; }
+L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true); [ "$L" = 0 ] || { log "PREFLIGHT_FAIL port $PORT listeners=$L"; fail 71; }
+P=$(pgrep -cx postgres || true); [ "$P" = 0 ] || { log "PREFLIGHT_FAIL postgres procs=$P"; fail 71; }
+[ ! -e "$S5DIR" ] || { log "PREFLIGHT_FAIL s5 cluster present (parent requires S5 ABSENT for the B lane)"; fail 71; }
+log "PREFLIGHT s5_cluster=ABSENT (recorded as-is, not reconstructed)"
+if [ -e "$C1DIR/pg-data" ]; then
+  [ ! -e "$C1DIR/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL c1 postmaster.pid present"; fail 71; }
+  C1_CONF0=$(sha256sum "$C1DIR/pg-data/postgresql.conf" | cut -c1-64); C1_CTRL0=$(sha256sum "$C1DIR/pg-data/global/pg_control" | cut -c1-64)
+  log "PREFLIGHT c1_cluster=PRESENT_STOPPED conf=$C1_CONF0 pg_control=$C1_CTRL0 (must be unchanged at end; never started)"
+else C1_CONF0=ABSENT; C1_CTRL0=ABSENT; log "PREFLIGHT c1_cluster=ABSENT"; fi
+PORC0=$(git -C "$W" status --porcelain --untracked-files=all | sha256sum | cut -c1-64)
+log "PREFLIGHT_OK $(ts) bdir=absent port$PORT=free postgres_procs=0 worktree_porcelain_sha=$PORC0"
+# ---- step 2 init (bound 60 s)
+STAGE=fixture-init; timeout -k 30 60 bash "$FIX" init >>"$LOG" 2>&1; rc=$?; log "FIXTURE_INIT rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+grep -q "^B_FIXTURE_INIT_OK data=$BDIR/pg-data port=$PORT superuser=$ADMIN cluster_name=b-disposable-pg17" "$LOG" || { log "FIXTURE_INIT marker missing"; fail 72; }
+# ---- step 3 start (bound 60 s)
+STAGE=fixture-start; STARTED=1; timeout -k 30 60 bash "$FIX" start >>"$LOG" 2>&1; rc=$?; log "FIXTURE_START rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+grep -q "^B_FIXTURE_START_OK pid=" "$LOG" || { log "FIXTURE_START marker missing"; fail 72; }
+# ---- step 4 preserved-O detached checkout OUTSIDE the candidate (unchanged accepted helper; git only; bound 180 s)
+STAGE=old-root
+( cd "$W" && G2_PG17_OLD_ROOT=$G2_B_OLD_ROOT timeout -k 30 180 bash test/utils/g2-pg17-old-root.sh create ) >>"$LOG" 2>&1; rc=$?
+log "OLD_ROOT rc=$rc $(ts) head=$(git -C "$G2_B_OLD_ROOT" rev-parse HEAD 2>/dev/null)"; [ $rc = 0 ] || fail $rc
+# ---- step 5 B bootstrap (derived helper committed at v3; roles, marked DB, shim, 164 O migrations, O client generate
+#      inside the old root — the only `prisma generate` of the lane; candidate client only VERIFIED) (bound 900 s)
+STAGE=bootstrap
+( cd "$W" && timeout -k 30 900 bash test/utils/g2-b-drain-bootstrap.sh ) >>"$LOG" 2>&1; rc=$?; log "BOOTSTRAP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+grep -q "^G2_B_BOOTSTRAP_OK" "$LOG" || { log "BOOTSTRAP marker missing"; fail 72; }
+# ---- step 6 identity (read-only, bound 15 s each; admin login with PGPASSWORD only, never a URL password)
+STAGE=identity
+psqlq(){ PGPASSWORD=$FIXPASS timeout -k 30 15 /usr/bin/psql -X -v ON_ERROR_STOP=1 -At "postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME" -c "$1" 2>>"$LOG"; }
+DD=$(psqlq 'SHOW data_directory'); [ "$DD" = "$G2_B_DATA_DIRECTORY" ] || { log "IDENTITY_FAIL data_directory='$DD'"; fail 73; }
+VN=$(psqlq 'SHOW server_version_num'); [ "$VN" = 170006 ] || { log "IDENTITY_FAIL server_version_num='$VN'"; fail 73; }
+CN=$(psqlq "SELECT current_setting('cluster_name')"); [ "$CN" = b-disposable-pg17 ] || { log "IDENTITY_FAIL cluster_name='$CN'"; fail 73; }
+DM=$(psqlq "SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()")
+[ "$DM" = b-g2-drain-synthetic-disposable-fixture-safe-to-drop ] || { log "IDENTITY_FAIL db marker='$DM'"; fail 73; }
+log "IDENTITY_OK $(ts) data_directory=$DD server_version_num=$VN cluster_name=$CN"
+# ---- step 7 the proof, exactly once (bound 1500 s); no --testTimeout/--forceExit/--detectOpenHandles/coverage
+STAGE=jest; log "JEST_START $(ts) cmd='./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-b-drain.spec.ts --runInBand --ci'"
+( cd "$W" && timeout -k 30 1500 ./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-b-drain.spec.ts --runInBand --ci ) >"$JLOG" 2>&1; JRC=$?
+log "JEST_END rc=$JRC $(ts)"; grep -E '^(Test Suites|Tests|Snapshots|Time):' "$JLOG" | tee -a "$LOG"
+grep -E 'requires an explicitly acknowledged|not the permitted disposable database|server identity mismatch|G2 proof requires' "$JLOG" >/dev/null && log "GUARD_REFUSAL_OBSERVED_IN_JEST_LOG"
+[ $JRC = 0 ] || fail $JRC
+# ---- step 8 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: b-fixture.sh destroy)
+STAGE=fixture-stop; STARTED=0; timeout -k 30 75 bash "$FIX" stop >>"$LOG" 2>&1; rc=$?; log "FIXTURE_STOP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+P=$(pgrep -cx postgres || true); L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true)
+[ "$P" = 0 ] && [ "$L" = 0 ] && [ ! -e "$BDIR/pg-data/postmaster.pid" ] && [ -d "$BDIR/pg-data" ] || { log "STOP_STATE_FAIL postgres_procs=$P listeners=$L"; fail 74; }
+log "STOP_STATE_OK postgres_procs=0 port$PORT=free datadir_retained=$BDIR/pg-data"
+# ---- step 9 post (read-only)
+STAGE=post
+[ ! -e "$S5DIR" ] || { log "POST_FAIL s5 cluster appeared"; fail 74; }; log "POST s5_cluster=ABSENT unchanged"
+if [ "$C1_CONF0" != ABSENT ]; then
+  [ "$(sha256sum "$C1DIR/pg-data/postgresql.conf" | cut -c1-64)" = "$C1_CONF0" ] && [ "$(sha256sum "$C1DIR/pg-data/global/pg_control" | cut -c1-64)" = "$C1_CTRL0" ] && [ ! -e "$C1DIR/pg-data/postmaster.pid" ] || { log "POST_FAIL c1 cluster changed"; fail 74; }
+  log "POST c1_cluster unchanged conf=$C1_CONF0 pg_control=$C1_CTRL0"
+fi
+[ "$(git -C "$W" status --porcelain --untracked-files=all | sha256sum | cut -c1-64)" = "$PORC0" ] && [ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "POST_FAIL worktree changed"; fail 74; }
+( cd "$R" && sha256sum b-pg-proof.log jest.log > RECEIPTS.sha256 ); log "POST_OK $(ts) receipts=$R/RECEIPTS.sha256"
+STAGE=done; finish 0

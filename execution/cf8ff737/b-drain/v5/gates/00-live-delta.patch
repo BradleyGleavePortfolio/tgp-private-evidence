@@ -1,0 +1,26 @@
+diff --git a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+index 91e646d..7deaf70 100644
+--- a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
++++ b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+@@ -61,7 +61,7 @@ BEGIN
+       AND NOT p.prosecdef
+       AND t.tgtype = 7
+       AND t.tgqual IS NULL
+-      AND t.tgattr::int2[] = '{}'::int2[]
++      AND cardinality(t.tgattr::int2[]) = 0
+       AND t.tgnargs = 0
+       AND t.tgconstraint = 0
+   ) THEN
+diff --git a/src/scout/scout-ledger-backfill.ts b/src/scout/scout-ledger-backfill.ts
+index 957fb8c..11d0a3f 100644
+--- a/src/scout/scout-ledger-backfill.ts
++++ b/src/scout/scout-ledger-backfill.ts
+@@ -254,7 +254,7 @@ export async function readDrainState(
+       AND pn.nspname = 'public' AND p.proname = 'scout_ledger_platform_fence' AND p.pronargs = 0
+       AND NOT t.tgisinternal AND t.tgenabled <> 'D'
+       AND t.tgtype = ${FENCE_TRIGGER_TYPE}::int2 AND t.tgqual IS NULL
+-      AND t.tgattr::int2[] = '{}'::int2[] AND t.tgnargs = 0 AND t.tgconstraint = 0`;
++      AND cardinality(t.tgattr::int2[]) = 0 AND t.tgnargs = 0 AND t.tgconstraint = 0`;
+   return { ledgerTotal: counts.total, nulls: counts.nulls, mismatch, fenced: fences === 1 };
+ }
+ 

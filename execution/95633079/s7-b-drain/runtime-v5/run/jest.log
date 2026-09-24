@@ -1,0 +1,409 @@
+  console.warn
+    PG17_DATABASE {"port":55461,"user":"postgres","owner":"postgres","super":false,"address":"127.0.0.1","version":"170006","database":"g2_b_drain_disposable","bypassrls":true,"directory":"/home/user/pg17/clusters/b-drain/pg-data"}
+
+      134 |     ),
+      135 |   ).toBe(G2_B_DATABASE_MARKER);
+    > 136 |   console.warn('PG17_DATABASE', JSON.stringify(identity));
+          |           ^
+      137 |   // Fresh S5-shaped bootstrap: the O root's full history (164 recorded), none of the
+      138 |   // accepted S1/C1/E predecessors this root tracks, no B, no fence.
+      139 |   base = Number(appliedMigrations());
+
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:136:11)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_1","old":true,"options":{},"result":{"intent_id":"intent","staged":400,"reconstructed":400,"skipped":0,"failed":0},"queries":1604,"pid":18080}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_2","old":true,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":30,"reconstructed":30,"skipped":0,"failed":0},"queries":124,"pid":18179}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_3","old":false,"options":{"intent":"i2"},"result":{"intent_id":"i2","staged":10,"reconstructed":10,"skipped":0,"failed":0},"queries":84,"pid":18201}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage2","options":{"batch":200},"report":{"batch":200,"ledgerTotal":440,"nullBefore":430,"nullAfter":0,"mismatch":0,"fenced":false,"passes":[{"chunks":3,"examined":430,"updated":430,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"complete_unfenced"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:221:33)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_4","old":true,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":31,"reconstructed":31,"skipped":0,"failed":0},"queries":128,"pid":18242}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage2_again","options":{"batch":200},"report":{"batch":200,"ledgerTotal":441,"nullBefore":1,"nullAfter":0,"mismatch":0,"fenced":false,"passes":[{"chunks":1,"examined":1,"updated":1,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"complete_unfenced"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:250:24)
+
+  console.warn
+    PG17_FENCE {"function":{"def":"CREATE OR REPLACE FUNCTION public.scout_ledger_platform_fence()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.source_platform IS NULL THEN\n    RAISE EXCEPTION 'G2-B obsolete writer fenced: ScoutReconstructionLedger.source_platform is required'\n      USING ERRCODE = 'check_violation';\n  END IF;\n  RETURN NEW;\nEND $function$\n","proacl":"{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}","proname":"scout_ledger_platform_fence","proconfig":["search_path=\"\""],"prosecdef":false,"provolatile":"v"},"triggers":[["ScoutReconstructionLedger_platform_fence","O",7,"CREATE TRIGGER \"ScoutReconstructionLedger_platform_fence\" BEFORE INSERT ON public.\"ScoutReconstructionLedger\" FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence()"]]}
+
+      299 |       );
+      300 |     }
+    > 301 |     console.warn('PG17_FENCE', JSON.stringify(installed));
+          |             ^
+      302 |   });
+      303 |   it('a raw rerun of B is refused atomically and changes nothing', () => {
+      304 |     const before = fence();
+
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:301:13)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_5","old":true,"options":{"family":"workouts"},"failure":{"status":500,"message":"Internal server error"},"queries":8,"pid":18364}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_6","old":true,"options":{"action":"roster","limit":5},"result":{"intent_id":"intent","accounting":{"staged":400,"reconstructed":400,"skipped":0,"failed":0},"persons":[{"id":"7d5fc2e9-597f-47be-9424-4c52f6274dec","state":"InvitePending","source_platform":"truecoach","source_person_id":"s00001","display_name":"Synthetic 1","created_at":"2026-09-24T15:38:22.787Z","updated_at":"2026-09-24T15:38:29.082Z"},{"id":"9b376c2f-0f38-465f-b29f-75c5ebf63ff1","state":"InvitePending","source_platform":"truecoach","source_person_id":"s00002","display_name":"Synthetic 2","created_at":"2026-09-24T15:38:22.790Z","updated_at":"2026-09-24T15:38:29.087Z"},{"id":"6bafa066-2902-40e9-bff0-93ffe63d6532","state":"InvitePending","source_platform":"truecoach","source_person_id":"s00003","display_name":"Synthetic 3","created_at":"2026-09-24T15:38:22.792Z","updated_at":"2026-09-24T15:38:29.091Z"},{"id":"5efa1ca4-0bfe-4ded-8ab8-019d6f783c1f","state":"InvitePending","source_platform":"truecoach","source_person_id":"s00004","display_name":"Synthetic 4","created_at":"2026-09-24T15:38:22.794Z","updated_at":"2026-09-24T15:38:29.095Z"},{"id":"0896c820-ce01-4656-8feb-4fa20c87b3c2","state":"InvitePending","source_platform":"truecoach","source_person_id":"s00005","display_name":"Synthetic 5","created_at":"2026-09-24T15:38:22.796Z","updated_at":"2026-09-24T15:38:29.098Z"}],"page":{"limit":5,"next_cursor":"czAwMDA1","has_more":true}},"queries":8,"pid":18386}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_7","old":true,"options":{"action":"entities","family":"workouts","limit":5},"result":{"intent_id":"intent","family":"workouts","entities":[{"id":"583eb70a-68ee-4d43-bf03-cf2e8565a450","source_platform":"truecoach","entity_type":"workouts","source_id":"w-late","client_source_id":"client-new","label":"Synthetic A","created_at":"2026-09-24T15:38:30.592Z","updated_at":"2026-09-24T15:38:30.592Z"},{"id":"645aaf4e-2f35-4e64-af11-6f0842c39ea2","source_platform":"truecoach","entity_type":"workouts","source_id":"w00001","client_source_id":"client-1","label":"Synthetic 1","created_at":"2026-09-24T15:38:28.001Z","updated_at":"2026-09-24T15:38:30.595Z"},{"id":"4f65dac1-35d1-41a2-959c-928fbf1ac9e2","source_platform":"truecoach","entity_type":"workouts","source_id":"w00002","client_source_id":"client-2","label":"Synthetic 2","created_at":"2026-09-24T15:38:28.004Z","updated_at":"2026-09-24T15:38:30.597Z"},{"id":"4aa44743-19dc-484b-a3cf-05e9975f7675","source_platform":"truecoach","entity_type":"workouts","source_id":"w00003","client_source_id":"client-3","label":"Synthetic 3","created_at":"2026-09-24T15:38:28.006Z","updated_at":"2026-09-24T15:38:30.600Z"},{"id":"7675a39f-8937-4e00-aafb-c25226353ac0","source_platform":"truecoach","entity_type":"workouts","source_id":"w00004","client_source_id":"client-4","label":"Synthetic 4","created_at":"2026-09-24T15:38:28.008Z","updated_at":"2026-09-24T15:38:30.601Z"}],"page_count":5,"next_cursor":"eyJjIjoiY29hY2giLCJpIjoiaW50ZW50IiwiZiI6IndvcmtvdXRzIiwibyI6InNvdXJjZV9pZDphc2MiLCJzIjoidzAwMDA0In0"},"queries":6,"pid":18405}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_8","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":32,"reconstructed":32,"skipped":0,"failed":0},"queries":260,"pid":18443}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_9","old":false,"options":{"family":"workouts"},"result":{"intent_id":"intent","staged":32,"reconstructed":32,"skipped":0,"failed":0},"queries":260,"pid":18465}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_10","old":false,"options":{},"result":{"intent_id":"intent","staged":1244,"reconstructed":1244,"skipped":0,"failed":0},"queries":9958,"pid":18500}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage5","options":{},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":1238,"nullAfter":8,"mismatch":2,"fenced":true,"passes":[{"chunks":3,"examined":1238,"updated":1230,"orphan":5,"invalid":3,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":8,"updated":0,"orphan":5,"invalid":3,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":5,"invalid":3,"ambiguous":0},"outcome":"unresolved"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:417:28)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage5_again","options":{},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":8,"nullAfter":8,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":8,"updated":0,"orphan":5,"invalid":3,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":5,"invalid":3,"ambiguous":0},"outcome":"unresolved"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:455:19)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage5_drain","options":{},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":8,"nullAfter":0,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":8,"updated":8,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"drained"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:474:21)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_locked","options":{"lockRetries":0},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":3,"nullAfter":1,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":2,"updated":2,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"stalled"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:497:23)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_released","options":{},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":1,"nullAfter":0,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":1,"updated":1,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"drained"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:507:21)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_t_staged","options":{},"report":{"batch":500,"ledgerTotal":1250,"nullBefore":2,"nullAfter":0,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":2,"updated":2,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"drained"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:517:20)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_11","old":false,"options":{"intent":"i3","pause":"staged"},"result":{"intent_id":"i3","staged":20,"reconstructed":20,"skipped":0,"failed":0},"queries":164,"pid":18720}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_t_claimed","options":{"lockRetries":0},"report":{"batch":500,"ledgerTotal":1270,"nullBefore":21,"nullAfter":1,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":20,"updated":20,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"stalled"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:529:20)
+
+  console.warn
+    PG17_PROCESS {"name":"g2b_12","old":false,"options":{"intent":"i3","pause":"claimed","txTimeout":60000},"result":{"intent_id":"i3","staged":20,"reconstructed":20,"skipped":0,"failed":0},"queries":164,"pid":18752}
+
+      228 |       }
+      229 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 230 |       console.warn(
+          |               ^
+      231 |         'PG17_PROCESS',
+      232 |         JSON.stringify({
+      233 |           name,
+
+      at settleWorker (test/utils/g2-b-drain-pg-harness.ts:230:15)
+      at ChildProcess.<anonymous> (test/utils/g2-b-drain-pg-harness.ts:250:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_t_claimed_after","options":{},"report":{"batch":500,"ledgerTotal":1270,"nullBefore":0,"nullAfter":0,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"drained"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:538:19)
+
+  console.warn
+    PG17_BLOCKED {"name":"g2b_stage6_staging_writer","rows":[{"type":"Lock","wait":"relation"}]}
+
+      275 |       FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
+      276 |     if (rows.length > 0) {
+    > 277 |       console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
+          |               ^
+      278 |       return;
+      279 |     }
+      280 |     await new Promise((r) => setTimeout(r, 25));
+
+      at blocked (test/utils/g2-b-drain-pg-harness.ts:277:15)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:551:7)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_staging_writer","options":{"lockRetries":0},"report":{"batch":500,"ledgerTotal":1270,"nullBefore":1,"nullAfter":1,"mismatch":2,"fenced":true,"passes":[{"chunks":0,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":1,"stalledByLocks":true}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"stalled"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:552:35)
+
+  console.warn
+    PG17_BACKFILL {"name":"g2b_stage6_staging_released","options":{},"report":{"batch":500,"ledgerTotal":1270,"nullBefore":1,"nullAfter":0,"mismatch":2,"fenced":true,"passes":[{"chunks":1,"examined":1,"updated":1,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false},{"chunks":1,"examined":0,"updated":0,"orphan":0,"invalid":0,"ambiguous":0,"lockFailures":0,"stalledByLocks":false}],"unresolved":{"orphan":0,"invalid":0,"ambiguous":0},"outcome":"drained"}}
+
+       96 |     const report = await backfillLedgerPlatform(runtime.client, options);
+       97 |     // Counts and shapes only; the report carries no identifiers by construction.
+    >  98 |     console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
+          |             ^
+       99 |     return { report, queries: runtime.queries };
+      100 |   } finally {
+      101 |     await runtime.client.$disconnect();
+
+      at backfill (test/rls-g2-b-drain.spec.ts:98:13)
+      at Object.<anonymous> (test/rls-g2-b-drain.spec.ts:568:21)
+
+PASS rls-live test/rls-g2-b-drain.spec.ts (52.182 s)
+  stage 1: legacy rows from the actual O binary, on narrow and on E
+    ✓ O on the narrow base, then E, then O on E: 430 rows without provenance (7530 ms)
+  stage 2: backfill on E without the fence — completion is not drain
+    ✓ assigns exactly the staged platform to every NULL row and touches nothing else (430 ms)
+    ✓ an O restart re-creates NULL rows after completion, so unfenced completion is not drain (1133 ms)
+  stage 3: B through the release mechanism
+    ✓ prisma migrate deploy applies exactly B; identity, RLS and indexes are untouched (1528 ms)
+    ✓ a raw rerun of B is refused atomically and changes nothing (1224 ms)
+  stage 4: the fence against O, T, direct writers and the API roles
+    ✓ refuses a NULL-provenance INSERT from the owner and from the runtime role (213 ms)
+    ✓ the actual O binary fails closed on a new staged row: 500, no ledger row, no target (2903 ms)
+    ✓ API roles are still denied by policy (with provenance, so the policy, not the fence, answers) (162 ms)
+    ✓ T creates with provenance and claims a re-opened NULL row through the fence; replay identical (2258 ms)
+  stage 5: bounded fixture — unresolvable classes, cursor, idempotence, recovery
+    ✓ builds 1238 NULL rows: 1230 resolvable, 5 orphans, 3 invalid; 2 mismatching and 10 claimed stay (6201 ms)
+    ✓ resolves exactly the 1230 in three chunks, reports the 8 remaining by class, stops honestly (890 ms)
+    ✓ rerun is idempotent: one short chunk, nothing written, same verdict (149 ms)
+    ✓ forward provenance recovery (staging repaired, not ledger edited) drains under the fence (388 ms)
+  stage 6: concurrency — locked rows, T barriers, a staging writer
+    ✓ skips a row locked by another transaction, stalls honestly, drains after release (246 ms)
+    ✓ T paused after reading staging: the backfill completes; T then claims identically (1160 ms)
+    ✓ T paused inside its claim: the backfill skips that row without waiting (1242 ms)
+    ✓ a concurrent staging writer makes the chunk wait, hit lock_timeout, and write nothing (5355 ms)
+  stage 7: down removes only the fence; up restores it
+    ✓ down keeps column, rows and history; NULL inserts are admitted again (1688 ms)
+    ✓ re-applying the file restores the identical fence (172 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       19 passed, 19 total
+Snapshots:   0 total
+Time:        52.444 s
+Ran all test suites matching test/rls-g2-b-drain.spec.ts.

@@ -52,6 +52,10 @@ The attached Mobile App Design Intelligence doctrine was read and compared indep
 
 Use the attachment prospectively within existing UX scope: make the intended user feeling and primary outcome explicit, minimize decisions, preserve consistency and provide truthful, calm feedback. Reuse existing quiet-luxury tokens/components and reduced-motion equivalents. Its case-study gamification, 3D objects and mascot expansion do not silently override importer-specific constraints or authorize new product scope. Assess applicable changed experiences through existing review and integrated journey acceptance, not a new universal audit/control layer.
 
+## UX-03 disposition
+
+The UX-03 readiness brief is accepted as planning input. UX-03a (T2, presentation-only paired-state truth correction) and UX-03b (T4, dark C1 setup-correlation consumer) are granted as separate path-disjoint mobile builds from accepted J3 head `9ff749c35f64068e156400d2ed37c0b144c2d56d`. The parent's S7-2′ consumer freeze covers only the five C1 pair paths at `2.0.0-c1-s1.1` (`a0ea1bea`, artifact `bdb022dd…`), proven by fixture-derived consumer tests, not assertion. Locator issuance, revocation/disconnect, account-mismatch signal, capability negotiation, retention/code-retirement and C1 activation remain G3-AUTH/owner matters and are not decided. No remote product write, deployment or rendered-device claim.
+
 ## Runtime and proof
 
 Canonical heavy slot: `/home/user/workspace/execution/test-validation.lock`, nonblocking flock, one owner. B's single PG proof ended at 2026-09-24 15:14:50Z and released the slot after successful owned-fixture cleanup. Parent relayed release to the already-granted J3 executor. Never remove another owner's lock.
@@ -62,9 +66,13 @@ J3 base r4 `820dbd04500b06648ce4c0820c1badced55d6d7c`; frozen r5 tree `823b97006
 
 Both independent reviewers traced the new PG failures to the same two-line catalog predicate defect. Parent's class A disposition and minimum v5 delta are in `B_V5_MINIMUM_CORRECTION_AND_PHASE_A_GRANT.md`, which supersedes the earlier no-edit posture only for those exact lines and the named phase-A continuation. The spec/harness and forward migration remain unchanged; original failures remain failures.
 
+v5 actual head `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c`, tree `d02f9b124bee52107f8ad2f286f8af611b859fe6`, single parent failed v4 `75a2863b`, genuine hooks, gates rc0, 42/42. Both independent reviewers attested head and fresh binding `e895b16e…` (five pins plus the necessary `RT→runtime-v5` receipt-root line). `B_V5_SINGLE_PG_PROOF_GRANT.md` grants PRE-1 (one preserving rename of the stopped first-proof datadir, hashes receipted, no deletion) and exactly one unchanged run. No automatic rerun on failure.
+
 Independent reviewer successors continue only the existing review question, new v5 delta and unchanged source applicability. They must identify themselves as successor reviewers, not impersonate inaccessible former reviewers, and must not read peer reports. No repeated source audit of accepted/frozen unchanged bytes.
 
 Bradley reiterated maximum safe parallelism at 07:49 PDT. Independent source recovery and review preparation run concurrently. Only real ownership, dependency and heavy-runtime contention justify serialization; duplicate audits or idle agents are not throughput.
+
+B/drain is ACCEPTED at `0d69c7ba7e7d257311cfcb21fa325ebb1ddc1f1c` (`B_DRAIN_LOCAL_ACCEPTANCE.md`): v5 single PG proof 19/19, dual independent ACCEPT. R is activated under `R_IDENTITY_READY_BUILD_GRANT.md` (T4). Heavy-slot relay order: UX-03a gates → UX-03b gates → R gates, then R's separate single PG grant.
 
 ## Safety ROI and continuation
 
