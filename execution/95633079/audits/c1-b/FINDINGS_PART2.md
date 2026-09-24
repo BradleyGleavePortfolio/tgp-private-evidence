@@ -1,0 +1,6 @@
+# S7-2 C1 review B — Part 2 findings (minimal fixture + execution binding, source only, frozen 2026-09-24 ~06:35Z)
+Carried forward unchanged: sealed source phase (A0/B0, C1–C9) and Part 3 (A0/B0, C10–C15, head a0ea1bea attested).
+Part 2: A=0. B=0. C=5 new (C16 README bound-sum 810 vs nominal 855, outer 900 covers realistic paths, pathological overrun would leave a visible loopback survivor; C17 ss-absent port check would read 0, ss present here, pgrep fails closed; C18 psql client version unpinned, immaterial; C19 recovery installers take the canonical lock themselves; C20 empty run/ dir on lock-busy attempt, harmless).
+Fixture c1-fixture.sh 27b816af… ACCEPTED as substitution-only vs donor 3a7d57bf… (constants PORT=55439/SUPER=user/MARKER/DATA/LOG/SOCK, initdb -A trust without pwfile, guard re-pointed, renames, necessary dirname-$DATA mkdir; all refusal/marker/stop/survivor/destroy semantics byte-identical; derivation deterministic).
+Binding c1-pg-proof.sh 50506175… GRANTABLE from B for ONE run of the existing 22-case spec cc3b0e4d on head a0ea1bea (§5 sequence verbatim, one CREATE DATABASE, unchanged §6 criteria) once the heavy owner recovers PG17.6 dist + psql at the recorded pins; S5 absence preserved, not reconstructed.
+No acceptance until Part 4 attests the actual 22/22 PG receipts. Details: PART2_MINIMAL_FIXTURE_AND_EXECUTION_BINDING.md.

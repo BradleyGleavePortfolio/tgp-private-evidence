@@ -1,47 +1,39 @@
 # EXEC-95633079 resumed scope
 
-Owner EXECUTE: 2026-09-23 22:35 PDT in session `95633079-d2f3-4674-a0b9-52d03477ce27`. Intake is accepted and recon closed at private checkpoint `a02f368aa474612d1a7d229621d5f48f3bc42f3a`; no further recon cycle is authorized.
+Bradley's EXECUTE on September 23 at 22:35 PDT authorizes routine local continuation through the canonical mission. Intake at checkpoint `a02f368aa474612d1a7d229621d5f48f3bc42f3a` is accepted and recon closed; no restart is authorized.
 
-## Authority and order
+## Authority and accepted cursor
 
-Parent orchestrates and publishes private telemetry/evidence only. Builders implement; independent nonbuilders attest; no product remote push/merge, deployment, production/customer enablement, real source-account access, security/governance changes, external commitments or new spending is authorized.
+Parent orchestrates and publishes private evidence only. Builders implement; independent nonbuilders review. Product remote push/merge, deployment, production/customer enablement, live source-account access, security/governance changes, destructive production actions, external commitments and new spending remain reserved.
 
-C1 order is unfinished execution-binding review → exact writable recovery → frozen launcher/genuine hooks → ordinary commit → targeted validation → minimum fixture build/review → existing 22-case PG proof → same-review final attestations → acceptance. Continue B/drain → R → N/Q1 → C and remaining S7, then S8–S12 as dependencies permit; parallel UX reuses the delivered plan and existing mobile work.
+C1 is **ACCEPTED** at `a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992`, exact tree `87798e742c7b48f56b05e9b5c30efa877180a9b3`. Both same-review finals accept genuine hooks, the frozen 18-file candidate, 190 targeted tests and the existing22 real-PG cases. Record `C1_FINAL_ACCEPTANCE.md` governs the scope and retained qualifications. All C1 execution grants are consumed; no repeat is authorized.
 
-S1–S6, S7 foundation and completed C1 source reviews remain accepted at recorded boundaries. No accepted proof, full source review, composition, formatting or completed UX planning is repeated. Source tree `87798e742c7b48f56b05e9b5c30efa877180a9b3`, parents `5c760b774598532e90d5d217e15adc9285c3c3f4` then `881c4c791727adef8d423931e1cca83a0ffbb9c9`, launcher `a57c224c6e8e9364393318efaa99c33f4a90877287d7e1a7e370b1c75b220448` and message `288048d7b7e908f8803d3d70e57465f52cfc9f102bb4bc4b1dba30143ce7cb83` are frozen.
+S1–S6 and S7 foundation remain accepted. S5's E/T-Q0 evidence transfers unchanged; source reviews, fixtures, diagnostics and foundation composition do not restart. Mobile presentation df0ad112 and extension presentation6fd7e4a are accepted bounded leaves, not complete UX jobs.
 
 ## Current graded assignments
 
-| Slice | Tier / requested route | Scope and frozen completion |
+| Slice | Tier / requested route | Granted work |
 |---|---|---|
-| C1 A execution-binding continuation | T4; parent-model inheritance | Exact frozen launcher review only; carry A source verdict forward, no peer conclusions; append fixture/results later |
-| C1 exact recovery / frozen local validation | T4; Claude Fable 5 / High requested | Sole recovery/writer/executor; reviewed binding's exact pins, real hooks, ordinary frozen-message commit, targeted Jest only; stop on first failure, no PG yet |
-| ROMAN-DONOR comparison | T2 source-only; Claude Sonnet 5 / High requested | Exact PR293/294 comparison against accepted S6, actionable reuse and minimal early UX slices; no product changes, install or runtime |
-| Mobile UX-02/UX-07 presentation | T2; same Sonnet 5 writer | Acceptedbc7 base; reuse P1 controlled components/tests, Settings label, presentation-only J3 restyle if existing controller behavior preserved; no Home eligibility fabrication or decision persistence; no runtime/commit yet |
-| UX-07.design outstanding details | T2 planning-only; Claude Sonnet 5 / High requested | Token reuse/exclusions, accessibility checks and focused test plan/popup styling; do not repeat journey/map/matrix |
-| UX-07.extension presentation | T1; GPT 5.6 Terra / Medium requested | Existing HTML/CSS source only, no protocol/JS/visibility behavior/new panels; exact extension base0111be66; freeze for targeted review, no runtime/commit yet |
-| UX-07.extension targeted review | T1; independent GPT 5.6 Terra / Medium requested | Exact two-file CSS candidate, relevant unchanged markup/controller context; source grantability only, no candidate writes or runtime |
-| UX mobile independent review | T2; independent Claude Sonnet 5 / High requested | Exact P1 adoption/Settings candidate377e4b7a; source review followed by actual-head/results applicability, no repeat S6 |
-| C1 independent B continuation | T4; Claude Fable 5 / High requested | Carry sealed B source verdict and qualifications; actual commit/results, minimal fixture and22PG phases only, independent of A |
-| C1 minimum fixture variant | T4; same Fable 5 builder | Source-only minimum substitutions from frozen S5 fixture per existing C1 PG preparation; one database creation, no test matrix expansion or PG runtime yet |
-| UX-01 account-scoped offer decision | T4; Claude Fable 5 / High requested | CQ-02 mobile default on acceptedbc7, minimal state/hook/tests and auth cleanup; no UI/presentation paths, backend endpoint, eligibility inference or intent binding; dual independent review later |
+| S7-3′ B/drain | T4; Claude Fable 5, High requested | Source-only implementation on acceptedC1: bounded resumable unambiguous backfill, obsolete-writer fence/drain, own migration and new focused proof source; preserve E/T semantics and both narrow indexes; separately promotable |
+| UX-01 account-state | T4; Claude Fable 5, High requested | Dual-granted treea33cb891 on acceptedS6; heavy slot for private copy of matching installed dependencies, ordinary handoff-message commit, two new test files, separately filtered added sign-out test, typecheck and exactly-six-path ESLint; first failure stops |
+| UX-01 reviews A/B | T4; independent Claude Fable 5, High requested | Both frozen SOURCE_GRANTABLE A0/B0; later same-review actual-head/results, no S6 reaudit |
 
-Requested routing is not observed model/effort telemetry. No silent downgrade of a required route is authorized.
+Exact worker IDs and sole paths are in `../DISPATCHES.md`. Requested route is not observed model/effort telemetry. No silent downgrade is authorized.
 
-## Ownership and execution limits
+## B/drain boundaries
 
-All prior workers are historical. Fresh workers write only their listed directories; none writes this private checkout. One writer per mutable product surface and generator; one canonical heavy-runtime slot at `execution/test-validation.lock`. C1 commit/Jest completed and released the slot at06:06Z. Extension completed install and9 targeted tests, stopped on its existing hook-alignment gate, and released the slot without a commit. Mobile now has the bounded locked-install/typecheck/adopted-tests/ordinary-commit grant. C1 fixture and UX-01 state are source-only. No PG run is granted yet.
+Canonical authority is `execution/e7d2385c/s7-mapping/S7_OVERLAP_ADDENDUM.md` corrected S7-3′ and `agent-context/handoffs/op81/CONTINUATION_AND_ROMAN_IMPORT_PLAN.md`, including its exact linked recovery/rollout documents. Read targeted historical evidence only when directly pointed to or needed for a concrete decision.
 
-This sandbox has no inherited product worktrees, dependencies or PostgreSQL directory. Only absent tooling may be rehydrated to recorded pins after appropriate binding disposition; absence does not reopen accepted S5 or require rebuilding its old cluster.
+Separate builder `s7_b_drain_builder_muf5xlqn` owns `worktrees/s7-b-drain/**` and `execution/95633079/s7-b-drain/**`. Recover accepted C1 objects locally, never recompose foundation/C1. Product scope is `src/scout/**`, its own new B migration, focused `test/rls-g2*` and `test/utils/g2*`. Shared schema/generator files require parent assignment if a real need appears.
 
-C1 source and environment are now recovered at the frozen pins. The original launcher ran once: successful hook installation, then RC71 at its conservative hook-path detector before commit. Reviewer A confirmed genuine native hooks and classified the mismatch C06, A0/B0. Only the unexecuted guards/ordinary commit/targeted Jest remainder is pending; no reinstall, old-launcher retry or new proof.
+No installs, generation, tests, builds, hooks, commit, database execution or remote writes are granted in this source phase. Freeze exact base/tree/blobs/diff, targeted acceptance and execution proposal for two independent T4 reviews. Preserve applicable original recovery assertions and add only phase-relevant mixed-version/concurrency/cursor/late-ingest proof; do not re-prove E/T-Q0 or C1.
 
-The remainder script is frozen at `execution/95633079/c1-execution/10-validate-continue.sh` with SHA-256 `47c27fb9c700c797c55e7216378581d193dd8de63ec9f85aff08534f5d81bb1c`. Existing reviewer A granted the narrow binding with A0/B0; the parent has authorized this exact remainder under the executor's heavy-slot ownership. Mobile validation will later be performed by the mobile sole writer, not the C1 backend executor; the source report's generic "C1" executor wording is a nonblocking naming qualification.
+Do not implement R, N/Q1 or C early, bundle all stage migrations into one automatic promotion, introduce new retention/erasure authority or use PR522 as a replacement mega-patch.
 
-That exact remainder has completed: ordinary genuine-hook commit `a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992`, frozen tree/parents unchanged, followed by11 suites/190 tests passing with raw0. Same-review A/B actual attestations are active; C1 acceptance still requires only the prepared22PG proof and its minimum fixture. The inherited conditional production-readiness no-op is not claimed as production proof.
+## Runtime and continuation
 
-A blocks the affected product path; B blocks only affected proof. Each A/B requires concrete harm, exact blocked decision, minimum closure and execution unlocked. C records/qualifies/continues and never independently creates a fixer, audit, rerun, control or delay.
+One heavy owner at a time uses `execution/test-validation.lock`. The slot is assigned to the UX-01 sole writer after completed C1 and extension execution. The pinned PG17.6 distribution and stopped C1 cluster remain; neither absence of an old S5 cluster nor a fresh worker authorizes a predecessor proof rerun.
 
-## Durable source references
+After frozen source grants, parent transfers only the minimum runtime scope to the sole writer, then obtains independent actual-head/results attestations. Every A/B finding states concrete harm, blocked decision, minimum closure and execution unlocked. C records/qualifies/continues without adding a cycle.
 
-The unchanged pause package and all previous acceptances remain under `execution/e7d2385c/`, with original current-state views recoverable at `a02f368`. The canonical master pause file supersedes the conflicted-merge restoration recipe: restore clean foundation plus exact staged patch and merge metadata, not a second composition.
+Continue B/drain → R → N/Q1 → C and remaining authoritative S7 lifecycle/forward contracts, then S8 native writers, S9 relationships/reconciliation, S10 unknown-source induction, S11 full journey/two hosts and S12 real pilot acceptance. Eligible UX remains parallel, with accepted mobile reuse and no invented backend contracts. No routine Bradley decision is needed now; stop only at an actual reserved authority boundary.

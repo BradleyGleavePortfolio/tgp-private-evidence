@@ -1,0 +1,20 @@
+author=Bradley Gleave <bradley@bradleytgpcoaching.com> 1790231590 +0000
+committer=Bradley Gleave <bradley@bradleytgpcoaching.com> 1790231590 +0000
+lefthook_config_sha256=11af12f6fe7f0607ba7c603ea4d7e8f8789f8b08984a159b65f53ffe64c28c2f
+pre_commit_hook_path=.git/hooks/pre-commit
+pre_commit_hook_sha256=1f99fa2b60f550c20aa72a0521988694a1795dcfa82795adecdb200eaaf83802
+pre_commit_config:
+min_version: 2.1.12
+pre-commit:
+  parallel: true
+  commands:
+    banned:
+      run: BANNED_DIFF_CACHED=1 npm run check:banned
+    deploy-readiness:
+      run: npm run check:production-preflight
+    lint:
+      run: npm run lint
+    type-check:
+      run: npm run type-check
+    format:
+      run: npm run format:check
