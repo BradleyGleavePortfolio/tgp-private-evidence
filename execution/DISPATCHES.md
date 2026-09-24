@@ -1,41 +1,17 @@
 # TGP Execution Register
 
-Current parent EXEC-e7d2385c, session e7d2385c-108e-44bd-a9dd-d7aa65c77bde. **PAUSED BY OWNER: all eight workers ended; all continuation/write/runtime grants revoked.** Scope: `execution/e7d2385c/SCOPE.md`; exact resume cursor: `execution/e7d2385c/OPERATOR_PAUSE_AND_RESUME.md`.
+Parent EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`. Owner EXECUTE received September 23 at 22:35 PDT; intake accepted and recon closed. Scope: `execution/95633079/SCOPE.md`.
 
-Rows below preserve historical assignments and receipts, not active authorization. Each child/cumulative integration was graded before work, with requested routing recorded honestly rather than asserted as runtime telemetry.
+All eight e7d2385c workers remain stopped/finished. Their immutable terminal assignments and receipts are preserved at private checkpoint `a02f368`; no old ACTIVE label or grant is inherited.
 
-| Slice | Worker | Requested route | Sole owned writes | Current state |
+| Slice | Fresh worker | Tier / requested route | Sole writable area | Current state |
 |---|---|---|---|---|
-| S5 exact recovery and hooked continuation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Frozen `execution/e7d2385c/s5-continuation/**`, product head98d39610 | COMPLETE4007b242; true hooks/identity/bundle, runtime released19:54:57Z; no realPG |
-| S5 exact runner and PG17.6 prerequisite recovery | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Sealed `s5-proof-preparation/**`, runner paths, `/home/user/pg17/**` | COMPLETE080b9574; runtime released20:07:25Z; no DB proof |
-| S5 exact fresh51 | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Sealed s5-fresh51/** and original logs | REFUSEDrc3 beforeDB/live51; source unchanged; slot RELEASED20:24:03Z |
-| S5 runner correction | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Frozen7.1/7.2 packets; swapped externalrunner | COMPLETE7.2 hash16c763f4, dual grantable; product/fixture/helper unchanged |
-| S5 full proof rev7.2 | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | Sealed s5-fresh51-r2/** and timestampedlogs | PASS51/51/proof0/stop0/outer0, no survivors/quarantine; slot RELEASED20:43:39Z |
-| S5 independent exact-head/runner A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | Sealed `audits/s5-a/**` | COMPLETE finalACCEPT1f7ac4da, noA/B; currentS6reviewseparate |
-| S5 independent exact-head/runner B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | Sealed `audits/s5-b/**` | COMPLETE finalACCEPTf2a23ef6, noA/B |
-| S6 frozen recovery/preparation/P2 | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Sealed preparationd94c80b7 and P2packet1cf14b97 | COMPLETE FROZEN P2treedddd7c28; never rewritten |
-| S6 minimum fresh setup | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Sealed `s6-p2-setup/**`, installed dependencies | COMPLETE1244063a; slot RELEASED20:19:59Z; wrapperreceipt missing/C, usable substrate, no reinstall |
-| S6 P3 validation | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Frozenbinding639b5349; result s6-p3-validation-result/**; installedworktree | STOPPED03raw124 after4/4 assertions;01/02failures preserved;04–09notrun, slot RELEASED20:37Z |
-| S6 combined observed test-only fix | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | Sealed s6-observed-test-fix-r2/** + s6-r2-validation/** | APPLIED e0d281f9/treeacb41c2b; 10 paths, dual source grant, product bytes unchanged |
-| S6 R2 bounded validation | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | s6-r2-validation-result/**, existing installed worktree | COMPLETE00–09; dual C qualification06/08 adopted, strictpost1 preserved; slot RELEASED21:17:02Z;20–23 gated |
-| S6 commit-message binding | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | s6-r2-commit-binding/** | COMPLETE43a995ac; onehashliteral, dualgrantAd26a4520/B6f7f51de; stale20count narrowly disposed |
-| S6 ordinary commit/bundle | `s6_frozen_source_recovery_muei56l7` | Claude Fable 5 / High | existing worktree + s6-r2-validation-result/** | COMMITTEDbc7b4e96/treeacb, sealedresulta9a580da/bundle85836076; slotRELEASED21:24:12Z |
-| S6 independent identity/privacy A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s6-a/**` | COMPLETE finalACCEPTa8461003 atbc7b4e96; all priorseals/qualifications preserved |
-| S6 independent lifecycle/integration B | `s6_independent_lifecycle_review_muei56lg` | Claude Fable 5 / High | `execution/e7d2385c/audits/s6-b/**` | COMPLETE finalACCEPT6d867c8a atbc7b4e96; no furthercycle |
-| S7 canonical continuation map | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | `execution/e7d2385c/s7-mapping/**` | COMPLETE corrected overlap map; reuse S3+S5, missing C1 delta only; no repeat E/T-Q0 proof |
-| S7-2 C1 composition/generator | `canonical_s7_continuation_map_muei9t11` | Claude Fable 5 / High | worktrees/s7-c1; s7-c1/**, s7-c1-formatted/** and localvalidationbinding | PAUSED source87798e74 complete; launcher a57c224c never run; 18-path merge retained; portable bundle a238a7b1 and checkpoint/addendum saved; stop returned completed |
-| S7-2 C1 independent A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | audits/s7-c1-a/** | PAUSED source GRANTABLE4b6eb453, noA/B; checkpoint890b64b4; binding/fixture/actual-result phases unfinished, source review not restarted; stop returned completed |
-| S7-2 C1 independent B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | audits/s7-c1-b/** | PAUSED source GRANTABLE e0aa8103, noA/B; checkpointcef828d5; fixture/actual-commit/PG attestations unfinished; stop returned completed |
-| S7-2 C1-only PG proof preparation | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | s7-c1-pg-preparation/** | PAUSED prep COMPLETE63076c47; checkpoint2346baea; fixture variant unbuilt, no cluster/DB/run; stop returned completed |
-| S7-1 foundation composition | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `execution/e7d2385c/s7-foundation/**`; isolated worktree | HOOK REFUSAL preserved; 13 Prettier files and default-heap OOM; no commit; slot RELEASED20:58:57Z |
-| S7-1 formatter-only correction | `s5_exact_candidate_continuation_muei56lb` | Claude Fable 5 / High | `execution/e7d2385c/s7-foundation-format/**` | COMMITTED5c760b77/tree7800ecb4, allrealhooks/raw0; bundle3e81299d; slotRELEASED21:20:28Z |
-| S7 independent composition/format A | `s6_independent_privacy_review_muei56ks` | Parent inheritance | `execution/e7d2385c/audits/s7-a/**` | FINAL exact-boundary ACCEPT51f608d5; previoussource9e9ca7bd preserved |
-| S7 independent composition/format B | `s5_independent_database_review_mueizmd3` | Claude Fable 5 / High | `execution/e7d2385c/audits/s7-b/**` | FINAL exact-boundary ACCEPT31840caa; sourceverdict preserved |
-| Importer UX official job/PR map | `plan_importer_ux_lane_muektoah` | Claude Fable 5 / High | `execution/e7d2385c/ux-planning/` jobmap/DAG/register only | COMPLETE/DELIVERED final7cc0021c; exactUX-01–08; existing289–292 reused; no code/runtime/remote writes |
-| Mobile importer journey/state planning | `specify_mobile_importer_journey_muekv9nz` | Claude Fable 5 / High | `execution/e7d2385c/ux-planning/journey/**` | COMPLETE/DELIVERED9701ab29; spec/matrix/questions, no product/runtime/remote writes |
+| C1 independent A continuation | `c1_review_a_continuation_muf3n97a` | T4 / parent inheritance | `execution/95633079/audits/c1-a/**` | ACTIVE unfinished execution-binding review only; source verdict preserved; no runtime |
+| Roman donor reuse comparison | `roman_donor_reuse_comparison_muf3n97e` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/roman-donor/**` | ACTIVE exact PR293/294 vs accepted S6 comparison; no product worktree/install/test |
+| UX-07 outstanding detail work | `ux_07_accessibility_detail_muf3n97i` | T2 / Claude Sonnet 5, High requested | `execution/95633079/ux/design-system/**` | ACTIVE new token/a11y/popup details only; no repeat journey planning or product writes |
 
-Parent alone owns the remaining private telemetry/evidence publication. No product mutation owner or heavy-runtime owner is active; former ownership is retained for provenance only. S1–S6 and S7-1 are accepted at their recorded boundaries. No productremote, customer/production/source-account or new spending action is active.
+Requested route is not observed runtime identity/effort. C1 writable recovery, executor, fixture builder and reviewer B continuation are not yet activated; no product writer or heavy-runtime owner is active.
 
-Prior 6c2a68ac worker IDs and grants are historical here; their remote liveness is UNKNOWN. Previous register remains in Git at cc62002bfd08c3cb677025b651965d36e6a1aaec. No prior ACTIVE label is treated as a live execution claim.
+S1–S6 and S7 foundation remain ACCEPTED at exact recorded boundaries. C1 tree `87798e74` and both source reviews remain frozen; launcher `a57c224c` has never run. Minimum fixture variant is unbuilt; existing 22-case PG proof remains unexecuted.
 
-Next only after fresh authorization: finish outstanding C1 execution-binding review, then boundedlocalvalidation and later the minimum reviewed fixture plus oneC1-onlyPGproof. Both full source reviews are already complete. S6 isclosed; UXplanningisdelivered withacceptedmobilebasebc7b4e96. No duplicateM5, source audit or accepted proof.
+Next: finish A binding review → delegate exact writable recovery → reviewed frozen local validation → minimum reviewed fixture → existing C1 PG proof → two same-review actual-head/result attestations → C1 acceptance → B/drain and canonical continuation. A/B blocks only its affected path/proof; C never starts another cycle.
