@@ -1,0 +1,27 @@
+merge(s7-c1): compose C1-S1 durable setup recovery 881c4c79 onto accepted foundation 5c760b77
+
+Composes the exact PR526 head 881c4c791727adef8d423931e1cca83a0ffbb9c9 (18
+files, commits 8e25c27b and 881c4c79) onto the accepted S7 foundation
+5c760b774598532e90d5d217e15adc9285c3c3f4 (tree 7800ecb4). Before formatting,
+14 of the 18 files were byte-identical to PR526. In this tree 5 remain
+byte-identical (decision record, both migration files, redeem-contract spec,
+controller spec); 10 differ from PR526 only by the repository's pinned
+Prettier 3.9.6 formatting under the unchanged .prettierrc.json (8 under
+src/extension-pair, test/rls-c1-setup.spec.ts, and
+test/contracts/importer-contract.spec.ts, which also carries the single
+version-literal change below); 3 are reconciled: prisma/schema.prisma
+auto-merged (ImportIntent model plus the E ledger source_platform column),
+scripts/importer-contract.ts, and docs/contracts/importer-openapi.json.
+
+The only authored change is the generated-contract version reconciliation:
+CONTRACT_VERSION 1.4.1 (T/Q0 cursor limit repair) and 2.0.0-c1-s1.0 (C1 setup
+recovery) become 2.0.0-c1-s1.1; the one existing version assertion is
+re-pinned and the artifact was regenerated once through the existing
+`npm run contract:importer`, whose output is byte-identical to the merge
+resolution (13 paths, 30 schemas). Prisma client regenerated locally for the
+changed schema; dependency manifests and lock are unchanged.
+
+Local composition only: not a remote merge, deployment, consumer contract
+freeze or activation. C1-specific targeted validation and the single
+rls-c1-setup real-PostgreSQL proof remain separate evidence obligations.
+

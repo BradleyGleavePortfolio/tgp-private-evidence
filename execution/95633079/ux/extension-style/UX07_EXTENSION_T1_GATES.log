@@ -1,0 +1,49 @@
+
+> tgp-importer-extension@0.3.0-rc.1 gates
+> npm run check:banned && npm run check:loc && npm run check:flags && npm run check:ratio && npm run check:fixtures && npm run check:production-preflight && npm run check:hooks && npm run lint && npm run type-check && npm run format:check
+
+
+> tgp-importer-extension@0.3.0-rc.1 check:banned
+> node scripts/check-banned.mjs
+
+OK: banned-token net clean (source patterns + origin/main commit identity)
+
+> tgp-importer-extension@0.3.0-rc.1 check:loc
+> node scripts/check-prod-loc.mjs
+
+prod LOC (base=origin/main) — prod_added=0 prod_removed=0 cap=600
+OK: added production JS is within the per-PR cap
+
+> tgp-importer-extension@0.3.0-rc.1 check:flags
+> node scripts/check-flag-discipline.mjs
+
+flag discipline — PAIRING_ENABLED=true (sole auth path)
+OK: sole auth path is enabled — no dark-merged dead-end
+
+> tgp-importer-extension@0.3.0-rc.1 check:ratio
+> node scripts/check-test-ratio.mjs
+
+test:src diff density (base=origin/main) — prod_added=0 test_added=0 ratio=n/a floor=2
+OK: no production JS added in this diff (nothing to gate)
+
+> tgp-importer-extension@0.3.0-rc.1 check:fixtures
+> node scripts/check-production-fixtures.mjs
+
+production fixture exclusion — scanned=41 violations=0
+OK: production modules do not reference test fixtures or mocks
+
+> tgp-importer-extension@0.3.0-rc.1 check:production-preflight
+> node scripts/check-deploy-readiness.mjs
+
+PRODUCTION STATIC PREFLIGHT (manifest, entrypoint, markers only)
+PASS  manifest-v3
+PASS  background-worker-declared
+PASS  background-worker-exists
+PASS  version-format
+PASS  forbidden-production-markers
+EXIT: STATIC PREFLIGHT CHECKS CLEAR
+
+> tgp-importer-extension@0.3.0-rc.1 check:hooks
+> node scripts/check-hook-config.mjs
+
+FAIL: pre-commit hook missing/alignment error: semantic type-check execution
