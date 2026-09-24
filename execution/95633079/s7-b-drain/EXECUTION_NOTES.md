@@ -49,3 +49,14 @@ paths/blobs/modes unchanged. One pinned Prettier 3.9.6 --check under flock -n: p
 no formatter process left. v4 tree f4922ca070e887fb7f613ce955b12621b5c33156 (temp index, no commit); packet
 frozen-v4/ (PACKET.v4.sha256). v3 packet and successor-proposal retained as history (PACKET.v3 re-verified).
 No env copy/install/generate/tsc/lint/jest/hooks/commit/PG.
+
+## 2026-09-24 08:16–08:19Z — Phase A run 1: stopped by own preflight-style detector after dependency copy (rc 71)
+Driver phase-a/phase-a.sh (sha 31e061ec…) under canonical flock -n. PREFLIGHT_OK (base, 11 path/mode/blob = frozen-v4,
+accepted/S5 pins, parity, node/npm, identity, no hooks/node_modules). cp -a --reflink=auto of accepted C1 node_modules
+completed: 649 entries, 717M, real directory, 0 shared inodes, 0 multi-link files, .package-lock.json and
+.prisma/client/index.d.ts SHAs match C1 record. Detector "symlinks_outside_tree" counted 1: node_modules/.bin/prettier
+is an ABSOLUTE symlink to the approved external Prettier 3.9.6 CLI (sha 6e922134…), identical in the accepted C1 tree
+itself (inherited by the isolated copy, not a link into C1's node_modules). Stopped at stage copy-symlink-outside per
+first-nonzero rule; no lefthook install, no staging, no gates, no commit; index clean, 0 hooks, lock released on exit.
+Copied node_modules left in place (verified). Minimum closure proposed to parent: whitelist exactly that one known
+symlink (pin target sha) in the detector and resume from stage 2 without re-copying. Not self-applied.

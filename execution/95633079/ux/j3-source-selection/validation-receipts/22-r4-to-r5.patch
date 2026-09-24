@@ -1,0 +1,27 @@
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+index 50bd855..34263ae 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+@@ -29,6 +29,10 @@ jest.mock('../../../theme/useTheme', () => ({
+       textOnPrimary: '#fff', info: '#2b6cb0', error: '#c0392b',
+       success: '#2e7d32', textTertiary: '#777',
+     },
++    semanticColors: {
++      bgPrimary: '#fff', bgSurface: '#f5f5f5', textPrimary: '#111', textMuted: '#999',
++      textOnAccent: '#fff', textOnDisabled: '#999', disabledBg: '#eee',
++    },
+   }),
+ }));
+ jest.mock('../../../analytics/posthog.service', () => ({ track: jest.fn() }));
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+index 2c03215..a1f65a6 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+@@ -83,6 +83,7 @@ describe('ImportDataScreen — J3 source-selection presentation', () => {
+     mockRecordDecision.mockResolvedValue(true);
+     canOpen = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
+     openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
++    openUrl.mockClear();
+   });
+   afterEach(async () => {
+     // Unmount first, then drain in-flight openLogin microtasks, so a prior

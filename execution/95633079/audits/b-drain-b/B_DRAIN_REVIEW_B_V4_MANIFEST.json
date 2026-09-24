@@ -1,0 +1,47 @@
+{
+  "review": "S7-3' G2 B/drain independent T4 reviewer B — v4 same-review single-hunk binding",
+  "report": "execution/95633079/audits/b-drain-b/B_DRAIN_REVIEW_B_V4.md",
+  "scope": "one changed blob + v4 tree + pin substitution only; ten unchanged files and C items not reopened",
+  "pins": {
+    "base_commit": "a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992",
+    "base_tree": "87798e742c7b48f56b05e9b5c30efa877180a9b3",
+    "v3_tree": "00b105ffe362c27808a38c44c6db1f733134f074",
+    "v4_tree": "f4922ca070e887fb7f613ce955b12621b5c33156",
+    "v3_to_v4": "1 M src/scout/scout-ledger-backfill.spec.ts 3a97093ac6923b0fdd1104939d6815cfa3ff2347 -> 5477059a152a04a1fa9a117e3c1d184259ac3341; +7/-4; other 10 blobs/modes identical",
+    "v4_vs_base": "11 A, +2323",
+    "v3_to_v4_diff_sha256": "3cdb4ff6c622b086a2b705736103b9010b33beec10fac39fa9ce1b68a34fc4e3",
+    "packet_checks": { "frozen-v4/PACKET.v4.sha256": "all OK", "frozen-v4/SOURCE.sha256": "OK vs worktree", "frozen-v4/BLOBS.git-sha1": "== git ls-tree -r f4922ca0" },
+    "v4_blobs": {
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql": "91e646dde82a8458d66ff6092b88b6674332ecf8",
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql": "55c859068260809ca2681451fb4e5ad670bc46f0",
+      "src/scout/scout-ledger-backfill.cli.ts": "bcc06577638e18d4660657c109f63ce2fa96af44",
+      "src/scout/scout-ledger-backfill.spec.ts": "5477059a152a04a1fa9a117e3c1d184259ac3341",
+      "src/scout/scout-ledger-backfill.ts": "957fb8c6d830cb6821b6087cda210523166d903d",
+      "test/rls-g2-b-drain.spec.ts": "9b31fd1813d25a1624ab04666e0b1be4743277ab",
+      "test/scout/g2-b-drain-db-guard.spec.ts": "4e1ed6ff932be9681fc943e122d0806eb095afb2",
+      "test/utils/g2-b-drain-bootstrap.sh (100755)": "b4503eef525baa531eedb148f47828db3a4ade6f",
+      "test/utils/g2-b-drain-db.ts": "cb60f3f47a18d11dd31b970ee49bcf1ed4ff2db3",
+      "test/utils/g2-b-drain-harness.ts": "469cbd2a76a7e56ca65eff5aa4a734c120e5c2a9",
+      "test/utils/g2-b-drain-pg-harness.ts": "c22a72c4ebed9710cbb66de5581441a1508ad730"
+    },
+    "runner_pins_to_fill_from_committed_head": {
+      "EXPECT_HEAD": "<commit sha of the ordinary hooked commit>",
+      "EXPECT_TREE": "f4922ca070e887fb7f613ce955b12621b5c33156",
+      "EXPECT_SPEC_BLOB": "9b31fd1813d25a1624ab04666e0b1be4743277ab",
+      "EXPECT_BOOTSTRAP_BLOB": "b4503eef525baa531eedb148f47828db3a4ade6f",
+      "EXPECT_FIXTURE_SHA": "4525f01d06333918bdb1fca3fd70f4d4e3936ee1cefc01eb5ac6d0ba9d501eb9",
+      "EXPECT_NM_LOCK_SHA": "05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44",
+      "EXPECT_NM_CLIENT_SHA": "bf679a16e50a6f0c39528887b80c2a03c5d0825b816cec3417fcbc94300b72d5"
+    }
+  },
+  "hunk_disposition": "SOUND — fresh FakeLedger([row('a')]) fenced with one lock fault and lockRetries:0 yields one pass {chunks:0,lockFailures:1,stalledByLocks:true}, outcome 'stalled' (1 NULL row unexplained), fresh.transactions===1; closes B-4 / B-BD-FRESH-FAKE at the granted minimum",
+  "verdict": {
+    "spec_blob_5477059a": "SOURCE_GRANTABLE",
+    "v4_tree": "SOURCE_GRANTABLE as a whole (ten unchanged blobs carry v3 grants)",
+    "open_a_findings": 0,
+    "open_b_findings": 0,
+    "runtime": "NOT granted; actual committed head + pin binding + separate PG grant later"
+  },
+  "phase_a_order": ["copy C1 node_modules + verify 05bc530a/bf679a16", "lefthook install; confirm hooks", "working tree must still write-tree to f4922ca0", "tsc --noEmit", "eslint --max-warnings 0 + prettier --check on 7 TS files", "node scripts/check-r75.js", "jest src/scout/scout-ledger-backfill.spec.ts test/scout/g2-b-drain-db-guard.spec.ts", "ordinary hooked Bradley-authored commit (tree must equal f4922ca0)", "fill runner pins from committed head", "separate PG grant: timeout -k 30 3600 bash fixture-proposal-v3/binding/b-pg-proof.sh"],
+  "availability": "reviewer B available for actual head/pin binding and results; not a new audit track"
+}

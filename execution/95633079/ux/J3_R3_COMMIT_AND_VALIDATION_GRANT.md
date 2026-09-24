@@ -69,3 +69,15 @@ The same reviewer's `J3_SOURCE_SELECTION_T2_R4_CHANGED_LINES_BINDING.md` binds t
 On the actual follow-up head, run local `tsc --noEmit` (180s), ESLint on only the two changed test files (120s), and Jest on the same two affected files with `--silent --runInBand` (180s), in order with first-nonzero stop and ordinary small kill grace. The previous unchanged product-file lint remains applicable. This explicit minimum supersedes the executor freeze note's proposed “gate 3 only” wording; the note remains preserved.
 
 Save additive raw receipts and exports, retain the first failed run, release the slot and return to the same reviewer for actual-head/results binding. No self-acceptance, wider suite, browser/device proof, product remote action or deployment is authorized.
+
+## r4 result and combined source-only r5 closure
+
+Actual follow-up head `820dbd04500b06648ce4c0820c1badced55d6d7c` has the exact r4 tree and parent22d056bb. Typecheck and two-test lint passed; full two-file Jest returned1 with 44 passed and six failed. Safe-area errors are gone. All failed receipts and the unamended commit are preserved.
+
+The same reviewer's `J3_SOURCE_SELECTION_T2_R4_ACTUAL_RESULTS_TRIAGE.md` distinguishes the two remaining roots: five restore cases lack the donor's semantic theme-color mock, while the main-file Later negative assertion sees sixteen retained URL mock calls. The executor's original aggregate description was incorrect and is qualified, not erased. The review's initial specific asynchronous-timing theory also exceeds what the retained-call evidence establishes.
+
+Parent granted only the existing semanticColors mock shape in the restore file and `openUrl.mockClear()` immediately after the main file's beforeEach spy assignment. No assertion weakening, post-action history clearing, extra waits/timers, product/donor/config edit or case-population change is authorized.
+
+Frozen r5 tree `823b97006f7df9617bad5516d7ef578189095e82`, patch SHA-256 `48d1c58355cd8d1d0129d802a3832b686ad9f18a6b877f5806df097e425a5fb6`, is +5/-0 across those two tests. The same reviewer's `J3_SOURCE_SELECTION_T2_R5_CHANGED_LINES_BINDING.md` binds both hunks and the unchanged product blob. The proposed message is `test(importer): complete J3 screen mock isolation`, single subject, empty body, no trailers.
+
+The eventual gate remains typecheck, two-test lint and the full existing two-file/50-case Jest run. Filtering to six failures would omit the preceding selections involved in the retained-call failure, and the beforeEach change is shared setup; the full affected files are therefore necessary, not a wider predecessor replay. B owns its phase-A remainder slot; J3 r5 has no commit/runtime grant yet.

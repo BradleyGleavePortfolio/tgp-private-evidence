@@ -1,0 +1,26 @@
+diff --git a/src/scout/scout-ledger-backfill.spec.ts b/src/scout/scout-ledger-backfill.spec.ts
+index 3a97093..5477059 100644
+--- a/src/scout/scout-ledger-backfill.spec.ts
++++ b/src/scout/scout-ledger-backfill.spec.ts
+@@ -267,14 +267,17 @@ describe('G2-B backfillLedgerPlatform control flow', () => {
+       stalledByLocks: false,
+     });
+     expect(recovered.outcome).toBe('drained');
+-    // Zero retries is a legal bound: exactly one attempt, then an honest stall.
+-    db.faults = ['lock'];
+-    const once = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 0 });
++    // Zero retries is a legal bound: exactly one attempt, then an honest stall (fresh fixture,
++    // still holding a NULL row, so neither prior drain nor cumulative counters leak in).
++    const fresh = new FakeLedger([row('a')]);
++    fresh.fenced = true;
++    fresh.faults = ['lock'];
++    const once = await backfillLedgerPlatform(fresh, { batch: 500, lockRetries: 0 });
+     expect(once.passes).toEqual([
+       expect.objectContaining({ chunks: 0, lockFailures: 1, stalledByLocks: true }),
+     ]);
+     expect(once.outcome).toBe('stalled');
+-    expect(db.transactions).toBe(1);
++    expect(fresh.transactions).toBe(1);
+   });
+ 
+   it('propagates any non-timeout database failure instead of retrying or inventing a verdict', async () => {

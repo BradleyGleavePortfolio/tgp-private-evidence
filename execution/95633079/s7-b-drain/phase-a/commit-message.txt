@@ -1,0 +1,19 @@
+scout: fence obsolete ledger writers and backfill NULL provenance (G2-B)
+
+Adds the B stage of the ledger provenance repair between the accepted E/T
+rollout and the later R widening.
+
+- 20270119000000_scout_ledger_obsolete_writer_fence: BEFORE INSERT trigger
+  on ScoutReconstructionLedger refusing rows without source_platform, with
+  the same identity/RLS prerequisites and lock budgets as E; down removes
+  only the fence and refuses when it is absent.
+- scout-ledger-backfill: bounded, resumable, idempotent backfill of NULL
+  source_platform from the exact staging match (one canonical row only),
+  SHARE lock on staging per chunk, FOR UPDATE SKIP LOCKED cursor, never
+  overwrites populated values, reports orphan/invalid/ambiguous/mismatch
+  counts and a drained / complete_unfenced / unresolved / stalled verdict.
+- CLI entry with exit codes for operators; DB-free control-flow spec.
+- rls-g2-b-drain live proof on the PG17 lane: fence vs O/T/RLS, deploy,
+  refusal, down/up, bounded fixture, concurrency.
+
+Both narrow unique indexes and the accepted E/T behaviour are unchanged.
