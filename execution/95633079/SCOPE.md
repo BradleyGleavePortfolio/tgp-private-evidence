@@ -17,8 +17,10 @@ S1–S6, S7 foundation and completed C1 source reviews remain accepted at record
 | C1 A execution-binding continuation | T4; parent-model inheritance | Exact frozen launcher review only; carry A source verdict forward, no peer conclusions; append fixture/results later |
 | C1 exact recovery / frozen local validation | T4; Claude Fable 5 / High requested | Sole recovery/writer/executor; reviewed binding's exact pins, real hooks, ordinary frozen-message commit, targeted Jest only; stop on first failure, no PG yet |
 | ROMAN-DONOR comparison | T2 source-only; Claude Sonnet 5 / High requested | Exact PR293/294 comparison against accepted S6, actionable reuse and minimal early UX slices; no product changes, install or runtime |
+| Mobile UX-02/UX-07 presentation | T2; same Sonnet 5 writer | Acceptedbc7 base; reuse P1 controlled components/tests, Settings label, presentation-only J3 restyle if existing controller behavior preserved; no Home eligibility fabrication or decision persistence; no runtime/commit yet |
 | UX-07.design outstanding details | T2 planning-only; Claude Sonnet 5 / High requested | Token reuse/exclusions, accessibility checks and focused test plan/popup styling; do not repeat journey/map/matrix |
 | UX-07.extension presentation | T1; GPT 5.6 Terra / Medium requested | Existing HTML/CSS source only, no protocol/JS/visibility behavior/new panels; exact extension base0111be66; freeze for targeted review, no runtime/commit yet |
+| UX-07.extension targeted review | T1; independent GPT 5.6 Terra / Medium requested | Exact two-file CSS candidate, relevant unchanged markup/controller context; source grantability only, no candidate writes or runtime |
 
 Requested routing is not observed model/effort telemetry. No silent downgrade of a required route is authorized.
 
