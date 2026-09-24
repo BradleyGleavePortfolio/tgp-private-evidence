@@ -1,0 +1,1503 @@
+diff --git a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+new file mode 100644
+index 0000000..8c6710e
+--- /dev/null
++++ b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql
+@@ -0,0 +1,64 @@
++-- Reverse of 20270119000000_scout_ledger_obsolete_writer_fence (G2-B).
++-- Removes ONLY the fence trigger and its function. The nullable E column, every
++-- ledger row and every assigned provenance value are retained; nothing is
++-- derived, deleted or reset. Re-admitting platform-unaware writers voids any
++-- completed drain evidence: a backfill "drained" report predates this down and
++-- must be re-established after a later re-apply before R is considered.
++-- Refuses when the fence is absent or not exactly as shipped (raw reruns fail).
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-B unexpected identity prerequisite';
++    END IF;
++  END LOOP;
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND a.attname = 'source_platform' AND NOT a.attisdropped
++      AND a.atttypid = 'text'::regtype AND NOT a.attnotnull
++  ) THEN
++    RAISE EXCEPTION 'G2-B unexpected platform column prerequisite';
++  END IF;
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_trigger t
++    JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid
++    WHERE t.tgrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND t.tgname = 'ScoutReconstructionLedger_platform_fence'
++      AND NOT t.tgisinternal
++      AND p.oid = to_regprocedure('public.scout_ledger_platform_fence()')
++      AND NOT p.prosecdef
++      AND pg_get_triggerdef(t.oid) =
++        'CREATE TRIGGER "ScoutReconstructionLedger_platform_fence" BEFORE INSERT ON public."ScoutReconstructionLedger" FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence()'
++  ) THEN
++    RAISE EXCEPTION 'G2-B fence absent';
++  END IF;
++END $$;
++
++DROP TRIGGER "ScoutReconstructionLedger_platform_fence" ON public."ScoutReconstructionLedger";
++DROP FUNCTION public.scout_ledger_platform_fence();
++COMMIT;
+diff --git a/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+new file mode 100644
+index 0000000..55c8590
+--- /dev/null
++++ b/prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql
+@@ -0,0 +1,92 @@
++-- G2-B only: fence obsolete (platform-unaware) ledger writers. NOT a backfill,
++-- NOT NULL, a CHECK, wide identity or any writer/reader/policy change.
++-- Entry gate (operator-owned, not provable here): T is the only deployed ledger
++-- writer image and no O image is restart-eligible. The fence makes a stray O
++-- restart or direct maintenance writer fail loudly on its first NULL-provenance
++-- INSERT instead of silently re-creating NULL rows after the bounded backfill,
++-- so the later "zero remaining NULL" sweep is durable evidence for R.
++--
++-- Insert-only on purpose: UPDATEs are not fenced, so the accepted T claim of an
++-- existing NULL row (upsert update path, then the transactional claim) and O's
++-- update of already-present rows keep their accepted semantics. Both narrow
++-- unique indexes, RLS and the nullable E column are prerequisites and untouched.
++-- The bounded resumable backfill is src/scout/scout-ledger-backfill.ts.
++-- Separate release artifact from E/T and from R/N/C. Raw reruns fail atomically.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutIngestEntity", public."ScoutReconstructionLedger" IN ACCESS EXCLUSIVE MODE;
++
++DO $$
++DECLARE
++  prerequisite RECORD;
++BEGIN
++  FOR prerequisite IN SELECT * FROM (VALUES
++    ('ScoutIngestEntity', 'ScoutIngestEntity_coach_id_intent_id_source_id_key',
++      'coach_id, intent_id, source_id'),
++    ('ScoutReconstructionLedger', 'ScoutReconstructionLedger_coach_id_intent_id_entity_type_source_id_key',
++      'coach_id, intent_id, entity_type, source_id')
++  ) AS required(table_name, index_name, columns)
++  LOOP
++    IF NOT EXISTS (
++      SELECT 1 FROM pg_catalog.pg_index i
++      JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++      WHERE i.indexrelid = to_regclass(format('public.%I', prerequisite.index_name))
++        AND i.indrelid = to_regclass(format('public.%I', prerequisite.table_name))
++        AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++        AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++        AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++        -- ::name honors PostgreSQL's identifier truncation for the ledger key.
++        AND pg_get_indexdef(i.indexrelid) = format(
++          'CREATE UNIQUE INDEX %I ON public.%I USING btree (%s)',
++          prerequisite.index_name::name, prerequisite.table_name, prerequisite.columns)
++    ) THEN
++      RAISE EXCEPTION 'G2-B unexpected identity prerequisite';
++    END IF;
++  END LOOP;
++  -- E must be present exactly as shipped: nullable TEXT, no default, no constraint.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND a.attname = 'source_platform' AND NOT a.attisdropped
++      AND a.atttypid = 'text'::regtype AND a.atttypmod = -1
++      AND NOT a.attnotnull AND NOT a.atthasdef AND a.attgenerated = '' AND a.attidentity = ''
++      AND NOT EXISTS (
++        SELECT 1 FROM pg_catalog.pg_constraint c
++        WHERE c.conrelid = a.attrelid AND a.attnum = ANY(c.conkey)
++      )
++  ) THEN
++    RAISE EXCEPTION 'G2-B unexpected platform column prerequisite';
++  END IF;
++  IF EXISTS (
++    SELECT 1 FROM pg_catalog.pg_trigger
++    WHERE tgrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND tgname = 'ScoutReconstructionLedger_platform_fence'
++  ) OR to_regprocedure('public.scout_ledger_platform_fence()') IS NOT NULL THEN
++    RAISE EXCEPTION 'G2-B fence already present';
++  END IF;
++END $$;
++
++-- Refuses, never derives: no default, lookup, or "unknown" substitute.
++CREATE FUNCTION public.scout_ledger_platform_fence() RETURNS trigger
++LANGUAGE plpgsql
++SET search_path = ''
++AS $$
++BEGIN
++  IF NEW.source_platform IS NULL THEN
++    RAISE EXCEPTION 'G2-B obsolete writer fenced: ScoutReconstructionLedger.source_platform is required'
++      USING ERRCODE = 'check_violation';
++  END IF;
++  RETURN NEW;
++END $$;
++-- Not SECURITY DEFINER; trigger firing needs no EXECUTE grant, so nothing is callable.
++REVOKE ALL ON FUNCTION public.scout_ledger_platform_fence() FROM PUBLIC;
++COMMENT ON FUNCTION public.scout_ledger_platform_fence() IS
++  'G2-B: refuses INSERT of a ScoutReconstructionLedger row without source_platform (obsolete-writer fence). Removed by 20270119000000 down.sql only.';
++
++CREATE TRIGGER "ScoutReconstructionLedger_platform_fence"
++  BEFORE INSERT ON public."ScoutReconstructionLedger"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence();
++COMMENT ON TRIGGER "ScoutReconstructionLedger_platform_fence" ON public."ScoutReconstructionLedger" IS
++  'G2-B obsolete-writer fence: platform-unaware (O) ledger INSERTs fail with check_violation. UPDATEs are not fenced.';
++COMMIT;
+diff --git a/src/scout/scout-ledger-backfill.cli.ts b/src/scout/scout-ledger-backfill.cli.ts
+new file mode 100644
+index 0000000..bcc0657
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.cli.ts
+@@ -0,0 +1,58 @@
++import { PrismaClient } from '@prisma/client';
++import {
++  backfillLedgerPlatform,
++  exitCodeFor,
++  type BackfillClient,
++  type BackfillOptions,
++} from './scout-ledger-backfill';
++
++/**
++ * G2-B operator entry (not wired into the HTTP app or any module):
++ *   DATABASE_URL=<service role url> npx ts-node src/scout/scout-ledger-backfill.cli.ts \
++ *     [--batch=500] [--passes=3] [--lock-retries=2]
++ * Prints one JSON report (counts only: no identifiers, payloads or platform values)
++ * and exits 0 only for `drained`; 4 complete but unfenced, 2 unresolved, 3 stalled,
++ * 1 on any other failure. Rerunning is safe at any point.
++ */
++export function parseBackfillArgs(argv: string[]): BackfillOptions {
++  const options: BackfillOptions = {};
++  for (const arg of argv) {
++    const match = /^--(batch|passes|lock-retries)=(\d{1,5})$/.exec(arg);
++    if (!match) throw new RangeError(`G2-B backfill: unsupported argument ${arg}`);
++    const value = Number(match[2]);
++    if (match[1] === 'batch') options.batch = value;
++    else if (match[1] === 'passes') options.maxPasses = value;
++    else options.lockRetries = value;
++  }
++  return options;
++}
++
++async function main(): Promise<number> {
++  const options = parseBackfillArgs(process.argv.slice(2));
++  const prisma: BackfillClient & { $disconnect(): Promise<void> } = new PrismaClient();
++  try {
++    const report = await backfillLedgerPlatform(prisma, options);
++    process.stdout.write(`${JSON.stringify(report)}\n`);
++    return exitCodeFor(report.outcome);
++  } finally {
++    await prisma.$disconnect();
++  }
++}
++
++if (require.main === module) {
++  main().then(
++    (code) => process.exit(code),
++    (err) => {
++      // Class only for database failures (a raw error can carry identifiers);
++      // usage and integrity errors are operator-facing and identifier-free.
++      const detail =
++        err instanceof RangeError || (err instanceof Error && err.name === 'BackfillIntegrityError')
++          ? err.message
++          : err instanceof Error
++            ? err.name
++            : 'unknown';
++      console.error(`G2-B backfill failed: ${detail}`);
++      process.exit(1);
++    },
++  );
++}
+diff --git a/src/scout/scout-ledger-backfill.spec.ts b/src/scout/scout-ledger-backfill.spec.ts
+new file mode 100644
+index 0000000..e64d826
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.spec.ts
+@@ -0,0 +1,312 @@
++import {
++  BackfillIntegrityError,
++  backfillLedgerPlatform,
++  classify,
++  decideOutcome,
++  exitCodeFor,
++  isLockOrStatementTimeout,
++  type BackfillClient,
++  type BackfillTx,
++  type Candidate,
++} from './scout-ledger-backfill';
++import { parseBackfillArgs } from './scout-ledger-backfill.cli';
++
++// DB-free proof of the G2-B runner's control flow: classification, chunk cursor
++// and pass termination, lock-retry bounds, integrity refusal and the drain
++// verdict. The SQL itself, locking and real PostgreSQL behaviour are proven only
++// by the guarded live spec test/rls-g2-b-drain.spec.ts; nothing here mocks a
++// database result that the live proof does not also establish.
++
++type LedgerRow = { id: string; platform: string | null; matches: number; staged: string | null };
++
++/** In-memory ledger obeying the runner's SQL contract, with per-chunk fault injection. */
++class FakeLedger implements BackfillClient {
++  readonly statements: string[] = [];
++  transactions = 0;
++  rollbacks = 0;
++  fenced = false;
++  locked = new Set<string>();
++  faults: Array<'lock' | 'other' | null> = [];
++  mismatchOnce = false;
++
++  constructor(readonly rows: LedgerRow[]) {}
++
++  async $transaction<T>(fn: (tx: BackfillTx) => Promise<T>): Promise<T> {
++    this.transactions += 1;
++    const fault = this.faults.shift() ?? null;
++    if (fault === 'lock') {
++      this.rollbacks += 1;
++      throw new Error(
++        'Raw query failed. Code: `55P03`. Message: canceling statement due to lock timeout',
++      );
++    }
++    if (fault === 'other') {
++      this.rollbacks += 1;
++      throw new Error('Raw query failed. Code: `42P01`. Message: relation does not exist');
++    }
++    const snapshot = this.rows.map((r) => ({ ...r }));
++    try {
++      return await fn(this);
++    } catch (err) {
++      this.rows.splice(0, this.rows.length, ...snapshot);
++      this.rollbacks += 1;
++      throw err;
++    }
++  }
++
++  async $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number> {
++    const text = query.join('?');
++    this.statements.push(text.trim().split(/\s+/).slice(0, 3).join(' '));
++    if (!text.includes('UPDATE')) return 0;
++    const ids = idsOf(values[0]);
++    let updated = 0;
++    for (const row of this.rows) {
++      if (ids.has(row.id) && row.platform === null && row.staged !== null && row.matches === 1) {
++        row.platform = row.staged;
++        updated += 1;
++      }
++    }
++    if (this.mismatchOnce) {
++      this.mismatchOnce = false;
++      return updated - 1;
++    }
++    return updated;
++  }
++
++  async $queryRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<any> {
++    const text = query.join('?');
++    this.statements.push(text.trim().split(/\s+/).slice(0, 3).join(' '));
++    if (text.includes('FOR UPDATE SKIP LOCKED')) {
++      const [after, limit] = values as [string, number];
++      const candidates: Candidate[] = this.rows
++        .filter((r) => r.platform === null && r.id > after && !this.locked.has(r.id))
++        .sort((a, b) => (a.id < b.id ? -1 : 1))
++        .slice(0, limit)
++        .map((r) => ({ id: r.id, matches: r.matches, platform: r.staged }));
++      return candidates;
++    }
++    if (text.includes('FILTER (WHERE source_platform IS NULL)')) {
++      return [
++        { total: this.rows.length, nulls: this.rows.filter((r) => r.platform === null).length },
++      ];
++    }
++    if (text.includes('AS mismatch')) {
++      return [
++        {
++          mismatch: this.rows.filter(
++            (r) => r.platform !== null && r.staged !== null && r.platform !== r.staged,
++          ).length,
++        },
++      ];
++    }
++    if (text.includes('pg_trigger')) return [{ fences: this.fenced ? 1 : 0 }];
++    throw new Error(`unexpected query: ${text}`);
++  }
++}
++
++/** Prisma.join(ids) arrives as a Sql object whose values are the ids. */
++function idsOf(joined: unknown): Set<string> {
++  const values = (joined as { values?: unknown[] }).values ?? [];
++  return new Set(values.map(String));
++}
++
++const row = (id: string, staged: string | null = 'truecoach', matches = 1): LedgerRow => ({
++  id,
++  platform: null,
++  matches,
++  staged,
++});
++const claimed = (id: string, platform: string): LedgerRow => ({
++  id,
++  platform,
++  matches: 1,
++  staged: 'truecoach',
++});
++
++describe('G2-B classify', () => {
++  it('resolves exactly one canonical staged match and classifies every other case', () => {
++    expect(
++      classify([
++        { id: 'a', matches: 1, platform: 'truecoach' },
++        { id: 'b', matches: 0, platform: null },
++        { id: 'c', matches: 2, platform: 'truecoach' },
++        { id: 'd', matches: 1, platform: 'Bad Platform' },
++        { id: 'e', matches: 1, platform: '' },
++        { id: 'f', matches: 1, platform: 'unknown' },
++        { id: 'g', matches: 1, platform: null },
++      ]),
++    ).toEqual({ resolvable: ['a', 'f'], orphan: 1, ambiguous: 1, invalid: 3 });
++  });
++});
++
++describe('G2-B decideOutcome / exit codes', () => {
++  const none = { orphan: 0, invalid: 0, ambiguous: 0 };
++  it('is drained only with zero NULL and the fence installed', () => {
++    expect(decideOutcome(0, true, none)).toBe('drained');
++    expect(decideOutcome(0, false, none)).toBe('complete_unfenced');
++  });
++  it('separates fully explained remainders from unexplained (locked/unprocessed) ones', () => {
++    expect(decideOutcome(3, true, { orphan: 2, invalid: 1, ambiguous: 0 })).toBe('unresolved');
++    expect(decideOutcome(4, true, { orphan: 2, invalid: 1, ambiguous: 0 })).toBe('stalled');
++    expect(decideOutcome(1, true, none)).toBe('stalled');
++  });
++  it('exits 0 only for drained', () => {
++    expect(exitCodeFor('drained')).toBe(0);
++    expect(exitCodeFor('unresolved')).toBe(2);
++    expect(exitCodeFor('stalled')).toBe(3);
++    expect(exitCodeFor('complete_unfenced')).toBe(4);
++  });
++  it('recognises lock and statement timeouts only', () => {
++    expect(isLockOrStatementTimeout(new Error('Code: `55P03`'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('due to statement timeout'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('Code: `57014`'))).toBe(true);
++    expect(isLockOrStatementTimeout(new Error('Code: `23505`'))).toBe(false);
++    expect(isLockOrStatementTimeout('string failure')).toBe(false);
++  });
++});
++
++describe('G2-B backfillLedgerPlatform control flow', () => {
++  it('walks NULL rows in id order in bounded chunks, resumes past unresolvable rows, and stops honestly', async () => {
++    const rows: LedgerRow[] = [];
++    for (let n = 1; n <= 7; n++) rows.push(row(`r${n}`));
++    rows.push(row('o1', null, 0), row('i1', 'Bad Platform'), claimed('k1', 'truecoach'));
++    rows.push(claimed('m1', 'different'));
++    const db = new FakeLedger(rows);
++    db.fenced = true;
++    const report = await backfillLedgerPlatform(db, { batch: 3 });
++    // Pass 1: chunks i1+o1+r1, r2-r4, r5-r7, then an empty chunk past r7 (a full chunk cannot
++    // prove the end): 9 examined, 7 updated. Pass 2: i1+o1 only, nothing updated -> stop.
++    // Claimed and mismatching rows are never candidates or updates.
++    expect(report.passes.map((p) => [p.chunks, p.examined, p.updated])).toEqual([
++      [4, 9, 7],
++      [1, 2, 0],
++    ]);
++    expect(report).toMatchObject({
++      batch: 3,
++      ledgerTotal: 11,
++      nullBefore: 9,
++      nullAfter: 2,
++      mismatch: 1,
++      fenced: true,
++      unresolved: { orphan: 1, invalid: 1, ambiguous: 0 },
++      outcome: 'unresolved',
++    });
++    expect(rows.filter((r) => r.id.startsWith('r')).every((r) => r.platform === 'truecoach')).toBe(
++      true,
++    );
++    expect(rows.find((r) => r.id === 'm1')?.platform).toBe('different');
++    expect(rows.find((r) => r.id === 'o1')?.platform).toBeNull();
++    // Every chunk transaction sets both budgets and takes the staging SHARE lock before selecting.
++    expect(db.statements.filter((s) => s.startsWith('SET LOCAL lock_timeout'))).toHaveLength(5);
++    expect(db.statements.filter((s) => s.startsWith('SET LOCAL statement_timeout'))).toHaveLength(
++      5,
++    );
++    expect(db.statements.filter((s) => s.startsWith('LOCK TABLE'))).toHaveLength(5);
++    expect(db.statements.filter((s) => s.startsWith('UPDATE'))).toHaveLength(3);
++    expect(db.rollbacks).toBe(0);
++    // Rerun is idempotent: one chunk, nothing to update, same verdict.
++    const again = await backfillLedgerPlatform(db, { batch: 3 });
++    expect(again.passes).toHaveLength(1);
++    expect(again.passes[0]).toMatchObject({ examined: 2, updated: 0 });
++    expect(again.outcome).toBe('unresolved');
++  });
++
++  it('reports completion without the fence as complete_unfenced, never drained', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    const report = await backfillLedgerPlatform(db, { batch: 500 });
++    expect(report).toMatchObject({ nullAfter: 0, fenced: false, outcome: 'complete_unfenced' });
++    // A productive pass is followed by one confirming pass that finds nothing.
++    expect(report.passes.map((p) => p.examined)).toEqual([2, 0]);
++  });
++
++  it('skips locked rows without waiting, revisits them on the next pass, and reports a stall', async () => {
++    const db = new FakeLedger([row('a'), row('b'), row('c')]);
++    db.fenced = true;
++    db.locked.add('b');
++    const stalled = await backfillLedgerPlatform(db, { batch: 500, maxPasses: 3 });
++    expect(stalled.passes.map((p) => [p.examined, p.updated])).toEqual([
++      [2, 2],
++      [0, 0],
++    ]);
++    expect(stalled).toMatchObject({
++      nullAfter: 1,
++      unresolved: { orphan: 0, invalid: 0, ambiguous: 0 },
++      outcome: 'stalled',
++    });
++    db.locked.clear();
++    const drained = await backfillLedgerPlatform(db, { batch: 500 });
++    expect(drained.passes.map((p) => [p.examined, p.updated])).toEqual([
++      [1, 1],
++      [0, 0],
++    ]);
++    expect(drained.outcome).toBe('drained');
++  });
++
++  it('retries a chunk only for lock/statement timeouts, within the bound, then stalls', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    db.fenced = true;
++    db.faults = ['lock', 'lock', 'lock'];
++    const report = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 2 });
++    expect(report.passes).toEqual([
++      expect.objectContaining({
++        chunks: 0,
++        examined: 0,
++        updated: 0,
++        lockFailures: 3,
++        stalledByLocks: true,
++      }),
++    ]);
++    expect(report.outcome).toBe('stalled');
++    expect(db.transactions).toBe(3);
++    // A recovered lock on the last permitted attempt completes the chunk normally.
++    db.faults = ['lock'];
++    const recovered = await backfillLedgerPlatform(db, { batch: 500, lockRetries: 1 });
++    expect(recovered.passes[0]).toMatchObject({
++      lockFailures: 1,
++      updated: 2,
++      stalledByLocks: false,
++    });
++    expect(recovered.outcome).toBe('drained');
++  });
++
++  it('propagates any non-timeout database failure instead of retrying or inventing a verdict', async () => {
++    const db = new FakeLedger([row('a')]);
++    db.faults = ['other'];
++    await expect(backfillLedgerPlatform(db, { batch: 500 })).rejects.toThrow('42P01');
++    expect(db.transactions).toBe(1);
++  });
++
++  it('refuses a chunk whose update count differs from the locked resolvable set and rolls it back', async () => {
++    const db = new FakeLedger([row('a'), row('b')]);
++    db.mismatchOnce = true;
++    await expect(backfillLedgerPlatform(db, { batch: 500 })).rejects.toBeInstanceOf(
++      BackfillIntegrityError,
++    );
++    expect(db.rollbacks).toBe(1);
++    expect(db.rows.every((r) => r.platform === null)).toBe(true);
++  });
++
++  it('bounds batch, passes and retries before touching the database', async () => {
++    const db = new FakeLedger([row('a')]);
++    const invalid = [{ batch: 0 }, { batch: 2001 }, { maxPasses: 11 }, { lockRetries: -1 }];
++    for (const options of [...invalid, { batch: 1.5 }]) {
++      await expect(backfillLedgerPlatform(db, options)).rejects.toBeInstanceOf(RangeError);
++    }
++    expect(db.transactions).toBe(0);
++    expect(db.statements).toHaveLength(0);
++  });
++});
++
++describe('G2-B operator argument parsing', () => {
++  it('accepts only the three bounded numeric flags', () => {
++    expect(parseBackfillArgs(['--batch=250', '--passes=2', '--lock-retries=1'])).toEqual({
++      batch: 250,
++      maxPasses: 2,
++      lockRetries: 1,
++    });
++    expect(parseBackfillArgs([])).toEqual({});
++    for (const bad of ['--batch', '--batch=abc', '--force', 'positional', '--batch=-1']) {
++      expect(() => parseBackfillArgs([bad])).toThrow(RangeError);
++    }
++  });
++});
+diff --git a/src/scout/scout-ledger-backfill.ts b/src/scout/scout-ledger-backfill.ts
+new file mode 100644
+index 0000000..8493f27
+--- /dev/null
++++ b/src/scout/scout-ledger-backfill.ts
+@@ -0,0 +1,289 @@
++import { Prisma } from '@prisma/client';
++import { isCanonicalPlatform } from './scout-platform';
++
++/**
++ * G2-B — bounded, resumable, unambiguous backfill of ScoutReconstructionLedger
++ * .source_platform (nullable since E) from the exact staging row, plus the drain
++ * verdict that R depends on. Operator-invoked only (see the .cli.ts entry); not
++ * an HTTP endpoint, not SECURITY DEFINER, no trigger-side inference.
++ *
++ * Contract (recovered from the accepted rollout design, RECOVERY_SEQUENCING /
++ * CYCLE3 B stage):
++ *  - Resolve ONLY an exact coach_id + intent_id + entity_type + source_id match
++ *    with exactly one staging row whose platform token is canonical. The narrow
++ *    staging key guarantees at most one match, never that one exists.
++ *  - Update NULL provenance only. Never touch a populated value, never derive a
++ *    default, never write "unknown" that was not literally staged, never delete
++ *    or re-status a row. A populated value that disagrees with staging is
++ *    counted (`mismatch`) and left alone.
++ *  - Bounded: each chunk is one transaction with lock_timeout/statement_timeout,
++ *    a SHARE lock on staging (freezes source mutation for that chunk only) and
++ *    `ORDER BY id LIMIT n FOR UPDATE SKIP LOCKED` on the NULL candidates.
++ *  - Resumable: a pass walks the id order once; a run repeats passes until a pass
++ *    updates nothing, so a row skipped while locked is revisited rather than
++ *    permanently missed. Interrupting between chunks loses nothing; rerunning is
++ *    idempotent.
++ *  - Honest: zero updated rows with NULL rows remaining is STOP, not completion.
++ *    `drained` is reported only when no NULL remains AND the obsolete-writer
++ *    fence (migration 20270119000000) is installed; without the fence an O
++ *    restart can re-create NULL rows, so completion is `complete_unfenced`.
++ */
++export const BACKFILL_DEFAULT_BATCH = 500;
++export const BACKFILL_MAX_BATCH = 2000;
++export const BACKFILL_DEFAULT_PASSES = 3;
++export const BACKFILL_MAX_PASSES = 10;
++export const BACKFILL_DEFAULT_LOCK_RETRIES = 2;
++export const BACKFILL_CHUNK_TIMEOUT_MS = 45_000;
++export const FENCE_TRIGGER_DEFINITION =
++  'CREATE TRIGGER "ScoutReconstructionLedger_platform_fence" BEFORE INSERT ON public."ScoutReconstructionLedger" FOR EACH ROW EXECUTE FUNCTION public.scout_ledger_platform_fence()';
++
++/** Minimal raw-SQL surface; PrismaClient and its interactive transaction client satisfy it. */
++export interface BackfillTx {
++  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
++  $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
++}
++export interface BackfillClient extends BackfillTx {
++  $transaction<T>(
++    fn: (tx: BackfillTx) => Promise<T>,
++    options?: { maxWait?: number; timeout?: number },
++  ): Promise<T>;
++}
++
++export type BackfillOptions = { batch?: number; maxPasses?: number; lockRetries?: number };
++export type Candidate = { id: string; matches: number; platform: string | null };
++export type Classified = {
++  resolvable: string[];
++  orphan: number;
++  invalid: number;
++  ambiguous: number;
++};
++export type PassReport = {
++  chunks: number;
++  examined: number;
++  updated: number;
++  orphan: number;
++  invalid: number;
++  ambiguous: number;
++  lockFailures: number;
++  stalledByLocks: boolean;
++};
++export type Outcome = 'drained' | 'complete_unfenced' | 'unresolved' | 'stalled';
++export type BackfillReport = {
++  batch: number;
++  ledgerTotal: number;
++  nullBefore: number;
++  nullAfter: number;
++  mismatch: number;
++  fenced: boolean;
++  passes: PassReport[];
++  unresolved: { orphan: number; invalid: number; ambiguous: number };
++  outcome: Outcome;
++};
++
++/** Chunk integrity: the locked resolvable set and the updated set must be identical. */
++export class BackfillIntegrityError extends Error {
++  constructor(expected: number, updated: number) {
++    super(`G2-B backfill chunk integrity failure: expected ${expected} updates, got ${updated}`);
++    this.name = 'BackfillIntegrityError';
++  }
++}
++
++export function classify(candidates: Candidate[]): Classified {
++  const result: Classified = { resolvable: [], orphan: 0, invalid: 0, ambiguous: 0 };
++  for (const c of candidates) {
++    if (c.matches === 0) result.orphan += 1;
++    else if (c.matches > 1) result.ambiguous += 1;
++    else if (!isCanonicalPlatform(c.platform)) result.invalid += 1;
++    else result.resolvable.push(c.id);
++  }
++  return result;
++}
++
++export function decideOutcome(
++  nullAfter: number,
++  fenced: boolean,
++  unresolved: { orphan: number; invalid: number; ambiguous: number },
++): Outcome {
++  if (nullAfter === 0) return fenced ? 'drained' : 'complete_unfenced';
++  const explained = unresolved.orphan + unresolved.invalid + unresolved.ambiguous;
++  return nullAfter === explained ? 'unresolved' : 'stalled';
++}
++
++/** lock_not_available (55P03) or query_canceled (57014) surfaced through Prisma's raw error. */
++export function isLockOrStatementTimeout(err: unknown): boolean {
++  const message = err instanceof Error ? err.message : String(err);
++  return /55P03|57014|lock timeout|statement timeout/i.test(message);
++}
++
++function bounded(value: number | undefined, fallback: number, max: number): number {
++  if (value === undefined) return fallback;
++  if (!Number.isInteger(value) || value < 1 || value > max) {
++    throw new RangeError(`G2-B backfill option out of range (1..${max})`);
++  }
++  return value;
++}
++
++async function runChunk(
++  prisma: BackfillClient,
++  after: string,
++  batch: number,
++): Promise<{ candidates: Candidate[]; classified: Classified; updated: number }> {
++  return prisma.$transaction(
++    async (tx) => {
++      await tx.$executeRaw`SET LOCAL lock_timeout = '5s'`;
++      await tx.$executeRaw`SET LOCAL statement_timeout = '30s'`;
++      // Freeze staging mutation for this chunk so the exact join cannot change under us.
++      await tx.$executeRaw`LOCK TABLE public."ScoutIngestEntity" IN SHARE MODE`;
++      const candidates = await tx.$queryRaw<Candidate[]>`
++        SELECT l.id, s.matches, s.platform
++        FROM (
++          SELECT id, coach_id, intent_id, entity_type, source_id
++          FROM public."ScoutReconstructionLedger"
++          WHERE source_platform IS NULL AND id > ${after}
++          ORDER BY id
++          LIMIT ${batch}::int
++          FOR UPDATE SKIP LOCKED
++        ) l
++        CROSS JOIN LATERAL (
++          SELECT count(*)::int AS matches, min(s.source_platform) AS platform
++          FROM public."ScoutIngestEntity" s
++          WHERE s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++            AND s.entity_type = l.entity_type AND s.source_id = l.source_id
++        ) s
++        ORDER BY l.id`;
++      const classified = classify(candidates);
++      let updated = 0;
++      if (classified.resolvable.length > 0) {
++        // Re-join to staging under the same SHARE lock: the written value is exactly
++        // the staged value, never a client-side copy. NULL-only, id-bounded.
++        updated = await tx.$executeRaw`
++          UPDATE public."ScoutReconstructionLedger" l
++          SET source_platform = s.source_platform
++          FROM public."ScoutIngestEntity" s
++          WHERE l.id IN (${Prisma.join(classified.resolvable)})
++            AND l.source_platform IS NULL
++            AND s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++            AND s.entity_type = l.entity_type AND s.source_id = l.source_id`;
++        if (updated !== classified.resolvable.length) {
++          throw new BackfillIntegrityError(classified.resolvable.length, updated);
++        }
++      }
++      return { candidates, classified, updated };
++    },
++    { maxWait: 10_000, timeout: BACKFILL_CHUNK_TIMEOUT_MS },
++  );
++}
++
++async function runPass(
++  prisma: BackfillClient,
++  batch: number,
++  lockRetries: number,
++): Promise<PassReport> {
++  const pass: PassReport = {
++    chunks: 0,
++    examined: 0,
++    updated: 0,
++    orphan: 0,
++    invalid: 0,
++    ambiguous: 0,
++    lockFailures: 0,
++    stalledByLocks: false,
++  };
++  let after = '';
++  for (;;) {
++    let chunk: Awaited<ReturnType<typeof runChunk>> | undefined;
++    for (let attempt = 0; attempt <= lockRetries && chunk === undefined; attempt++) {
++      try {
++        chunk = await runChunk(prisma, after, batch);
++      } catch (err) {
++        if (!isLockOrStatementTimeout(err)) throw err;
++        pass.lockFailures += 1;
++      }
++    }
++    if (chunk === undefined) {
++      pass.stalledByLocks = true;
++      return pass;
++    }
++    pass.chunks += 1;
++    pass.examined += chunk.candidates.length;
++    pass.updated += chunk.updated;
++    pass.orphan += chunk.classified.orphan;
++    pass.invalid += chunk.classified.invalid;
++    pass.ambiguous += chunk.classified.ambiguous;
++    if (chunk.candidates.length < batch) return pass;
++    after = chunk.candidates[chunk.candidates.length - 1].id;
++  }
++}
++
++type Counts = { total: number; nulls: number };
++
++export async function readDrainState(
++  prisma: BackfillTx,
++): Promise<{ ledgerTotal: number; nulls: number; mismatch: number; fenced: boolean }> {
++  const [counts] = await prisma.$queryRaw<Counts[]>`
++    SELECT count(*)::int AS total,
++           count(*) FILTER (WHERE source_platform IS NULL)::int AS nulls
++    FROM public."ScoutReconstructionLedger"`;
++  const [{ mismatch }] = await prisma.$queryRaw<{ mismatch: number }[]>`
++    SELECT count(*)::int AS mismatch
++    FROM public."ScoutReconstructionLedger" l
++    JOIN public."ScoutIngestEntity" s
++      ON s.coach_id = l.coach_id AND s.intent_id = l.intent_id
++     AND s.entity_type = l.entity_type AND s.source_id = l.source_id
++    WHERE l.source_platform IS NOT NULL AND l.source_platform <> s.source_platform`;
++  const [{ fences }] = await prisma.$queryRaw<{ fences: number }[]>`
++    SELECT count(*)::int AS fences
++    FROM pg_catalog.pg_trigger t
++    WHERE t.tgrelid = 'public."ScoutReconstructionLedger"'::regclass
++      AND t.tgname = 'ScoutReconstructionLedger_platform_fence'
++      AND NOT t.tgisinternal AND t.tgenabled <> 'D'
++      AND pg_get_triggerdef(t.oid) = ${FENCE_TRIGGER_DEFINITION}`;
++  return { ledgerTotal: counts.total, nulls: counts.nulls, mismatch, fenced: fences === 1 };
++}
++
++export async function backfillLedgerPlatform(
++  prisma: BackfillClient,
++  options: BackfillOptions = {},
++): Promise<BackfillReport> {
++  const batch = bounded(options.batch, BACKFILL_DEFAULT_BATCH, BACKFILL_MAX_BATCH);
++  const maxPasses = bounded(options.maxPasses, BACKFILL_DEFAULT_PASSES, BACKFILL_MAX_PASSES);
++  const lockRetries = bounded(options.lockRetries, BACKFILL_DEFAULT_LOCK_RETRIES, 10);
++
++  const before = await readDrainState(prisma);
++  const passes: PassReport[] = [];
++  let unresolved = { orphan: 0, invalid: 0, ambiguous: 0 };
++  for (let n = 0; n < maxPasses; n++) {
++    const pass = await runPass(prisma, batch, lockRetries);
++    passes.push(pass);
++    unresolved = { orphan: pass.orphan, invalid: pass.invalid, ambiguous: pass.ambiguous };
++    // No progress means STOP: every remaining NULL row is either unresolvable
++    // (reported) or locked (stalled). Another identical pass would prove nothing.
++    if (pass.stalledByLocks || pass.examined === 0 || pass.updated === 0) break;
++  }
++  const after = await readDrainState(prisma);
++  return {
++    batch,
++    ledgerTotal: after.ledgerTotal,
++    nullBefore: before.nulls,
++    nullAfter: after.nulls,
++    mismatch: after.mismatch,
++    fenced: after.fenced,
++    passes,
++    unresolved,
++    outcome: decideOutcome(after.nulls, after.fenced, unresolved),
++  };
++}
++
++/** Process exit code for the operator entry: only a fenced, NULL-free ledger is 0. */
++export function exitCodeFor(outcome: Outcome): number {
++  switch (outcome) {
++    case 'drained':
++      return 0;
++    case 'complete_unfenced':
++      return 4;
++    case 'unresolved':
++      return 2;
++    case 'stalled':
++      return 3;
++  }
++}
+diff --git a/test/rls-g2-b-drain.spec.ts b/test/rls-g2-b-drain.spec.ts
+new file mode 100644
+index 0000000..c970ab2
+--- /dev/null
++++ b/test/rls-g2-b-drain.spec.ts
+@@ -0,0 +1,567 @@
++// S7-3′ G2 B/drain proof on the isolated PostgreSQL 17 lane (S1-provisioned,
++// synthetic data only). Ordered stages in ONE file, run with --runInBand, on a
++// FRESH S5-shaped bootstrap (164 migrations, no E). Establishes only what is new
++// in B: the bounded/resumable/unambiguous NULL→platform backfill, the obsolete-
++// writer fence migration (deploy, refusal, down/up), their coexistence with the
++// accepted O/T writers and readers, and the drain verdict semantics.
++//   1. identity + O legacy rows on narrow and on E;  2. backfill on E without the
++//   fence (completion is not drain);  3. B through `prisma migrate deploy`;
++//   4. fence vs O/T/RLS;  5. bounded fixture: unresolvable classes, cursor,
++//   untouched columns, idempotence, provenance recovery → drained;
++//   6. concurrency (row locks, T barriers, staging writer);  7. down/up.
++// Accepted E/T-Q0 proof (test/rls-g2-pg17-etq0.spec.ts) is neither rerun nor
++// restated. A "drained" verdict here is a property of THIS disposable fixture and
++// says nothing about production writers; R remains unimplemented and unclaimed.
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  appliedMigrations,
++  blocked,
++  catalog,
++  directory,
++  E_MIGRATION,
++  expectedVersion,
++  gitShow,
++  hasColumn,
++  holdTransaction,
++  json,
++  legacy,
++  OLD_HEAD,
++  oldClient,
++  oldRoot,
++  prisma,
++  prismaMigrateDeploy,
++  quote,
++  records,
++  refused,
++  resetData,
++  root,
++  run,
++  settle,
++  sql,
++  sqlAdmin,
++  sqlFile,
++  stage,
++  stageMany,
++  target,
++  targets,
++  upFile,
++  worker,
++} from './utils/g2-pg17-harness';
++import { G2_PG17_CLUSTER_MARKER, G2_PG17_DATABASE_MARKER } from './utils/g2-pg17-db';
++import {
++  B_MIGRATION,
++  bDownFile,
++  bUpFile,
++  disagreeing,
++  fence,
++  ledgerCount,
++  ledgerIds,
++  ledgerWithoutPlatform,
++  nullCount,
++  nullify,
++  platformOf,
++  runtimeClient,
++  stagingSnapshot,
++} from './utils/g2-b-drain-harness';
++import {
++  backfillLedgerPlatform,
++  FENCE_TRIGGER_DEFINITION,
++  type BackfillOptions,
++  type BackfillReport,
++} from '../src/scout/scout-ledger-backfill';
++
++jest.setTimeout(240000);
++const FENCED = 'G2-B obsolete writer fenced';
++const nullInsert = (id: string, role?: string) =>
++  `${role ? `SET ROLE ${role}; ` : ''}INSERT INTO public."ScoutReconstructionLedger"
++  (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++  VALUES (${quote(id)},'coach','intent','clients',${quote(id)},NULL,'skipped')`;
++
++// Teardown authority (S5-R3-A-01), unchanged from the accepted proof: no mutating cleanup
++// against a fixture whose identity this proof never accepted.
++let teardownAuthorized = false;
++const clients: Array<{ client: { $disconnect(): Promise<void> } }> = [];
++async function backfill(name: string, options: BackfillOptions = {}) {
++  const runtime = runtimeClient(name);
++  clients.push(runtime);
++  try {
++    const report = await backfillLedgerPlatform(runtime.client, options);
++    // Counts and shapes only; the report carries no identifiers by construction.
++    console.warn('PG17_BACKFILL', JSON.stringify({ name, options, report }));
++    return { report, queries: runtime.queries };
++  } finally {
++    await runtime.client.$disconnect();
++  }
++}
++const selects = (queries: string[]) => queries.filter((q) => /FOR UPDATE SKIP LOCKED/.test(q));
++const updates = (queries: string[]) =>
++  queries.filter((q) => /^\s*UPDATE public\."ScoutReconstructionLedger"/.test(q));
++
++beforeAll(() => {
++  const identity =
++    json(`SELECT jsonb_build_object('database',current_database(),'address',inet_server_addr(),
++    'port',inet_server_port(),'directory',${quote(sqlAdmin(`SELECT current_setting('data_directory')`))},
++    'version',current_setting('server_version_num'),'user',current_user,'super',
++    (SELECT rolsuper FROM pg_roles WHERE rolname=current_user),'bypassrls',
++    (SELECT rolbypassrls FROM pg_roles WHERE rolname=current_user),'owner',
++    (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname=current_database()))`);
++  expect(identity).toMatchObject({
++    database: 'g2_s5_etq0_disposable',
++    address: '127.0.0.1',
++    port: target.port,
++    directory,
++    user: 'postgres',
++    super: false,
++    bypassrls: true,
++    owner: 'postgres',
++  });
++  expect(Number(identity.version)).toBe(expectedVersion);
++  expect(Number(identity.version)).toBeGreaterThanOrEqual(170000);
++  expect(Number(identity.version)).toBeLessThan(180000);
++  expect(directory).toMatch(/\/pg17\/clusters\/s5$/);
++  expect(sql(`SELECT current_setting('cluster_name')`)).toBe(G2_PG17_CLUSTER_MARKER);
++  expect(
++    sql(
++      `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++    ),
++  ).toBe(G2_PG17_DATABASE_MARKER);
++  console.warn('PG17_DATABASE', JSON.stringify(identity));
++  // Fresh S5-shaped bootstrap: full O history, no E, no B, no fence.
++  expect(appliedMigrations()).toBe('164');
++  expect(
++    sql(`SELECT count(*) FROM "_prisma_migrations"
++    WHERE migration_name IN (${quote(E_MIGRATION)},${quote(B_MIGRATION)})`),
++  ).toBe('0');
++  expect(hasColumn()).toBe('0');
++  expect(fence()).toEqual({ triggers: [], function: null });
++  // Accepted E is the shipped file; B is this packet's file; the O source is byte-identical to
++  // the preserved head. The T client in this root carries the nullable provenance column.
++  expect(readFileSync(upFile, 'utf8')).toBe(
++    gitShow(`HEAD:prisma/migrations/${E_MIGRATION}/migration.sql`),
++  );
++  expect(readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8')).not.toMatch(
++    /model ScoutReconstructionLedger \{[^}]*source_platform/,
++  );
++  expect(readFileSync(resolve(root, 'node_modules/.prisma/client/schema.prisma'), 'utf8')).toMatch(
++    /model ScoutReconstructionLedger \{[^}]*source_platform\s+String\?/,
++  );
++  expect(readFileSync(resolve(oldRoot!, 'src/scout/scout-reconstruct.service.ts'), 'utf8')).toBe(
++    gitShow(`${OLD_HEAD}:src/scout/scout-reconstruct.service.ts`),
++  );
++  expect(
++    sql(`SELECT string_agg(rolsuper::text||':'||rolbypassrls::text,',' ORDER BY rolname)
++    FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')`),
++  ).toBe('false:false,false:false,false:true');
++  // Read-only gates passed; authorize teardown, then the accepted setup mutations.
++  teardownAuthorized = true;
++  sql(`GRANT USAGE ON SCHEMA public TO service_role,anon,authenticated;
++    GRANT ALL ON public."ScoutIngestEntity",public."ScoutReconstructionLedger",
++      public."Person",public."ScoutReconstructedEntity",public."ScoutImport" TO service_role,anon,authenticated;`);
++  resetData();
++});
++afterAll(async () => {
++  for (const c of clients) await c.client.$disconnect();
++  if (!teardownAuthorized) {
++    console.warn(
++      'PG17_TEARDOWN_SKIPPED',
++      JSON.stringify({ reason: 'setup refused before first mutation; no DDL/DML issued' }),
++    );
++    return;
++  }
++  resetData();
++  sql('DELETE FROM "ScoutImport"');
++});
++
++describe('stage 1: legacy rows from the actual O binary, on narrow and on E', () => {
++  it('O on the narrow base, then E, then O on E: 430 rows without provenance', async () => {
++    stageMany(400, 'clients');
++    expect((await run({}, true)).result).toMatchObject({ reconstructed: 400 });
++    expect(ledgerCount()).toBe(400);
++    // E exactly as the accepted proof applies it, then recorded so `migrate deploy` later
++    // applies precisely B (E's own deploy path is accepted elsewhere and not re-proven).
++    sqlFile(upFile);
++    expect(prisma(root, ['migrate', 'resolve', '--applied', E_MIGRATION]).ok).toBe(true);
++    expect(appliedMigrations()).toBe('165');
++    expect(hasColumn()).toBe('1');
++    stageMany(30, 'workouts', 'truecoach', 'coach', 'intent', 0, 'w');
++    expect((await run({ family: 'workouts' }, true)).result).toMatchObject({ reconstructed: 30 });
++    expect(nullCount()).toBe(430);
++    // T on a second intent writes provenance; those rows are never backfill candidates.
++    settle('coach', 'i2');
++    stageMany(10, 'clients', 'truecoach', 'coach', 'i2');
++    expect((await run({ intent: 'i2' })).result).toMatchObject({ reconstructed: 10 });
++    expect(ledgerCount()).toBe(440);
++    expect(nullCount()).toBe(430);
++  });
++});
++
++describe('stage 2: backfill on E without the fence — completion is not drain', () => {
++  it('assigns exactly the staged platform to every NULL row and touches nothing else', async () => {
++    const ledgerBefore = ledgerWithoutPlatform();
++    const stagingBefore = stagingSnapshot();
++    const { report, queries } = await backfill('g2b_stage2', { batch: 200 });
++    expect(report).toMatchObject({
++      batch: 200,
++      ledgerTotal: 440,
++      nullBefore: 430,
++      nullAfter: 0,
++      mismatch: 0,
++      fenced: false,
++      unresolved: { orphan: 0, invalid: 0, ambiguous: 0 },
++      outcome: 'complete_unfenced',
++    });
++    // 200 + 200 + 30 (short chunk ends the pass), then one confirming pass with nothing left.
++    expect(report.passes.map((p) => [p.chunks, p.examined, p.updated])).toEqual([
++      [3, 430, 430],
++      [1, 0, 0],
++    ]);
++    expect(selects(queries)).toHaveLength(4);
++    expect(updates(queries)).toHaveLength(3);
++    expect(disagreeing()).toBe(0);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++    expect(stagingSnapshot()).toEqual(stagingBefore);
++    expect(
++      sql(`SELECT string_agg(DISTINCT source_platform,',') FROM "ScoutReconstructionLedger"`),
++    ).toBe('truecoach');
++  });
++  it('an O restart re-creates NULL rows after completion, so unfenced completion is not drain', async () => {
++    stage('w-late', 'workouts');
++    expect((await run({ family: 'workouts' }, true)).result).toMatchObject({ reconstructed: 31 });
++    expect(nullCount()).toBe(1);
++    const { report } = await backfill('g2b_stage2_again', { batch: 200 });
++    expect(report).toMatchObject({ nullBefore: 1, nullAfter: 0, outcome: 'complete_unfenced' });
++    expect(report.passes[0]).toMatchObject({ chunks: 1, examined: 1, updated: 1 });
++  });
++});
++
++describe('stage 3: B through the release mechanism', () => {
++  let beforeCatalog: string;
++  it('prisma migrate deploy applies exactly B; identity, RLS and indexes are untouched', () => {
++    beforeCatalog = catalog();
++    const output = prismaMigrateDeploy(root);
++    expect(output).toContain(B_MIGRATION);
++    expect(output).not.toContain(E_MIGRATION);
++    expect(appliedMigrations()).toBe('166');
++    expect(catalog()).toBe(beforeCatalog);
++    expect(hasColumn()).toBe('1');
++    expect(nullCount()).toBe(0);
++    const installed = fence();
++    expect(installed.triggers).toEqual([
++      ['ScoutReconstructionLedger_platform_fence', 'O', FENCE_TRIGGER_DEFINITION],
++    ]);
++    expect(installed.function).toMatchObject({
++      proname: 'scout_ledger_platform_fence',
++      prosecdef: false,
++      proconfig: [expect.stringMatching(/^search_path=("")?$/)],
++    });
++    for (const role of ['anon', 'authenticated', 'service_role']) {
++      expect(
++        sql(
++          `SELECT has_function_privilege(${quote(role)},'public.scout_ledger_platform_fence()','EXECUTE')`,
++        ),
++      ).toBe('f');
++    }
++    console.warn('PG17_FENCE', JSON.stringify(installed));
++  });
++  it('a raw rerun of B is refused atomically and changes nothing', () => {
++    const before = fence();
++    expect(() => sqlFile(bUpFile)).toThrow(/G2-B fence already present/);
++    expect(fence()).toEqual(before);
++    expect(catalog()).toBe(beforeCatalog);
++    expect(appliedMigrations()).toBe('166');
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++  });
++});
++
++describe('stage 4: the fence against O, T, direct writers and the API roles', () => {
++  it('refuses a NULL-provenance INSERT from the owner and from the runtime role', () => {
++    refused(nullInsert('direct-null'), FENCED);
++    refused(nullInsert('direct-null', 'service_role'), FENCED);
++    expect(ledgerIds(`id='direct-null'`)).toEqual([]);
++    // Provenance present: admitted (then removed) — the fence is not a write block.
++    sql(`INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++      VALUES ('direct-ok','coach','intent','clients','direct-ok','truecoach','skipped')`);
++    expect(platformOf('direct-ok')).toBe('truecoach');
++    sql(`DELETE FROM "ScoutReconstructionLedger" WHERE id='direct-ok'`);
++  });
++  it('the actual O binary fails closed on a new staged row: 500, no ledger row, no target', async () => {
++    const before = { ledger: ledgerCount(), targets: targets() };
++    stage('w-fenced', 'workouts');
++    const old = await run({ family: 'workouts' }, true);
++    expect(old.result).toBeUndefined();
++    expect(old.failure).toMatchObject({ status: 500, message: 'Internal server error' });
++    expect(ledgerCount()).toBe(before.ledger);
++    expect(targets()).toEqual(before.targets);
++    expect(nullCount()).toBe(0);
++    // O readers are unaffected by an INSERT trigger.
++    expect((await run({ action: 'roster', limit: 5 }, true)).result.persons).toHaveLength(5);
++    expect(
++      (await run({ action: 'entities', family: 'workouts', limit: 5 }, true)).result.entities,
++    ).toHaveLength(5);
++  });
++  it('API roles are still denied by policy (with provenance, so the policy, not the fence, answers)', () => {
++    for (const role of ['anon', 'authenticated']) {
++      refused(
++        `SET ROLE ${role}; INSERT INTO public."ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status)
++        VALUES ('bad','coach','intent','clients','bad','truecoach','skipped')`,
++        'row-level security',
++      );
++      // BEFORE ROW triggers run before WITH CHECK policies, so a NULL row from an API role is
++      // expected to meet the fence first; whichever answers, it is refused and never exists.
++      let error: unknown;
++      try {
++        sql(nullInsert('bad', role));
++      } catch (e) {
++        error = e;
++      }
++      expect(String(error)).toMatch(/G2-B obsolete writer fenced|row-level security/);
++    }
++    expect(ledgerIds(`id='bad'`)).toEqual([]);
++  });
++  it('T creates with provenance and claims a re-opened NULL row through the fence; replay identical', async () => {
++    // The fence rejected O's row for w-fenced; T reconstructs it (create path, provenance set)
++    // and claims one legacy row whose provenance is re-opened (update path, not fenced).
++    const reopened = ledgerIds(
++      `intent_id='intent' AND entity_type='workouts' AND source_id='w00001'`,
++    );
++    expect(nullify(`id=${quote(reopened[0])}`)).toBe(1);
++    const first = await run({ family: 'workouts' });
++    expect(first.result).toMatchObject({ reconstructed: 32 });
++    expect(platformOf(reopened[0])).toBe('truecoach');
++    expect(nullCount()).toBe(0);
++    const rows = records('coach', 'intent', 'workouts');
++    const replay = await run({ family: 'workouts' });
++    expect(replay.result).toEqual(first.result);
++    expect(records('coach', 'intent', 'workouts')).toEqual(rows);
++  });
++});
++
++describe('stage 5: bounded fixture — unresolvable classes, cursor, idempotence, recovery', () => {
++  let report: BackfillReport;
++  let queries: string[];
++  let ledgerBefore: unknown;
++  let stagingBefore: unknown;
++  it('builds 1238 NULL rows: 1230 resolvable, 5 orphans, 3 invalid; 2 mismatching and 10 claimed stay', async () => {
++    resetData();
++    stageMany(1244, 'clients');
++    expect((await run()).result).toMatchObject({ reconstructed: 1244 });
++    expect(nullCount()).toBe(0);
++    // Two populated rows disagree with staging (never overwritten); ten keep their claim.
++    expect(
++      Number(
++        sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform='other-platform'
++        WHERE source_id IN ('s01243','s01244') RETURNING id) SELECT count(*) FROM c`),
++      ),
++    ).toBe(2);
++    expect(nullify(`source_id NOT BETWEEN 's01233' AND 's01244'`)).toBe(1232);
++    // Erased staging: two NULL rows whose exact staging match no longer exists.
++    sql(`DELETE FROM "ScoutIngestEntity" WHERE source_id IN ('s01231','s01232')`);
++    // Cross-tenant: staged under coach 'c2' would not match; here nothing is staged for c2.
++    settle('c2');
++    for (const s of ['x1', 'x2']) {
++      legacy('skipped', 'truecoach', s, 'clients', 'c2');
++      nullify(`coach_id='c2' AND source_id=${quote(s)}`);
++    }
++    // Wrong family: a workouts ledger row with no staging at all.
++    legacy('skipped', 'truecoach', 'w1', 'workouts');
++    nullify(`source_id='w1'`);
++    // Invalid: staging carries a non-canonical token; the backfill must not copy it.
++    for (const s of ['b1', 'b2', 'b3']) {
++      stage(s, 'clients', 'Bad Platform');
++      legacy('skipped', 'Bad Platform', s);
++      nullify(`source_id=${quote(s)}`);
++    }
++    expect(ledgerCount()).toBe(1250);
++    expect(nullCount()).toBe(1238);
++    ledgerBefore = ledgerWithoutPlatform();
++    stagingBefore = stagingSnapshot();
++  });
++  it('resolves exactly the 1230 in three chunks, reports the 8 remaining by class, stops honestly', async () => {
++    ({ report, queries } = await backfill('g2b_stage5'));
++    expect(report).toMatchObject({
++      batch: 500,
++      ledgerTotal: 1250,
++      nullBefore: 1238,
++      nullAfter: 8,
++      mismatch: 2,
++      fenced: true,
++      unresolved: { orphan: 5, invalid: 3, ambiguous: 0 },
++      outcome: 'unresolved',
++    });
++    expect(
++      report.passes.map((p) => [p.chunks, p.examined, p.updated, p.orphan, p.invalid]),
++    ).toEqual([
++      [3, 1238, 1230, 5, 3],
++      [1, 8, 0, 5, 3],
++    ]);
++    expect(report.passes.every((p) => p.lockFailures === 0 && !p.stalledByLocks)).toBe(true);
++    expect(selects(queries)).toHaveLength(4);
++    expect(updates(queries)).toHaveLength(3);
++    // The written values are the staged values; nothing non-NULL changed; staging untouched.
++    // Disagreeing = 2 mismatching + 3 invalid (NULL vs non-canonical staging); orphans have no join.
++    expect(disagreeing()).toBe(5);
++    expect(
++      sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='Bad Platform'`),
++    ).toBe('0');
++    expect(
++      sql(
++        `SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='other-platform'`,
++      ),
++    ).toBe('2');
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++    expect(stagingSnapshot()).toEqual(stagingBefore);
++    expect(ledgerIds(`source_platform IS NULL`).sort()).toEqual(
++      ledgerIds(`source_id IN ('s01231','s01232','x1','x2','w1','b1','b2','b3')`).sort(),
++    );
++  });
++  it('rerun is idempotent: one short chunk, nothing written, same verdict', async () => {
++    const again = await backfill('g2b_stage5_again');
++    expect(again.report.passes).toEqual([
++      expect.objectContaining({ chunks: 1, examined: 8, updated: 0 }),
++    ]);
++    expect(again.report).toMatchObject({ nullAfter: 8, outcome: 'unresolved' });
++    expect(updates(again.queries)).toHaveLength(0);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++  });
++  it('forward provenance recovery (staging repaired, not ledger edited) drains under the fence', async () => {
++    // Re-stage the erased/missing sources and correct the invalid token at the source of truth.
++    stageMany(2, 'clients', 'truecoach', 'coach', 'intent', 0, 'r');
++    sql(`UPDATE "ScoutIngestEntity" SET source_id=CASE id WHEN 'coach-intent-r00001' THEN 's01231' ELSE 's01232' END
++      WHERE id IN ('coach-intent-r00001','coach-intent-r00002')`);
++    stage('x1', 'clients', 'truecoach', 'Synthetic X1', 'c2', 'intent');
++    stage('x2', 'clients', 'truecoach', 'Synthetic X2', 'c2', 'intent');
++    stage('w1', 'workouts');
++    sql(
++      `UPDATE "ScoutIngestEntity" SET source_platform='truecoach' WHERE source_platform='Bad Platform'`,
++    );
++    const drained = await backfill('g2b_stage5_drain');
++    expect(drained.report).toMatchObject({
++      nullBefore: 8,
++      nullAfter: 0,
++      mismatch: 2,
++      fenced: true,
++      outcome: 'drained',
++    });
++    expect(drained.report.passes[0]).toMatchObject({ chunks: 1, examined: 8, updated: 8 });
++    expect(disagreeing()).toBe(2);
++    expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
++  });
++});
++
++describe('stage 6: concurrency — locked rows, T barriers, a staging writer', () => {
++  it('skips a row locked by another transaction, stalls honestly, drains after release', async () => {
++    expect(nullify(`source_id IN ('s00001','s00002','s00003')`)).toBe(3);
++    const [held] = ledgerIds(`source_id='s00002'`);
++    const holder = holdTransaction(
++      `SELECT id FROM public."ScoutReconstructionLedger" WHERE id=${quote(held)} FOR UPDATE`,
++    );
++    await holder.held;
++    try {
++      const stalled = await backfill('g2b_stage6_locked', { lockRetries: 0 });
++      expect(stalled.report.passes.map((p) => [p.examined, p.updated, p.lockFailures])).toEqual([
++        [2, 2, 0],
++        [0, 0, 0],
++      ]);
++      expect(stalled.report).toMatchObject({ nullAfter: 1, outcome: 'stalled' });
++      expect(platformOf(held)).toBe('<NULL>');
++    } finally {
++      holder.release();
++    }
++    const drained = await backfill('g2b_stage6_released');
++    expect(drained.report.passes[0]).toMatchObject({ examined: 1, updated: 1 });
++    expect(drained.report.outcome).toBe('drained');
++  });
++  it('T paused after reading staging: the backfill completes; T then claims identically', async () => {
++    settle('coach', 'i3');
++    stageMany(20, 'clients', 'truecoach', 'coach', 'i3');
++    expect(nullify(`source_id IN ('s00004','s00005')`)).toBe(2);
++    const paused = worker({ intent: 'i3', pause: 'staged' });
++    await paused.ready;
++    const during = await backfill('g2b_stage6_t_staged');
++    expect(during.report).toMatchObject({ nullAfter: 0, outcome: 'drained' });
++    paused.release();
++    expect((await paused.done).result).toMatchObject({ staged: 20, reconstructed: 20 });
++    expect(records('coach', 'i3').every((r: any) => r.source_platform === 'truecoach')).toBe(true);
++  });
++  it('T paused inside its claim: the backfill skips that row without waiting', async () => {
++    // Every i3 row is re-opened so that whichever row T claims first is the locked one.
++    expect(nullify(`intent_id='i3'`)).toBe(20);
++    expect(nullify(`intent_id='intent' AND source_id='s00006'`)).toBe(1);
++    const paused = worker({ intent: 'i3', pause: 'claimed', txTimeout: 60000 });
++    await paused.ready;
++    const during = await backfill('g2b_stage6_t_claimed', { lockRetries: 0 });
++    // The uncommitted claim is invisible and locked: skipped without a lock wait, reported as an
++    // unexplained remainder. Completing before release is the non-blocking evidence.
++    expect(during.report).toMatchObject({ nullBefore: 21, nullAfter: 1, outcome: 'stalled' });
++    expect(during.report.passes[0]).toMatchObject({ examined: 20, updated: 20, lockFailures: 0 });
++    paused.release();
++    expect((await paused.done).result).toMatchObject({ reconstructed: 20 });
++    expect(nullCount()).toBe(0);
++    expect(records('coach', 'i3').every((r: any) => r.source_platform === 'truecoach')).toBe(true);
++    const after = await backfill('g2b_stage6_t_claimed_after');
++    expect(after.report).toMatchObject({ nullBefore: 0, nullAfter: 0, outcome: 'drained' });
++    expect(after.report.passes).toEqual([expect.objectContaining({ examined: 0, updated: 0 })]);
++  });
++  it('a concurrent staging writer makes the chunk wait, hit lock_timeout, and write nothing', async () => {
++    expect(nullify(`intent_id='intent' AND source_id='s00007'`)).toBe(1);
++    const holder = holdTransaction(
++      `UPDATE public."ScoutIngestEntity" SET payload=payload WHERE id='coach-intent-s00007'`,
++    );
++    await holder.held;
++    try {
++      const name = 'g2b_stage6_staging_writer';
++      const pending = backfill(name, { lockRetries: 0 });
++      await blocked(name);
++      const { report, queries } = await pending;
++      expect(report.passes).toEqual([
++        expect.objectContaining({
++          chunks: 0,
++          examined: 0,
++          updated: 0,
++          lockFailures: 1,
++          stalledByLocks: true,
++        }),
++      ]);
++      expect(report).toMatchObject({ nullBefore: 1, nullAfter: 1, outcome: 'stalled' });
++      expect(selects(queries)).toHaveLength(0);
++      expect(updates(queries)).toHaveLength(0);
++    } finally {
++      holder.release();
++    }
++    const drained = await backfill('g2b_stage6_staging_released');
++    expect(drained.report).toMatchObject({ nullAfter: 0, outcome: 'drained' });
++  });
++});
++
++describe('stage 7: down removes only the fence; up restores it', () => {
++  let installed: unknown;
++  let installedCatalog: string;
++  it('down keeps column, rows and history; NULL inserts are admitted again', () => {
++    installed = fence();
++    installedCatalog = catalog();
++    const ledger = ledgerWithoutPlatform();
++    const nulls = nullCount();
++    sqlFile(bDownFile);
++    expect(fence()).toEqual({ triggers: [], function: null });
++    expect(hasColumn()).toBe('1');
++    expect(ledgerWithoutPlatform()).toEqual(ledger);
++    expect(nullCount()).toBe(nulls);
++    expect(catalog()).toBe(installedCatalog);
++    // History is not rewritten by down (S1-owned recovery semantics, recorded not judged):
++    // B stays applied and deploy has nothing pending, so the fence is absent while recorded.
++    expect(appliedMigrations()).toBe('166');
++    expect(prismaMigrateDeploy(root)).toContain('No pending migrations');
++    sql(nullInsert('after-down'));
++    expect(platformOf('after-down')).toBe('<NULL>');
++    sql(`DELETE FROM "ScoutReconstructionLedger" WHERE id='after-down'`);
++    expect(() => sqlFile(bDownFile)).toThrow(/G2-B fence absent/);
++  });
++  it('re-applying the file restores the identical fence', () => {
++    sqlFile(bUpFile);
++    expect(fence()).toEqual(installed);
++    expect(catalog()).toBe(installedCatalog);
++    refused(nullInsert('after-up'), FENCED);
++    expect(appliedMigrations()).toBe('166');
++  });
++});
+diff --git a/test/utils/g2-b-drain-harness.ts b/test/utils/g2-b-drain-harness.ts
+new file mode 100644
+index 0000000..09c677f
+--- /dev/null
++++ b/test/utils/g2-b-drain-harness.ts
+@@ -0,0 +1,79 @@
++/**
++ * G2-B live-proof helpers layered on the accepted S5 harness (test/utils/g2-pg17-harness.ts).
++ * Adds only what the B/drain stage needs: the B migration files, fence/catalog observation,
++ * NULL-provenance fixture shaping (UPDATE only: the fence blocks NULL INSERTs by design) and an
++ * in-process runtime-role Prisma client whose query log is captured for shape assertions.
++ * Imported only by the explicitly guarded test/rls-g2-b-drain.spec.ts.
++ */
++import { PrismaClient } from '@prisma/client';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import { json, quote, root, sql, target } from './g2-pg17-harness';
++import { G2_PG17_RUNTIME_ROLE, withFixturePassword } from './g2-pg17-db';
++
++export const B_MIGRATION = '20270119000000_scout_ledger_obsolete_writer_fence';
++export const bDir = resolve(root, 'prisma/migrations', B_MIGRATION);
++export const bUpFile = resolve(bDir, 'migration.sql');
++export const bDownFile = resolve(bDir, 'down.sql');
++export const bUp = readFileSync(bUpFile, 'utf8');
++export const bDown = readFileSync(bDownFile, 'utf8');
++
++/** Trigger + function catalog shape; '[]'/null when absent. Includes proconfig and ACL. */
++export const fence = () =>
++  json(`SELECT jsonb_build_object(
++  'triggers',(SELECT COALESCE(jsonb_agg(jsonb_build_array(tgname,tgenabled,pg_get_triggerdef(oid)) ORDER BY tgname),'[]')
++    FROM pg_trigger WHERE tgrelid='public."ScoutReconstructionLedger"'::regclass AND NOT tgisinternal),
++  'function',(SELECT to_jsonb(f) FROM (SELECT proname,prosecdef,proconfig,proacl::text,provolatile,
++    pg_get_functiondef(oid) def FROM pg_proc WHERE oid=to_regprocedure('public.scout_ledger_platform_fence()')) f))`);
++export const nullCount = () =>
++  Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform IS NULL`));
++export const ledgerCount = () => Number(sql(`SELECT count(*) FROM "ScoutReconstructionLedger"`));
++/** Every ledger column except provenance, deterministic order: the backfill's "untouched" proof. */
++export const ledgerWithoutPlatform = () =>
++  json(`SELECT COALESCE(jsonb_agg((to_jsonb(l) - 'source_platform')
++  ORDER BY coach_id,intent_id,entity_type,source_id,id),'[]') FROM "ScoutReconstructionLedger" l`);
++export const stagingSnapshot = () =>
++  json(`SELECT COALESCE(jsonb_agg(to_jsonb(s) ORDER BY coach_id,intent_id,source_id,id),'[]')
++  FROM "ScoutIngestEntity" s`);
++/** Rows whose provenance differs from the exact staging match (never written by the backfill). */
++export const disagreeing = () =>
++  Number(
++    sql(`SELECT count(*) FROM "ScoutReconstructionLedger" l JOIN "ScoutIngestEntity" s
++  ON s.coach_id=l.coach_id AND s.intent_id=l.intent_id AND s.entity_type=l.entity_type AND s.source_id=l.source_id
++  WHERE l.source_platform IS DISTINCT FROM s.source_platform`),
++  );
++/** Fixture shaping only: re-open provenance on existing rows (an UPDATE; the fence is INSERT-only). */
++export const nullify = (where: string) =>
++  Number(
++    sql(`WITH c AS (UPDATE "ScoutReconstructionLedger" SET source_platform=NULL WHERE ${where} RETURNING id)
++  SELECT count(*) FROM c`),
++  );
++export const ledgerIds = (where: string) =>
++  json(
++    `SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`,
++  );
++export const platformOf = (id: string) =>
++  sql(
++    `SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`,
++  );
++
++/**
++ * In-process runtime-role (service_role) client: the same generated T client the product ships,
++ * connected exactly like the worker processes, with an application_name so lock waits are
++ * observable through the accepted `blocked()` helper. Query text only is logged, never parameters.
++ */
++export function runtimeClient(name: string) {
++  const url = new URL(
++    withFixturePassword(target.prismaUrl, process.env.G2_PG17_PASSWORD, G2_PG17_RUNTIME_ROLE),
++  );
++  url.searchParams.set('application_name', name);
++  const queries: string[] = [];
++  const client = new PrismaClient({
++    datasources: { db: { url: url.toString() } },
++    log: [{ emit: 'event', level: 'query' }],
++  });
++  client.$on('query', (e) => {
++    queries.push(e.query);
++  });
++  return { client, queries, name };
++}

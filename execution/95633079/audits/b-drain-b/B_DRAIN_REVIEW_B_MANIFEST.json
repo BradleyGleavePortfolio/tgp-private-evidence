@@ -1,0 +1,73 @@
+{
+  "review": "S7-3' G2 B/drain independent T4 reviewer B",
+  "phase": "SOURCE (not final acceptance) + additive binding-proposal section",
+  "reviewer_mode": "independent non-builder; peer-A not opened; read-only outside execution/95633079/audits/b-drain-b/",
+  "routing_note": "Requested Claude Fable 5 / High is requested routing, not observed runtime effort",
+  "reports": [
+    "execution/95633079/audits/b-drain-b/B_DRAIN_REVIEW_B_SOURCE.md",
+    "execution/95633079/audits/b-drain-b/B_DRAIN_REVIEW_B_BINDING.md"
+  ],
+  "pins": {
+    "accepted_c1_base_commit": "a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992",
+    "accepted_c1_base_tree": "87798e742c7b48f56b05e9b5c30efa877180a9b3",
+    "candidate_v2_tree": "3739193a5badb104a0aa880a5242ff21e2a98fb0",
+    "candidate_v1_tree_superseded": "be80087c154ffca0d1d82713892913883c819d9a",
+    "diff_vs_base": "7 files added, 1461 insertions, 0 accepted files modified",
+    "o_head": "925780e0a1906593e5383c618311b6b17364b8dc",
+    "o_migration_dirs": 164,
+    "candidate_tracked_migration_dirs": 167,
+    "candidate_with_b_migration_dirs": 168,
+    "worktree": "/home/user/workspace/worktrees/s7-b-drain (standalone repo, HEAD a0ea1bea, index clean, 7 untracked, no hooks, no node_modules, no remote)",
+    "files_v2": {
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql": { "git_sha1": "55c859068260809ca2681451fb4e5ad670bc46f0", "sha256": "416cb774e452db754d41bde3dbc9e05dad7cebe57f4ad78fc809fbafccc9122f", "kind": "product" },
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql": { "git_sha1": "8c6710e708e28454126e2030b3b463d8e181f683", "sha256": "3c5183dc0961cf58d3d1081ca40478a70a9800786a217119af35743a3a3b9364", "kind": "product" },
+      "src/scout/scout-ledger-backfill.ts": { "git_sha1": "8493f27888159adea009e10950f8876703641235", "sha256": "aaa369505128265d1d6f2f92db2c1315ed6607dd27649c111707561ed0e4ba0b", "kind": "product" },
+      "src/scout/scout-ledger-backfill.cli.ts": { "git_sha1": "bcc06577638e18d4660657c109f63ce2fa96af44", "sha256": "55320ea2acb8c8260ce0b881777c2101a993d55cd4e67494e3d0adf1064e65b6", "kind": "product" },
+      "src/scout/scout-ledger-backfill.spec.ts": { "git_sha1": "e64d8263c2590e7a2c956cd585f32ea6ae8726d9", "sha256": "52ab68c822d655efdc270b02c70783fdc948214538f88aedb0364dcfa01c6304", "kind": "proof" },
+      "test/rls-g2-b-drain.spec.ts": { "git_sha1": "c970ab2969613ea8e48b79f97d94ec429cfe9f68", "sha256": "72db1a6be163e57885b841cf55977fe3f1c4498dbdecf332833b1acb6569e354", "kind": "proof" },
+      "test/utils/g2-b-drain-harness.ts": { "git_sha1": "09c677fa1cef76863d1aac5696988c7206163b36", "sha256": "34c824ae51f1577fe79d5190d676a5bc2a332dd36988625222b8ccfd825d3170", "kind": "proof" }
+    },
+    "fixture_proposal_doc_sha256": "5f3182e33fe6fbc7285cd0d73a2b69da7899fef383e735b9e19308a638ea280a",
+    "fixture_proposal_manifest": "execution/95633079/s7-b-drain/fixture-proposal/PROPOSAL.sha256 (16 entries, all OK)",
+    "v2_to_v3_identity_diff_sha256": "562a5be3a564157b9fb34824f2adffb086ada2f1c8cafb0b6951dcafea35679e",
+    "toolchain_pins_in_repo": { "typescript": "5.9.3", "prisma": "6.19.3", "@prisma/client": "6.19.3", "eslint": "10.5.0", "ts-jest": "29.4.9", "lefthook": "2.1.9", "jest": "30.4.2", "prettier_used_for_v2": "3.9.6 external" },
+    "runtime_dependency_records_for_binding": { "c1_node_modules_package_lock_sha256": "05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44", "c1_generated_client_index_dts_sha256": "bf679a16e50a6f0c39528887b80c2a03c5d0825b816cec3417fcbc94300b72d5", "postgres_bin_sha256": "23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a", "initdb_bin_sha256": "b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a", "psql": "/usr/bin/psql", "pg17_dist": "/home/user/pg17/dist" }
+  },
+  "verdict": {
+    "product_files": "SOURCE_GRANTABLE (migration.sql, down.sql, scout-ledger-backfill.ts, scout-ledger-backfill.cli.ts) — with B-1 library min-fix recommended (<=3 lines) or test-only alternative",
+    "proof_files": "BLOCKED-PROOF on B-1, B-2, B-3 (minimal same-review test/fixture deltas; no new audit track)",
+    "a_findings": 0,
+    "binding_proposal": "ACCEPTABLE-MINIMUM design; NOT EXECUTABLE/GRANTABLE until BIND-1 order rewrite, BIND-2 (=B-2) and BIND-3 (=B-1) land in v3 and pins are filled from the committed v3 head"
+  },
+  "findings": [
+    { "id": "B-1", "class": "B", "title": "lockRetries:0 requested by live spec (3 sites) but bounded() rejects <1; CLI admits --lock-retries=0 then throws", "harm_or_blocked": "blocked: stage 6 concurrency proof cannot execute; no product harm", "min_closure": "bounded(value,fallback,max,min=1) with min 0 for lockRetries + one DB-free assertion; alt: spec lockRetries:1 x3 and 6d lockFailures:2", "paths": ["src/scout/scout-ledger-backfill.ts:118-124,250", "test/rls-g2-b-drain.spec.ts:436,483,508", "src/scout/scout-ledger-backfill.cli.ts:20"], "unlocks": "stage 6 (row locks, T barrier, staging writer, lock stall)" , "present_in_v3_candidate": true },
+    { "id": "B-2", "class": "B", "title": "spec migration counts 164/165/166 and 'exactly B' assume the S5 lane root; candidate root tracks S1+C1+E so stage-3 migrate deploy applies S1+C1+B", "harm_or_blocked": "blocked: stage 3 and 7 cannot pass; product migration unaffected (real DB has S1/C1/E recorded)", "min_closure": "fixture (bootstrap 5b) or spec stage 1 applies S1+C1 by file + migrate resolve --applied (E path); spec counts relative (base, base+1, base+2); 'exactly B' via migration_name finished after stage-3 start", "paths": ["test/rls-g2-b-drain.spec.ts:127,186,236-242,stage7", "fixture-proposal/adapter/g2-b-drain-bootstrap.sh step 5", "prisma/migrations/20261224000000_rls_close_public_exposure", "prisma/migrations/20270117000000_durable_import_setup"], "unlocks": "stages 3 and 7; whole spec runnable on C1 lineage", "present_in_v3_candidate": true },
+    { "id": "B-3", "class": "B", "title": "live proof identity is S5-bound (db/dir literals, G2_PG17_* env, S5 markers); O root checkout and O client absent in sandbox", "harm_or_blocked": "blocked: not runnable on any B identity as frozen", "min_closure": "parent's additive B-only fixture/adapter (verified literal-only) + 21-line identity delta; O client generate inside runtime/old-root is a genuine fixture dependency", "paths": ["test/rls-g2-b-drain.spec.ts:111,120", "test/utils/g2-pg17-harness.ts:22-34", "test/utils/g2-pg17-db.ts"], "unlocks": "Phase B run", "present_in_v3_candidate": "closed by identity delta" },
+    { "id": "BIND-1", "class": "B(binding)", "title": "proposal §5 orders v3 commit before dependency copy; hooks/tsc/jest need the tree first", "min_closure": "order: node_modules copy+verify -> lefthook install -> gates -> ordinary commit with hooks -> pins -> run" },
+    { "id": "BIND-4", "class": "C", "title": "runner pins PG binary shas as constants; record PROVENANCE.txt line at pin-fill; jest bound 1500s vs 26x240s not a hard cover" },
+    { "id": "BIND-5", "class": "C", "title": "old-root symlink/O client writes are outside the worktree; local git clone read-only for source; data dir retained, destroy separate grant" },
+    { "id": "C-1", "class": "C", "title": "Prisma native upsert -> BEFORE INSERT fires for existing rows too; O replay of existing rows also fenced (stricter than handoff prose, no harm)" },
+    { "id": "C-2", "class": "C", "title": "fence admits '' (CHECK is R's); session_replication_role=replica bypass is SUSET; DISABLE TRIGGER detected by fenced=false" },
+    { "id": "C-3", "class": "C", "title": "unresolved reflects last pass only; never over-claims drained" },
+    { "id": "C-4", "class": "C", "title": "T claim may wait on B row locks up to T's 5s tx ceiling and fail closed; LOCK TABLE SHARE needs UPDATE-class privilege on staging" },
+    { "id": "C-5", "class": "C", "title": "45s tx ceiling can be exceeded by 5+30+30s statement budgets -> P2028 propagates -> exit 1 (honest)" },
+    { "id": "C-6", "class": "C", "title": "CLI prints only err.name on DB error; CLI lives in src/scout not scripts/" },
+    { "id": "C-7", "class": "C", "title": "tsc items to observe at gate: PrismaClient->BackfillClient assignability; $on('query') typing; proconfig search_path rendering" }
+  ],
+  "confirmed_sound": [
+    "exact 4-key join; staging unique (coach,intent,source) => <=1 match; ambiguous impossible live",
+    "SELECT and UPDATE both require source_platform IS NULL; value written = staged; integrity check on updated count; no status/target/reason/payload/delete writes",
+    "LIMIT above LockRows with SKIP LOCKED: short chunk == unlocked set exhausted; no high-water mark; cursor strictly increases; passes <= 10; batch <= 2000",
+    "lock order staging(SHARE)->ledger rows; T reads staging only; no deadlock cycle; T claim p IS NULL OR p=staged compatible",
+    "fence: BEFORE INSERT only, check_violation, SET search_path='', not SECURITY DEFINER, REVOKE PUBLIC; migration guards copy E; down requires exact triggerdef, drops trigger+function only; migration-dry-run down/up parity expected",
+    "repo gates: LOC/density retired 2026-09-20 (no exemption needed); R75 live incl .sh under test/; lefthook pre-commit tsc/eslint/prettier/r75/prod-readiness; prisma/migrations outside eslint/prettier; prettier glob excludes .sh",
+    "O head and candidate package.json/package-lock.json identical -> shared node_modules for O root legitimate",
+    "adapter files literal-only vs donors except bootstrap step 7 (generate -> verify); identity values unique and mutually consistent"
+  ],
+  "pending_execution_binding": "Source is NOT runnable on an invented B identity today. Required before any PG run: v3 = identity delta + B-1 + B-2 closures; isolated C1 node_modules copy verified; lefthook install; gates; ordinary commit with hooks; pins filled from committed head; S5 ABSENT; C1 cluster stopped and hash-guarded; single flock'd run of one spec; no npm ci, no candidate generate, no predecessor proof replay; O client generate inside runtime/old-root is the only generate (parent decision).",
+  "minimum_gate": {
+    "phase_a": ["cp -a s7-c1/node_modules -> s7-b-drain/node_modules; verify .package-lock.json 05bc530a and .prisma/client/index.d.ts bf679a16", "./node_modules/.bin/lefthook install", "tsc --noEmit", "eslint --max-warnings 0 + prettier --check on 6 TS files", "node scripts/check-r75.js", "jest src/scout/scout-ledger-backfill.spec.ts test/scout/g2-b-drain-db-guard.spec.ts", "ordinary Bradley-authored commit with hooks executing; record head/tree/blobs"],
+    "phase_b": ["fill b-pg-proof.sh pins from committed v3", "timeout -k 30 2400 bash binding/b-pg-proof.sh (single run; jest --config jest.rls.config.js test/rls-g2-b-drain.spec.ts --runInBand --ci)", "capture PG17_* lines, RECEIPTS.sha256"]
+  },
+  "availability": "reviewer B stays available for same-review minimal delta/binding and final actual-head/results; not a new audit track"
+}
