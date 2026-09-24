@@ -1,0 +1,18 @@
+--- /home/user/workspace/execution/95633079/s7-b-drain/frozen/files/test/utils/g2-b-drain-harness.ts	2026-09-24 07:05:38.824630514 +0000
++++ test/utils/g2-b-drain-harness.ts	2026-09-24 07:11:09.140630514 +0000
+@@ -49,9 +49,13 @@
+   SELECT count(*) FROM c`),
+   );
+ export const ledgerIds = (where: string) =>
+-  json(`SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`);
++  json(
++    `SELECT COALESCE(jsonb_agg(id ORDER BY id),'[]') FROM "ScoutReconstructionLedger" WHERE ${where}`,
++  );
+ export const platformOf = (id: string) =>
+-  sql(`SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`);
++  sql(
++    `SELECT COALESCE(source_platform,'<NULL>') FROM "ScoutReconstructionLedger" WHERE id=${quote(id)}`,
++  );
+ 
+ /**
+  * In-process runtime-role (service_role) client: the same generated T client the product ships,

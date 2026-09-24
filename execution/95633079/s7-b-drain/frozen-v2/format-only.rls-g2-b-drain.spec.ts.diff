@@ -1,0 +1,89 @@
+--- /home/user/workspace/execution/95633079/s7-b-drain/frozen/files/test/rls-g2-b-drain.spec.ts	2026-09-24 07:05:38.788630514 +0000
++++ test/rls-g2-b-drain.spec.ts	2026-09-24 07:11:09.092630514 +0000
+@@ -137,7 +137,9 @@
+   expect(fence()).toEqual({ triggers: [], function: null });
+   // Accepted E is the shipped file; B is this packet's file; the O source is byte-identical to
+   // the preserved head. The T client in this root carries the nullable provenance column.
+-  expect(readFileSync(upFile, 'utf8')).toBe(gitShow(`HEAD:prisma/migrations/${E_MIGRATION}/migration.sql`));
++  expect(readFileSync(upFile, 'utf8')).toBe(
++    gitShow(`HEAD:prisma/migrations/${E_MIGRATION}/migration.sql`),
++  );
+   expect(readFileSync(resolve(oldClient!, 'schema.prisma'), 'utf8')).not.toMatch(
+     /model ScoutReconstructionLedger \{[^}]*source_platform/,
+   );
+@@ -255,7 +257,9 @@
+     });
+     for (const role of ['anon', 'authenticated', 'service_role']) {
+       expect(
+-        sql(`SELECT has_function_privilege(${quote(role)},'public.scout_ledger_platform_fence()','EXECUTE')`),
++        sql(
++          `SELECT has_function_privilege(${quote(role)},'public.scout_ledger_platform_fence()','EXECUTE')`,
++        ),
+       ).toBe('f');
+     }
+     console.warn('PG17_FENCE', JSON.stringify(installed));
+@@ -318,7 +322,9 @@
+   it('T creates with provenance and claims a re-opened NULL row through the fence; replay identical', async () => {
+     // The fence rejected O's row for w-fenced; T reconstructs it (create path, provenance set)
+     // and claims one legacy row whose provenance is re-opened (update path, not fenced).
+-    const reopened = ledgerIds(`intent_id='intent' AND entity_type='workouts' AND source_id='w00001'`);
++    const reopened = ledgerIds(
++      `intent_id='intent' AND entity_type='workouts' AND source_id='w00001'`,
++    );
+     expect(nullify(`id=${quote(reopened[0])}`)).toBe(1);
+     const first = await run({ family: 'workouts' });
+     expect(first.result).toMatchObject({ reconstructed: 32 });
+@@ -383,7 +389,9 @@
+       unresolved: { orphan: 5, invalid: 3, ambiguous: 0 },
+       outcome: 'unresolved',
+     });
+-    expect(report.passes.map((p) => [p.chunks, p.examined, p.updated, p.orphan, p.invalid])).toEqual([
++    expect(
++      report.passes.map((p) => [p.chunks, p.examined, p.updated, p.orphan, p.invalid]),
++    ).toEqual([
+       [3, 1238, 1230, 5, 3],
+       [1, 8, 0, 5, 3],
+     ]);
+@@ -393,12 +401,14 @@
+     // The written values are the staged values; nothing non-NULL changed; staging untouched.
+     // Disagreeing = 2 mismatching + 3 invalid (NULL vs non-canonical staging); orphans have no join.
+     expect(disagreeing()).toBe(5);
+-    expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='Bad Platform'`)).toBe(
+-      '0',
+-    );
+-    expect(sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='other-platform'`)).toBe(
+-      '2',
+-    );
++    expect(
++      sql(`SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='Bad Platform'`),
++    ).toBe('0');
++    expect(
++      sql(
++        `SELECT count(*) FROM "ScoutReconstructionLedger" WHERE source_platform='other-platform'`,
++      ),
++    ).toBe('2');
+     expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
+     expect(stagingSnapshot()).toEqual(stagingBefore);
+     expect(ledgerIds(`source_platform IS NULL`).sort()).toEqual(
+@@ -407,7 +417,9 @@
+   });
+   it('rerun is idempotent: one short chunk, nothing written, same verdict', async () => {
+     const again = await backfill('g2b_stage5_again');
+-    expect(again.report.passes).toEqual([expect.objectContaining({ chunks: 1, examined: 8, updated: 0 })]);
++    expect(again.report.passes).toEqual([
++      expect.objectContaining({ chunks: 1, examined: 8, updated: 0 }),
++    ]);
+     expect(again.report).toMatchObject({ nullAfter: 8, outcome: 'unresolved' });
+     expect(updates(again.queries)).toHaveLength(0);
+     expect(ledgerWithoutPlatform()).toEqual(ledgerBefore);
+@@ -420,7 +432,9 @@
+     stage('x1', 'clients', 'truecoach', 'Synthetic X1', 'c2', 'intent');
+     stage('x2', 'clients', 'truecoach', 'Synthetic X2', 'c2', 'intent');
+     stage('w1', 'workouts');
+-    sql(`UPDATE "ScoutIngestEntity" SET source_platform='truecoach' WHERE source_platform='Bad Platform'`);
++    sql(
++      `UPDATE "ScoutIngestEntity" SET source_platform='truecoach' WHERE source_platform='Bad Platform'`,
++    );
+     const drained = await backfill('g2b_stage5_drain');
+     expect(drained.report).toMatchObject({
+       nullBefore: 8,

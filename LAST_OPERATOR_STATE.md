@@ -1,6 +1,6 @@
 # LAST OPERATOR STATE
 
-EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`. Bradley's September 23 22:35 PDT EXECUTE remains active; intake is accepted and recon closed. Current product cursor: **C1 ACCEPTED; canonical B/drain source implementation dispatched.** C1's last runtime terminal is `2026-09-24T06:30:27Z`.
+EXEC-95633079, session `95633079-d2f3-4674-a0b9-52d03477ce27`. Bradley's September 23 22:35 PDT EXECUTE remains active; intake is accepted and recon closed. Current product cursor: **C1 ACCEPTED; canonical B/drain v2 under two independent source reviews; mobile composition ACCEPTED and J3 source-only assigned.** C1's last runtime terminal is `2026-09-24T06:30:27Z`.
 
 ## Authority
 
@@ -23,8 +23,9 @@ No product remote push/merge, deployment, production/customer enablement, real s
 | UX-02/07 mobile presentation slice | `df0ad112529afcd9bfdf084e9930c90ee0bfffb3` | ACCEPTED PR293 reuse and Settings label only; typecheck and 4 suites/69 tests; independent same-review final |
 | UX-07 extension presentation slice | `6fd7e4a95ec2bc400cb8bec62a95955280a31f12` | ACCEPTED two HTML presentation paths; unchanged R2, genuine hooks and bounded proof; independent same-review final |
 | UX-01 local account-state slice | `8fd4cf759c2a8dd3f9ef9772f6dadb2035d93820` | ACCEPTED six-path state boundary; dual final, proof-only timing closure, 55 transferred passes plus two r2 cases, typecheck/lint |
+| Mobile pure composition | `716a606e9d23c77a6d705beccb8cefc6e8228284` | ACCEPTED exact 18-path union, ordered accepted parents, dual binding and inherited-evidence applicability; no new runtime |
 
-Predecessor acceptance records remain unchanged under `execution/e7d2385c/` and `execution/6c2a68ac/`. New records are `execution/95633079/C1_FINAL_ACCEPTANCE.md`, `ux/MOBILE_PRESENTATION_ACCEPTANCE.md`, `ux/EXTENSION_PRESENTATION_ACCEPTANCE.md` and `ux/ACCOUNT_STATE_ACCEPTANCE.md`. Do not repeat accepted proof, completed source reviews, foundation composition or UX planning.
+Predecessor acceptance records remain unchanged under `execution/e7d2385c/` and `execution/6c2a68ac/`. New records are `execution/95633079/C1_FINAL_ACCEPTANCE.md`, `ux/MOBILE_PRESENTATION_ACCEPTANCE.md`, `ux/EXTENSION_PRESENTATION_ACCEPTANCE.md`, `ux/ACCOUNT_STATE_ACCEPTANCE.md` and `ux/MOBILE_COMPOSITION_ACCEPTANCE.md`. Do not repeat accepted proof, completed source reviews, foundation composition or UX planning.
 
 Targeted intake mains were backend `c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7`, mobile `a5933fd6de5616493de75f0db907098b149b955c`, extension `0111be661922234d670bbf23e23d270eec1b4a4e`, context `1ebbed76188e33c970fc17c1e7b252f535d040d0`. No product remote writes occurred. Backend auto-deploy/main protection are later landing constraints, not local-work blockers.
 
@@ -44,11 +45,13 @@ C1 acceptance is not all S7, production readiness, complete importer or consumer
 
 ## Active product and UX work
 
-**B/drain:** separate T4 builder `s7_b_drain_builder_muf5xlqn` owns `worktrees/s7-b-drain/**` and `execution/95633079/s7-b-drain/**`, source-only. Exact base is accepted C1. Scope: bounded resumable unambiguous backfill, obsolete-writer fence/drain, own migration and focused new proof source; preserve E/T semantics and both narrow indexes, separately promotable. Shared schema/generator requires prior parent disposition if actually needed. No install, test, generator, hook, commit, PG or remote runtime grant yet. Two independent T4 reviews follow the frozen source packet.
+**B/drain:** separate T4 builder `s7_b_drain_builder_muf5xlqn` owns `worktrees/s7-b-drain/**` and `execution/95633079/s7-b-drain/**`. Exact base is accepted C1. Source v2 tree `3739193a5badb104a0aa880a5242ff21e2a98fb0` contains seven new files and 1461 additions, no accepted path modified. The bounded format-only grant completed using the existing pinned Prettier; v1 is preserved and v2 is frozen. Independent T4 reviewers `b_drain_independent_a_muf76vdm` and `b_drain_independent_b_muf76vds` now review exact source. Builder may separately prepare an evidence-only minimal B-specific fixture/adapter execution proposal without changing v2. No install, dependency copy, test, generator, hook, commit, PG or remote runtime grant. Later execution must reuse matching accepted C1 dependencies/generated client and existing PG tooling; S5 stays absent and retained stopped C1 data remains untouched.
 
 **UX-01 state ACCEPTED:** exact head `8fd4cf759c2a8dd3f9ef9772f6dadb2035d93820`, tree `17a6ce1acea7e4d6e926113faeb6a57eafa684f3`, parent original327731d4 over acceptedS6. Both same-review finals ACCEPTED, A0/B0. The original55pass/1fail receipt remains preserved; only the erroneous timing observation was corrected with a held read, retaining all assertions and product bytes. The corrected case and the new filtered sign-out case passed on r2, followed by typecheck and six-path ESLint, all raw0. The55 unchanged passes transfer by both reviewers' reasoned applicability; never claim57 cases ran together. Runtime released06:58:38Z, no owned survivors. All C qualifications remain, including local-only authority and late-write windows.
 
-**Mobile pure composition ACTIVE:** the same T4 writer has a new exact local-git-only grant in `worktrees/ux-mobile-composed/**` and `execution/95633079/ux/mobile-composition/**`: first parent accepted presentationdf0ad112, second parent accepted state8fd4cf75, commonbasebc7b4e96, exact disjoint18-path union only. No authored source, install, test, generation or remote work; stop on any conflict or unexpected delta. Same A/B reviewers will attest only composition bindings and inherited-evidence applicability. J3 implementation follows accepted composition; server eligibility and intent binding remain separate.
+**Mobile pure composition ACCEPTED:** head `716a606e9d23c77a6d705beccb8cefc6e8228284`, tree `430c76a0a686f8756ea0d77f37613d3f85561fb2`, first parent presentationdf0ad112, second parent state8fd4cf75, commonbasebc7b4e96. Both same A/B reviewers accept the exact disjoint18-path union, all18 owning-parent blobs identical, zero authored hunks and no new import edge. No runtime on the union is claimed; inherited proof transfer is explicitly reasoned. Source worktrees untouched, composed clone clean, no remotes/hooks/bypass.
+
+**J3 source-selection ACTIVE:** existing T2 writer `roman_donor_reuse_comparison_muf3n97e` owns only new `worktrees/ux03-j3/**` and `execution/95633079/ux/j3-source-selection/**`, based on accepted716a606e. Consume accepted presentation and local Later state through the existing controller/safe URL flow, with truthful identity/write-result handling. Scope is the early-codeable J3 restyle, not full UX-03 pairing/handoff. No Home/eligibility/role inference, intent/origin binding, new persistence/API/flag or authority changes. Source freeze plus one independent T2 review precede any runtime/commit; existing mobile environment will be reused, not reinstalled.
 
 **UX-07 extension:** B-01 was limited to semantic proof contaminated by unrelated ancestor `string_decoder`. Exact R2 recovery under `/tmp/tgp-ux07-extension` closed it without product/configuration/dependency changes. Clean install/typecheck/check:hooks/lint/format and genuine commit hooks passed; original 2-file/9-test evidence remains applicable. Final report accepts the local slice only. The original contaminated receipts remain retained; no browser/package/customer-readiness claim is made.
 
@@ -56,7 +59,7 @@ C1 acceptance is not all S7, production readiness, complete importer or consumer
 
 ## Ownership, runtime and continuation
 
-All eight previous-session workers remain stopped/finished. C1, accepted presentation and UX-01 state execution/review lanes are complete; their old grants are not reusable. The canonical heavy slot `execution/test-validation.lock` is free after the UX-01 r2 terminal. B/drain is source-only; pure mobile Git composition does not acquire a test slot.
+All eight previous-session workers remain stopped/finished. C1, accepted presentation, UX-01 state and pure composition lanes are complete; their old grants are not reusable. The canonical heavy slot `execution/test-validation.lock` was released after B/drain's short format-only grant; no heavy execution is currently granted. B/drain source reviews/fixture proposal and J3 source authoring are disjoint.
 
 Next: freeze/review/execute/accept B/drain, then R → N/Q1 → C and remaining authoritative S7 lifecycle/forward contracts, reusing S5 E/T-Q0. Continue S8 native writers, S9 relationships/reconciliation, S10 unseen-source induction, S11 complete customer/multi-host journey and S12 real acceptance/pilot. No routine Bradley decision is required at this cursor.
 
