@@ -1,0 +1,54 @@
+{
+  "review": "S7-3' G2 B/drain independent T4 reviewer B — v3 same-review changed-lines binding",
+  "report": "execution/95633079/audits/b-drain-b/B_DRAIN_REVIEW_B_V3.md",
+  "prior_outputs_unchanged": ["B_DRAIN_REVIEW_B_SOURCE.md", "B_DRAIN_REVIEW_B_BINDING.md", "B_DRAIN_REVIEW_B_MANIFEST.json", "B_DRAIN_REVIEW_B_ADDENDUM_PARENT_RELAY.md", "REVIEW_B.sha256"],
+  "pins": {
+    "base_commit": "a0ea1bea92ba830d5ffb712a3dcb26e7be0a0992",
+    "base_tree": "87798e742c7b48f56b05e9b5c30efa877180a9b3",
+    "v2_tree": "3739193a5badb104a0aa880a5242ff21e2a98fb0",
+    "v3_tree": "00b105ffe362c27808a38c44c6db1f733134f074",
+    "v3_vs_base": "11 A, +2320",
+    "v3_vs_v2": "5 M + 4 A, +896/-37; migration.sql and cli.ts byte-identical to v2",
+    "v2_to_v3_diff_sha256": "557b5b1f9b374d99eac527ab6d191eefaa7995d88fdbd0f2d00ef7534ff70619",
+    "v3_blobs": {
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/down.sql": "91e646dde82a8458d66ff6092b88b6674332ecf8",
+      "prisma/migrations/20270119000000_scout_ledger_obsolete_writer_fence/migration.sql": "55c859068260809ca2681451fb4e5ad670bc46f0",
+      "src/scout/scout-ledger-backfill.cli.ts": "bcc06577638e18d4660657c109f63ce2fa96af44",
+      "src/scout/scout-ledger-backfill.spec.ts": "3a97093ac6923b0fdd1104939d6815cfa3ff2347",
+      "src/scout/scout-ledger-backfill.ts": "957fb8c6d830cb6821b6087cda210523166d903d",
+      "test/rls-g2-b-drain.spec.ts": "9b31fd1813d25a1624ab04666e0b1be4743277ab",
+      "test/scout/g2-b-drain-db-guard.spec.ts": "4e1ed6ff932be9681fc943e122d0806eb095afb2",
+      "test/utils/g2-b-drain-bootstrap.sh (100755)": "b4503eef525baa531eedb148f47828db3a4ade6f",
+      "test/utils/g2-b-drain-db.ts": "cb60f3f47a18d11dd31b970ee49bcf1ed4ff2db3",
+      "test/utils/g2-b-drain-harness.ts": "469cbd2a76a7e56ca65eff5aa4a734c120e5c2a9",
+      "test/utils/g2-b-drain-pg-harness.ts": "c22a72c4ebed9710cbb66de5581441a1508ad730"
+    },
+    "s5_donors_unchanged_at_head": { "test/utils/g2-pg17-db.ts": "0e73d76d", "test/utils/g2-pg17-harness.ts": "ab9aaab4", "test/utils/g2-pg17-bootstrap.sh": "85a636ba", "test/scout/g2-pg17-db-guard.spec.ts": "4fed8bcd", "test/utils/g2-pg17-old-root.sh": "b9080538" },
+    "packet_checks": { "frozen-v3/PACKET.v3.sha256": "all OK", "frozen-v3/SOURCE.sha256": "OK vs worktree and vs frozen files", "fixture-proposal-v3/PROPOSAL.v3.sha256": "all OK", "b-fixture.sh": "byte-identical to reviewed proposal" }
+  },
+  "changed_property_dispositions": {
+    "F1_searchpath_independent_fence": "SOUND (library readDrainState structural predicate, tgtype 7, absent->false without throw; down.sql same predicate, to_regprocedure NULL-safe, no tgenabled requirement by design; fence() renders under search_path='' with tgtype)",
+    "F2_acl_test_only": "SOUND (proacl explicit, no PUBLIC EXECUTE, direct call refused for postgres/anon/authenticated/service_role; SET ROLE valid via WITH ADMIN OPTION; no product REVOKE widened)",
+    "B1_zero_lock_retries_library": "SOUND (bounded min param, only lockRetries min 0)",
+    "B1_zero_lock_retries_unit_assertion": "DEFECTIVE — see B-4",
+    "B2_history_relative_counts_exact_B": "SOUND (S1 then C1 SQL by file + migrate resolve before E; base=164; base+2/+3/+4; appliedSince(start)==[B]; S1/C1 do not touch scout tables)",
+    "identity_adapter": "SOUND (bytes == reviewed proposal except Prettier Set literal collapse)",
+    "binding_runner_v3": "order copy->hooks->gates->hooked commit->pins->PG grant; outer 3600 > soft 2835; hook presence + S5 donor pins + provenance echo added; placeholders => not runtime-grantable"
+  },
+  "findings": [
+    { "id": "B-4", "class": "B", "title": "new DB-free zero-retry assertion reuses a fake whose rows are already drained and whose transaction counter is cumulative: outcome would be 'drained' not 'stalled'; transactions 7 not 1", "harm_or_blocked": "blocked: Phase-A DB-free gate and CI npm test fail deterministically; no product harm", "min_closure": "fresh FakeLedger([row('a')]) with fenced=true, faults=['lock'] for the lockRetries:0 case; assert passes [{chunks:0,lockFailures:1,stalledByLocks:true}], outcome 'stalled', zero.transactions===1 (~4 test lines)", "paths": ["src/scout/scout-ledger-backfill.spec.ts:270-277"], "unlocks": "Phase-A gate; new blob/tree/pins" },
+    { "id": "C-8", "class": "C", "title": "down.sql omits tgenabled by design (removes disabled fence too); library requires enabled — intentional asymmetry" },
+    { "id": "C-9", "class": "C", "title": "fence() SET search_path affects only its own per-call psql session" },
+    { "id": "C-10", "class": "C", "title": "runner 'set -- $pin' reassigns positional params; script uses none" },
+    { "id": "C-11", "class": "C", "title": "tsc observations for Phase A: proacl/appliedSince typed via any from json(); FENCE_TRIGGER_TYPE interpolation" }
+  ],
+  "verdict": {
+    "product_v3": "SOURCE_GRANTABLE (down.sql 91e646dd, scout-ledger-backfill.ts 957fb8c6, migration.sql 55c85906, cli.ts bcc06577)",
+    "proof_adapter_v3": "SOURCE_GRANTABLE except src/scout/scout-ledger-backfill.spec.ts 3a97093a BLOCKED on B-4 (test-only, same review)",
+    "a_findings": 0,
+    "v3_tree_as_pinned_head": "NOT eligible; next candidate differs by one test file",
+    "runtime": "NOT grantable yet (placeholders); Phase-A gate then pins from committed head then separate PG grant"
+  },
+  "phase_a_gate_min": ["copy C1 node_modules + verify 05bc530a/bf679a16", "lefthook install; confirm hooks", "tsc --noEmit", "eslint --max-warnings 0 + prettier --check on 7 TS files", "node scripts/check-r75.js", "jest src/scout/scout-ledger-backfill.spec.ts test/scout/g2-b-drain-db-guard.spec.ts", "ordinary hooked Bradley-authored commit", "fill EXPECT_* pins from committed head"],
+  "availability": "reviewer B available for the B-4 one-file delta and actual head/results; not a new audit track"
+}

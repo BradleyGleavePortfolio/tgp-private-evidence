@@ -38,3 +38,15 @@ The same A/B reviewers inspect only the changed closure, adapter and binding byt
 One old-schema client generation inside the isolated O fixture is accepted in principle as a necessary fixture dependency, not authorized to run yet. Applying accepted migration bytes is fixture setup, not a replay of S1, C1, S5 or E/T-Q0 assertions.
 
 After separately granted affected gates and a genuine hooked commit, actual pins must bind the single novel B PG proof. No new supervisor, trap framework, harness redesign or absolute autonomous-cleanup guarantee is requested; observed sentinel, stop and no-survivor receipts govern. All reviewer Class C notes remain qualifications and do not create extra changes, controls or proof cycles.
+
+## v3 result and minimum v4 successor
+
+Both same reviewers independently bound formatted v3 tree `00b105ffe362c27808a38c44c6db1f733134f074`. All product, live-proof, adapter and execution-template corrections above are source-grantable; template placeholders still prohibit PG execution. Both independently found the same test-only defect in the new zero-retry assertion.
+
+**B-BD-FRESH-FAKE** consolidates reviewer A's FB-3 and reviewer B's B-4. Reusing the already-drained fake also reuses its cumulative transaction count, so the assertion cannot prove a stalled one-attempt run. Only the affected DB-free proof is blocked.
+
+The sole builder may replace that assertion's reused fake with a fresh fenced `FakeLedger` containing one NULL-provenance row and one lock fault, preserving the existing assertions but directing them to the fresh instance. No case population, product, SQL, live spec or other adapter change is granted. Freeze a new v4 tree and one-file diff; all other ten candidate blobs must remain v3-identical.
+
+Following J3's first-run stop/release, one short pinned Prettier check is granted on that changed test file only under the canonical nonblocking lock, with formatting/write/recheck only if needed. No dependency copy, hook, typecheck, lint, Jest, commit or PG run is granted by this correction. The same A/B reviewers bind the single hunk/new pins, not another full review.
+
+Differing static predictions of the old cumulative transaction count are nonblocking wording: all accounts agree that it is not one and that rows are already drained. The actual unit gate will establish the fresh-instance behavior. The direct-call proof is scoped to the actual fixture-role privileges, not a universal statement about ACL-check ordering.

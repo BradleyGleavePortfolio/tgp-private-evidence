@@ -1,0 +1,28 @@
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+index 846b811..50bd855 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.restore.test.tsx
+@@ -41,6 +41,9 @@ jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+ jest.mock('../../../api/extensionPairApi', () => ({
+   extensionPairApi: { init: jest.fn(), status: jest.fn() },
+ }));
++jest.mock('react-native-safe-area-context', () => ({
++  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
++}));
+ 
+ // The kill switch is read at module scope by the screen and as the hook's
+ // default `enabled`; flip it per test through a getter.
+diff --git a/src/screens/coach/__tests__/ImportDataScreen.test.tsx b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+index 8922c27..2c03215 100644
+--- a/src/screens/coach/__tests__/ImportDataScreen.test.tsx
++++ b/src/screens/coach/__tests__/ImportDataScreen.test.tsx
+@@ -46,6 +46,9 @@ jest.mock('@react-navigation/native', () => ({
+ jest.mock('../../../hooks/useRosterReviewDelta', () => ({
+   useRosterReviewDelta: () => ({ delta: 0, refresh: jest.fn() }),
+ }));
++jest.mock('react-native-safe-area-context', () => ({
++  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
++}));
+ 
+ // UX-01 accepted contract: exercised via its real public shape so a false
+ // result and identity/status gating are honored exactly as documented,

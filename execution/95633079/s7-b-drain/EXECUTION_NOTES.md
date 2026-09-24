@@ -35,3 +35,17 @@ index clean, no hooks, no node_modules). Prettier 3.9.6 (sha verified) --check/-
 reflowed format-only, 8/8 TS conformant. v3 tree 00b105ffe362c27808a38c44c6db1f733134f074 via temp index (no
 commit). Packets: frozen-v3/ (PACKET.v3.sha256), fixture-proposal-v3/ (PROPOSAL.v3.sha256). v1/v2/fixture-proposal
 unchanged (PROPOSAL.sha256 and PACKET.v2.sha256 re-verified). No install/copy/hooks/tsc/eslint/jest/commit/PG/probe.
+
+## 2026-09-24 ~08:02Z — reviewer B v3 B-4 (test-only): proposed successor delta prepared, NOT applied
+Live v3 source held unchanged (SOURCE.sha256 re-verified) pending reviewer A. Proposed minimal fix staged as
+frozen-v3/successor-proposal/B-4.zero-retry-fresh-fixture.diff (+ full proposed file): the zero-retry case uses a
+fresh FakeLedger([row('a')]) with fenced=true / faults=['lock'] and asserts that instance (chunks 0, lockFailures 1,
+stalledByLocks, 'stalled', transactions 1). To be consolidated with any A result into one successor under a later
+grant; no formatter/commit/lock action taken (J3 owns the slot).
+
+## 2026-09-24 ~08:08Z — v4 (B-BD-FRESH-FAKE, test-only) applied, format-checked, frozen
+Applied the proposed fresh-FakeLedger hunk to src/scout/scout-ledger-backfill.spec.ts only (11 lines); all other v3
+paths/blobs/modes unchanged. One pinned Prettier 3.9.6 --check under flock -n: pass, no write; lock released at once;
+no formatter process left. v4 tree f4922ca070e887fb7f613ce955b12621b5c33156 (temp index, no commit); packet
+frozen-v4/ (PACKET.v4.sha256). v3 packet and successor-proposal retained as history (PACKET.v3 re-verified).
+No env copy/install/generate/tsc/lint/jest/hooks/commit/PG.

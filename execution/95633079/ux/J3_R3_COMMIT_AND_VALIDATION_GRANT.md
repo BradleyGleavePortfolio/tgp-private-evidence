@@ -41,3 +41,31 @@ Save additive raw logs/status, runner, approved and actual message, identity/tre
 The same reviewer will bind actual head/results. Its source-stage tree identity is reasoned from verified base/path/blob evidence, not an independently recomputed claimed tree hash; ordinary commit preflight supplies the actual tree. Authored Jest coverage is mocked component-interaction coverage, not executed evidence until the gate runs and never real browser/device/end-to-end proof.
 
 No Home offer, J4 reorder, eligibility/intent authority, product remote action, deployment or customer-readiness claim is included.
+
+## Execution ownership continuation
+
+The original J3 writer stopped before any dependency copy, commit or gate and reported the exact frozen source unchanged. Its phase-grant interpretation did not change the user's authorization or the reviewed product boundary. That assignment is complete, with no continuing write/runtime grant.
+
+Parent assigns the identical bounded execution, without source changes or a new review, to `j3_exact_head_validation_executor_muf8p1wx` (T2, Claude Sonnet 5, High requested). The independent reviewer remains `ux_mobile_independent_review_muf47x7e`. Only this replacement executor may acquire the J3 slot or make the ordinary exact-tree commit.
+
+For clarity, the dependency lock hash refers to `package-lock.json`, the installed-record hash to `node_modules/.package-lock.json`, and neither to the empty advisory-lock file. Parent recomputed both accepted siblings' pins and confirmed candidate package-input equality. The independent review was authored by the reviewer, not the builder; the private evidence mirror preserves that report rather than providing a second independent attestation.
+
+## Actual first execution and source-only safe-area closure
+
+The replacement executor committed exact r3 as `22d056bb9d36d3c9f659e6d870ef443f9a0a697b`, tree `4e139900f0f10a3c63bc0baf150257dd0ce8fd60`, parent `716a606e9d23c77a6d705beccb8cefc6e8228284`. Typecheck and three-path lint passed; the two-file Jest gate returned1 with 49 failed and one passed case, all failures reporting absent safe-area context on donor rendering. The unamended commit and failed raw run remain preserved. The slot was released and no automatic retry occurred.
+
+The same reviewer's `J3_SOURCE_SELECTION_T2_ACTUAL_HEAD_RESULTS_NOTE.md` independently binds the commit and raw results and classifies **B-J3-SAFEAREA**, a missing test setup prerequisite. This does not establish product correctness beyond the aborted render.
+
+Parent grants the same executor only the existing donor safe-area mock in the two scoped test files. Each receives `jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }), }));` in normal existing formatting. No assertion, test population, expected value, product/donor code or global configuration changes.
+
+The resulting source-only r4 freeze is tree `0ec34e174d52cfdeddfc145b323b6045a3dd5d5c`, patch SHA-256 `9bbdbc11558fb2a1d651dd44b2e71e5231e9d6800a099ceb1b681cb8f403d8b1`, +6/-0 across those two tests. Product blob `92ed52f5cc108f3a098062364d6af793cbb8e2b7` is unchanged. The same reviewer is assigned only the two mock additions and new pins before a separate follow-up commit/gate grant.
+
+The proposed complete follow-up message is `test(importer): provide safe area context in J3 screen tests`, single subject with empty body and no trailers. No further runtime or commit is authorized by this source-only correction.
+
+## r4 execution grant after changed-lines binding
+
+The same reviewer's `J3_SOURCE_SELECTION_T2_R4_CHANGED_LINES_BINDING.md` binds the two mock additions and exact r4 pins. B's one-file formatter is complete/released. Parent now grants the existing J3 executor the next canonical slot for an ordinary additive commit of tree `0ec34e174d52cfdeddfc145b323b6045a3dd5d5c` on `22d056bb9d36d3c9f659e6d870ef443f9a0a697b`, using the single-subject message above and both Bradley identities. No source changes, reinstall, dependency recopy, formatter, amendment or bypass are included.
+
+On the actual follow-up head, run local `tsc --noEmit` (180s), ESLint on only the two changed test files (120s), and Jest on the same two affected files with `--silent --runInBand` (180s), in order with first-nonzero stop and ordinary small kill grace. The previous unchanged product-file lint remains applicable. This explicit minimum supersedes the executor freeze note's proposed “gate 3 only” wording; the note remains preserved.
+
+Save additive raw receipts and exports, retain the first failed run, release the slot and return to the same reviewer for actual-head/results binding. No self-acceptance, wider suite, browser/device proof, product remote action or deployment is authorized.
