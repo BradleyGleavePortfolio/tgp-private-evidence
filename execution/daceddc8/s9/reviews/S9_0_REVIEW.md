@@ -240,3 +240,103 @@ One bound is worth recording: E2 accepts a 200 only within 64 KiB (L78), and the
 ## 9. What this review does not claim
 
 I ran no tests, hooks or PG work, and I made no product or git change. This review is not an acceptance of S7-L, S8-C, S8-F or S8-G. The closures above are text amendments for the S9-0 author. After they are made, a delta re-review of D-S9-2 C-COV, D-S9-3, D-S9-5 L274 and R13/R15/R18 is sufficient.
+
+---
+
+## Re-review (changed parts only), 2026-09-25
+
+**Final verdict: GO.** R-A1 and R-B1 are closed. Every folded C item is correct, and I found no regression in the unchanged parts. The only new findings are class C.
+
+### Subject
+
+- Same worktree and branch. HEAD is still `df713fd9217df524915348ef8a42c797f288dde1`.
+- `git status --porcelain --untracked-files=all` still shows only `?? docs/decisions/2026-09-25-s9-reconciliation.md`.
+- sha256 `cda68d826be08e5bf5cd1152ecbb092b10dfc373c7234bd73943815d0d07bab1`, which matches the parent mail. The file has 533 lines.
+- Inputs:
+  - the changed-sections list in `s9/S9_0_DRAFT_READY.md` ("Amendment");
+  - the parent disposition in `SCOPE.md` L244-265.
+- Read-only. I made no git writes, took no lock and ran no tests or PG work.
+
+### R-A1: closed
+
+- **Required-family set.** D-S9-2 (doc L163-177) defines `required_families` as the union of three sets:
+  - the canonical families of the staged entries;
+  - the families the coverage map names;
+  - every family the mapping spec of each staged `source_platform` declares (`spec.families` keys; `mapping-spec.ts` L118 and L252 at `df713fd9`).
+- **When the set is undeterminable.** It is undeterminable with zero staged rows, or when any staged platform has no spec.
+- **C-COV** (L158-161) holds when any of these holds:
+  - the set is empty or undeterminable;
+  - any member lacks `coverageKnown`;
+  - the claim is not `success`.
+- **D-S9-3** (L206-215):
+  - `coverageKnown` now requires `coverage[f]` to be present, so a family missing from the map counts as not known.
+  - `complete` needs a non-empty, determinable set, `coverageKnown` for every member, and claim `success`.
+  - S9-A's `coverage.ts` is bound to this text. This matches the parent's closure (SCOPE L248-252).
+- **Vacuity cases, each checked:**
+  - Zero rows, any map: undeterminable, so C-COV fires (L182-184).
+  - Zero rows, `{}`, claim `success`: C-COV fires; R18b (L497-499) covers it.
+  - Staged rows with an empty map: the staged families are required and absent from the map, so C-COV fires.
+  - A family the spec declares but the map omits: C-COV fires; R01d (L436-437) covers it.
+  - An unregistered platform: undeterminable, and C-FAM fires as well.
+- **No residual vacuous path.** When the set is non-empty and determinable, every member must carry an explicit `known: true` with `covers_staged_identities`.
+- **v1 behaviour is unchanged.** S9-B still passes `coverage: null`.
+- S9-B now supplies the per-platform declared families (L408), so the S9-A input exists.
+
+### R-B1: closed (option (i))
+
+- **Additive fields are optional and omitted.** D-S9-5 (L294-322) makes the six fields optional DTO properties (`required: false`). They are omitted, never `null` or `[]`, whenever no report applies: legacy rows, open server runs, and `reconciliation_not_performed` terminals.
+- **Two-argument calls are unchanged.** `projectFamilies` takes an optional third parameter, and with two arguments it returns today's objects.
+- **Accepted assertions stay untouched.** The two accepted `toEqual` literals (`scout.service.spec.ts` L766-787, `lifecycle.service.spec.ts` L464-492) stay untouched and passing, and S7L-DOC L229-230 is cited correctly.
+- **The null-or-empty wording is gone.** The line "Legacy rows keep all of these null or empty" is removed. R13 (L473-479) and R15 (L485-488) now say "absent" and "untouched and passing".
+- **No other accepted unit case is affected.** Every `getImportStatus` case in `src/scout/scout.service.spec.ts` uses legacy `importRow(...)` fixtures, so none of them gets a report. `lifecycle.service.spec.ts` has no status-read case. `scout.controller.spec.ts` mocks `getImportStatus`. The accepted S7-L PG proof uses `objectContaining` for `families` (`rls-g2-s7l.spec.ts` L791-793) and is not rerun.
+
+### Folded C items: all correct
+
+- **C-1, constructor and read hunks.** S9-C's `lifecycle.service.ts` scope (L409) now lists:
+  - the reconciliation import;
+  - an `@Optional()` facts-service constructor parameter after `prisma, analytics`. The constructor is at L114-119, and the four two-argument construction sites are verified: `scout.service.ts` L96, `scout-ingest.service.ts` L50, `lifecycle.service.spec.ts` L67 and `g2-s7l-worker.cjs` L112;
+  - one report-read method;
+  - the optional `projectFamilies` parameter and optional `FamilyProjection` fields.
+- **C-2, classification table.**
+  - Bucket j is now positive: ledger `reconstructed` with a native kind.
+  - Bucket e reads "any other ledger `skipped`".
+  - New catch-all bucket k gives `unresolved:reason_unrecognised`.
+  - The partition invariant states that buckets a-k are total.
+  - `ledger_without_staged` is counted run-wide (L119-122), and C-ID uses the run-wide count (L153-154).
+- **C-3, missing R cases.** R02b (`missing_source_id` → d/`rejected`) and R03b (unregistered platform → a/`rejected`, `unresolved_family`) are added. R03b is PG-testable: the staging CHECK accepts any canonical-form token (`20270120000000…/migration.sql` L130-132, regex), and only three specs are registered (`reconstruct/sources/*.json`).
+- **C-4, per-row bucket f key.** Bucket f is now keyed per row, as S8-DOC L148-149 requires: a client-owned family, a resolved client link, or an existing `no_native_client_principal` reason. It also covers the S8-C candidate's unresolved provenance row.
+- **C-7, E2 body bound.** A note in D-S9-5 cites CONSUMER_FREEZE L78, and R15 gains a 32-family fixture that keeps the status body within 64 KiB.
+- **C-8, R16 deadline window.** R16 now reads "≤ 10 000 ms, one thirtieth of `SCOUT_RUN_DEADLINE_MS_DEFAULT` = 300 000 ms". The arithmetic is right, and the constant is at `lifecycle.service.ts` L29.
+- **Minor edits.**
+  - "Why no table" point 2 now reads "never `complete` in v1", which is correct now that fenced terminals get reports.
+  - §5 lists the new R cases.
+
+### Regression check
+
+- **Lines 1-78** (status, sources and D-S9-1) are unchanged, and their citations are the ones already verified in §2.
+- **Sections left unchanged:**
+  - D-S9-4, D-S9-6 and D-S9-7 run codes;
+  - D-S9-8 for S9-0, S9-A and Gen;
+  - R01-R19;
+  - §4.
+
+  All of these match the reviewed version, apart from the items listed above.
+- **Parent decisions F1, F2, recompute, ceiling and `blocked`** remain faithful.
+- **Disjointness from S8-F, S8-G and the S8-C candidate** is unchanged. The added hunks are all inside S9-C's existing files.
+- **E2 compatibility.** `families[]` is still additive, and omitting fields is more conservative than null-valued fields.
+
+### New findings (class C only; record and continue)
+
+- **RC-1. `coverage_basis_unknown` meaning.** The D-S9-7 meaning cell (L366) does not mention the empty or undeterminable `required_families` trigger. Wording only; D-S9-2 is the binding definition.
+- **RC-2. "Pre-S9 terminals" wording.** "Pre-S9 terminals (the arbiter's step-4 default)" (L296) excludes only `reconciliation_not_performed`. Runs fenced before S9-C landed (`cancelled`, `timed_out`) will therefore get a recomputed report. That is a truthful account under an unchanged terminal, so there is no harm, but state it explicitly.
+- **RC-3. Layout of the declared-family sentence.** The sentence "a declared family that has no staged row gets `staged_unique: 0`…" sits inside the second "cannot be determined" bullet (L173-177). Move it to its own paragraph, and say that such report-only entries never create a `families[]` projection entry, because there is no staged token for them.
+- **Carried into the S9-B and S9-C grants, as the author recorded:**
+  - C-5: E-R2 `#ord:<n>` notation (L140 is still unchanged);
+  - C-6: qualifier-domain parsing and client-controlled tokens;
+  - C-7 second half: a closed OpenAPI enum for `qualifiers`;
+  - C-9: a REPEATABLE READ status-read transaction and a catalogue-equality spec;
+  - C-10: `not_applicable` wording, `media_policy` in R12, and the sum rule for multi-platform tokens.
+
+  None of these weakens the verdict predicate, so it is acceptable to carry them.
+
+**Execution unlocked:** the S9-0 commit (genuine hooks) under the heavy-queue slot, and then S9-A source frozen to this text.

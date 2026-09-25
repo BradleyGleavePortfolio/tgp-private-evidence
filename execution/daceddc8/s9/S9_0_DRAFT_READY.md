@@ -1,7 +1,7 @@
-# S9-0 draft ready (decision doc; uncommitted)
+# S9-0 draft ready (decision doc; uncommitted) — AMENDED after review NO-GO
 
 Lane `s9_0_decision_doc`, grant S9-0-1 (`execution/daceddc8/SCOPE.md` "S7-L landed" → "Grants"), T3
-sole writer. Status: **DRAFT_READY**. The draft is not committed. The commit waits for the parent to
+sole writer. Status: **AMENDED** (was DRAFT_READY at sha256 `53c15c68…c521`, 463 lines). The draft is not committed. The commit waits for the parent to
 relay the heavy slot and for one independent T3 review to return GO. This evidence repo is not
 committed.
 
@@ -12,8 +12,9 @@ committed.
   (`integration/importer`). HEAD has not moved, and no other ref changed.
 - Working tree: exactly one untracked file and no other change (`git status --porcelain
   --untracked-files=all` shows only `?? docs/decisions/2026-09-25-s9-reconciliation.md`).
-- File: `docs/decisions/2026-09-25-s9-reconciliation.md`, 463 lines, 37,555 bytes.
-- **sha256:** `53c15c686dd330d33595ed2048cb2fd20710d2f0a383d6e54fceca4a397ec521`
+- File: `docs/decisions/2026-09-25-s9-reconciliation.md`, 533 lines, 48,101 bytes.
+- **sha256 (amended, current):** `cda68d826be08e5bf5cd1152ecbb092b10dfc373c7234bd73943815d0d07bab1`
+- Superseded draft sha256: `53c15c686dd330d33595ed2048cb2fd20710d2f0a383d6e54fceca4a397ec521`
 - Formatting: `npx prettier --check` passes. The repo `.prettierrc` has printWidth 100. The lefthook
   pre-commit prettier glob includes `*.md`. Prettier is not a devDependency, so npx fetched it,
   exactly as the hook will. R75 does not scan `docs/`.
@@ -112,3 +113,82 @@ boundary.
 
 No commit, no push, no hooks run, no tests, no PG work and no change to the evidence repo other than
 this file.
+
+## Amendment (after `s9/reviews/S9_0_REVIEW.md` NO-GO and SCOPE §"S9-0 review NO-GO")
+
+The same untracked file was amended in place. HEAD and branch are unchanged, and it is still the
+only change. `npx prettier --check` passes.
+
+### Changed sections (for the delta re-review)
+
+1. **R-A1 (class A).**
+   - **D-S9-2 C-COV** now names three conditions: `required_families` is empty or undeterminable;
+     any required family lacks `coverageKnown`; the claim is not `success`.
+   - **New "Required families" paragraph:**
+     - `required_families` is the union of staged canonical families, coverage-map families and
+       every family that a staged platform's mapping spec declares (`families` keys).
+     - The set is undeterminable when there are zero staged rows or any staged platform has no
+       spec.
+     - A declared but unstaged family gets a `staged_unique: 0` entry and still needs coverage.
+   - The **empty-run paragraph** now covers `null`, `{}` and non-empty coverage maps.
+   - **D-S9-3:** `coverageKnown` requires `coverage[f]` to be present. `complete` requires a
+     non-empty, determinable `required_families` with `coverageKnown` for every member, plus claim
+     `success`. The doc binds S9-A `coverage.ts` to this. The predicate inputs list now includes
+     `required_families`.
+   - **Acceptance:** R01a is reworded to "every required family (staged and spec-declared)". New
+     **R01d** (a spec-declared family missing from the map → `partial/coverage_basis_unknown`) and
+     new **R18b** (zero staged, `coverage = {}`, claim `success` → `partial/coverage_basis_unknown`).
+   - **D-S9-8 S9-B scope:** S9-B supplies the per-platform spec-declared families (`null` for an
+     unregistered platform).
+2. **R-B1 (class B), option (i).**
+   - **D-S9-5 Projection:**
+     - New "report applies" rule: a server run with a terminal whose `reason_code` is not
+       `reconciliation_not_performed`. Legacy rows, open runs and pre-S9 terminals get no report.
+     - With no report, the entry is exactly the S7-L shape and the additive fields are **absent**.
+     - The additive fields are **optional** DTO properties (`required: false`), omitted rather than
+       set to `null` or `[]`.
+     - `projectFamilies` takes an optional third parameter. Called with two arguments, it returns
+       the S7-L objects unchanged.
+     - The accepted `toEqual` assertions at `scout.service.spec.ts` L766-787 and
+       `lifecycle.service.spec.ts` L464-492 stay untouched (S7L-DOC L229-230).
+     - The "Legacy rows keep all of these null or empty" line is removed.
+   - **R13** and **R15** are reworded to "absent" and "untouched and passing".
+   - The **D-S9-8 S9-C `scout.dto.ts` hunk** is now "optional additive properties only".
+3. **C items folded in (from the parent disposition list).**
+   - `lifecycle.service.ts` S9-C hunks now list:
+     - the reconciliation import;
+     - an `@Optional()` facts-service constructor parameter after `prisma, analytics` (L114-119).
+       This keeps the 2-argument constructions at `scout.service.ts` L96, `scout-ingest.service.ts`
+       L50, `lifecycle.service.spec.ts` L67 and `g2-s7l-worker.cjs` L112;
+     - one report-read method;
+     - the optional `projectFamilies` parameter and `FamilyProjection` optional fields.
+   - Classification table:
+     - new catch-all bucket **k** → `unresolved:reason_unrecognised` (the partition is total);
+     - bucket **e** is now "any other ledger `skipped`";
+     - bucket **j** is stated positively (ledger `reconstructed` with a native kind);
+     - bucket **f** is keyed **per row** (S8-DOC L148-149): client-owned family, resolved client
+       link, or an existing `no_native_client_principal` reason, else `evidence_only`.
+   - `ledger_without_staged` is counted **run-wide** (and also attributed per family where
+     resolvable). C-ID uses the run-wide count.
+   - New **R02b** (`missing_source_id` → bucket d `rejected`, `partial/unresolved_identities`) and
+     **R03b** (unregistered platform → bucket a `rejected`, `partial/unresolved_family`).
+   - **R16:** the numeric window is at most 10 000 ms of wall time for a synthetic 10k-row intent
+     on the proof lane, which is 1/30 of `SCOUT_RUN_DEADLINE_MS_DEFAULT` = 300 000 ms
+     (`lifecycle.service.ts` L29).
+   - **E2 64 KiB note** in D-S9-5 (CONSUMER_FREEZE L78). R15 gains a 32-family body-size fixture.
+4. **Minor consistency edits.**
+   - The partition invariant notes that buckets a-k are total.
+   - "Why no table" point 2 now reads "never `complete` in v1" instead of "stays `partial`",
+     because fenced terminals also get reports.
+   - The §5 release boundary lists the new R cases.
+
+### Recorded, not folded (review C items outside the disposition list)
+
+- C-5: `#ord:<ordinal>` notation and ordinal-vs-order semantics.
+- C-6: the qualifier-domain parser and the note that tokens are client-controlled.
+- C-7, second half: a closed OpenAPI enum for `qualifiers`.
+- C-8 is done.
+- C-9: a REPEATABLE READ read transaction and an S9-A/S8-C catalogue-equality spec.
+- C-10: `not_applicable` wording, `media_policy` in R12, and the sum rule for multi-platform tokens.
+
+All of these are safe to carry into the S9-B and S9-C grants.

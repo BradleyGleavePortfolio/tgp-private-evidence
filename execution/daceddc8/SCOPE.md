@@ -275,3 +275,11 @@ The independent T3 review (`s9/reviews/S9_0_REVIEW.md`) found one class A and on
 - **Grantee:** `s8c_bootstrap_completion` as proof executor.
 - **Waiting rule:** poll read-only, at least 60 s apart, until 0 holders and no E2 gate process. Then re-run PREFLIGHT and launch exactly once: `S8C_PG5_GRANT=1 bash …/s8c/binding/v5/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s8c/binding/v5/s8c-pg-proof.sh` against `f428db9a…` (tree `f2623be6…`), with driver `b641db2d…`, fixture `34a42ab8…` and manifest `2995ed83…`.
 - **Rules:** no rerun on any consumed rc. A full pass means accept, then compose onto `integration/importer` `df713fd9` under the LAND-1 scripts.
+
+## S9-0 re-review GO; landing sequencing (17:58Z)
+
+- **Status:** `docs/decisions/2026-09-25-s9-reconciliation.md` `cda68d82…` is GO on the changed-part re-review (`s9/reviews/S9_0_REVIEW.md`). The re-review's RC-1..3 and the carried C-5, C-6, C-7 (enum half), C-9 and C-10 go into the S9-B and S9-C grants. The reviewed bytes stay frozen.
+- **Sequencing:** the S8-C landing is the critical path, because it unblocks S8-F and S8-G. So the S8-C proof and the S8-C composition onto `integration/importer` run first. After that, `s9_0_decision_doc` commits the unchanged doc bytes onto the then-current landed integration head and lands them by FF under the LAND-1 method.
+  - To do that, it moves its untracked file to a fresh branch from that head. This is docs-only, and no tracked file overlaps.
+  - The doc's code citations are pinned at `df713fd9`.
+- **S9-A:** freezes to `cda68d82`.
