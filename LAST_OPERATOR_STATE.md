@@ -1,5 +1,19 @@
 # LAST OPERATOR STATE
 
+## Owner handoff freeze: 2026-09-25 05:56Z
+
+ALL EXECUTION IS FROZEN. The owner requested handoff, not continuation. `execution/64e33dc7/HANDOFF_FREEZE.md` supersedes every active grant and cursor below; `execution/64e33dc7/OPERATOR_HANDOFF_GUIDE.md` is the new operator's start document. Only evidence capture and publication are authorized during handoff.
+
+S7-L `a68cdac7` remains unaccepted after a natural 23-pass/1-fail v3 proof. Both runtime reviews identify one OLD-client worker runtime-identity proof defect; no fix has started. S8-C `87018a42` remains unaccepted after bootstrap rc7 before Jest; its one-file bootstrap WIP is exported but uncommitted and ungated. The written 05:43 relay was never delivered; no S8-C v4 binding/v6 checkpoint exists. S8-F's 15-path draft is frozen and recoverable; S8-G readiness is complete, implementation not started. All lanes require a new explicit operator grant to resume.
+
+Accepted backend integration remains `93389265`; production main unchanged. All sections below are historical, even when titled "Live".
+
+## Live correction cursor: 2026-09-25 05:43Z
+
+S7-L's a68cdac7/v3 proof exited naturallyrc1:23 passed/1 failed/24,172 migrations applied, clean bounded stop and release05:41:42Z. Sole failure is OLD legacy replay result in L05/L12; both existing reviewers are assigned new runtime-only causal dispositions under `execution/64e33dc7/S7L_V3_FAILED_PROOF_DISPOSITION.md`. No acceptance or retry.
+
+Parent verified free slot/no heavy processes05:43:14Z and read S8-C's one-bootstrap-file correction. The explicit relay in `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` now gives S8-C sole source-gate authority, not PG; finish hooked commit/export/frozen v4, then dual changed-question reviews. All failed lanes/receipts remain untouched. Neither replacement is accepted or landed.
+
 ## Live proof cursor: 2026-09-25 05:39Z
 
 S7-L a68cdac7/tree6c00e248 has dual independent changed-question GO, closing the observed message assertion and leaked-holder proof defects. `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md` activates one new exact v3 invocation on fresh `proof-v3` paths; S7-L alone owns the heavy slot. Parent verified no holder/process/listener and both retained lanes stopped05:38:04Z. No acceptance yet.

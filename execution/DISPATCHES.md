@@ -1,5 +1,17 @@
 # Current execution dispatches
 
+## Owner-directed freeze, 2026-09-25 05:56Z
+
+ALL LANES FROZEN. No active builder, reviewer, heavy-slot or PostgreSQL grantee remains. `64e33dc7/HANDOFF_FREEZE.md` supersedes every prior row and relay; `64e33dc7/OPERATOR_HANDOFF_GUIDE.md` and `64e33dc7/handoff/AGENT_FREEZE_REGISTER.md` hold the final inventory and resume prerequisites.
+
+Parent may only verify/export/publish the frozen handoff. S7-L's two latest runtime reviews are complete; S8-C's prepared one-file WIP is uncommitted, with no source gates or v4 binding begun. Existing pending grants require fresh explicit ownership and scope before any resumption. Historical rows below must not reactivate agents.
+
+## Live override, 2026-09-25 05:43Z
+
+S7-L builder's v3 proof is terminal naturalrc1,23pass/1fail,172 migrations; clean stop/release05:41:42Z. Builder may finish only terminal receipt; independent reviewers write new RUNTIME_V3_REVIEW_A/B for the single OLD replay failure, no source audit or runtime.
+
+S8-C alone receives the source-gate relay in `64e33dc7/S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md`, after parent no-holder/no-heavy verification05:43:14Z. One bootstrap file, genuine hooks, release/export/frozen v4, then BOOTSTRAP_CORRECTION_REVIEW_A/B; first failure stops. No PG, regenerate, S7 retry or acceptance.
+
 ## Live override, 2026-09-25 05:39Z
 
 S7-L builder is sole heavy grantee under `64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md`: one exact a68cdac7/v3 invocation on fresh proof-v3 paths. Both RUNTIME_CORRECTION_REVIEW_A/B are GO; parent read full reports and verified no holder/heavy process/listener, both retained lanes stopped05:38:04Z. No automatic repair or retry; terminal receipt then runtime-only independent review.

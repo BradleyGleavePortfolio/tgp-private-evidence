@@ -1,5 +1,15 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Owner freeze supersedes all grants, 2026-09-25 05:56Z
+
+Scope is now handoff only under `HANDOFF_FREEZE.md`. All agents are frozen; no product edit, gate, commit, PostgreSQL proof, retry, review expansion or landing is authorized. Read `OPERATOR_HANDOFF_GUIDE.md` for exact state and recovery.
+
+S7-L v3 has final dual runtime dispositions: one proof-tool B, 23 passed/1 failed, not accepted. S8-C's one-bootstrap-file WIP is exported, with no gate/commit/v4 binding started; its written 05:43 relay was not delivered and is revoked. F is a checkpointed draft and G is readiness only. Prior "Live" sections below are history, not authorization.
+
+## Live correction cursor, 2026-09-25 05:43Z
+
+S7-L's v3 proof failed naturally23pass/1fail with172 migrations and clean stop; only the remaining L05/L12 OLD replay assertion is under new runtime review. S8-C is sole source-gate grantee under the explicit05:43 relay for its one-bootstrap-file correction, hooked commit and v4 binding. No PG grant or acceptance is active.
+
 ## Live proof cursor, 2026-09-25 05:39Z
 
 `S7L_V3_SINGLE_PG_PROOF_GRANT.md` is the sole active heavy authority: one exact a68cdac7/v3 proof on fresh proof-v3 paths after dual GO and verified stopped retained lanes. S8-C's two runtime diagnoses are complete; `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` separately authorizes only one-bootstrap-file source preparation and fresh v4 binding, with later gates requiring explicit relay. No S8 retry, regeneration or product acceptance is granted.

@@ -1,0 +1,728 @@
+2026-09-25 05:39:47.097 UTC [1261] LOG:  starting PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-09-25 05:39:47.098 UTC [1261] LOG:  listening on IPv4 address "127.0.0.1", port 55641
+2026-09-25 05:39:47.098 UTC [1261] LOG:  listening on Unix socket "/home/user/workspace/execution/64e33dc7/recovery-reset/proof-v3/run/s7l/.s.PGSQL.55641"
+2026-09-25 05:39:47.099 UTC [1264] LOG:  database system was shut down at 2026-09-25 05:39:45 UTC
+2026-09-25 05:39:47.100 UTC [1261] LOG:  database system is ready to accept connections
+2026-09-25 05:40:17.812 UTC [1782] WARNING:  there is already a transaction in progress
+2026-09-25 05:40:17.816 UTC [1782] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:40:17.816 UTC [1782] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:40:17.816 UTC [1782] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:40:19.120 UTC [1862] WARNING:  there is already a transaction in progress
+2026-09-25 05:40:19.124 UTC [1862] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:40:19.124 UTC [1862] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:40:19.124 UTC [1862] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:40:19.945 UTC [1912] WARNING:  there is already a transaction in progress
+2026-09-25 05:40:20.445 UTC [1912] LOG:  process 1912 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.089 ms
+2026-09-25 05:40:20.445 UTC [1912] DETAIL:  Process holding the lock: 1910. Wait queue: 1912.
+2026-09-25 05:40:20.445 UTC [1912] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:40:24.945 UTC [1912] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:40:24.945 UTC [1912] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:40:25.818 UTC [1952] WARNING:  there is already a transaction in progress
+2026-09-25 05:40:25.821 UTC [1952] ERROR:  G2-S7L run lifecycle absent
+2026-09-25 05:40:25.821 UTC [1952] CONTEXT:  PL/pgSQL function inline_code_block line 47 at RAISE
+2026-09-25 05:40:25.821 UTC [1952] STATEMENT:  DO $$
+	BEGIN
+	  -- S7-L1 exactly as shipped: the ten columns with their shipped types, nullability and defaults,
+	  -- the four validated CHECKs, the validated composite FK to ImportIntent and the partial unique
+	  -- index. Anything else (absent, partial, decoy) is refused with this fixed text, so a pre-S7-L
+	  -- database or a rerun receives it, not a raw undefined-column error.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_attribute a
+	    LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	      AND (
+	        (a.attname = 'mode' AND a.atttypid = 'text'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '''legacy''::text')
+	        OR (a.attname = 'import_intent_id' AND a.atttypid = 'uuid'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'phase' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'accepted_start_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'deadline_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'last_observed_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'execution_epoch' AND a.atttypid = 'int4'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '1')
+	        OR (a.attname = 'fenced_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'fence_reason' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'reason_code' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	      )
+	  ) <> 10 OR (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'c' AND c.convalidated
+	      AND c.conname IN ('ScoutImport_mode_check', 'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check', 'ScoutImport_mode_shape_check')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'f' AND c.convalidated
+	      AND c.conname = 'ScoutImport_import_intent_id_coach_id_fkey'
+	      AND c.confrelid = to_regclass('public."ImportIntent"')
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_import_intent_id_key"')
+	      AND i.indrelid = 'public."ScoutImport"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NOT NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key" ON public."ScoutImport" USING btree (import_intent_id) WHERE (import_intent_id IS NOT NULL)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle absent';
+	  END IF;
+	  -- Refuse to erase recorded lifecycle facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (
+	    SELECT 1 FROM public."ScoutImport"
+	    WHERE "mode" <> 'legacy'
+	      OR "import_intent_id" IS NOT NULL
+	      OR "phase" IS NOT NULL
+	      OR "accepted_start_at" IS NOT NULL
+	      OR "deadline_at" IS NOT NULL
+	      OR "last_observed_at" IS NOT NULL
+	      OR "execution_epoch" <> 1
+	      OR "fenced_at" IS NOT NULL
+	      OR "fence_reason" IS NOT NULL
+	      OR "reason_code" IS NOT NULL
+	  ) THEN
+	    RAISE EXCEPTION 'Run lifecycle state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-25 05:40:30.027 UTC [2170] WARNING:  there is already a transaction in progress
+2026-09-25 05:40:30.032 UTC [2170] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:40:30.032 UTC [2170] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:40:30.032 UTC [2170] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:40:33.612 UTC [2278] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_check"
+2026-09-25 05:40:33.612 UTC [2278] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.611, null, other, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.611, 2026-09-25 05:45:33.611, null, 1, null, null, null).
+2026-09-25 05:40:33.612 UTC [2278] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'other','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.645 UTC [2280] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_check"
+2026-09-25 05:40:33.645 UTC [2280] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.644, null, other, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.644, 2026-09-25 05:45:33.644, null, 1, null, null, null).
+2026-09-25 05:40:33.645 UTC [2280] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'other','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.677 UTC [2282] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.677 UTC [2282] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.677, null, server, null, discovering, 2026-09-25 05:40:33.677, 2026-09-25 05:45:33.677, null, 1, null, null, null).
+2026-09-25 05:40:33.677 UTC [2282] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server',NULL,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.710 UTC [2284] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.710 UTC [2284] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.71, null, server, null, discovering, 2026-09-25 05:40:33.71, 2026-09-25 05:45:33.71, null, 1, null, null, null).
+2026-09-25 05:40:33.710 UTC [2284] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server',NULL,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.757 UTC [2286] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.757 UTC [2286] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.756, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, null, 2026-09-25 05:45:33.756, null, 1, null, null, null).
+2026-09-25 05:40:33.757 UTC [2286] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',NULL,(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.792 UTC [2288] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.792 UTC [2288] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.791, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, null, 2026-09-25 05:45:33.791, null, 1, null, null, null).
+2026-09-25 05:40:33.792 UTC [2288] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',NULL,(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.825 UTC [2290] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.825 UTC [2290] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.825, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.825, null, null, 1, null, null, null).
+2026-09-25 05:40:33.825 UTC [2290] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),NULL)
+2026-09-25 05:40:33.857 UTC [2292] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.857 UTC [2292] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.857, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.857, null, null, 1, null, null, null).
+2026-09-25 05:40:33.857 UTC [2292] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),NULL)
+2026-09-25 05:40:33.890 UTC [2294] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.890 UTC [2294] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.889, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.889, 2026-09-25 05:40:33.889, null, 1, null, null, null).
+2026-09-25 05:40:33.890 UTC [2294] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC'))
+2026-09-25 05:40:33.922 UTC [2296] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.922 UTC [2296] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:33.922, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.922, 2026-09-25 05:40:33.922, null, 1, null, null, null).
+2026-09-25 05:40:33.922 UTC [2296] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC'))
+2026-09-25 05:40:33.954 UTC [2298] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.954 UTC [2298] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, success, success, 2026-09-25 05:40:33.954, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.954, 2026-09-25 05:45:33.954, null, 1, null, null, null).
+2026-09-25 05:40:33.954 UTC [2298] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','success','success','server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:33.985 UTC [2300] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:33.985 UTC [2300] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, success, success, 2026-09-25 05:40:33.985, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:33.985, 2026-09-25 05:45:33.985, null, 1, null, null, null).
+2026-09-25 05:40:33.985 UTC [2300] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','success','success','server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.017 UTC [2302] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:34.017 UTC [2302] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy, complete, complete, 2026-09-25 05:40:34.017, null, legacy, null, null, null, null, null, 1, null, null, null).
+2026-09-25 05:40:34.017 UTC [2302] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy','complete','complete','legacy',NULL,NULL,NULL,NULL)
+2026-09-25 05:40:34.050 UTC [2304] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:34.050 UTC [2304] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy, complete, complete, 2026-09-25 05:40:34.049, null, legacy, null, null, null, null, null, 1, null, null, null).
+2026-09-25 05:40:34.050 UTC [2304] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy','complete','complete','legacy',NULL,NULL,NULL,NULL)
+2026-09-25 05:40:34.082 UTC [2306] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:34.082 UTC [2306] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2, in_progress, null, 2026-09-25 05:40:34.081, null, legacy, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, null, null, null, null, 1, null, null, null).
+2026-09-25 05:40:34.082 UTC [2306] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2','in_progress',NULL,'legacy','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,NULL,NULL,NULL)
+2026-09-25 05:40:34.114 UTC [2308] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:34.114 UTC [2308] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2, in_progress, null, 2026-09-25 05:40:34.114, null, legacy, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, null, null, null, null, 1, null, null, null).
+2026-09-25 05:40:34.114 UTC [2308] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-legacy2','in_progress',NULL,'legacy','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,NULL,NULL,NULL)
+2026-09-25 05:40:34.147 UTC [2310] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_phase_check"
+2026-09-25 05:40:34.147 UTC [2310] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.147, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, settling, 2026-09-25 05:40:34.147, 2026-09-25 05:45:34.147, null, 1, null, null, null).
+2026-09-25 05:40:34.147 UTC [2310] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'settling',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.181 UTC [2312] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_phase_check"
+2026-09-25 05:40:34.181 UTC [2312] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.18, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, settling, 2026-09-25 05:40:34.18, 2026-09-25 05:45:34.18, null, 1, null, null, null).
+2026-09-25 05:40:34.181 UTC [2312] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'settling',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.214 UTC [2314] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.214 UTC [2314] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.213, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.213, 2026-09-25 05:45:34.213, null, 1, null, cancelled, null).
+2026-09-25 05:40:34.214 UTC [2314] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fence_reason) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes','cancelled')
+2026-09-25 05:40:34.246 UTC [2316] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.246 UTC [2316] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.245, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.245, 2026-09-25 05:45:34.245, null, 1, null, cancelled, null).
+2026-09-25 05:40:34.246 UTC [2316] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fence_reason) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes','cancelled')
+2026-09-25 05:40:34.277 UTC [2318] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.277 UTC [2318] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.277, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.277, 2026-09-25 05:45:34.277, null, 1, 2026-09-25 05:40:34.277, null, null).
+2026-09-25 05:40:34.277 UTC [2318] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fenced_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',(now() AT TIME ZONE 'UTC'))
+2026-09-25 05:40:34.309 UTC [2320] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.309 UTC [2320] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.308, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.308, 2026-09-25 05:45:34.308, null, 1, 2026-09-25 05:40:34.308, null, null).
+2026-09-25 05:40:34.309 UTC [2320] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fenced_at) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',(now() AT TIME ZONE 'UTC'))
+2026-09-25 05:40:34.340 UTC [2322] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.340 UTC [2322] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.339, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.339, 2026-09-25 05:45:34.339, null, 1, 2026-09-25 05:40:34.339, paused, null).
+2026-09-25 05:40:34.340 UTC [2322] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fenced_at,fence_reason) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',(now() AT TIME ZONE 'UTC'),'paused')
+2026-09-25 05:40:34.371 UTC [2324] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.371 UTC [2324] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.371, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.371, 2026-09-25 05:45:34.371, null, 1, 2026-09-25 05:40:34.371, paused, null).
+2026-09-25 05:40:34.371 UTC [2324] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,fenced_at,fence_reason) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',(now() AT TIME ZONE 'UTC'),'paused')
+2026-09-25 05:40:34.404 UTC [2326] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.404 UTC [2326] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.403, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.403, 2026-09-25 05:45:34.403, null, 0, null, null, null).
+2026-09-25 05:40:34.404 UTC [2326] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,execution_epoch) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',0)
+2026-09-25 05:40:34.436 UTC [2328] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_fence_reason_check"
+2026-09-25 05:40:34.436 UTC [2328] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, in_progress, null, 2026-09-25 05:40:34.436, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.436, 2026-09-25 05:45:34.436, null, 0, null, null, null).
+2026-09-25 05:40:34.436 UTC [2328] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at,execution_epoch) VALUES ('coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes',0)
+2026-09-25 05:40:34.469 UTC [2330] ERROR:  insert or update on table "ScoutImport" violates foreign key constraint "ScoutImport_import_intent_id_coach_id_fkey"
+2026-09-25 05:40:34.469 UTC [2330] DETAIL:  Key (import_intent_id, coach_id)=(00000000-0000-4000-8000-000000000000, coach) is not present in table "ImportIntent".
+2026-09-25 05:40:34.469 UTC [2330] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-00000000-0000-4000-8000-000000000000','coach','00000000-0000-4000-8000-000000000000','in_progress',NULL,'server','00000000-0000-4000-8000-000000000000'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.507 UTC [2332] ERROR:  insert or update on table "ScoutImport" violates foreign key constraint "ScoutImport_import_intent_id_coach_id_fkey"
+2026-09-25 05:40:34.507 UTC [2332] DETAIL:  Key (import_intent_id, coach_id)=(00000000-0000-4000-8000-000000000000, coach) is not present in table "ImportIntent".
+2026-09-25 05:40:34.507 UTC [2332] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-00000000-0000-4000-8000-000000000000','coach','00000000-0000-4000-8000-000000000000','in_progress',NULL,'server','00000000-0000-4000-8000-000000000000'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.541 UTC [2334] ERROR:  insert or update on table "ScoutImport" violates foreign key constraint "ScoutImport_import_intent_id_coach_id_fkey"
+2026-09-25 05:40:34.541 UTC [2334] DETAIL:  Key (import_intent_id, coach_id)=(b10c5e62-7577-400b-a1f1-4314a24e0db9, coach) is not present in table "ImportIntent".
+2026-09-25 05:40:34.541 UTC [2334] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-b10c5e62-7577-400b-a1f1-4314a24e0db9','coach','b10c5e62-7577-400b-a1f1-4314a24e0db9','in_progress',NULL,'server','b10c5e62-7577-400b-a1f1-4314a24e0db9'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.575 UTC [2336] ERROR:  insert or update on table "ScoutImport" violates foreign key constraint "ScoutImport_import_intent_id_coach_id_fkey"
+2026-09-25 05:40:34.575 UTC [2336] DETAIL:  Key (import_intent_id, coach_id)=(b10c5e62-7577-400b-a1f1-4314a24e0db9, coach) is not present in table "ImportIntent".
+2026-09-25 05:40:34.575 UTC [2336] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-b10c5e62-7577-400b-a1f1-4314a24e0db9','coach','b10c5e62-7577-400b-a1f1-4314a24e0db9','in_progress',NULL,'server','b10c5e62-7577-400b-a1f1-4314a24e0db9'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.673 UTC [2342] ERROR:  duplicate key value violates unique constraint "ScoutImport_import_intent_id_key"
+2026-09-25 05:40:34.673 UTC [2342] DETAIL:  Key (import_intent_id)=(4e035b5e-16f0-471f-b7a1-3ad6d0ecf741) already exists.
+2026-09-25 05:40:34.673 UTC [2342] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('second-run','coach','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741-b','in_progress',NULL,'server','4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:34.834 UTC [2352] ERROR:  update or delete on table "ImportIntent" violates foreign key constraint "ScoutImport_import_intent_id_coach_id_fkey" on table "ScoutImport"
+2026-09-25 05:40:34.834 UTC [2352] DETAIL:  Key (id, coach_id)=(4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach) is still referenced from table "ScoutImport".
+2026-09-25 05:40:34.834 UTC [2352] STATEMENT:  DELETE FROM "ImportIntent" WHERE id='4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'::uuid
+2026-09-25 05:40:34.931 UTC [2358] ERROR:  new row for relation "ScoutImport" violates check constraint "ScoutImport_mode_shape_check"
+2026-09-25 05:40:34.931 UTC [2358] DETAIL:  Failing row contains (coach-4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, coach, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, complete, success, 2026-09-25 05:40:34.64, null, server, 4e035b5e-16f0-471f-b7a1-3ad6d0ecf741, discovering, 2026-09-25 05:40:34.64, 2026-09-25 05:45:34.64, null, 1, null, null, null).
+2026-09-25 05:40:34.931 UTC [2358] STATEMENT:  UPDATE "ScoutImport" SET terminal_status='success' WHERE intent_id='4e035b5e-16f0-471f-b7a1-3ad6d0ecf741'
+2026-09-25 05:40:35.142 UTC [2370] ERROR:  new row violates row-level security policy for table "ScoutImport"
+2026-09-25 05:40:35.142 UTC [2370] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-17aa7d2f-2f1f-4778-9d05-7a53083f3d02','coach','17aa7d2f-2f1f-4778-9d05-7a53083f3d02','in_progress',NULL,'server','17aa7d2f-2f1f-4778-9d05-7a53083f3d02'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:40:35.280 UTC [2378] ERROR:  new row violates row-level security policy for table "ScoutImport"
+2026-09-25 05:40:35.280 UTC [2378] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-17aa7d2f-2f1f-4778-9d05-7a53083f3d02','coach','17aa7d2f-2f1f-4778-9d05-7a53083f3d02','in_progress',NULL,'server','17aa7d2f-2f1f-4778-9d05-7a53083f3d02'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:41:35.983 UTC [3493] ERROR:  duplicate key value violates unique constraint "ScoutImportCompletion_coach_id_intent_id_key"
+2026-09-25 05:41:35.983 UTC [3493] DETAIL:  Key (coach_id, intent_id)=(coach, intent_old_ext_2026) already exists.
+2026-09-25 05:41:35.983 UTC [3493] STATEMENT:  INSERT INTO "public"."ScoutImportCompletion" ("id","coach_id","intent_id","terminal_status","completed_at") VALUES ($1,$2,$3,$4,$5) RETURNING "public"."ScoutImportCompletion"."id", "public"."ScoutImportCompletion"."coach_id", "public"."ScoutImportCompletion"."intent_id", "public"."ScoutImportCompletion"."terminal_status", "public"."ScoutImportCompletion"."final_counts", "public"."ScoutImportCompletion"."error_summary", "public"."ScoutImportCompletion"."completed_at"
+2026-09-25 05:41:36.361 UTC [3509] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:36.366 UTC [3509] ERROR:  Run lifecycle state exists; retain schema and use compatible forward repair
+2026-09-25 05:41:36.366 UTC [3509] CONTEXT:  PL/pgSQL function inline_code_block line 63 at RAISE
+2026-09-25 05:41:36.366 UTC [3509] STATEMENT:  DO $$
+	BEGIN
+	  -- S7-L1 exactly as shipped: the ten columns with their shipped types, nullability and defaults,
+	  -- the four validated CHECKs, the validated composite FK to ImportIntent and the partial unique
+	  -- index. Anything else (absent, partial, decoy) is refused with this fixed text, so a pre-S7-L
+	  -- database or a rerun receives it, not a raw undefined-column error.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_attribute a
+	    LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	      AND (
+	        (a.attname = 'mode' AND a.atttypid = 'text'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '''legacy''::text')
+	        OR (a.attname = 'import_intent_id' AND a.atttypid = 'uuid'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'phase' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'accepted_start_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'deadline_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'last_observed_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'execution_epoch' AND a.atttypid = 'int4'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '1')
+	        OR (a.attname = 'fenced_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'fence_reason' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'reason_code' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	      )
+	  ) <> 10 OR (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'c' AND c.convalidated
+	      AND c.conname IN ('ScoutImport_mode_check', 'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check', 'ScoutImport_mode_shape_check')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'f' AND c.convalidated
+	      AND c.conname = 'ScoutImport_import_intent_id_coach_id_fkey'
+	      AND c.confrelid = to_regclass('public."ImportIntent"')
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_import_intent_id_key"')
+	      AND i.indrelid = 'public."ScoutImport"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NOT NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key" ON public."ScoutImport" USING btree (import_intent_id) WHERE (import_intent_id IS NOT NULL)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle absent';
+	  END IF;
+	  -- Refuse to erase recorded lifecycle facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (
+	    SELECT 1 FROM public."ScoutImport"
+	    WHERE "mode" <> 'legacy'
+	      OR "import_intent_id" IS NOT NULL
+	      OR "phase" IS NOT NULL
+	      OR "accepted_start_at" IS NOT NULL
+	      OR "deadline_at" IS NOT NULL
+	      OR "last_observed_at" IS NOT NULL
+	      OR "execution_epoch" <> 1
+	      OR "fenced_at" IS NOT NULL
+	      OR "fence_reason" IS NOT NULL
+	      OR "reason_code" IS NOT NULL
+	  ) THEN
+	    RAISE EXCEPTION 'Run lifecycle state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-25 05:41:37.121 UTC [3555] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:37.125 UTC [3555] ERROR:  Run lifecycle state exists; retain schema and use compatible forward repair
+2026-09-25 05:41:37.125 UTC [3555] CONTEXT:  PL/pgSQL function inline_code_block line 63 at RAISE
+2026-09-25 05:41:37.125 UTC [3555] STATEMENT:  DO $$
+	BEGIN
+	  -- S7-L1 exactly as shipped: the ten columns with their shipped types, nullability and defaults,
+	  -- the four validated CHECKs, the validated composite FK to ImportIntent and the partial unique
+	  -- index. Anything else (absent, partial, decoy) is refused with this fixed text, so a pre-S7-L
+	  -- database or a rerun receives it, not a raw undefined-column error.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_attribute a
+	    LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	      AND (
+	        (a.attname = 'mode' AND a.atttypid = 'text'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '''legacy''::text')
+	        OR (a.attname = 'import_intent_id' AND a.atttypid = 'uuid'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'phase' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'accepted_start_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'deadline_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'last_observed_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'execution_epoch' AND a.atttypid = 'int4'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '1')
+	        OR (a.attname = 'fenced_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'fence_reason' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'reason_code' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	      )
+	  ) <> 10 OR (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'c' AND c.convalidated
+	      AND c.conname IN ('ScoutImport_mode_check', 'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check', 'ScoutImport_mode_shape_check')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'f' AND c.convalidated
+	      AND c.conname = 'ScoutImport_import_intent_id_coach_id_fkey'
+	      AND c.confrelid = to_regclass('public."ImportIntent"')
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_import_intent_id_key"')
+	      AND i.indrelid = 'public."ScoutImport"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NOT NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key" ON public."ScoutImport" USING btree (import_intent_id) WHERE (import_intent_id IS NOT NULL)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle absent';
+	  END IF;
+	  -- Refuse to erase recorded lifecycle facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (
+	    SELECT 1 FROM public."ScoutImport"
+	    WHERE "mode" <> 'legacy'
+	      OR "import_intent_id" IS NOT NULL
+	      OR "phase" IS NOT NULL
+	      OR "accepted_start_at" IS NOT NULL
+	      OR "deadline_at" IS NOT NULL
+	      OR "last_observed_at" IS NOT NULL
+	      OR "execution_epoch" <> 1
+	      OR "fenced_at" IS NOT NULL
+	      OR "fence_reason" IS NOT NULL
+	      OR "reason_code" IS NOT NULL
+	  ) THEN
+	    RAISE EXCEPTION 'Run lifecycle state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-25 05:41:37.875 UTC [3601] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:37.883 UTC [3601] WARNING:  there is no transaction in progress
+2026-09-25 05:41:39.636 UTC [3661] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:39.640 UTC [3661] ERROR:  G2-S7L run lifecycle absent
+2026-09-25 05:41:39.640 UTC [3661] CONTEXT:  PL/pgSQL function inline_code_block line 47 at RAISE
+2026-09-25 05:41:39.640 UTC [3661] STATEMENT:  DO $$
+	BEGIN
+	  -- S7-L1 exactly as shipped: the ten columns with their shipped types, nullability and defaults,
+	  -- the four validated CHECKs, the validated composite FK to ImportIntent and the partial unique
+	  -- index. Anything else (absent, partial, decoy) is refused with this fixed text, so a pre-S7-L
+	  -- database or a rerun receives it, not a raw undefined-column error.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_attribute a
+	    LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	      AND (
+	        (a.attname = 'mode' AND a.atttypid = 'text'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '''legacy''::text')
+	        OR (a.attname = 'import_intent_id' AND a.atttypid = 'uuid'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'phase' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'accepted_start_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'deadline_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'last_observed_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'execution_epoch' AND a.atttypid = 'int4'::regtype AND a.attnotnull
+	          AND pg_get_expr(d.adbin, d.adrelid) = '1')
+	        OR (a.attname = 'fenced_at' AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	          AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'fence_reason' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	        OR (a.attname = 'reason_code' AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef)
+	      )
+	  ) <> 10 OR (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'c' AND c.convalidated
+	      AND c.conname IN ('ScoutImport_mode_check', 'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check', 'ScoutImport_mode_shape_check')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_constraint c
+	    WHERE c.conrelid = 'public."ScoutImport"'::regclass AND c.contype = 'f' AND c.convalidated
+	      AND c.conname = 'ScoutImport_import_intent_id_coach_id_fkey'
+	      AND c.confrelid = to_regclass('public."ImportIntent"')
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_import_intent_id_key"')
+	      AND i.indrelid = 'public."ScoutImport"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NOT NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key" ON public."ScoutImport" USING btree (import_intent_id) WHERE (import_intent_id IS NOT NULL)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle absent';
+	  END IF;
+	  -- Refuse to erase recorded lifecycle facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (
+	    SELECT 1 FROM public."ScoutImport"
+	    WHERE "mode" <> 'legacy'
+	      OR "import_intent_id" IS NOT NULL
+	      OR "phase" IS NOT NULL
+	      OR "accepted_start_at" IS NOT NULL
+	      OR "deadline_at" IS NOT NULL
+	      OR "last_observed_at" IS NOT NULL
+	      OR "execution_epoch" <> 1
+	      OR "fenced_at" IS NOT NULL
+	      OR "fence_reason" IS NOT NULL
+	      OR "reason_code" IS NOT NULL
+	  ) THEN
+	    RAISE EXCEPTION 'Run lifecycle state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-25 05:41:40.216 UTC [3697] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:40.240 UTC [3697] WARNING:  there is no transaction in progress
+2026-09-25 05:41:40.860 UTC [3735] WARNING:  there is already a transaction in progress
+2026-09-25 05:41:40.865 UTC [3735] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:41:40.865 UTC [3735] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:41:40.865 UTC [3735] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:41:41.836 UTC [1261] LOG:  received fast shutdown request
+2026-09-25 05:41:41.836 UTC [1261] LOG:  aborting any active transactions
+2026-09-25 05:41:41.838 UTC [1261] LOG:  background worker "logical replication launcher" (PID 1267) exited with exit code 1
+2026-09-25 05:41:41.838 UTC [1262] LOG:  shutting down
+2026-09-25 05:41:41.839 UTC [1262] LOG:  checkpoint starting: shutdown immediate
+2026-09-25 05:41:41.861 UTC [1262] LOG:  checkpoint complete: wrote 1764 buffers (10.8%); 0 WAL file(s) added, 0 removed, 1 recycled; write=0.022 s, sync=0.001 s, total=0.023 s; sync files=0, longest=0.000 s, average=0.000 s; distance=14053 kB, estimate=14053 kB; lsn=0/2292AC8, redo lsn=0/2292AC8
+2026-09-25 05:41:41.866 UTC [1261] LOG:  database system is shut down

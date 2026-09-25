@@ -1,5 +1,17 @@
 # LAST OPERATOR HANDOFF
 
+## Owner-requested frozen handoff: 2026-09-25 05:56Z
+
+START HERE: `execution/64e33dc7/OPERATOR_HANDOFF_GUIDE.md`, then `execution/64e33dc7/HANDOFF_FREEZE.md`. The owner explicitly stopped continuation for handoff; every previous source, review, gate, lock, PG and landing authority is suspended. Do not execute any old grant or script merely because it is present.
+
+S7-L is committed at `a68cdac7`, but its v3 proof failed 23/24; two independent reviewers agree on a narrow OLD-client runtime-instance proof defect, not an evidenced product defect. S8-C is committed at `87018a42`, with one exact uncommitted bootstrap fix captured in `s8c/handoff-freeze/`; its gates/commit/v4 binding were never started. The 05:43 relay below was written but never delivered and is now revoked. S8-F's 15-path checkpoint and S8-G readiness are preserved. Neither replacement is accepted or landed.
+
+The guide identifies verified GitHub recovery artifacts, pending steps and owner-reserved boundaries. The canonical lock remains intact and all proof lanes are stopped; no production or integration branch was changed during handoff. Everything below is historical context.
+
+## Live continuation: 2026-09-25 05:43Z
+
+S7-L v3 is terminal failed23pass/1fail at05:41:42Z, naturalrc1, clean stop/release; read `S7L_V3_FAILED_PROOF_DISPOSITION.md` and await only new runtime reviews of the OLD legacy replay assertion. S8-C now alone has narrow source-gate authority under the05:43 relay in `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md`, after verified no holder/process. No S8 PG or S7 retry. Preserve every failed cluster and receipt; neither candidate is accepted.
+
 ## Live continuation: 2026-09-25 05:39Z
 
 Read `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md`: both changed-question reviewers are GO on a68cdac7/tree6c00e248 with driver0c33b222/fixture721468ac/manifest82f501a3. S7-L alone receives one new proof on fresh proof-v3 paths after verified S8 cleanup and free slot. Never restart that driver on a tool return. Both S8-C runtime reviews confirm the normalized-client raw-byte comparison is a proof defect; `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` permits only source preparation now, with source gates waiting for explicit post-S7 relay and no PG grant. Check terminal receipts before later action; neither candidate is accepted.

@@ -1,5 +1,9 @@
 # S8-C bootstrap minimum correction grant
 
+## Revoked for owner handoff, 2026-09-25 05:56Z
+
+`HANDOFF_FREEZE.md` supersedes this entire grant, including its written 05:43 relay. That relay was never delivered to the builder; source gates, hooked commit, v4 binding and v6 checkpoint never began. The exact one-file WIP and prepared scripts are preserved in `s8c/handoff-freeze/`; a new operator must explicitly regrant any future work. All content below is historical scope, not current authority.
+
 Parent disposition, 2026-09-25. Sole writer remains `s8_c_replacement_builder_muge72rc`. This authorizes source preparation only until an explicit later source-gate relay. S7-L retains sole heavy authority for its currently granted a68cdac7/v3 proof; no S8-C lock, gate, commit, generation, database action or retry is authorized now.
 
 ## Causal disposition
@@ -43,3 +47,9 @@ All other five proof-object pins, accepted-base/schema/migration pins, nine tool
 On the new head and complete frozen v4 binding, the same two independent reviewers examine only this bootstrap closure, one-file lineage, applicable gate receipt and the exact private-binding/fresh-path delta. New immutable outputs: `s8c/reviews/BOOTSTRAP_CORRECTION_REVIEW_A.md` and `BOOTSTRAP_CORRECTION_REVIEW_B.md`; no peer reads or unchanged source audit.
 
 No new S8-C PostgreSQL grant exists until both changed-question attestations are GO and parent separately binds a single invocation to the new head and v4 driver after the heavy slot is free. Neither this correction nor any later pass retroactively accepts the failed87018a42/v3 run.
+
+## Explicit source-gate relay, 2026-09-25 05:43Z
+
+S7-L's v3 proof terminated naturally with Jest rc1 at05:41:42Z,23 passed/1 failed; bounded cleanup reported stop0/postgres0/listeners0/survivor none. Parent verified no canonical holder, relevant heavy process or55641/55642 listener at05:43:14Z, inode691716 intact. S7-L's execution authority has ended and its candidate/data/receipts are frozen for runtime-only review.
+
+Parent read the prepared S8-C one-file delta at05:43:20Z: only `test/utils/g2-s8c-bootstrap.sh` is modified, with exact generated-schema hash check, missing-file/mismatch rc7 and related comments/diagnostic; no other path changed. S8-C is now the sole heavy source-gate grantee. Finish the checkpoint and perform only the source gates and ordinary hooked commit specified above, then release/export/freeze and stop. First failure must be preserved and reported without automatic remediation or retry. This relay grants no S8-C PostgreSQL invocation.

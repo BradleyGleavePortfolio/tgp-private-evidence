@@ -1,0 +1,8 @@
+S8-C: pin the accepted generated client schema copy by SHA256 in the G2 bootstrap
+
+Prisma normalizes the schema text it copies into the generated client, so a
+raw byte comparison against prisma/schema.prisma can never succeed even for
+the correct accepted client. Verify the copy by its exact accepted SHA256
+instead, still refusing a missing or different file with the same exit code,
+and keep every other engine, runtime, head, ancestry, migration and model
+check unchanged.

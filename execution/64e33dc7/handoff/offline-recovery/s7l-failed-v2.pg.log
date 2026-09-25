@@ -1,0 +1,595 @@
+2026-09-25 05:06:45.905 UTC [18796] LOG:  starting PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-09-25 05:06:45.908 UTC [18796] LOG:  listening on IPv4 address "127.0.0.1", port 55641
+2026-09-25 05:06:45.908 UTC [18796] LOG:  listening on Unix socket "/home/user/workspace/execution/64e33dc7/recovery-reset/run/s7l/.s.PGSQL.55641"
+2026-09-25 05:06:45.909 UTC [18799] LOG:  database system was shut down at 2026-09-25 05:06:38 UTC
+2026-09-25 05:06:45.911 UTC [18796] LOG:  database system is ready to accept connections
+2026-09-25 05:07:20.354 UTC [19526] WARNING:  there is already a transaction in progress
+2026-09-25 05:07:20.358 UTC [19526] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:07:20.358 UTC [19526] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:07:20.358 UTC [19526] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:07:21.663 UTC [19606] WARNING:  there is already a transaction in progress
+2026-09-25 05:07:21.668 UTC [19606] ERROR:  G2-S7L run lifecycle already present
+2026-09-25 05:07:21.668 UTC [19606] CONTEXT:  PL/pgSQL function inline_code_block line 77 at RAISE
+2026-09-25 05:07:21.668 UTC [19606] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+2026-09-25 05:07:22.476 UTC [19656] WARNING:  there is already a transaction in progress
+2026-09-25 05:07:22.976 UTC [19656] LOG:  process 19656 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.068 ms
+2026-09-25 05:07:22.976 UTC [19656] DETAIL:  Process holding the lock: 19654. Wait queue: 19656.
+2026-09-25 05:07:22.976 UTC [19656] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:27.476 UTC [19656] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:07:27.476 UTC [19656] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:27.544 UTC [20007] WARNING:  there is already a transaction in progress
+2026-09-25 05:07:28.045 UTC [20007] LOG:  process 20007 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.178 ms
+2026-09-25 05:07:28.045 UTC [20007] DETAIL:  Process holding the lock: 19654. Wait queue: 20007.
+2026-09-25 05:07:28.045 UTC [20007] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:32.545 UTC [20007] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:07:32.545 UTC [20007] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:34.199 UTC [20055] LOG:  process 20055 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.090 ms
+2026-09-25 05:07:34.199 UTC [20055] DETAIL:  Process holding the lock: 19654. Wait queue: 20055.
+2026-09-25 05:07:34.199 UTC [20055] STATEMENT:  -- G2-S7-L1 only: the server-owned import run lifecycle expand
+	-- (docs/decisions/2026-09-24-s7l-run-lifecycle.md D-S7L-1..5, §4 invariants 2, 4, 7).
+	-- Additive and metadata-only on ScoutImport: ten nullable-or-defaulted columns
+	-- (mode, import_intent_id, phase, accepted_start_at, deadline_at, last_observed_at,
+	-- execution_epoch, fenced_at, fence_reason, reason_code), four closed CHECKs (mode, phase,
+	-- fence_reason, and the mode-shape CHECK that binds a server run to its intent, its
+	-- server-owned clock and the server terminal vocabulary while every legacy row keeps the
+	-- legacy vocabulary), one partial unique index on import_intent_id (at most one run per
+	-- setup intent) and one composite owner-scoped FK to ImportIntent(id, coach_id)
+	-- (ON DELETE RESTRICT: the intent cannot be deleted while its run exists; ON UPDATE
+	-- CASCADE). No data is rewritten, renamed or dropped: every existing row is
+	-- mode='legacy', execution_epoch=1 and every other lifecycle column NULL by default.
+	-- ScoutImport RLS (ENABLE+FORCE, the three 20261223000100 policies) and both existing
+	-- indexes are untouched; the existing policies cover the new columns. NOT a
+	-- writer/reader/route change by itself: S7-L2 is the first code that writes mode='server'.
+	-- Separate release artifact; own promotion stage after C (D-C2); order-independent of
+	-- 20270122000000 (S8-B).
+	--
+	-- Entry gate (refuses, never derives, deletes or repairs): the accepted ScoutImport shape
+	-- (RLS enabled+forced, the (coach_id, intent_id) unique key exactly as shipped,
+	-- state NOT NULL TEXT, terminal_status nullable TEXT, completed_at nullable
+	-- TIMESTAMP(3)), the C1 FK target ImportIntent(id, coach_id) exactly as shipped, and none
+	-- of the objects this file creates (raw rerun, partial state or a decoy holding one of the
+	-- names). Raw reruns fail atomically.
+	BEGIN;
+	SET LOCAL lock_timeout = '5s';
+	SET LOCAL statement_timeout = '30s';
+	LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+	LOCK TABLE public."ImportIntent" IN SHARE ROW EXCLUSIVE MODE;
+	
+	DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+	
+	-- Lifecycle columns (D-S7L-1, D-S7L-3, D-S7L-4, D-S7L-5). Every default is a constant, so the
+	-- ADD COLUMN is metadata-only (PG 11+): no rewrite of the existing rows, which become
+	-- mode='legacy', execution_epoch=1, everything else NULL.
+	ALTER TABLE public."ScoutImport"
+	  ADD COLUMN "mode"              TEXT NOT NULL DEFAULT 'legacy',
+	  ADD COLUMN "import_intent_id"  UUID,
+	  ADD COLUMN "phase"             TEXT,
+	  ADD COLUMN "accepted_start_at" TIMESTAMP(3),
+	  ADD COLUMN "deadline_at"       TIMESTAMP(3),
+	  ADD COLUMN "last_observed_at"  TIMESTAMP(3),
+	  ADD COLUMN "execution_epoch"   INTEGER NOT NULL DEFAULT 1,
+	  ADD COLUMN "fenced_at"         TIMESTAMP(3),
+	  ADD COLUMN "fence_reason"      TEXT,
+	  ADD COLUMN "reason_code"       TEXT;
+	
+	-- Closed vocabularies (D-S7L-1 modes; §3 phases; D-S7L-4 fence reasons). Adding a value is a
+	-- core change by design. reason_code is closed by src/scout/lifecycle/reason-codes.ts (the only
+	-- writer) and left as opaque TEXT here so an S9 verdict reason needs no schema change.
+	ALTER TABLE public."ScoutImport"
+	  ADD CONSTRAINT "ScoutImport_mode_check"
+	    CHECK ("mode" IN ('legacy', 'server')),
+	  ADD CONSTRAINT "ScoutImport_phase_check"
+	    CHECK ("phase" IS NULL OR "phase" IN ('discovering', 'transferring', 'reconciling')),
+	  ADD CONSTRAINT "ScoutImport_fence_reason_check"
+	    CHECK (("fenced_at" IS NULL) = ("fence_reason" IS NULL)
+	      AND ("fence_reason" IS NULL OR "fence_reason" IN ('cancelled', 'timed_out', 'revoked'))
+	      AND "execution_epoch" >= 1),
+	  -- Invariant 2 (CQ-18 legacy marker): `success` appears only on legacy rows, `complete` only on
+	  -- server rows; a server run always carries its intent, its server-owned clock and a deadline
+	  -- strictly after its accepted start; a legacy run never carries an intent binding.
+	  ADD CONSTRAINT "ScoutImport_mode_shape_check"
+	    CHECK (
+	      ("mode" = 'legacy'
+	        AND "import_intent_id" IS NULL
+	        AND ("terminal_status" IS NULL OR "terminal_status" IN ('success', 'partial', 'failed')))
+	      OR
+	      ("mode" = 'server'
+	        AND "import_intent_id" IS NOT NULL
+	        AND "accepted_start_at" IS NOT NULL
+	        AND "deadline_at" IS NOT NULL
+	        AND "deadline_at" > "accepted_start_at"
+	        AND ("terminal_status" IS NULL
+	          OR "terminal_status" IN ('complete', 'partial', 'blocked', 'failed', 'cancelled', 'timed_out')))
+	    );
+	
+	-- Invariant 7: at most one run per setup intent. Partial so every legacy row (NULL) is free.
+	CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key"
+	  ON public."ScoutImport" USING btree ("import_intent_id")
+	  WHERE "import_intent_id" IS NOT NULL;
+	
+	-- Owner-scoped binding to the setup authority (C1 ImportIntent(id, coach_id)). RESTRICT: the intent
+	-- (and, through its cascade, the User row) cannot be hard-deleted while a server run exists (§8 L8
+	-- seam; the live erasure flow tombstones and never hard-deletes). The pair challenge cascades from
+	-- the intent, not from the run, so a run outlives challenge deletion.
+	ALTER TABLE public."ScoutImport"
+	  ADD CONSTRAINT "ScoutImport_import_intent_id_coach_id_fkey"
+	    FOREIGN KEY ("import_intent_id", "coach_id")
+	    REFERENCES public."ImportIntent" ("id", "coach_id")
+	    ON DELETE RESTRICT ON UPDATE CASCADE;
+	COMMIT;
+	
+2026-09-25 05:07:38.699 UTC [20055] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:07:38.699 UTC [20055] STATEMENT:  -- G2-S7-L1 only: the server-owned import run lifecycle expand
+	-- (docs/decisions/2026-09-24-s7l-run-lifecycle.md D-S7L-1..5, §4 invariants 2, 4, 7).
+	-- Additive and metadata-only on ScoutImport: ten nullable-or-defaulted columns
+	-- (mode, import_intent_id, phase, accepted_start_at, deadline_at, last_observed_at,
+	-- execution_epoch, fenced_at, fence_reason, reason_code), four closed CHECKs (mode, phase,
+	-- fence_reason, and the mode-shape CHECK that binds a server run to its intent, its
+	-- server-owned clock and the server terminal vocabulary while every legacy row keeps the
+	-- legacy vocabulary), one partial unique index on import_intent_id (at most one run per
+	-- setup intent) and one composite owner-scoped FK to ImportIntent(id, coach_id)
+	-- (ON DELETE RESTRICT: the intent cannot be deleted while its run exists; ON UPDATE
+	-- CASCADE). No data is rewritten, renamed or dropped: every existing row is
+	-- mode='legacy', execution_epoch=1 and every other lifecycle column NULL by default.
+	-- ScoutImport RLS (ENABLE+FORCE, the three 20261223000100 policies) and both existing
+	-- indexes are untouched; the existing policies cover the new columns. NOT a
+	-- writer/reader/route change by itself: S7-L2 is the first code that writes mode='server'.
+	-- Separate release artifact; own promotion stage after C (D-C2); order-independent of
+	-- 20270122000000 (S8-B).
+	--
+	-- Entry gate (refuses, never derives, deletes or repairs): the accepted ScoutImport shape
+	-- (RLS enabled+forced, the (coach_id, intent_id) unique key exactly as shipped,
+	-- state NOT NULL TEXT, terminal_status nullable TEXT, completed_at nullable
+	-- TIMESTAMP(3)), the C1 FK target ImportIntent(id, coach_id) exactly as shipped, and none
+	-- of the objects this file creates (raw rerun, partial state or a decoy holding one of the
+	-- names). Raw reruns fail atomically.
+	BEGIN;
+	SET LOCAL lock_timeout = '5s';
+	SET LOCAL statement_timeout = '30s';
+	LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+	LOCK TABLE public."ImportIntent" IN SHARE ROW EXCLUSIVE MODE;
+	
+	DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run identity prerequisite';
+	  END IF;
+	  -- Run lifecycle columns exactly as shipped: state NOT NULL TEXT, terminal_status nullable TEXT
+	  -- without default, completed_at nullable TIMESTAMP(3) without default, coach_id NOT NULL TEXT.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'state'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'terminal_status'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'completed_at'
+	      AND NOT a.attisdropped AND a.atttypid = 'timestamp'::regtype AND a.atttypmod = 3
+	      AND NOT a.attnotnull AND NOT a.atthasdef
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected run column prerequisite';
+	  END IF;
+	  -- C1 FK target exactly as shipped: ImportIntent(id uuid, coach_id text) with its unique key.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ImportIntent_id_coach_id_key"')
+	      AND i.indrelid = to_regclass('public."ImportIntent"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ImportIntent_id_coach_id_key" ON public."ImportIntent" USING btree (id, coach_id)'
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'id'
+	      AND NOT a.attisdropped AND a.atttypid = 'uuid'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ImportIntent"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S7L unexpected intent prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutImport_import_intent_id_key"') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname IN ('ScoutImport_mode_check',
+	                        'ScoutImport_phase_check',
+	                        'ScoutImport_fence_reason_check',
+	                        'ScoutImport_mode_shape_check',
+	                        'ScoutImport_import_intent_id_coach_id_fkey')
+	    ) OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_attribute a
+	      WHERE a.attrelid = 'public."ScoutImport"'::regclass AND NOT a.attisdropped
+	        AND a.attname IN ('mode', 'import_intent_id', 'phase', 'accepted_start_at', 'deadline_at',
+	                          'last_observed_at', 'execution_epoch', 'fenced_at', 'fence_reason', 'reason_code')
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S7L run lifecycle already present';
+	  END IF;
+	END $$;
+	
+	-- Lifecycle columns (D-S7L-1, D-S7L-3, D-S7L-4, D-S7L-5). Every default is a constant, so the
+	-- ADD COLUMN is metadata-only (PG 11+): no rewrite of the existing rows, which become
+	-- mode='legacy', execution_epoch=1, everything else NULL.
+	ALTER TABLE public."ScoutImport"
+	  ADD COLUMN "mode"              TEXT NOT NULL DEFAULT 'legacy',
+	  ADD COLUMN "import_intent_id"  UUID,
+	  ADD COLUMN "phase"             TEXT,
+	  ADD COLUMN "accepted_start_at" TIMESTAMP(3),
+	  ADD COLUMN "deadline_at"       TIMESTAMP(3),
+	  ADD COLUMN "last_observed_at"  TIMESTAMP(3),
+	  ADD COLUMN "execution_epoch"   INTEGER NOT NULL DEFAULT 1,
+	  ADD COLUMN "fenced_at"         TIMESTAMP(3),
+	  ADD COLUMN "fence_reason"      TEXT,
+	  ADD COLUMN "reason_code"       TEXT;
+	
+	-- Closed vocabularies (D-S7L-1 modes; §3 phases; D-S7L-4 fence reasons). Adding a value is a
+	-- core change by design. reason_code is closed by src/scout/lifecycle/reason-codes.ts (the only
+	-- writer) and left as opaque TEXT here so an S9 verdict reason needs no schema change.
+	ALTER TABLE public."ScoutImport"
+	  ADD CONSTRAINT "ScoutImport_mode_check"
+	    CHECK ("mode" IN ('legacy', 'server')),
+	  ADD CONSTRAINT "ScoutImport_phase_check"
+	    CHECK ("phase" IS NULL OR "phase" IN ('discovering', 'transferring', 'reconciling')),
+	  ADD CONSTRAINT "ScoutImport_fence_reason_check"
+	    CHECK (("fenced_at" IS NULL) = ("fence_reason" IS NULL)
+	      AND ("fence_reason" IS NULL OR "fence_reason" IN ('cancelled', 'timed_out', 'revoked'))
+	      AND "execution_epoch" >= 1),
+	  -- Invariant 2 (CQ-18 legacy marker): `success` appears only on legacy rows, `complete` only on
+	  -- server rows; a server run always carries its intent, its server-owned clock and a deadline
+	  -- strictly after its accepted start; a legacy run never carries an intent binding.
+	  ADD CONSTRAINT "ScoutImport_mode_shape_check"
+	    CHECK (
+	      ("mode" = 'legacy'
+	        AND "import_intent_id" IS NULL
+	        AND ("terminal_status" IS NULL OR "terminal_status" IN ('success', 'partial', 'failed')))
+	      OR
+	      ("mode" = 'server'
+	        AND "import_intent_id" IS NOT NULL
+	        AND "accepted_start_at" IS NOT NULL
+	        AND "deadline_at" IS NOT NULL
+	        AND "deadline_at" > "accepted_start_at"
+	        AND ("terminal_status" IS NULL
+	          OR "terminal_status" IN ('complete', 'partial', 'blocked', 'failed', 'cancelled', 'timed_out')))
+	    );
+	
+	-- Invariant 7: at most one run per setup intent. Partial so every legacy row (NULL) is free.
+	CREATE UNIQUE INDEX "ScoutImport_import_intent_id_key"
+	  ON public."ScoutImport" USING btree ("import_intent_id")
+	  WHERE "import_intent_id" IS NOT NULL;
+	
+	-- Owner-scoped binding to the setup authority (C1 ImportIntent(id, coach_id)). RESTRICT: the intent
+	-- (and, through its cascade, the User row) cannot be hard-deleted while a server run exists (§8 L8
+	-- seam; the live erasure flow tombstones and never hard-deletes). The pair challenge cascades from
+	-- the intent, not from the run, so a run outlives challenge deletion.
+	ALTER TABLE public."ScoutImport"
+	  ADD CONSTRAINT "ScoutImport_import_intent_id_coach_id_fkey"
+	    FOREIGN KEY ("import_intent_id", "coach_id")
+	    REFERENCES public."ImportIntent" ("id", "coach_id")
+	    ON DELETE RESTRICT ON UPDATE CASCADE;
+	COMMIT;
+	
+2026-09-25 05:07:38.700 UTC [20055] ERROR:  current transaction is aborted, commands ignored until end of transaction block
+2026-09-25 05:07:38.700 UTC [20055] STATEMENT:  UPDATE "_prisma_migrations" SET "logs" = $1 WHERE "id" = $2
+2026-09-25 05:07:38.775 UTC [20060] WARNING:  there is already a transaction in progress
+2026-09-25 05:07:39.275 UTC [20060] LOG:  process 20060 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.061 ms
+2026-09-25 05:07:39.275 UTC [20060] DETAIL:  Process holding the lock: 19654. Wait queue: 20060.
+2026-09-25 05:07:39.275 UTC [20060] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:43.775 UTC [20060] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:07:43.775 UTC [20060] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:07:43.882 UTC [20302] ERROR:  column "mode" of relation "ScoutImport" does not exist at character 72
+2026-09-25 05:07:43.882 UTC [20302] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-58aceacf-ca84-459f-98f3-1bb5c496c1c6','coach','58aceacf-ca84-459f-98f3-1bb5c496c1c6','in_progress',NULL,'server','58aceacf-ca84-459f-98f3-1bb5c496c1c6'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:07:43.979 UTC [20308] ERROR:  column "mode" of relation "ScoutImport" does not exist at character 72
+2026-09-25 05:07:43.979 UTC [20308] STATEMENT:  INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status,mode,import_intent_id,phase,accepted_start_at,deadline_at) VALUES ('coach-b57d49fd-63f2-48ab-9c2b-0d65ac4e1752','coach','b57d49fd-63f2-48ab-9c2b-0d65ac4e1752','in_progress',NULL,'server','b57d49fd-63f2-48ab-9c2b-0d65ac4e1752'::uuid,'discovering',(now() AT TIME ZONE 'UTC'),(now() AT TIME ZONE 'UTC') + interval '5 minutes')
+2026-09-25 05:07:44.513 UTC [20310] LOG:  process 20310 still waiting for ShareLock on transaction 1456 after 500.114 ms
+2026-09-25 05:07:44.513 UTC [20310] DETAIL:  Process holding the lock: 19654. Wait queue: 20310.
+2026-09-25 05:07:44.513 UTC [20310] CONTEXT:  while deleting tuple (0,1) in relation "ScoutImport"
+2026-09-25 05:07:44.513 UTC [20310] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:07:54.011 UTC [20310] LOG:  process 20310 still waiting for ShareLock on transaction 1456 after 9998.650 ms
+2026-09-25 05:07:54.011 UTC [20310] DETAIL:  Process holding the lock: 19654. Wait queue: 20310.
+2026-09-25 05:07:54.011 UTC [20310] CONTEXT:  while deleting tuple (0,1) in relation "ScoutImport"
+2026-09-25 05:07:54.011 UTC [20310] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:08:44.550 UTC [20383] LOG:  process 20383 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 500.087 ms
+2026-09-25 05:08:44.550 UTC [20383] DETAIL:  Process holding the lock: 20310. Wait queue: 20383.
+2026-09-25 05:08:44.550 UTC [20383] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:08:54.048 UTC [20383] LOG:  process 20383 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 9998.347 ms
+2026-09-25 05:08:54.048 UTC [20383] DETAIL:  Process holding the lock: 20310. Wait queue: 20383.
+2026-09-25 05:08:54.048 UTC [20383] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:09:44.657 UTC [20578] LOG:  process 20578 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 500.272 ms
+2026-09-25 05:09:44.657 UTC [20578] DETAIL:  Process holding the lock: 20310. Wait queue: 20383, 20578.
+2026-09-25 05:09:44.657 UTC [20578] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:09:54.155 UTC [20578] LOG:  process 20578 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 9998.681 ms
+2026-09-25 05:09:54.155 UTC [20578] DETAIL:  Process holding the lock: 20310. Wait queue: 20383, 20578.
+2026-09-25 05:09:54.155 UTC [20578] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:10:44.318 UTC [20963] WARNING:  there is already a transaction in progress
+2026-09-25 05:10:44.818 UTC [20963] LOG:  process 20963 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.072 ms
+2026-09-25 05:10:44.818 UTC [20963] DETAIL:  Processes holding the lock: 19654, 20310, 20383, 20578. Wait queue: 20963.
+2026-09-25 05:10:44.818 UTC [20963] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:10:49.318 UTC [20963] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:10:49.318 UTC [20963] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:10:49.388 UTC [21026] WARNING:  there is already a transaction in progress
+2026-09-25 05:10:49.889 UTC [21026] LOG:  process 21026 still waiting for AccessExclusiveLock on relation 22235 of database 16391 after 500.125 ms
+2026-09-25 05:10:49.889 UTC [21026] DETAIL:  Processes holding the lock: 19654, 20310, 20383, 20578. Wait queue: 21026.
+2026-09-25 05:10:49.889 UTC [21026] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:10:54.389 UTC [21026] ERROR:  canceling statement due to lock timeout
+2026-09-25 05:10:54.389 UTC [21026] STATEMENT:  LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE;
+2026-09-25 05:10:54.925 UTC [21028] LOG:  process 21028 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 500.060 ms
+2026-09-25 05:10:54.925 UTC [21028] DETAIL:  Process holding the lock: 20310. Wait queue: 20383, 20578, 21028.
+2026-09-25 05:10:54.925 UTC [21028] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:11:04.423 UTC [21028] LOG:  process 21028 still waiting for AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 9998.755 ms
+2026-09-25 05:11:04.423 UTC [21028] DETAIL:  Process holding the lock: 20310. Wait queue: 20383, 20578, 21028.
+2026-09-25 05:11:04.423 UTC [21028] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:11:46.009 UTC [18797] LOG:  checkpoint starting: time
+2026-09-25 05:14:22.094 UTC [19654] LOG:  unexpected EOF on client connection with an open transaction
+2026-09-25 05:14:22.095 UTC [20310] LOG:  process 20310 acquired ShareLock on transaction 1456 after 398082.896 ms
+2026-09-25 05:14:22.095 UTC [20310] CONTEXT:  while deleting tuple (0,1) in relation "ScoutImport"
+2026-09-25 05:14:22.095 UTC [20310] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:14:22.097 UTC [20383] LOG:  process 20383 acquired AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 338046.662 ms
+2026-09-25 05:14:22.097 UTC [20383] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:14:22.098 UTC [20578] LOG:  process 20578 acquired AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 277941.105 ms
+2026-09-25 05:14:22.098 UTC [20578] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:14:22.099 UTC [21028] LOG:  process 21028 acquired AccessExclusiveLock on tuple (0,1) of relation 22235 of database 16391 after 207674.267 ms
+2026-09-25 05:14:22.099 UTC [21028] STATEMENT:  DELETE FROM "ScoutImport";
+2026-09-25 05:14:22.385 UTC [18796] LOG:  received fast shutdown request
+2026-09-25 05:14:22.385 UTC [18796] LOG:  aborting any active transactions
+2026-09-25 05:14:22.386 UTC [18796] LOG:  background worker "logical replication launcher" (PID 18802) exited with exit code 1
+2026-09-25 05:14:22.392 UTC [18797] LOG:  checkpoint complete: wrote 1766 buffers (10.8%); 0 WAL file(s) added, 0 removed, 1 recycled; write=156.382 s, sync=0.001 s, total=156.383 s; sync files=0, longest=0.000 s, average=0.000 s; distance=14171 kB, estimate=14171 kB; lsn=0/22B02A8, redo lsn=0/22B00D0
+2026-09-25 05:14:22.392 UTC [18797] LOG:  shutting down
+2026-09-25 05:14:22.392 UTC [18797] LOG:  checkpoint starting: shutdown immediate
+2026-09-25 05:14:22.393 UTC [18797] LOG:  checkpoint complete: wrote 1 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=12754 kB; lsn=0/22B0320, redo lsn=0/22B0320
+2026-09-25 05:14:22.399 UTC [18796] LOG:  database system is shut down
