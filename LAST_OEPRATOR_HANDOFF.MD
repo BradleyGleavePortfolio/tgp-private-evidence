@@ -1,5 +1,17 @@
 # LAST OPERATOR HANDOFF
 
+## Current handoff: EXEC-64E33DC7, September 25, 2026
+
+Read the current leading section of `LAST_OPERATOR_STATE.md` and `execution/64e33dc7/SCOPE.md` first. The historical text below remains unchanged. The canonical misspelled filename is retained.
+
+Do not restart N/Q1 or C: backend integration is `93389265`, including accepted S8-A and S8-B. Mobile is `67b646f4`; extension accepted staging is `8901d5f5`, still blocked from main by PR #27's required non-author approval. Backend main is production-coupled and unchanged.
+
+Exact continuation currently requires the S7-L source at `a585bf76` (tree `9a2c411b`), the latest S8-C source/worktree export, and an explicit predecessor worker/runtime release. Git fetch by the recorded candidate SHAs failed; no matching durable export was found; predecessor session and artifact-library recovery were unsuccessful. This is an affected-path recovery block, not a loss of accepted product work. Do not recreate accepted tests, synthesize the missing history, run the stale S7-L binding, or infer a heavy-slot release from an absent local lock.
+
+The parent may continue independent read-only work and private evidence publication. Mobile CI diagnosis is delegated without tests or product edits. Current owner EXECUTE authorizes ordinary accepted non-production landing but does not authorize approximation of missing candidate bytes, production promotion, protection bypass or reserved product/security decisions.
+
+## Historical handoff below, unchanged
+
 EXEC-CF8FF737; canonical misspelled filename retained. Bradley's September 24, 2026 EXECUTE is active and recon is closed. Continue, do not restart accepted history.
 
 Read `LAST_OPERATOR_STATE.md`, `execution/DISPATCHES.md`, `execution/cf8ff737/SCOPE.md`, live G01–G22 and the current routing/EXECUTE/Safety ROI doctrines.

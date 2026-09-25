@@ -1,5 +1,21 @@
 # Current execution dispatches
 
+## EXEC-64E33DC7, September 25, 2026
+
+Current scope: `64e33dc7/SCOPE.md`. Entries below the historical heading are not live-worker assertions.
+
+| Worker | Tier / requested route | Scope / sole writable surface | Status |
+|---|---|---|---|
+| Parent, session `64e33dc7-18e7-42d0-add5-7db69dc37a24` | Executive orchestration | State, scope, grants and private evidence publication only | ACTIVE |
+| `mobile_ci_disposition_mug8nlmc` | T3 / `claude_opus_5_5`, high | Read-only mobile CI diagnosis; optional `execution/64e33dc7/mobile-ci/DIAGNOSIS.md` only | ACTIVE; no tests, installs, commits or push |
+| Predecessor S7-L / S8-C workers | Historical, no current telemetry | Prior candidate surfaces remain unclaimed by replacements | Ownership unresolved; exact source recovery required |
+
+Heavy slot: no new holder. Predecessor release is unverified. No heavy run, PG proof, dependency installation or canonical lock modification is granted. Read-only diagnosis and parent evidence publication do not take the slot.
+
+Requested routes are not actual model/effort telemetry. No new T4 worker has been dispatched. Production, branch protection, native client-principal direction, G3-AUTH policy and real-account operations remain owner-reserved.
+
+## Historical dispatches below, unchanged
+
 See `SCOPE.md` for owner authority and exact pins.
 
 - B/drain builder: `b_drain_exact_recovery_and_remainder_mufn6ybc`, phase A complete at `75a2863bf79a44f84050406d6878ec9a87f4053e`, genuine hooks and 42/42 tests; dual actual-head/binding GO. First real-PG proof FAILED RC1: 11 passed, 8 failed, 19 total; cleanup RC0 at 15:14:50Z, no TERM. Both reviewers identify the same two-line product defect, class A on B only. `B_V5_MINIMUM_CORRECTION_AND_PHASE_A_GRANT.md` authorizes exactly two predicate replacements and source preparation now, phase-A gates/ordinary new commit after J3 releases the slot; no PG rerun yet.
