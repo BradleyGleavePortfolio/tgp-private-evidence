@@ -1,5 +1,28 @@
 # Current execution dispatches
 
+## CURRENT EXEC-1910A060, 2026-09-25 21:12Z
+
+Latest Bradley OWNER CONTINUATION RESET14:08PT controls.
+All inaccessible predecessor assignments below are revoked for future work.
+Historical outputs remain historical. Current scope: `1910a060/SCOPE.md`.
+
+| Lane / exact worker | Requested route | Exclusive surface | Current grant |
+|---|---|---|---|
+| `s8_f_independent_review_a_muhgb3ej` | T4 `claude_fable_5_1` | `1910a060/s8f/reviews/REVIEW_A.md` | Independent source/binding review only |
+| `s8_f_independent_review_b_muhgbbaa` | T4 `claude_fable_5_1` | `1910a060/s8f/reviews/REVIEW_B.md` | Independent source/binding review only |
+| `prepare_current_runtime_and_s8_f_binding_muhgfhmn` | T4 `claude_fable_5_1` | runtime1910a060, exact S8F standalone clone, runtime evidence and bindingv2 | RT-NEW-1 initial heavy setup slot; no PG start/proof |
+| `build_new_s8_g_orchestration_candidate_muhgfqom` | T4 `claude_fable_5_1` | standalone clone1910a060-s8g, exact S8G PATHS, evidence1910a060/s8g | G-NEW-1 source-first NEW candidate |
+| `recover_and_freeze_exact_s9_a_source_muhgfyxc` | T4 `claude_fable_5_1` | standalone clone1910a060-s9a, four exact S9A paths, evidence1910a060/s9a | A-NEW-1 exact recovery; gates await relay |
+| `build_new_s9_b_reconciliation_facts_muhgg842` | T4 `claude_fable_5_1` | standalone clone1910a060-s9b, S9B facts/harness/addendum paths, evidence1910a060/s9b | B-NEW-1 source-first NEW candidate |
+
+Requested routes above were accepted by dispatch; they are not runtime telemetry.
+Parent is sole publisher/acceptor/lander, no product coding or self-review.
+Canonical lock established after actual current-runtime inspection at21:09:49Z:
+`execution/test-validation.lock`, inode667698. Never replace or delete.
+Queue: runtime setup; S9-A gates; S8-F one proof only after dual binding GO and
+separate grant; S8-G/S9-B gates when ready. Parent relays each transition.
+The queue authorizes no self-dispatch and no automatic retry of a failed proof.
+
 ## EXEC-DACEDDC8 orchestrator-mode dispatch, 2026-09-25 16:38Z
 
 RT-2 runtime finished RC=0 and every pin was reproduced (`daceddc8/SCOPE.md`). The parent now orchestrates only. Ten parallel lanes are running:

@@ -1,5 +1,58 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-1910A060, 2026-09-25 21:12Z
+
+Controlling scope: `execution/1910a060/SCOPE.md`. Bradley's explicit 14:08 PT
+OWNER CONTINUATION RESET revokes inaccessible predecessor ownership for future
+writes/runtime/acceptance/landing. Historical evidence stays valid on its terms.
+Lower sections are historical snapshots, not current grants or current branch heads.
+
+### Verified remote state
+
+- Backend integration/importer: `1c5fbb0441178e0cfe6e9f8d72e955c645c265e9`.
+- Backend main: `1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47`.
+- Mobile main: `affc28184bb18b29d2011d25325ecba50587f9d1`.
+- Extension main: `a889f4ade0e13d9f45aabd69c5878ff07e2038bf`.
+- Private evidence predecessor head: `e8dbb2bb28884205868fe0cbdd3c927aca6e1ec5`;
+  this record's containing commit supersedes it.
+
+S7-L, S8-C, S9-0, backend #530 and mobile #295 are LANDED and closed work.
+EXT-LAND-1 completed both exact FFs at21:07Z. Protection restored byte-identical
+and independently rechecked. Main push CI and CodeQL green. PR27 MERGED.
+PR30 remains OPEN on its historical stacked base although its exact head is on main;
+GitHub rejected retargeting with "no new commits". Closing it was blocked by the
+execution platform; no retry or broader protection change is authorized here.
+This bookkeeping does not block product continuation.
+Record: `execution/1910a060/extension/LANDED.md`.
+
+Backend main is not deployed production. Fly deploy remains dispatch-only, with
+latest observed run September9. Production image/migration/uptime observations in
+the prior report remain historical; no new production access or deployment occurred.
+CWS publication remains reserved and was not performed.
+
+### Frontier and ownership
+
+See current `execution/DISPATCHES.md` for exact fresh worker IDs.
+S8-F exact `e1ec2fec` is reused; two independent T4 reviews underway. Runtime
+executor prepares fresh pinned environment and binding v2, no PG proof yet.
+S9-A exact four preformat hashes verified, including B-1 union regression; fresh
+freezer recovers them, not reimplements them. Old gate remains incomplete evidence.
+S8-G final unaccepted source unrecovered after bounded attempt; NEW candidate
+authorized from landed base and durable design. S9-B NEW facts candidate likewise.
+
+Current runtime was actually inspected free of relevant holders/processes.
+New canonical lock created exclusively at21:09:49Z, inode667698.
+Initial heavy grantee: RT-NEW-1 runtime preparation only. No PG proof authorized.
+Subsequent gates require explicit parent relay; source work/reviews run in parallel.
+
+### Material boundaries
+
+S8-F proof/acceptance pending; S9-A final gates/review pending; S9-B B-2 relationship
+fact obligation pending. No reopened findings on accepted S7-L/S8-C/S9-0.
+Production image proof gap affects future deployment only.
+Owner-reserved: prod deploy/enablement, destructive prod, live accounts, S8-D/E,
+G3-AUTH, CWS, external commitments/new spending/unrelated governance.
+
 ## EXEC-DACEDDC8 live update, 2026-09-25 17:12Z (supersedes the lower sections where they conflict)
 
 ### Landed

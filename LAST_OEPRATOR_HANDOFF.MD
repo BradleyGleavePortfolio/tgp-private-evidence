@@ -1,5 +1,29 @@
 # LAST OPERATOR HANDOFF
 
+## CURRENT continuation: EXEC-1910A060, 2026-09-25 21:12Z
+
+Read `LAST_OPERATOR_STATE.md`, `execution/DISPATCHES.md`, then
+`execution/1910a060/SCOPE.md`. This is an active continuation, not a stop request.
+Bradley's September25 14:08PT explicit ownership reset supersedes all inaccessible
+predecessor grants and locks for future execution. Historical failures and accepted
+evidence remain preserved; the old frozen handoff below is historical only.
+
+Current integration1c5fbb04 includes S7-L/S8-C/S9-0. Main1c10e2a1 promotion
+did not deploy production. Mobileaffc2818 accepted. Extensiona889f4ad now LANDED,
+protection restored exactly, main push CI/CodeQL green; PR30 is still open bookkeeping
+on land/s4-r6, not missing product bytes. Do not rerun EXT-LAND-1.
+
+Six fresh T4 lanes: S8-F reviewersA/B, runtime and binding preparation, new S8-G
+builder, exact S9-A recovery/freezer, new S9-B facts builder.
+Exact identities and owned surfaces are in current DISPATCHES/SCOPE.
+Canonical current-runtime lock inode667698; RT-NEW-1 initially owns setup authority.
+No S8-F PG grant exists yet. Source/reviews must continue alongside runtime work.
+
+Next actions: complete runtime preparation; relay S9-A gates; dual-review new S8-F
+binding then grant one exact proof; gate/review fresh S8-G/S9-B when ready; land
+accepted dependency-valid nonproduction candidates. Never copy future integration
+work automatically to main and never interpret landed foundation as complete importer.
+
 ## Owner-requested frozen handoff: 2026-09-25 05:56Z
 
 START HERE: `execution/64e33dc7/OPERATOR_HANDOFF_GUIDE.md`, then `execution/64e33dc7/HANDOFF_FREEZE.md`. The owner explicitly stopped continuation for handoff; every previous source, review, gate, lock, PG and landing authority is suspended. Do not execute any old grant or script merely because it is present.
