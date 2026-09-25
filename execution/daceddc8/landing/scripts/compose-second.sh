@@ -133,8 +133,9 @@ check_identity_range "$FIRST_HEAD" "$M"
 log "COMMITTED merge=$M tree=$MT parents=$FIRST_HEAD,$SECOND_HEAD"
 
 # ---------- 8. export ----------
+# The bundle needs a ref tip. A raw sha gives "Refusing to create empty bundle" (LAND-2 run fix).
 X=$RUN_DIR/export; mkdir -p "$X" "$LANDING_DIR/state"
-git bundle create "$X/land-$SLICE-${M:0:12}.bundle" "$BASE..$M" >>"$RUN_DIR/run.log" 2>&1 \
+git bundle create "$X/land-$SLICE-${M:0:12}.bundle" "$BASE..refs/heads/$BR" >>"$RUN_DIR/run.log" 2>&1 \
   && git bundle verify "$X/land-$SLICE-${M:0:12}.bundle" >>"$RUN_DIR/run.log" 2>&1 || refuse 80 "bundle export failed"
 git diff --name-status "$FIRST_HEAD" "$M" >"$X/name-status-vs-first.txt"
 { echo "base=$BASE"; echo "first=$FIRST $FIRST_HEAD"; echo "second=$SECOND $SECOND_HEAD"; echo "merge=$M"; echo "tree=$MT"

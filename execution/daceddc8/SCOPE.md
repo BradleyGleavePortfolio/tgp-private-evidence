@@ -305,3 +305,26 @@ Afterwards the order is: S9-0 docs lands on the new head, then S8-F moves onto i
 The independent T3 review (`daceddc8/e2/reviews/E2_REVIEW.md`) is GO on `a889f4ad`: no class A or B, 8 new class C items.
 
 PR #30 stays a DRAFT, stacked on `land/s4-r6` / PR #27. The parent did not change PR state and did not modify PR #27. Marking it ready and landing it on extension `main` both stay with Bradley: PR #27 first, then PR #30 retargeted, each with a non-author approval.
+
+## LAND-2 CI red (L2-1): parent disposition (18:05Z)
+
+**L2-1** is class B, test-only. The CI failure is in `test/scout/g2-s8c-db-guard.spec.ts`: its repository-directory scan pins exactly 171 migrations with none newer than S8-B. The composition legitimately adds S7-L's landed migration. Closure option (a) is chosen, keeping S8-C acceptance of `f428db9a`.
+
+- **S8C-BC-6 (`s8c_bootstrap_completion`, T4):** in `worktrees/daceddc8-land-s8-c` on local branch `land/s8-c` (`2542af44`):
+  - Edit only that spec's directory-scan assertions so they assert that the 171 migrations of the proof base are present in order, and allow later, already-landed migrations.
+  - The bootstrap and harness pins stay unchanged, and so do the other assertions.
+  - One genuine hooked Bradley commit on top of `2542af44`, under the slot.
+  - Then run that spec and a default-config sweep of every spec that reads `prisma/migrations`, `docs/contracts` or base pins (the L2-2 method fix).
+- **REV (`s8_c_review_a`):** a changed-question review of the one-file delta.
+- **LAND-2 continues (`landing_composition_prep`):**
+  - convert PR #540 to draft while it is red;
+  - after the fix and review GO, push `land/s8-c` (fast-forward, no force);
+  - CI must be green;
+  - then the FF of `integration/importer` from `df713fd9`.
+- **L2-2 and L2-3:** accepted as class C. The method fix is binding for S8-F and S8-G compositions.
+
+## S9-A review Phase 1 (18:05Z)
+
+- **B-1** (A reviewer; duplicate mapped family entries overwrite the bucket-j map, which gives a false `complete`): the closure is in S9-A source, a per-family union plus one spec row. The builder applies it before gates.
+- **B-2** (S9-B must emit one edge per declared relationship, including unresolvable parents): carried into the S9-B grant.
+- **Deviations 2, 3 and 5:** the one-line doc amendments are deferred to an S9-0 addendum that lands with S9-B. They are verdict-neutral in v1.
