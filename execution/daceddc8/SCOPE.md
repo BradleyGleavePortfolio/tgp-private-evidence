@@ -283,3 +283,19 @@ The independent T3 review (`s9/reviews/S9_0_REVIEW.md`) found one class A and on
   - To do that, it moves its untracked file to a fresh branch from that head. This is docs-only, and no tracked file overlaps.
   - The doc's code citations are pinned at `df713fd9`.
 - **S9-A:** freezes to `cda68d82`.
+
+## S8-C accepted; LAND-2 grant (17:41Z)
+
+See `64e33dc7/S8C_ACCEPTANCE.md`.
+
+`landing_composition_prep` (T3, `claude_opus_5_5`) is granted **LAND-2**:
+- **Slot:** it may self-acquire the canonical slot with `flock -n` when free, and hold it only for the composition gates and the hooked merge commit.
+- **Composition:** compose S8-C `f428db9a` onto `integration/importer` `df713fd9` with `compose-second.sh`. That is a fresh worktree, `git merge --no-ff --no-commit` followed by a hooked commit as Bradley, and regeneration of `npm run contract:importer`. The determinism check (two cold runs plus the contract spec) and the 27 affected suites must pass.
+- **Landing:**
+  - push branch `land/s8-c`;
+  - open the PR, with CI required green;
+  - one ordinary FF push to `integration/importer`, only if the remote is still `df713fd9`;
+  - verify the remote head and record it.
+- **Limits:** never touch `main`; no force. Any mismatch or red check other than known class C: stop and report.
+
+Afterwards the order is: S9-0 docs lands on the new head, then S8-F moves onto it, then S8-G starts.
