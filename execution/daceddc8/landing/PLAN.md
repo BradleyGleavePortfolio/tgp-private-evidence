@@ -287,3 +287,11 @@ There are no A or B findings against landing either candidate.
 - **PR #540:** MERGED. CI green, 8 pass and 1 skip.
 - **Untouched:** `main` is still `c23b9d9f`; #530 was not touched.
 - **Record:** `ci/s8-c/LANDED.md`.
+
+## LAND-3 complete (18:29Z)
+
+- **Landed:** `integration/importer` moved `1c10e2a1 → 1c5fbb0441178e0cfe6e9f8d72e955c645c265e9` (S9-0, docs only).
+- **PR #541:** MERGED. CI green, 8 pass and 1 skip.
+- **Record:** `ci/s9-0/LANDED.md`.
+- **`main`:** now `1c10e2a1`, merged through #530 at 18:20:30Z by the separate owner-bridge executor, not by this lane.
+- **Constant not updated:** `MAIN_AT_PLAN` in `landing-lib.sh` still says `c23b9d9f`. It only triggers a NOTE, never a write.

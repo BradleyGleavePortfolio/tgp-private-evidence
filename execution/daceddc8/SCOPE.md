@@ -404,3 +404,11 @@ Under the precedence rule, Bradley's latest instruction overrides the earlier ru
 - **Contract version:** left at `2.0.0-c1-s2.0`. The change is additive fields on the reconstruct and roster DTOs, not the status response. Reviewers disposition this.
 - **Landing:** by composition onto the integration tip, which will then be S9-0 `1c5fbb04`, a docs-only sibling, using `compose-second.sh` with the L2-2 method.
 - **PG proof:** a single-run grant after dual GO.
+
+## PR #530 MERGED (18:20:30Z)
+
+Backend `main` moved `c23b9d9f` → `1c10e2a1` by FF. PR #530 is MERGED.
+- No deploy: no Fly workflow ran. Production stays on image `5076a07a`, uptime has been continuous since before the merge, and the database has 164 migrations applied, unchanged.
+- The Release Please failure is chronic and class C: an Actions PR-permission problem.
+
+Deploy and enablement stay owner-reserved, per assessment D1–D6. Reference: `prod/PR530_MERGED.md`.
