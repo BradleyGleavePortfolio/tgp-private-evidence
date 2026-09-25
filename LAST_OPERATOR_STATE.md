@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live correction cursor: 2026-09-25 05:16Z
+
+S7-L head54970cd9's first PG proof failed:21 failed/3 passed/24 total. It bootstrapped171 migrations, but the initial lock-test assertion expected SQLSTATE55P03 absent from default psql output; downstream failures include held locks and missing lifecycle columns. Independent reviewers are dispositioning the actual causal defects, not re-auditing accepted history. After the failed summary remained open, parent verified and terminated only the Jest-stage process group. The unchanged driver completed cleanup at05:14:22Z, terminalrc124, stoprc0, postgres0/listener0/survivor none; lock released, data retained. No acceptance or landing. See `execution/64e33dc7/S7L_FAILED_PROOF_DISPOSITION.md`.
+
+S8-C's two initial independent reviews are complete against frozenaf9f7f54/v2. Parent granted one seven-path ordinary follow-up: preserve failed native verification without provenance mutation; emit the existing contract's qualified enum_unmapped code; stage the legacy PG fixture on its repository source; restore child provenance namespaceworkouts.exercise in writer/count/tests. No contract amendment, schema or dependency change. S8-C is sole heavy source-gate grantee under amended `S8C_REVIEW_MINIMUM_CORRECTION_GRANT.md`; final head and four-line v3 driver delta need changed-question-only dual re-attestation. No S8-C PG grant. F stays frozen, G prerequisite-gated; accepted remote integration remains933, production reserved.
+
 ## Live proof cursor: 2026-09-25 05:07Z
 
 S7-L follow-up `54970cd937afc8dea689b33243961abfef8b9dd6`, tree `513c71d7c1390787e1521ccbfa46b30bb52b5462`, has dual independent v2 GO, closing F1 A and F2 B. `execution/64e33dc7/S7L_SINGLE_PG_PROOF_GRANT.md` authorizes its first and only current real-PG execution through the exact v2 driver; S7-L is sole heavy-slot grantee. No runtime acceptance is yet claimed.

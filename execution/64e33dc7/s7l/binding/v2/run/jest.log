@@ -1,0 +1,439 @@
+  console.warn
+    PG17_DATABASE {"port":55641,"user":"postgres","owner":"postgres","super":false,"address":"127.0.0.1","version":"170006","database":"g2_s7l_disposable","bypassrls":true,"directory":"/home/user/workspace/execution/64e33dc7/recovery-reset/clusters/s7l/pg-data"}
+
+      146 |     ),
+      147 |   ).toBe(G2_S7L_DATABASE_MARKER);
+    > 148 |   console.warn('PG17_DATABASE', JSON.stringify(identity));
+          |           ^
+      149 |   // Fresh OLD-shaped bootstrap: the whole accepted history through the OLD root's own
+      150 |   // `prisma migrate deploy`; S8-B present, S7-L absent in both catalog and history.
+      151 |   expect(Number(appliedMigrations())).toBe(EXPECTED_HISTORY);
+
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:148:11)
+
+  console.warn
+    PG17_PROCESS {"name":"g2l_1","old":true,"options":{"action":"complete","coach":"coach","intent":"intent_legacy_2026","body":{"terminal_status":"success"}},"result":{"acknowledged":true,"intent_id":"intent_legacy_2026"},"queries":4,"pid":19433}
+
+      171 |       }
+      172 |       // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
+    > 173 |       console.warn(
+          |               ^
+      174 |         'PG17_PROCESS',
+      175 |         JSON.stringify({
+      176 |           name,
+
+      at settleWorker (test/utils/g2-s7l-pg-harness.ts:173:15)
+      at ChildProcess.<anonymous> (test/utils/g2-s7l-pg-harness.ts:193:7)
+
+FAIL rls-live test/rls-g2-s7l.spec.ts (294.449 s)
+  ● stage 1: OLD shape baseline and refusing entry gates › a held transaction on the run table makes up hit lock_timeout (55P03); nothing applied; release → free
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "55P03"
+    Received string:    "Error: Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 --single-transaction -f /home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql postgresql://postgres@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:25: WARNING:  there is already a transaction in progress
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:28: ERROR:  canceling statement due to lock timeout
+    "
+
+       98 |   }
+       99 |   if (error === undefined) throw new Error('SQL file unexpectedly applied');
+    > 100 |   expect(String(error)).toContain(message);
+          |                         ^
+      101 | }
+      102 |
+      103 | export const stageSql = resolve(root, 'prisma/migrations', S7L_MIGRATION);
+
+      at refusedFile (test/utils/g2-s7l-pg-harness.ts:100:25)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:269:16)
+
+  ● stage 1: OLD shape baseline and refusing entry gates › down on the OLD shape refuses with the fixed absent text; nothing changes
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "G2-S7L run lifecycle absent"
+    Received string:    "Error: Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 --single-transaction -f /home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql postgresql://postgres@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql:11: WARNING:  there is already a transaction in progress
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql:17: ERROR:  canceling statement due to lock timeout
+    "
+
+       98 |   }
+       99 |   if (error === undefined) throw new Error('SQL file unexpectedly applied');
+    > 100 |   expect(String(error)).toContain(message);
+          |                         ^
+      101 | }
+      102 |
+      103 | export const stageSql = resolve(root, 'prisma/migrations', S7L_MIGRATION);
+
+      at refusedFile (test/utils/g2-s7l-pg-harness.ts:100:25)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:281:16)
+
+  ● stage 2: S7-L through the release mechanism, catalog exactness and the gate SQL › L01: prisma migrate deploy applies exactly S7-L; catalog exact; RLS byte-equal; legacy rows untouched
+
+    prisma migrate deploy failed: Prisma schema loaded from prisma/schema.prisma
+    Datasource "db": PostgreSQL database "g2_s7l_disposable", schema "public" at "127.0.0.1:55641"
+
+    172 migrations found in prisma/migrations
+
+    Applying migration `20270123000000_scout_run_lifecycle_expand`
+
+    Error: ERROR: current transaction is aborted, commands ignored until end of transaction block
+       0: schema_commands::commands::apply_migrations::Applying migration
+               with migration_name="20270123000000_scout_run_lifecycle_expand"
+                 at schema-engine/commands/src/commands/apply_migrations.rs:95
+       1: schema_core::state::ApplyMigrations
+                 at schema-engine/core/src/state.rs:260
+
+      270 | export function prismaMigrateDeploy(schemaRoot: string): string {
+      271 |   const result = prisma(schemaRoot, ['migrate', 'deploy']);
+    > 272 |   if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
+          |                         ^
+      273 |   return result.output;
+      274 | }
+      275 |
+
+      at prismaMigrateDeploy (test/utils/g2-s7l-pg-harness.ts:272:25)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:290:39)
+
+  ● stage 2: S7-L through the release mechanism, catalog exactness and the gate SQL › L02: a raw rerun is refused atomically; OIDs, rows and history unchanged; deploy has nothing pending
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "G2-S7L run lifecycle already present"
+    Received string:    "Error: Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 --single-transaction -f /home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql postgresql://postgres@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:25: WARNING:  there is already a transaction in progress
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:28: ERROR:  canceling statement due to lock timeout
+    "
+
+       98 |   }
+       99 |   if (error === undefined) throw new Error('SQL file unexpectedly applied');
+    > 100 |   expect(String(error)).toContain(message);
+          |                         ^
+      101 | }
+      102 |
+      103 | export const stageSql = resolve(root, 'prisma/migrations', S7L_MIGRATION);
+
+      at refusedFile (test/utils/g2-s7l-pg-harness.ts:100:25)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:347:16)
+
+  ● stage 2: S7-L through the release mechanism, catalog exactness and the gate SQL › §3.1 gate SQL: two sessions on one run serialize on the UPDATE (no 40P01); last_observed_at monotonic; phase moves once
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://service_role@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    ERROR:  column "mode" of relation "ScoutImport" does not exist
+    LINE 1: ...ort" (id,coach_id,intent_id,state,terminal_status,mode,impor...
+                                                                 ^
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sqlAs (test/utils/g2-s7l-pg-harness.ts:69:62)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:358:10)
+
+  ● stage 2: S7-L through the release mechanism, catalog exactness and the gate SQL › a FOR NO KEY UPDATE fence waits for the gated writer to commit, then sees the committed observation
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://service_role@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    ERROR:  column "mode" of relation "ScoutImport" does not exist
+    LINE 1: ...ort" (id,coach_id,intent_id,state,terminal_status,mode,impor...
+                                                                 ^
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sqlAs (test/utils/g2-s7l-pg-harness.ts:69:62)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:391:10)
+
+  ● stage 3: constraints and API roles on S7-L › CHECK/FK/partial-unique refuse every malformed run row for the owner and the runtime role; nothing is written
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:414:14)
+
+  ● stage 3: constraints and API roles on S7-L › L06: anon/authenticated are refused by policy; a service_role transaction that rolls back persists nothing
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:414:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L07: Start guards — 404 foreign/unknown, 409 intent_not_paired, 409 intent_superseded, 409 legacy_run
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L07: a duplicate Start race produces exactly one server row; both callers receive the same body
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L08: cancel vs in-flight ingest — the fence waits on the gated writer, both succeed in order, no 40P01
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L08: concurrent ingest and /progress on one run serialize on the row lock; last_observed_at monotonic; no 40P01
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L09: /complete on an open run stores the claim and settles partial/reconciliation_not_performed (never complete); a duplicate is a no-op ack
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L09: /complete after a cancel is a no-op ack (fence beats late complete); /complete without a Start is 409 run_not_started
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L10: lazy deadline — an expired open run is fenced timed_out by the next writer AFTER its own rollback (no self-wait); the read path fences too
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › CAS terminal-once: a stale settle epoch after a fence writes nothing
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L11: projections — legacy rows read as mode legacy with the accepted fields; non-UUID intents never touch the lifecycle; unknown intents 404
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 4: the real writers on S7-L (separate OS processes, real clients, barriers) › L05/L12: the OLD image legacy writers on the S7-L schema — byte-identical legacy rows; a server row is protected by the legacy marker
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:550:14)
+
+  ● stage 5: down refuses lifecycle state; with legacy rows only it removes exactly S7-L › L03: down refuses with one server row (fixed text); nothing deleted; schema, OIDs and history unchanged
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:1004:14)
+
+  ● stage 5: down refuses lifecycle state; with legacy rows only it removes exactly S7-L › L04: down removes exactly S7-L and keeps every legacy row; the OLD writer continues; a second down refuses
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 --single-transaction -f /home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql postgresql://postgres@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql:11: WARNING:  there is already a transaction in progress
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/down.sql:17: ERROR:  canceling statement due to lock timeout
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sqlFile (test/utils/g2-s7l-pg-harness.ts:75:3)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:1025:12)
+
+  ● stage 5: down refuses lifecycle state; with legacy rows only it removes exactly S7-L › re-applying the file restores the identical shape (OIDs aside); legacy rows keep defaults; a raw rerun is refused again
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 --single-transaction -f /home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql postgresql://postgres@127.0.0.1:55641/g2_s7l_disposable?connect_timeout=5
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:25: WARNING:  there is already a transaction in progress
+    psql:/home/user/workspace/worktrees/64e33dc7-s7l/prisma/migrations/20270123000000_scout_run_lifecycle_expand/migration.sql:28: ERROR:  canceling statement due to lock timeout
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sqlFile (test/utils/g2-s7l-pg-harness.ts:75:3)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:1046:12)
+
+
+  ● Test suite failed to run
+
+    spawnSync /usr/bin/psql ETIMEDOUT
+
+      56 |
+      57 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 58 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      59 |     input,
+      60 |     encoding: 'utf8',
+      61 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s7l-pg-harness.ts:58:15)
+      at sql (test/utils/g2-s7l-pg-harness.ts:65:46)
+      at resetData (test/utils/g2-s7l-harness.ts:247:6)
+      at Object.<anonymous> (test/rls-g2-s7l.spec.ts:218:12)
+
+Test Suites: 1 failed, 1 total
+Tests:       21 failed, 3 passed, 24 total
+Snapshots:   0 total
+Time:        294.68 s
+Ran all test suites matching test/rls-g2-s7l.spec.ts.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.

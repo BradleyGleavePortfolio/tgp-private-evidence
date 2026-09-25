@@ -1,5 +1,17 @@
 # Current execution dispatches
 
+## Live override, 2026-09-25 05:16Z
+
+S7-L terminal failed proof: rc124 after completed21-failed/3-passed summary and verified parent TERM of only the stuck Jest stage; bound cleanup rc0 and canonical lock released05:14:22Z. Builder receipt and two independent runtime-only failure dispositions remain active, with no source/gate/proof authority.
+
+S8-C is sole heavy source-gate grantee under the amended `64e33dc7/S8C_REVIEW_MINIMUM_CORRECTION_GRANT.md`. Its seven-path ordinary follow-up closes the two review-B defects plus the legacy-platform fixture and child-family identity findings from review A. Frozen contract is retained; no record-only namespace amendment. Both initial reviews remain immutable. New head/v3 binding requires only changed-question re-attestation. Neither a retry of S7-L nor a first S8-C PG invocation is granted. F remains frozen and G prerequisite-gated.
+
+## Live override, 2026-09-25 05:14Z
+
+S7-L's one v2 PG invocation reports21 failed/3 passed/24 total and remains in executor-owned cleanup. The S7-L builder alone owns the heavy slot until its actual release; no retry or source remediation is granted. Existing independent S7-L reviewers A/B are active for runtime-failure disposition only under `64e33dc7/S7L_FAILED_PROOF_DISPOSITION.md`.
+
+S8-C reviewer B completed with two concrete B findings. The sole S8-C builder may perform only the five-path source correction in `64e33dc7/S8C_REVIEW_MINIMUM_CORRECTION_GRANT.md`, with no gates or lock until explicit relay after S7-L cleanup. Reviewer A finishes independently against frozen `af9f7f54`; reviewer B waits for the new head/v3 binding for delta-only re-review. Heavy queue: S8-C minimum correction source gates once safely relayed; any S7-L corrective gates and either new proof require their own later grants. F remains frozen; G remains prerequisite-gated. All earlier dispatch rows are historical where superseded here.
+
 ## EXEC-64E33DC7 owner-reset assignments, 2026-09-25 03:16Z
 
 Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers and runtime owners are REVOKED; any later predecessor output is unauthorized until reconciled. Old rows below are history.

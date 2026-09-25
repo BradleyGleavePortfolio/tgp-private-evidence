@@ -114,3 +114,8 @@ Continue B/drain → R → N/Q1 → C → remaining S7 → S8–S12 with eligibl
 1. N/Q1 v2 delta re-attestation, then a single PG run, then acceptance.
 2. Land onto `integration/importer` (sibling of PROD-CI-1, disjoint paths).
 3. C phase 2.
+# Live correction cursor: 2026-09-25 05:16Z
+
+S7-L replacement54970cd9 is unaccepted after its first PG proof reported21 failed/3 passed. Parent terminated only the verified, completed-but-stuck Jest stage; the existing driver stopped the disposable server and released its lock at05:14:22Z (terminalrc124, cleanup0, no surviving postgres/listener). All bytes, failed logs and old bindings remain intact. Both original reviewers now disposition only the new runtime failure; no S7-L corrective execution is yet granted.
+
+S8-C is sole heavy source-gate owner for the combined seven-path review-minimum correction under `execution/64e33dc7/S8C_REVIEW_MINIMUM_CORRECTION_GRANT.md`. Preserveaf9f7f54/v2; make an ordinary new candidate and v3 binding, then dual changed-question review before any separately granted PG run. This closes provenance-reason, enum-code, legacy-fixture and child-namespace defects without weakening the frozen contract. No owner decision required for these bounded corrections. Accepted integration933 and all production/activation/principal-policy reservations are unchanged.
