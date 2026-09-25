@@ -1,0 +1,16 @@
+feat(scout): add pure S9 reconciler (verdict, coverage predicate, report v1)
+
+Adds src/scout/reconciliation/{types,coverage,reconcile}.ts: a pure,
+deterministic reconcile(facts) -> {verdict, report} that implements the
+S9-0 decision (docs/decisions/2026-09-25-s9-reconciliation.md): per-identity
+buckets a-k with a closed histogram catalogue, run-level conditions C-FAM,
+C-ID, C-REL and C-COV in order, required_families with the recorded
+per-family completeness basis (complete is never vacuous), the F2 split
+kept null, and relationship closure by identity through provenance keys.
+No I/O, no Prisma, no clock; nothing in lifecycle/** or reconstruct/** is
+edited and nothing wires the reconciler yet (S9-B/S9-C).
+
+test/scout/reconciliation/reconcile.spec.ts is the table-driven spec over
+R01-R19 (incl. R01d, R02b, R03b, R18b), the parse/classify/edge/coverage
+tables, determinism, no-mutation and the never-blocked invariant, plus the
+review B-1 duplicate-family closure case.
