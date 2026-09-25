@@ -412,3 +412,7 @@ Backend `main` moved `c23b9d9f` → `1c10e2a1` by FF. PR #530 is MERGED.
 - The Release Please failure is chronic and class C: an Actions PR-permission problem.
 
 Deploy and enablement stay owner-reserved, per assessment D1–D6. Reference: `prod/PR530_MERGED.md`.
+
+## S9-0 LANDED (18:29:24Z)
+
+`integration/importer` moved `1c10e2a1` → `1c5fbb04` by FF, through PR #541 with green CI. Backend `main` is at `1c10e2a1`, one docs-only commit behind.
