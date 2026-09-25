@@ -1,5 +1,35 @@
 # LAST OPERATOR STATE
 
+## EXEC-DACEDDC8 live update, 2026-09-25 17:12Z (supersedes the lower sections where they conflict)
+
+### Landed
+- **S7-L:** `integration/importer` = `df713fd9217df524915348ef8a42c797f288dde1`. Landed via PR #539, CI green, one ordinary FF push at 17:05:00Z.
+  - Basis: v4 real-PG proof 24/24, dual GO (`execution/64e33dc7/S7L_ACCEPTANCE.md`).
+  - `main` is unchanged at `c23b9d9f`.
+
+### Failed and in correction
+- **S8-C:** v4 proof failed at stage jest (0/13). Cause: the harness `ExerciseCatalogItem` INSERT omits NOT NULL `updated_at`. Class B, harness-only; see `execution/64e33dc7/S8C_V4_FAILED_PROOF_DISPOSITION.md`.
+- The bootstrap correction `e0cee7e0` was proven effective (BOOTSTRAP rc 0).
+- S8C-BC-3 is in progress. After it: v5 binding, dual review, one PG-4c proof, then composition onto `df713fd9` (`execution/daceddc8/landing/` scripts are ready).
+
+### Ready and waiting
+- **S8-F:** COMPOSITION_READY. Waits for S8-C to be accepted.
+- **S8-G:** DRAFT_READY. Waits for S8-C to land.
+
+### Active
+- **S9:** readiness done; F1/F2 dispositions are in `execution/daceddc8/SCOPE.md`. S9-0 doc (T3) and S9-A reconciler (T4) are building.
+- **E2:** extension status reads server (T3), in progress.
+
+### Heavy queue
+S8-C BC-3, then S9-0 commit, then E2 gates, then S9-A gates, then S8-C v5 proof.
+
+### Owner-reserved (unchanged)
+- PR #530 (production).
+- Extension PR #27 approval.
+- S8-D/E client principal.
+- G3-AUTH.
+- CWS, flags, accounts, spending, protection.
+
 ## EXEC-DACEDDC8 takeover: 2026-09-25 16:25Z
 
 Execution RESUMED under Bradley's current takeover prompt, which supersedes the 05:56Z freeze. Durable state and live GitHub agree: backend integration `93389265`, prod main unchanged, and live is not ahead. The prior sandbox is gone. The half-done inventory is reconstructed in `execution/daceddc8/HALF_DONE_WORK.md`, and grants are in `execution/daceddc8/SCOPE.md`.
