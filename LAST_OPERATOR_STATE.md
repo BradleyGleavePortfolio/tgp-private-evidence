@@ -1,10 +1,10 @@
 # LAST OPERATOR STATE
 
-## Live cursor: 2026-09-25 04:51Z
+## Live cursor: 2026-09-25 04:57Z
 
-S7-L `839b54c5` and its original filled binding are preserved, not accepted. Review A returned GO; Review B identified F1 A (a newly committed future-deadline Start can be permanently timed out) and F2 B (L06 attempts login as NOLOGIN roles). Parent granted only the service guard, one regression unit case and L06 owner-session SET ROLE under `execution/64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`. The builder is active source-only; its source gates queue after S8-C. A new ordinary head and versioned binding require only changed-question re-attestation by the same two reviewers before a separately granted first PG proof.
+S7-L `839b54c5` and its original filled binding are preserved, not accepted. Review A returned GO; Review B identified F1 A (a newly committed future-deadline Start can be permanently timed out) and F2 B (L06 attempts login as NOLOGIN roles). Parent granted only the service guard, one regression unit case and L06 owner-session SET ROLE under `execution/64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`. The builder received the explicit source-gate relay at04:55Z after verified S8-C release. A new ordinary head and versioned binding require only changed-question re-attestation by the same two reviewers before a separately granted first PG proof.
 
-S8-C remains sole source-gate grantee; parent observed its live canonical holder at 04:49Z. Its initial gate failures are preserved while minimum new-adapter/fixture closures proceed. S8-F's 15-path exact draft is published and frozen pending accepted S8-C composition; no re-authoring or runtime is authorized there. No backend replacement is accepted or landed, no PG proof has run, and no owner decision is required for these narrow corrections. Accepted product heads and reserved boundaries below remain unchanged.
+S8-C committed `527fe2bc24f954b26c0485c90345f237ce39a09d`, tree `d87a96267c2ec4f4d79d83d26e6b2928a56c8a85`, through genuine hooks and released its slot at04:52:24Z. Exact exports, full gate history and original filled binding are complete. Two independent reviewers are active. One remaining B is authorized for a test-only correction: the old TrueCoach test assumes every canonical family is supported; the new `programs` family must explicitly remain unresolved for its unchanged mapping. See `S8C_MAPPING_EXPECTATION_CORRECTION_GRANT.md`; its gates queue after S7-L. S8-F's 15-path exact draft is published and frozen pending accepted S8-C composition. No replacement is accepted or landed, no PG proof has run, and no owner decision is required for these corrections.
 
 ## Live cursor: 2026-09-25 04:33Z
 

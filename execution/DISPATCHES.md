@@ -6,10 +6,12 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 
 | New lane | Tier / requested route | Sole writable surface | State |
 |---|---|---|---|
-| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`; three exact paths, versioned exports/binding | `839b54c5` preserved; F1 future-deadline guard and F2 L06 SET ROLE corrections authorized source-only; source gates await explicit relay |
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`; three exact paths, versioned exports/binding | `839b54c5` preserved; correction source gates relayed04:55Z after S8-C release; no PG |
 | `s7_l_independent_review_a_muggs3qw` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original report preserved, `REVIEW_A_V2.md` next | Original GO recorded; changed-question review waits for corrected exact head and filled v2 binding |
 | `s7_l_independent_review_b_muggs3ql` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original report preserved, `REVIEW_B_V2.md` next | NOT GO: F1 A and F2 B; minimum closures granted, no broad re-audit |
-| `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md` plus `S8C_SOURCE_GATES_GRANT.md`; native writers/typed handoff and own-worktree derived artifact only | Source gates ACTIVE under04:31Z relay; no generator script/version/spec edits and no PG |
+| `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md` plus `S8C_SOURCE_GATES_GRANT.md`; native writers/typed handoff and own-worktree derived artifact only | Committed `527fe2bc`, tree `d87a9626`; genuine hooks rc0, slot released04:52:24Z; exports/final receipt/filled binding source-only |
+| `s8_c_independent_review_a_mughlv0v` | T4 / `claude_fable_5_1`, high | Read-only committed S8-C delta and filled binding; `s8c/reviews/REVIEW_A.md` only | ACTIVE under `S8C_INDEPENDENT_REVIEW_GRANT.md`; final GO waits for one-test B closure and v2 exact binding |
+| `s8_c_independent_review_b_mughlv1e` | T4 / `claude_fable_5_1`, high | Read-only committed S8-C delta and filled binding; `s8c/reviews/REVIEW_B.md` only | ACTIVE independently of A; no accepted-source audit or runtime |
 | `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | Initial setup DONE; `64e33dc7/FORMATTER_TOOLING_GRANT.md`, isolated formatter tool only | DONE rc0 at04:23:36Z, Prettier3.9.9 verified; lock released; no project dependency changes |
 | `s8_f_reader_readiness_muge8avl` | T3 / `claude_opus_5_5`, high | Read-only accepted native-reader contracts; `64e33dc7/s8f/READINESS.md` only, no product writes/runtime | DONE; A1 minimum typed-target handoff granted to S8-C; A2 qualified dark sequencing; no S8-F build yet |
 | `s8_g_orchestration_readiness_mugf57lu` | T4 / `claude_fable_5_1`, high | Read-only accepted lifecycle/native orchestration requirements; `64e33dc7/s8g/READINESS.md` only | DONE; prerequisites are final S7-L/S8-C interfaces and acceptance; no product/Git/runtime writes or slot grant |
@@ -19,6 +21,10 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 Heavy slot: canonical `execution/test-validation.lock`, S7-L source completion released04:30:19Z; parent observed no holder or relevant heavy process04:31:04Z. File remains in place. Current grantee: S8-C source gates and own-worktree derived contract generation under `S8C_SOURCE_GATES_GRANT.md`. Queue: separately granted new proofs after dual exact-head/binding attestations. No real-PG run yet granted. Source work and read-only reviews proceed in parallel. Requested routes are not actual telemetry.
 
 Current S7-L disposition supersedes its original single-review GO: F1 is a concrete fresh-run timeout defect (A); F2 is a deterministic NOLOGIN proof defect (B). Only the three-path minimum correction is authorized. S8-C source-gate work continues independently; S7-L correction gates queue next, then exact changed-question dual review and a separately granted first PG proof. No owner decision is needed for these contract-preserving closures.
+
+04:55Z relay supersedes the preceding heavy-slot entry: parent verified S8-C's actual04:52:24Z release, no holder/relevant heavy process and clean committed candidate. S7-L now owns only its narrow correction source gates. S8-C is frozen for independent review while its builder completes exports/binding source-only. Neither lane has a PG grant.
+
+S8-C one-test B closure is authorized source-only under `S8C_MAPPING_EXPECTATION_CORRECTION_GRANT.md`: preserve original committed product, correct only the changed-dependency assumption that TrueCoach supports every canonical family, explicitly retain `programs` as unresolved. Its targeted gate/ordinary follow-up queues after S7-L correction gates. Reviewers continue against the frozen committed object, then bind only the final test-only delta and v2 driver.
 
 ## Earlier checkpoint, preserved
 

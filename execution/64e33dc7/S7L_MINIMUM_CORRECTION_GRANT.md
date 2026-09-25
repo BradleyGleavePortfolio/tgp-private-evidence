@@ -34,3 +34,9 @@ Prepare a new filled binding under `s7l/binding/v2/`; do not overwrite the origi
 Keep the original driver/fixture behavior except mechanical versioned paths and candidate/parent pins required by these corrections. The original fixture can be copied byte-for-byte. Record the exact original-to-v2 binding delta and hashes. No initializer, server, bootstrap, migration or PG test may run.
 
 Both original independent reviewers will re-attest only F1/F2 closure, new head/parent/tree, applicable gates, and the changed filled binding. Do not repeat their unchanged source audit. Their original reports are immutable; each writes a separate `REVIEW_A_V2.md` or `REVIEW_B_V2.md`. Only two GO verdicts on the final head and filled v2 binding permit the parent to consider a separate single-PG execution grant.
+
+## Source-gate activation, 2026-09-25 04:55Z
+
+S8-C's actual driver recorded its ordinary hooked commit `527fe2bc24f954b26c0485c90345f237ce39a09d`, clean tree `d87a96267c2ec4f4d79d83d26e6b2928a56c8a85`, and slot release at 04:52:24Z. Parent read that terminal record and verified no canonical holder or relevant heavy process at 04:54Z. S8-C's source-gate authority is now ended; its export/binding preparation is source-only.
+
+S7-L is now the sole source-gate grantee for the bounded follow-up above. Acquire the existing canonical lock nonblocking in the actual working process, complete only the necessary gates and genuine ordinary commit, and release promptly. This activation does not grant any PG action.
