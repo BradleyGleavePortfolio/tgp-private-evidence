@@ -208,3 +208,19 @@ The canonical slot passes to S8-C BC-3 diagnostics.
 - Then a scratch diagnostic (b) rerun under the slot, non-accepting; it must show 13 of 13. Any new failure: stop for disposition.
 - Then checkpoint v7, binding v5 (proof-v5 paths, all changed-blob pins, and the PINS L57 fill fix) and run-prep v5 (`S8C_PG5_GRANT`), from the final head.
 - Reviewers for v5 must check that the three assertion changes do not weaken product assertions.
+
+## S8C-BC-4 result and BC-5 grant (17:25Z)
+
+### BC-4 result
+- **Commit:** `4d7d4b4e…` (tree `c1949c5b…`). F1 and F2 are closed.
+- **Diagnostic b2:** 11 of 13 passed. The two failures are both `count('User')`:
+  - **F4 (new, spec L290):** the same class as F3. It was previously masked because that test threw earlier at F2.
+  - **F3 site (L429):** failed only because the scratch lane was reused between runs.
+- The builder stopped correctly.
+
+### BC-5 grant: `s8c_bootstrap_completion`
+- **Edit:** at both User-count sites (L290 and the F3 site), use the baseline form: `usersBefore = count('User')` before the writer runs, then `expect(count('User')).toBe(usersBefore)`. This still proves no User is minted and is immune to seeds and history.
+- **Standing permission:** the builder may apply the same baseline form, without another stop, to any other count assertion over a table that accepted migrations seed. Any other failure class still stops.
+- **Commit:** one hooked commit, child of `4d7d4b4e`.
+- **Diagnostic b3:** on a FRESH scratch lane `scratch/s8c-diag2` (new initdb plus the unchanged bootstrap). It must show 13 of 13.
+- **Then:** checkpoint v7, binding v5 and run-prep v5 from that head.
