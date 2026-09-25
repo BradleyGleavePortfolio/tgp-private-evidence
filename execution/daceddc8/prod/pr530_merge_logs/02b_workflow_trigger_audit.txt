@@ -1,0 +1,28 @@
+workflows at 1c10e2a1 : 20
+.github/workflows/ci.yml                                triggers=['pull_request', 'push', 'workflow_dispatch'] branches(push)={'branches': ['main']} fly=False
+.github/workflows/codeql.yml                            triggers=['pull_request', 'push', 'schedule'] branches(push)={'branches': ['main']} fly=False
+.github/workflows/danger.yml                            triggers=['pull_request', 'workflow_dispatch'] branches(push)=- fly=False
+.github/workflows/dependency-audit.yml                  triggers=['pull_request', 'push', 'schedule', 'workflow_dispatch'] branches(push)={'branches': ['main']} fly=False
+.github/workflows/fly-db-secrets-set.yml                triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-deploy.yml                        triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-feature-flags-set.yml             triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-launch-env-set.yml                triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-logs.yml                          triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-recent-auth-set.yml               triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-secrets-list.yml                  triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/fly-secrets-set.yml                   triggers=['workflow_dispatch'] branches(push)=- fly=True
+.github/workflows/h4-readiness.yml                      triggers=['pull_request', 'push', 'workflow_dispatch'] branches(push)={'branches': ['release/*']} fly=False
+.github/workflows/infra-lint.yml                        triggers=['pull_request', 'push', 'workflow_dispatch'] branches(push)={'branches': ['main'], 'paths': ['.github/workflows/**', 'scripts/**', 'dangerfile.js']} fly=False
+.github/workflows/migration-dry-run.yml                 triggers=['pull_request', 'workflow_dispatch'] branches(push)=- fly=False
+.github/workflows/pr-checks-watcher.yml                 triggers=['check_suite'] branches(push)=- fly=False
+.github/workflows/pr-size-labeler.yml                   triggers=['pull_request'] branches(push)=- fly=False
+.github/workflows/r100-quality-gate.yml                 triggers=['pull_request', 'workflow_dispatch'] branches(push)=- fly=False
+.github/workflows/release-please.yml                    triggers=['push', 'workflow_dispatch'] branches(push)={'branches': ['main']} fly=False
+.github/workflows/sbom.yml                              triggers=['pull_request', 'push', 'workflow_dispatch'] branches(push)={'branches': ['main'], 'tags': ['v*.*.*']} fly=False
+
+FLY WORKFLOWS WITH push/pull_request TRIGGER: NONE
+fly-deploy.yml on-keys: ['workflow_dispatch']
+ASSERT fly-deploy workflow_dispatch-only OK
+
+--- main c23b9d9f fly-deploy.yml trigger for contrast:
+{'push': {'branches': ['main']}}

@@ -1,0 +1,75 @@
+{
+ "version": [
+  "2.0.0-c1-s2.0",
+  "2.0.0-c1-s2.0"
+ ],
+ "paths": [
+  15,
+  15
+ ],
+ "schemas": [
+  36,
+  36
+ ],
+ "entity_before": [
+  "client_source_id",
+  "created_at",
+  "entity_type",
+  "id",
+  "label",
+  "source_id",
+  "source_platform",
+  "updated_at"
+ ],
+ "entity_after": [
+  "client_source_id",
+  "created_at",
+  "entity_type",
+  "id",
+  "label",
+  "native_id",
+  "source_id",
+  "source_platform",
+  "target_kind",
+  "updated_at"
+ ],
+ "roster_before": [
+  "accounting",
+  "intent_id",
+  "page",
+  "persons"
+ ],
+ "roster_after": [
+  "accounting",
+  "intent_id",
+  "page",
+  "persons",
+  "roster_bridge_pending"
+ ],
+ "family_enum": [
+  "workouts",
+  "client_history",
+  "programs"
+ ],
+ "target_kind": {
+  "description": "What `id` references. `scout_entity` is generic canonical evidence (also the effective kind of legacy rows); `workout_program` / `workout_plan` are tenant-owned native records. Rows of any other kind are never served.",
+  "enum": [
+   "scout_entity",
+   "workout_program",
+   "workout_plan"
+  ],
+  "example": "scout_entity",
+  "type": "string"
+ },
+ "native_id": {
+  "description": "The owned native record id when `target_kind` is a native kind (equal to `id`); null for `scout_entity` evidence rows.",
+  "format": "uuid",
+  "nullable": true,
+  "type": "string"
+ },
+ "bridge": {
+  "description": "Always true for now: these rows are the interim reconstructed Person bridge, not native coach-roster clients or principals. Imported clients stay absent from the User-based roster until the S8-D bridge is accepted. Present on empty pages too.",
+  "example": true,
+  "type": "boolean"
+ }
+}

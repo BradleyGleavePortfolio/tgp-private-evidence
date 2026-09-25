@@ -1,0 +1,249 @@
+time: 2026-09-25T18:19:31Z
+origin/main local: c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7
+ls-remote main: c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7	refs/heads/main
+ls-remote integration/importer: 1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47	refs/heads/integration/importer
+gh api main: c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7
+main protected: false
+ASSERT main==c23b9d9f OK
+ASSERT ancestor OK
+merge-base: c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7
+commits main..1c10e2a1: 99
+merge commits in range: 13
+=== fly-deploy.yml at 1c10e2a1 ===
+# Fly Deploy — explicit, evidence-gated production release.
+#
+# Merge to main is NOT deployment. This workflow only runs when an operator
+# dispatches it from `main` and types the exact 40-hex commit they authorize.
+# Before flyctl is touched, the `evidence-gate` job re-derives, from the GitHub
+# API, that this exact commit has: a trusted (same-repo, main, non-PR) newest
+# CI run with every required job green, a CodeQL run AND an uploaded
+# code-scanning analysis, and a non-expired CycloneDX SBOM artifact. Any
+# missing / skipped / stale / in-progress / fork / newer-failed evidence fails
+# the gate (scripts/ci/release-evidence-gate.sh). After deploy, the machines are
+# checked to be running the image built for that commit
+# (scripts/ci/verify-fly-release.sh) and an evidence manifest with the image
+# digest is uploaded.
+#
+# Hosted controls this workflow relies on but cannot create (see
+# docs/delivery-controls.md): branch protection on main, required PR checks,
+# required reviewers on the `production` environment, and required review for
+# changes under .github/workflows/** and scripts/ci/**. The gate refuses to run
+# while the `production` environment lacks a required reviewer or allows admin
+# bypass; whether those settings exist is UNKNOWN until read back from GitHub.
+#
+# Recovery: this path is forward-only (release_sha must be the current main
+# head). Rolling back = revert on main, let CI/CodeQL/SBOM run, dispatch again.
+# The previous running image is recorded in the manifest (machines-before) so
+# the emergency, UNGATED route in docs/deploy-runbook.md §7 has an exact target.
+
+name: Fly Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 'Exact 40-hex commit on main to release (must equal the current main head)'
+        required: true
+        type: string
+      confirm:
+        description: 'Type "deploy" to confirm a production release'
+        required: true
+        type: string
+      migrations:
+        description: 'Type "apply-migrations" ONLY if this release may change prisma/migrations or schema (release_command applies them before rollout). Leave empty otherwise; the job fails if the delta is non-empty or unknown without it.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  evidence-gate:
+    name: Release evidence gate
+    runs-on: ubuntu-latest
+    # Refuse anything not dispatched from main itself: the gate definition and
+    # the deployed commit must be the same reviewed tree.
+    if: github.ref == 'refs/heads/main' && github.event.inputs.confirm == 'deploy'
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
+    outputs:
+      release_sha: ${{ steps.gate.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Verify evidence for the exact commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ github.event.inputs.release_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+          TRUSTED_BRANCH: main
+          # Must match the deploy job's `environment.name`; the gate refuses to
+          # proceed unless that environment already has required reviewers and
+          # no admin bypass (environments auto-create unprotected otherwise).
+          REQUIRED_ENVIRONMENT: production
+          OUT_DIR: release-evidence
+        run: |
+          bash scripts/ci/release-evidence-gate.sh
+          echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload evidence manifest (pre-deploy)
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        with:
+          name: release-evidence-${{ github.event.inputs.release_sha }}
+          path: release-evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy:
+    name: Deploy app
+    needs: evidence-gate
+    # `needs` alone is not enough: a skipped gate would let this run. Require
+    # the gate to have concluded success and re-pin the sha it validated.
+    if: needs.evidence-gate.result == 'success' && needs.evidence-gate.outputs.release_sha == github.sha
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://backend-spring-lake-3890.fly.dev
+    permissions:
+      contents: read
+      actions: read
+    env:
+      RELEASE_SHA: ${{ needs.evidence-gate.outputs.release_sha }}
+      FLY_APP: backend-spring-lake-3890
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: ${{ needs.evidence-gate.outputs.release_sha }}
+          fetch-depth: 0   # migration delta needs the previously deployed commit
+          persist-credentials: false
+
+      - name: Assert checked-out tree is the authorized commit
+        run: |
+          head=$(git rev-parse HEAD)
+          [ "$head" = "$RELEASE_SHA" ] || { echo "::error::checked out $head, expected $RELEASE_SHA"; exit 1; }
+
+      - name: Download evidence manifest
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0  # v5.0.0 (same major as upload-artifact)
+        with:
+          name: release-evidence-${{ needs.evidence-gate.outputs.release_sha }}
+          path: release-evidence
+
+      # Fail loudly when the Fly deploy environment is missing the API token.
+      # The shell never prints the token value itself.
+      - name: Verify FLY_API_TOKEN is configured
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "::error::FLY_API_TOKEN GitHub Actions secret is not set. See docs/deploy-runbook.md §8."
+            exit 1
+          fi
+          case "${FLY_API_TOKEN}" in
+            '<'*'>'|'changeme'|'REPLACE_ME'|'placeholder'|'TODO')
+              echo "::error::FLY_API_TOKEN looks like a placeholder value."
+              exit 1
+              ;;
+          esac
+          tok_len=${#FLY_API_TOKEN}
+          if [ "${tok_len}" -lt 20 ]; then
+            echo "::error::FLY_API_TOKEN is suspiciously short (length=${tok_len})."
+            exit 1
+          fi
+          echo "FLY_API_TOKEN present (length=${tok_len})."
+
+      # Pinned to a commit (resolved 2026-09-20 from refs/heads/master with
+      # `git ls-remote`). The action installs flyctl from fly.io's release
+      # channel; the binary itself is not pinned here — see docs/delivery-controls.md.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # master 2026-09-20
+
+      # Record what is running BEFORE the release (rollback target + migration
+      # baseline). Raw machine config stays in RUNNER_TEMP; only
+      # {id,name,region,state,image_ref,checks,process_group} is uploaded.
+      - name: Record currently running machines
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl machines list -a "${FLY_APP}" --json > "${RUNNER_TEMP}/machines-before.json"
+          bash scripts/ci/filter-machines.sh "${RUNNER_TEMP}/machines-before.json" > release-evidence/machines-before.json
+
+      # release_command applies pending Prisma migrations to production before
+      # any machine flips. Fail closed unless the delta from the running commit
+      # is empty or the operator explicitly acknowledged it.
+      - name: Migration delta from running commit
+        env:
+          MACHINES_JSON: ${{ runner.temp }}/machines-before.json
+          MIGRATIONS_ACK: ${{ github.event.inputs.migrations }}
+          MANIFEST: release-evidence/release-evidence-${{ needs.evidence-gate.outputs.release_sha }}.json
+        run: bash scripts/ci/migration-delta.sh
+
+      # RELEASE_VERSION / GIT_SHA are the authorized commit (build arg + runtime
+      # ENV so Sentry releases and logs name the same commit). --image-label
+      # names the pushed image after the commit so the post-deploy check can
+      # bind running machines to it. SENTRY_AUTH_TOKEN stays a build secret.
+      - name: Deploy to Fly
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          flyctl deploy --remote-only -a "${FLY_APP}" \
+            --wait-timeout 5m \
+            --image-label "sha-${RELEASE_SHA}" \
+            --build-arg RELEASE_VERSION="${RELEASE_SHA}" \
+            --build-arg GIT_SHA="${RELEASE_SHA}" \
+            --build-arg SENTRY_DSN="${SENTRY_DSN}" \
+            --build-arg SENTRY_ORG="${SENTRY_ORG}" \
+            --build-arg SENTRY_PROJECT="${SENTRY_PROJECT}" \
+            --build-secret sentry_auth_token="${SENTRY_AUTH_TOKEN}"
+
+      - name: Verify running machines bind to the authorized image
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl machines list -a "${FLY_APP}" --json > "${RUNNER_TEMP}/machines-after.json"
+          bash scripts/ci/filter-machines.sh "${RUNNER_TEMP}/machines-after.json" > release-evidence/machines-after.json
+          MACHINES_JSON="${RUNNER_TEMP}/machines-after.json" \
+          IMAGE_LABEL="sha-${RELEASE_SHA}" \
+          MANIFEST="release-evidence/release-evidence-${RELEASE_SHA}.json" \
+            bash scripts/ci/verify-fly-release.sh
+
+      - name: Readiness probe
+        run: |
+          curl -fsS --max-time 20 "https://${FLY_APP}.fly.dev/readyz" | tee release-evidence/readyz.json
+          jq -e '.ok == true and .db == "up"' release-evidence/readyz.json >/dev/null
+
+      # The manifest names the job result so a failed release is never mistaken
+      # for a successful one (artifact name and deploy_result field).
+      - name: Finalize manifest with deploy result
+        if: always()
+        env:
+          MANIFEST: release-evidence/release-evidence-${{ needs.evidence-gate.outputs.release_sha }}.json
+          DEPLOY_RESULT: ${{ job.status }}
+        run: |
+          if [ -f "$MANIFEST" ]; then
+            jq --arg r "$DEPLOY_RESULT" '.deploy_result = $r' "$MANIFEST" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
+          else
+            mkdir -p release-evidence
+            jq -n --arg r "$DEPLOY_RESULT" --arg sha "$RELEASE_SHA" '{schema:"tgp.release-evidence.v1", release_sha:$sha, deploy_result:$r, note:"evidence manifest missing; deploy job failed before it was downloaded"}' > "$MANIFEST"
+          fi
+
+      - name: Upload release manifest (post-deploy)
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        with:
+          name: release-manifest-${{ needs.evidence-gate.outputs.release_sha }}-${{ job.status }}
+          path: release-evidence/
+          if-no-files-found: error
+          retention-days: 90

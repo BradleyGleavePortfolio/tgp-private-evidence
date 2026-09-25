@@ -396,3 +396,11 @@ Under the precedence rule, Bradley's latest instruction overrides the earlier ru
 4. Watch the push workflows on `main`, and assert that no Fly deploy job ran.
 
 **Deployment and flag enablement remain owner-reserved (assessment D1–D6).** This grant does NOT authorize a `workflow_dispatch` of the deploy, secret or flag workflows, and does not authorize protection changes.
+
+## S8-F COMMIT_READY (18:24Z)
+
+- **Candidate:** `e1ec2fecb71f315b6721d426ba0dacb84f304498` (tree `2fe0201f`), one commit on landed `1c10e2a1`. Gates passed: 33 of 33 suites, contract regenerated and deterministic (`9eacdd3e`). The binding v1 draft is not yet run.
+- **Reviews (REV-F1, both T4):** `s8_c_review_a` and `s8_c_review_b`, each on source plus binding, independently.
+- **Contract version:** left at `2.0.0-c1-s2.0`. The change is additive fields on the reconstruct and roster DTOs, not the status response. Reviewers disposition this.
+- **Landing:** by composition onto the integration tip, which will then be S9-0 `1c5fbb04`, a docs-only sibling, using `compose-second.sh` with the L2-2 method.
+- **PG proof:** a single-run grant after dual GO.

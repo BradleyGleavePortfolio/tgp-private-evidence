@@ -1,0 +1,52 @@
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/composition/gates/.pre-prettier.src_scout_scout-roster.service.ts	2026-09-25 16:36:27.113603848 +0000
++++ src/scout/scout-roster.service.ts	2026-09-25 18:17:05.877603848 +0000
+@@ -197,9 +197,7 @@
+     const personRows = rows.filter(
+       (r) => r.target_kind === null || r.target_kind === ROSTER_TARGET_KIND,
+     );
+-    const targetIds = personRows
+-      .map((r) => r.target_id)
+-      .filter((id): id is string => id !== null);
++    const targetIds = personRows.map((r) => r.target_id).filter((id): id is string => id !== null);
+     if (targetIds.length === 0) return [];
+ 
+     const persons = await tx.person.findMany({
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/composition/gates/.pre-prettier.test_rls-g2-s8f.spec.ts	2026-09-25 16:36:27.137603848 +0000
++++ test/rls-g2-s8f.spec.ts	2026-09-25 18:17:06.441603848 +0000
+@@ -45,7 +45,9 @@
+     expect(Number(sql('SHOW server_version_num'))).toBe(expectedVersion);
+     expect(sql("SELECT current_setting('cluster_name')")).toBe(G2_S8F_CLUSTER_MARKER);
+     expect(
+-      sqlAdmin(`SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`),
++      sqlAdmin(
++        `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++      ),
+     ).toBe(G2_S8F_DATABASE_MARKER);
+     expect(sql('SELECT inet_server_port()')).toBe(String(target.port));
+     // The S8-B catalog shape the new joins depend on is present (composed head, not S8-F's doing).
+@@ -76,7 +78,12 @@
+     vouch({ kind: 'workout_plan', nativeId: 'plan-own', source: 'w-plan' });
+     ledger({ source: 'w-plan', targetId: 'plan-own', kind: 'workout_plan' });
+     program('prog-own');
+-    vouch({ kind: 'workout_program', nativeId: 'prog-own', source: 'w-prog', outcome: 'already_present' });
++    vouch({
++      kind: 'workout_program',
++      nativeId: 'prog-own',
++      source: 'w-prog',
++      outcome: 'already_present',
++    });
+     ledger({ source: 'w-prog', targetId: 'prog-own', kind: 'workout_program' });
+     // F04: the OTHER coach's native plan, vouched for by the OTHER coach, but named by a ledger
+     // row of THIS coach (a cross-tenant pointer must never surface).
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/composition/gates/.pre-prettier.test_utils_g2-s8f-db.ts	2026-09-25 16:36:27.149603848 +0000
++++ test/utils/g2-s8f-db.ts	2026-09-25 18:17:06.473603848 +0000
+@@ -42,7 +42,8 @@
+  * the S8-F bootstrap (operator-derived from test/utils/g2-s8b-bootstrap.sh) and the S8-F fixture binding under execution/64e33dc7/s8f/ must carry the same literals.
+  */
+ export const G2_S8F_CLUSTER_MARKER = 's8f-disposable-pg17';
+-export const G2_S8F_DATABASE_MARKER = 's8f-g2-native-reader-synthetic-disposable-fixture-safe-to-drop';
++export const G2_S8F_DATABASE_MARKER =
++  's8f-g2-native-reader-synthetic-disposable-fixture-safe-to-drop';
+ // 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
+ // 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
+ // R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the

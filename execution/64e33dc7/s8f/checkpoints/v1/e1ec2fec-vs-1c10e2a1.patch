@@ -1,0 +1,2335 @@
+diff --git a/docs/contracts/importer-openapi.json b/docs/contracts/importer-openapi.json
+index f9109c06..8ebf936a 100644
+--- a/docs/contracts/importer-openapi.json
++++ b/docs/contracts/importer-openapi.json
+@@ -321,7 +321,7 @@
+             "type": "string"
+           },
+           "id": {
+-            "description": "Opaque server-issued canonical entity id.",
++            "description": "Opaque server-issued canonical id: the ScoutReconstructedEntity id for `scout_entity` rows, or the owned native record id for native target kinds.",
+             "format": "uuid",
+             "type": "string"
+           },
+@@ -331,6 +331,12 @@
+             "nullable": true,
+             "type": "string"
+           },
++          "native_id": {
++            "description": "The owned native record id when `target_kind` is a native kind (equal to `id`); null for `scout_entity` evidence rows.",
++            "format": "uuid",
++            "nullable": true,
++            "type": "string"
++          },
+           "source_id": {
+             "description": "Source platform's own record id (provenance, not a canonical key).",
+             "example": "tc_workout_5c22a",
+@@ -341,6 +347,16 @@
+             "example": "truecoach",
+             "type": "string"
+           },
++          "target_kind": {
++            "description": "What `id` references. `scout_entity` is generic canonical evidence (also the effective kind of legacy rows); `workout_program` / `workout_plan` are tenant-owned native records. Rows of any other kind are never served.",
++            "enum": [
++              "scout_entity",
++              "workout_program",
++              "workout_plan"
++            ],
++            "example": "scout_entity",
++            "type": "string"
++          },
+           "updated_at": {
+             "description": "When the record last changed.",
+             "format": "date-time",
+@@ -349,6 +365,8 @@
+         },
+         "required": [
+           "id",
++          "target_kind",
++          "native_id",
+           "source_platform",
+           "entity_type",
+           "source_id",
+@@ -1038,13 +1056,19 @@
+               "$ref": "#/components/schemas/ScoutRosterPersonDto"
+             },
+             "type": "array"
++          },
++          "roster_bridge_pending": {
++            "description": "Always true for now: these rows are the interim reconstructed Person bridge, not native coach-roster clients or principals. Imported clients stay absent from the User-based roster until the S8-D bridge is accepted. Present on empty pages too.",
++            "example": true,
++            "type": "boolean"
+           }
+         },
+         "required": [
+           "intent_id",
+           "accounting",
+           "persons",
+-          "page"
++          "page",
++          "roster_bridge_pending"
+         ],
+         "type": "object"
+       },
+@@ -2290,7 +2314,7 @@
+     },
+     "/api/scout/reconstruct/entities": {
+       "get": {
+-        "description": "Returns the reconstructed non-person canonical rows (workouts / client_history) for one settled crawl intent and family, joined to the reconstruction ledger, with honest per-page metadata (page_count + an opaque forward-only cursor) and deterministic bounded pagination. Issues no full-collection total scan and is not a second progress system. Excludes cross-tenant rows and cascade-erased rows; never returns email or billing fields. Returns 404 when the intent is unknown for the caller or when the scout flags are off.",
++        "description": "Returns the reconstructed non-person canonical rows (workouts / client_history) for one settled crawl intent and family, joined to the reconstruction ledger, with honest per-page metadata (page_count + an opaque forward-only cursor) and deterministic bounded pagination. Issues no full-collection total scan and is not a second progress system. Excludes cross-tenant rows and cascade-erased rows; never returns email or billing fields. Returns 404 when the intent is unknown for the caller or when the scout flags are off. Each row reports its materialized target_kind: generic scout_entity evidence (native_id null, the effective kind of every legacy row) or an owned native workout_program / workout_plan row (native_id set), the latter served only when the coach owns a live native row backed by matching import provenance; anything else is dropped from the page.",
+         "operationId": "ScoutEntitiesController_getEntities",
+         "parameters": [
+           {
+@@ -2419,7 +2443,7 @@
+     },
+     "/api/scout/reconstruct/roster": {
+       "get": {
+-        "description": "Returns the invite-pending roster Person records reconstructed from one settled crawl intent, joined to the reconstruction ledger, with honest accounting { staged, reconstructed, skipped, failed } and deterministic, bounded cursor pagination. Excludes deleted and cross-tenant rows; never returns email or billing fields. Returns 404 when the intent is unknown for the caller or when the scout flags are off.",
++        "description": "Returns the invite-pending roster Person records reconstructed from one settled crawl intent, joined to the reconstruction ledger, with honest accounting { staged, reconstructed, skipped, failed } and deterministic, bounded cursor pagination. Excludes deleted and cross-tenant rows; never returns email or billing fields. Returns 404 when the intent is unknown for the caller or when the scout flags are off. The response carries roster_bridge_pending: true (also on empty pages): these are interim Person bridge rows, not native roster clients or principals, until the S8-D bridge is accepted. Only person-kind ledger rows are materialized here.",
+         "operationId": "ScoutRosterController_getRoster",
+         "parameters": [
+           {
+diff --git a/src/scout/scout-entities.controller.ts b/src/scout/scout-entities.controller.ts
+index 7756cda7..8060a368 100644
+--- a/src/scout/scout-entities.controller.ts
++++ b/src/scout/scout-entities.controller.ts
+@@ -40,7 +40,11 @@ export class ScoutEntitiesController {
+       'no full-collection total scan and is not a second progress system. ' +
+       'Excludes cross-tenant rows and cascade-erased rows; never returns email or ' +
+       'billing fields. Returns 404 when the intent is unknown for the caller or ' +
+-      'when the scout flags are off.',
++      'when the scout flags are off. Each row reports its materialized target_kind: ' +
++      'generic scout_entity evidence (native_id null, the effective kind of every ' +
++      'legacy row) or an owned native workout_program / workout_plan row (native_id ' +
++      'set), the latter served only when the coach owns a live native row backed by ' +
++      'matching import provenance; anything else is dropped from the page.',
+   })
+   @ApiResponse({
+     status: 200,
+diff --git a/src/scout/scout-entities.dto.ts b/src/scout/scout-entities.dto.ts
+index 4f15339b..8b0f8ec0 100644
+--- a/src/scout/scout-entities.dto.ts
++++ b/src/scout/scout-entities.dto.ts
+@@ -42,6 +42,24 @@ export const ENTITY_REVIEW_FAMILIES: readonly string[] = RECONSTRUCT_ENTITY_TYPE
+   (family) => family !== RECONSTRUCT_ENTITY_TYPE,
+ );
+ 
++/**
++ * S8-F — the materialized target kinds an entity row can report. Mirrors the
++ * non-person values of the ledger's nullable `target_kind` column (S8-B/S8-C):
++ *  - `scout_entity`: generic canonical evidence in `ScoutReconstructedEntity`
++ *    (also the EFFECTIVE kind reported for legacy NULL-kind ledger rows);
++ *  - `workout_program`: a tenant-owned native `WorkoutProgram`;
++ *  - `workout_plan`: a tenant-owned native `WorkoutPlan`.
++ * The person kind is never served here (roster contract). Any other kind is
++ * dropped from the page (fail closed), never guessed.
++ */
++export const ENTITY_TARGET_KIND = {
++  scout_entity: 'scout_entity',
++  workout_program: 'workout_program',
++  workout_plan: 'workout_plan',
++} as const;
++export type EntityTargetKind = (typeof ENTITY_TARGET_KIND)[keyof typeof ENTITY_TARGET_KIND];
++export const ENTITY_TARGET_KINDS: readonly EntityTargetKind[] = Object.values(ENTITY_TARGET_KIND);
++
+ /**
+  * GET /api/scout/reconstruct/entities query. coach_id is taken from the bearer
+  * identity (never a query/body field); the inputs are which settled intent to
+@@ -106,11 +124,43 @@ export class ScoutEntitiesQueryDto {
+  * key. `client_source_id` is the soft provenance link to the owning client and
+  * `label` a best-effort PII-minimal title. NEVER any email, billing, or
+  * credential field.
++ *
++ * S8-F (additive): `target_kind` names what `id` points at and `native_id` is
++ * the tenant-owned native record id when the row was reconstructed into a
++ * native table (`workout_program` / `workout_plan`); it is null for generic
++ * `scout_entity` evidence, including every legacy row. All established fields
++ * keep their meaning; a native row's `label` is the native record's name and
++ * its `client_source_id` is null (never invented).
+  */
+ export class ReconstructedEntityDto {
+-  @ApiProperty({ description: 'Opaque server-issued canonical entity id.', format: 'uuid' })
++  @ApiProperty({
++    description:
++      'Opaque server-issued canonical id: the ScoutReconstructedEntity id for ' +
++      '`scout_entity` rows, or the owned native record id for native target kinds.',
++    format: 'uuid',
++  })
+   id!: string;
+ 
++  @ApiProperty({
++    description:
++      'What `id` references. `scout_entity` is generic canonical evidence (also the ' +
++      'effective kind of legacy rows); `workout_program` / `workout_plan` are ' +
++      'tenant-owned native records. Rows of any other kind are never served.',
++    enum: ENTITY_TARGET_KINDS,
++    example: ENTITY_TARGET_KIND.scout_entity,
++  })
++  target_kind!: EntityTargetKind;
++
++  @ApiProperty({
++    type: String,
++    format: 'uuid',
++    nullable: true,
++    description:
++      'The owned native record id when `target_kind` is a native kind ' +
++      '(equal to `id`); null for `scout_entity` evidence rows.',
++  })
++  native_id!: string | null;
++
+   @ApiProperty({ description: 'Source platform slug (provenance).', example: 'truecoach' })
+   source_platform!: string;
+ 
+diff --git a/src/scout/scout-entities.service.ts b/src/scout/scout-entities.service.ts
+index 50adeeb6..77db2ee4 100644
+--- a/src/scout/scout-entities.service.ts
++++ b/src/scout/scout-entities.service.ts
+@@ -14,6 +14,8 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
++  EntityTargetKind,
+   ReconstructedEntityDto,
+   ScoutEntitiesResult,
+ } from './scout-entities.dto';
+@@ -22,6 +24,25 @@ import { RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ /** Prisma transaction client — the interactive-transaction handle passed to $transaction. */
+ type Tx = Prisma.TransactionClient;
+ 
++/** One reconstructed ledger row as the page read projects it (S8-F adds the nullable kind). */
++type LedgerPageRow = {
++  source_id: string;
++  source_platform: string;
++  target_id: string | null;
++  target_kind: string | null;
++};
++
++/**
++ * S8-F: the native provenance outcomes that prove a same-coach native row was
++ * produced (or found already present) by an accepted import. `unresolved` and
++ * every other outcome never qualify, so an `unresolved` provenance row with a
++ * NULL native_id can never dress an evidence row up as native.
++ */
++const NATIVE_PROVENANCE_OUTCOMES: readonly string[] = ['created', 'already_present'];
++
++/** Minimal native projection shared by WorkoutPlan and WorkoutProgram (name only; no payload). */
++type NativeRecord = { id: string; name: string; created_at: Date; updated_at: Date };
++
+ /**
+  * IMPORTER-I — authoritative read bridge for reconstructed NON-person canonical
+  * entities (D2, site-agnostic). Projects one settled intent's `workouts` /
+@@ -50,6 +71,12 @@ type Tx = Prisma.TransactionClient;
+  *    so it drops from the page — there is no `Deleted` state to leak.
+  *  - Read-only, idempotent, PII-safe: no mutation, no email/billing/secret in the
+  *    response or logs.
++ *  - Native targets (S8-F): a ledger row typed `workout_plan` / `workout_program`
++ *    resolves to the coach's own live native row, and only when a same-coach
++ *    native provenance row (`created` / `already_present`) vouches for that
++ *    (kind, id). Legacy NULL-kind and `scout_entity` rows keep the generic
++ *    evidence join unchanged. The response is additive: `target_kind` +
++ *    nullable `native_id`; every established field keeps its meaning.
+  */
+ @Injectable()
+ export class ScoutEntitiesService {
+@@ -123,7 +150,7 @@ export class ScoutEntitiesService {
+             status: RECONSTRUCT_STATUS.reconstructed,
+             ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, source_platform: true, target_id: true },
++          select: { source_id: true, source_platform: true, target_id: true, target_kind: true },
+           orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+@@ -165,55 +192,168 @@ export class ScoutEntitiesService {
+   }
+ 
+   /**
+-   * Join reconstructed ledger rows to their canonical `ScoutReconstructedEntity`,
+-   * preserving ledger order and dropping any missing target (erasure preserved).
+-   * The entity read re-asserts coach_id AND entity_type so a stale/forged
+-   * target_id can never cross tenants or families. Runs on the caller's
++   * Join reconstructed ledger rows to what they target, preserving ledger order
++   * and dropping any missing target (erasure preserved). Runs on the caller's
+    * transaction client so it shares the one consistent snapshot.
++   *
++   * Dispatch is by the ledger row's `target_kind` (S8-F):
++   *  - NULL (legacy) or `scout_entity` → the generic canonical
++   *    `ScoutReconstructedEntity` join, unchanged: it re-asserts coach_id AND
++   *    entity_type so a stale/forged target_id can never cross tenants or
++   *    families. Reported with the EFFECTIVE kind `scout_entity`, native_id null.
++   *  - `workout_plan` / `workout_program` → the tenant-owned native table, which
++   *    must hold a same-coach, NOT archived row, AND a same-coach
++   *    `ImportNativeProvenance` row with matching (native_kind, native_id) and a
++   *    `created` / `already_present` outcome. Missing row, other tenant,
++   *    archived, missing/mismatched provenance or a non-qualifying outcome all
++   *    drop the row (fail closed). The join never touches `import_intent_id`.
++   *  - a typed kind with a NULL target_id, or any unknown kind → dropped.
++   * Dropped rows still advance paging because next_cursor anchors to the ledger.
+    */
+   private async materialize(
+     tx: Tx,
+     coachId: string,
+     family: string,
+-    rows: Array<{ source_id: string; target_id: string | null }>,
++    rows: LedgerPageRow[],
+   ): Promise<ReconstructedEntityDto[]> {
+-    const targetIds = rows.map((r) => r.target_id).filter((id): id is string => id !== null);
+-    if (targetIds.length === 0) return [];
++    const evidenceIds: string[] = [];
++    const planIds: string[] = [];
++    const programIds: string[] = [];
++    for (const row of rows) {
++      const kind = ScoutEntitiesService.effectiveKind(row);
++      if (row.target_id === null || kind === null) continue;
++      if (kind === ENTITY_TARGET_KIND.scout_entity) evidenceIds.push(row.target_id);
++      else if (kind === ENTITY_TARGET_KIND.workout_plan) planIds.push(row.target_id);
++      else programIds.push(row.target_id);
++    }
++    if (evidenceIds.length + planIds.length + programIds.length === 0) return [];
+ 
+-    const records = await tx.scoutReconstructedEntity.findMany({
+-      where: {
+-        id: { in: targetIds },
+-        coach_id: coachId,
+-        entity_type: family,
+-      },
+-      select: {
+-        id: true,
+-        source_platform: true,
+-        entity_type: true,
+-        source_id: true,
+-        client_source_id: true,
+-        label: true,
+-        created_at: true,
+-        updated_at: true,
+-      },
+-    });
++    const evidence = evidenceIds.length
++      ? await tx.scoutReconstructedEntity.findMany({
++          where: {
++            id: { in: evidenceIds },
++            coach_id: coachId,
++            entity_type: family,
++          },
++          select: {
++            id: true,
++            source_platform: true,
++            entity_type: true,
++            source_id: true,
++            client_source_id: true,
++            label: true,
++            created_at: true,
++            updated_at: true,
++          },
++        })
++      : [];
++    const evidenceById = new Map(evidence.map((r) => [r.id, r]));
++
++    // Native joins: same coach, live (archived_at IS NULL), name-only projection.
++    const nativeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
++    const plans: NativeRecord[] = planIds.length
++      ? await tx.workoutPlan.findMany({
++          where: { id: { in: planIds }, coach_id: coachId, archived_at: null },
++          select: nativeSelect,
++        })
++      : [];
++    const programs: NativeRecord[] = programIds.length
++      ? await tx.workoutProgram.findMany({
++          where: { id: { in: programIds }, coach_id: coachId, archived_at: null },
++          select: nativeSelect,
++        })
++      : [];
++    const nativeById = new Map<string, NativeRecord>();
++    for (const r of plans) nativeById.set(`${ENTITY_TARGET_KIND.workout_plan}:${r.id}`, r);
++    for (const r of programs) nativeById.set(`${ENTITY_TARGET_KIND.workout_program}:${r.id}`, r);
++
++    // Provenance: a same-coach (native_kind, native_id) row with a qualifying
++    // outcome is REQUIRED for every native row served. Keyed by kind so a plan id
++    // can never be vouched for by a program provenance row (or vice versa).
++    const proven = new Set<string>();
++    if (nativeById.size > 0) {
++      const kinds: Array<{ native_kind: string; native_id: { in: string[] } }> = [];
++      if (plans.length)
++        kinds.push({
++          native_kind: ENTITY_TARGET_KIND.workout_plan,
++          native_id: { in: plans.map((r) => r.id) },
++        });
++      if (programs.length)
++        kinds.push({
++          native_kind: ENTITY_TARGET_KIND.workout_program,
++          native_id: { in: programs.map((r) => r.id) },
++        });
++      const provenance = await tx.importNativeProvenance.findMany({
++        where: {
++          coach_id: coachId,
++          outcome: { in: [...NATIVE_PROVENANCE_OUTCOMES] },
++          OR: kinds,
++        },
++        select: { native_kind: true, native_id: true },
++      });
++      for (const p of provenance) {
++        if (p.native_id !== null) proven.add(`${p.native_kind}:${p.native_id}`);
++      }
++    }
+ 
+-    const byId = new Map(records.map((r) => [r.id, r]));
+     const out: ReconstructedEntityDto[] = [];
+     for (const row of rows) {
+-      const r = row.target_id ? byId.get(row.target_id) : undefined;
+-      if (!r) continue;
++      const kind = ScoutEntitiesService.effectiveKind(row);
++      if (row.target_id === null || kind === null) continue;
++      if (kind === ENTITY_TARGET_KIND.scout_entity) {
++        const r = evidenceById.get(row.target_id);
++        if (!r) continue;
++        out.push({
++          id: r.id,
++          target_kind: ENTITY_TARGET_KIND.scout_entity,
++          native_id: null,
++          source_platform: r.source_platform,
++          entity_type: r.entity_type,
++          source_id: r.source_id,
++          client_source_id: r.client_source_id,
++          label: r.label,
++          created_at: r.created_at.toISOString(),
++          updated_at: r.updated_at.toISOString(),
++        });
++        continue;
++      }
++      const key = `${kind}:${row.target_id}`;
++      const native = nativeById.get(key);
++      if (!native || !proven.has(key)) continue;
+       out.push({
+-        id: r.id,
+-        source_platform: r.source_platform,
+-        entity_type: r.entity_type,
+-        source_id: r.source_id,
+-        client_source_id: r.client_source_id,
+-        label: r.label,
+-        created_at: r.created_at.toISOString(),
+-        updated_at: r.updated_at.toISOString(),
++        id: native.id,
++        target_kind: kind,
++        native_id: native.id,
++        // Provenance stays the LEDGER's (source_platform, source_id): the native
++        // table carries no source identity and none is invented here.
++        source_platform: row.source_platform,
++        entity_type: family,
++        source_id: row.source_id,
++        client_source_id: null,
++        label: native.name,
++        created_at: native.created_at.toISOString(),
++        updated_at: native.updated_at.toISOString(),
+       });
+     }
+     return out;
+   }
++
++  /**
++   * The kind a ledger row is materialized as: NULL means the pre-S8-B generic
++   * evidence row (`scout_entity`); the two native kinds pass through; anything
++   * else (person, a future kind, garbage) is `null` = not served here.
++   */
++  private static effectiveKind(row: Pick<LedgerPageRow, 'target_kind'>): EntityTargetKind | null {
++    switch (row.target_kind) {
++      case null:
++      case ENTITY_TARGET_KIND.scout_entity:
++        return ENTITY_TARGET_KIND.scout_entity;
++      case ENTITY_TARGET_KIND.workout_plan:
++        return ENTITY_TARGET_KIND.workout_plan;
++      case ENTITY_TARGET_KIND.workout_program:
++        return ENTITY_TARGET_KIND.workout_program;
++      default:
++        return null;
++    }
++  }
+ }
+diff --git a/src/scout/scout-roster.controller.ts b/src/scout/scout-roster.controller.ts
+index fbe6eae2..02904b3d 100644
+--- a/src/scout/scout-roster.controller.ts
++++ b/src/scout/scout-roster.controller.ts
+@@ -37,7 +37,10 @@ export class ScoutRosterController {
+       'accounting { staged, reconstructed, skipped, failed } and deterministic, ' +
+       'bounded cursor pagination. Excludes deleted and cross-tenant rows; never ' +
+       'returns email or billing fields. Returns 404 when the intent is unknown ' +
+-      'for the caller or when the scout flags are off.',
++      'for the caller or when the scout flags are off. The response carries ' +
++      'roster_bridge_pending: true (also on empty pages): these are interim Person ' +
++      'bridge rows, not native roster clients or principals, until the S8-D bridge ' +
++      'is accepted. Only person-kind ledger rows are materialized here.',
+   })
+   @ApiResponse({ status: 200, description: 'Reconstructed roster page.', type: ScoutRosterResult })
+   @ApiResponse({
+diff --git a/src/scout/scout-roster.dto.ts b/src/scout/scout-roster.dto.ts
+index 7f7e797f..939713d7 100644
+--- a/src/scout/scout-roster.dto.ts
++++ b/src/scout/scout-roster.dto.ts
+@@ -24,6 +24,23 @@ export const ROSTER_DEFAULT_PAGE_SIZE = 50;
+  */
+ export const ROSTER_MAX_PAGE_SIZE = 200;
+ 
++/**
++ * S8-F — the only ledger `target_kind` the roster materializes (besides the
++ * legacy NULL kind, which means the same pre-S8-B Person target). Mirrors the
++ * ledger's person kind value written by the clients writer; any other kind is
++ * never joined to Person here.
++ */
++export const ROSTER_TARGET_KIND = 'person';
++
++/**
++ * S8-F — response-level qualifier. The roster remains the interim accepted
++ * Person bridge (native contract §4.1): imported clients are NOT yet visible in
++ * the User-based coach roster and no principal is minted here. Fixed `true`
++ * until the accepted S8-D bridge lands and this reader is revised; it is never
++ * derived from row contents or counts.
++ */
++export const ROSTER_BRIDGE_PENDING = true as const;
++
+ /**
+  * GET /api/scout/reconstruct/roster query. coach_id is taken from the bearer
+  * identity (never a query/body field); the only inputs are which settled intent
+@@ -163,4 +180,14 @@ export class ScoutRosterResult {
+ 
+   @ApiProperty({ type: ScoutRosterPageDto, description: 'Pagination envelope.' })
+   page!: ScoutRosterPageDto;
++
++  @ApiProperty({
++    type: Boolean,
++    description:
++      'Always true for now: these rows are the interim reconstructed Person bridge, ' +
++      'not native coach-roster clients or principals. Imported clients stay absent from ' +
++      'the User-based roster until the S8-D bridge is accepted. Present on empty pages too.',
++    example: true,
++  })
++  roster_bridge_pending!: boolean;
+ }
+diff --git a/src/scout/scout-roster.service.ts b/src/scout/scout-roster.service.ts
+index ef355bcb..4435cbf0 100644
+--- a/src/scout/scout-roster.service.ts
++++ b/src/scout/scout-roster.service.ts
+@@ -12,8 +12,10 @@ import {
+ } from './scout-cursor';
+ import { RECONSTRUCT_ENTITY_TYPE, RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ import {
++  ROSTER_BRIDGE_PENDING,
+   ROSTER_DEFAULT_PAGE_SIZE,
+   ROSTER_MAX_PAGE_SIZE,
++  ROSTER_TARGET_KIND,
+   ScoutRosterPersonDto,
+   ScoutRosterResult,
+ } from './scout-roster.dto';
+@@ -120,7 +122,7 @@ export class ScoutRosterService {
+             status: RECONSTRUCT_STATUS.reconstructed,
+             ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, source_platform: true, target_id: true },
++          select: { source_id: true, source_platform: true, target_id: true, target_kind: true },
+           orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+@@ -170,6 +172,10 @@ export class ScoutRosterService {
+       },
+       persons,
+       page: { limit, next_cursor: nextCursor, has_more: hasMore },
++      // S8-F: the roster is still the interim Person bridge (native contract
++      // §4.1). Always true — including on an empty page — until the accepted
++      // S8-D principal bridge replaces it. Not a per-row flag, not a count.
++      roster_bridge_pending: ROSTER_BRIDGE_PENDING,
+     };
+   }
+ 
+@@ -178,13 +184,20 @@ export class ScoutRosterService {
+    * dropping any Deleted or missing target (erasure preserved). The Person read
+    * re-asserts coach_id so a stale/forged target_id can never cross tenants. Runs
+    * on the caller's transaction client so it shares the one consistent snapshot.
++   *
++   * S8-F: only rows whose ledger `target_kind` is NULL (legacy) or `person` are
++   * Person targets. Any other kind is never joined to Person — it is dropped
++   * (paging still advances because next_cursor anchors to the ledger row).
+    */
+   private async materialize(
+     tx: Tx,
+     coachId: string,
+-    rows: Array<{ source_id: string; target_id: string | null }>,
++    rows: Array<{ source_id: string; target_id: string | null; target_kind: string | null }>,
+   ): Promise<ScoutRosterPersonDto[]> {
+-    const targetIds = rows.map((r) => r.target_id).filter((id): id is string => id !== null);
++    const personRows = rows.filter(
++      (r) => r.target_kind === null || r.target_kind === ROSTER_TARGET_KIND,
++    );
++    const targetIds = personRows.map((r) => r.target_id).filter((id): id is string => id !== null);
+     if (targetIds.length === 0) return [];
+ 
+     const persons = await tx.person.findMany({
+@@ -206,7 +219,7 @@ export class ScoutRosterService {
+ 
+     const byId = new Map(persons.map((p) => [p.id, p]));
+     const out: ScoutRosterPersonDto[] = [];
+-    for (const row of rows) {
++    for (const row of personRows) {
+       const p = row.target_id ? byId.get(row.target_id) : undefined;
+       if (!p) continue;
+       out.push({
+diff --git a/test/contracts/importer-contract.spec.ts b/test/contracts/importer-contract.spec.ts
+index e3db4b62..4300eec3 100644
+--- a/test/contracts/importer-contract.spec.ts
++++ b/test/contracts/importer-contract.spec.ts
+@@ -313,14 +313,18 @@ describe('importer contract (R80 freeze)', () => {
+ 
+     it('advertises a PII-minimal ReconstructedEntityDto row (no email/billing/coach_id)', () => {
+       const row = props('ReconstructedEntityDto');
++      // S8-F adds exactly two additive fields: the materialized `target_kind` and the
++      // nullable owned `native_id`. Every legacy field keeps its meaning.
+       expect(row).toEqual([
+         'client_source_id',
+         'created_at',
+         'entity_type',
+         'id',
+         'label',
++        'native_id',
+         'source_id',
+         'source_platform',
++        'target_kind',
+         'updated_at',
+       ]);
+       for (const banned of ['email', 'price', 'billing', 'coach_id', 'payload']) {
+diff --git a/test/rls-g2-s8f.spec.ts b/test/rls-g2-s8f.spec.ts
+new file mode 100644
+index 00000000..77785ec5
+--- /dev/null
++++ b/test/rls-g2-s8f.spec.ts
+@@ -0,0 +1,285 @@
++// G2-S8-F proof on the isolated PostgreSQL 17 lane (S1-provisioned, synthetic data only).
++// Ordered stages in ONE file, run with --runInBand, on a FRESH test/utils/g2-s8f-bootstrap.sh
++// database (whole accepted history of the S8-F candidate composed onto the accepted S8-C head; no
++// S8-F migration exists). The real ScoutEntitiesService / ScoutRosterService readers run in
++// separate OS processes with the candidate generated client (unchanged test/utils/g2-tq0-worker.cjs)
++// as the BYPASSRLS runtime role, exactly as the application does; the harness seeds the rows a
++// writer would have produced. Only the cases the S8-F readiness (F04, F05, F07, F10) cannot prove
++// with the default fakes are here: the NEW native joins against real RLS-enabled WorkoutPlan /
++// WorkoutProgram tables, real provenance denial on the S8-B CHECK-constrained table, and archived-
++// row paging on a real ledger. The accepted E/T-Q0, B, R, N/Q1, C, S8-B proofs are neither rerun
++// nor restated. Nothing here claims deployment, S8-C acceptance, counts, activation or customer
++// acceptance. PREPARED, NOT EXECUTED by the S8-F source-preparation lane.
++//
++// Environment: G2_S8F_DATABASE_URL, G2_S8F_CONFIRM (<db>:<port>), G2_S8F_PASSWORD, G2_S8F_PSQL.
++import {
++  ensureUser,
++  evidence,
++  expectedVersion,
++  ledger,
++  plan,
++  program,
++  refused,
++  resetData,
++  run,
++  settle,
++  sql,
++  sqlAdmin,
++  target,
++  vouch,
++} from './utils/g2-s8f-pg-harness';
++import { G2_S8F_CLUSTER_MARKER, G2_S8F_DATABASE_MARKER } from './utils/g2-s8f-db';
++
++jest.setTimeout(180000);
++
++const OTHER = 'other-coach';
++const entities = (options: Record<string, unknown> = {}) =>
++  run({ action: 'entities', family: 'workouts', limit: 10, ...options });
++const roster = (options: Record<string, unknown> = {}) =>
++  run({ action: 'roster', limit: 10, ...options });
++const ids = (r: { result?: any }) => (r.result?.entities ?? []).map((e: any) => e.id);
++
++describe('S8-F stage 0: disposable lane identity', () => {
++  it('is the S8-F disposable database on the S8-F disposable PG17 cluster', () => {
++    expect(sql('SELECT current_database()')).toBe('g2_s8f_disposable');
++    expect(Number(sql('SHOW server_version_num'))).toBe(expectedVersion);
++    expect(sql("SELECT current_setting('cluster_name')")).toBe(G2_S8F_CLUSTER_MARKER);
++    expect(
++      sqlAdmin(
++        `SELECT shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database()`,
++      ),
++    ).toBe(G2_S8F_DATABASE_MARKER);
++    expect(sql('SELECT inet_server_port()')).toBe(String(target.port));
++    // The S8-B catalog shape the new joins depend on is present (composed head, not S8-F's doing).
++    expect(
++      sql(`SELECT count(*) FROM information_schema.columns WHERE table_schema='public'
++        AND table_name='ScoutReconstructionLedger' AND column_name='target_kind'`),
++    ).toBe('1');
++    expect(sql(`SELECT relrowsecurity FROM pg_class WHERE relname='WorkoutPlan'`)).toBe('t');
++    expect(sql(`SELECT relrowsecurity FROM pg_class WHERE relname='WorkoutProgram'`)).toBe('t');
++    expect(sql(`SELECT relrowsecurity FROM pg_class WHERE relname='ImportNativeProvenance'`)).toBe(
++      't',
++    );
++  });
++});
++
++describe('S8-F stage 1: native joins on real RLS-enabled tables (F01/F02/F04)', () => {
++  beforeAll(() => {
++    resetData();
++    settle('coach', 'intent');
++    settle(OTHER, 'intent');
++    // Legacy evidence row (NULL kind) and an explicitly typed scout_entity row.
++    evidence('ev-1', 'w-legacy');
++    ledger({ source: 'w-legacy', targetId: 'ev-1', kind: null });
++    evidence('ev-2', 'w-typed-evidence');
++    ledger({ source: 'w-typed-evidence', targetId: 'ev-2', kind: 'scout_entity' });
++    // Same-coach native plan with created provenance; same-coach program with already_present.
++    plan('plan-own');
++    vouch({ kind: 'workout_plan', nativeId: 'plan-own', source: 'w-plan' });
++    ledger({ source: 'w-plan', targetId: 'plan-own', kind: 'workout_plan' });
++    program('prog-own');
++    vouch({
++      kind: 'workout_program',
++      nativeId: 'prog-own',
++      source: 'w-prog',
++      outcome: 'already_present',
++    });
++    ledger({ source: 'w-prog', targetId: 'prog-own', kind: 'workout_program' });
++    // F04: the OTHER coach's native plan, vouched for by the OTHER coach, but named by a ledger
++    // row of THIS coach (a cross-tenant pointer must never surface).
++    plan('plan-other', OTHER);
++    vouch({ kind: 'workout_plan', nativeId: 'plan-other', source: 'w-cross', coach: OTHER });
++    ledger({ source: 'w-cross', targetId: 'plan-other', kind: 'workout_plan' });
++  });
++
++  it('F01/F02: legacy and typed rows materialize side by side with the effective kind', async () => {
++    const r = await entities();
++    expect(r.failure).toBeUndefined();
++    const byId = Object.fromEntries(r.result.entities.map((e: any) => [e.id, e]));
++    expect(byId['ev-1']).toMatchObject({
++      target_kind: 'scout_entity',
++      native_id: null,
++      client_source_id: 'tc_client_1',
++      label: 'Evidence w-legacy',
++      source_id: 'w-legacy',
++    });
++    expect(byId['ev-2']).toMatchObject({ target_kind: 'scout_entity', native_id: null });
++    expect(byId['plan-own']).toMatchObject({
++      target_kind: 'workout_plan',
++      native_id: 'plan-own',
++      client_source_id: null,
++      label: 'Plan plan-own',
++      source_id: 'w-plan',
++      source_platform: 'truecoach',
++      entity_type: 'workouts',
++    });
++    expect(byId['prog-own']).toMatchObject({
++      target_kind: 'workout_program',
++      native_id: 'prog-own',
++      label: 'Program prog-own',
++    });
++    // Ledger (source_id) order: w-cross (dropped) < w-legacy < w-plan < w-prog < w-typed-evidence.
++    // page_count keeps its established meaning: the size of THIS page body (four of five rows).
++    expect(ids(r)).toEqual(['ev-1', 'plan-own', 'prog-own', 'ev-2']);
++    expect(r.result.page_count).toBe(4);
++    expect(r.result.next_cursor).toBeNull();
++  });
++
++  it('F04: a cross-tenant native pointer is dropped even though the other coach vouched for it', async () => {
++    const r = await entities();
++    expect(ids(r)).not.toContain('plan-other');
++    // And the other coach's own read of its own intent sees only its own row, never ours.
++    const other = await entities({ coach: OTHER });
++    expect(other.failure).toBeUndefined();
++    expect(ids(other)).toEqual([]);
++    expect(other.result.page_count).toBe(0);
++  });
++
++  it('F04: the API roles cannot read the native tables or provenance directly (RLS + grants)', () => {
++    for (const role of ['anon', 'authenticated']) {
++      for (const table of ['WorkoutPlan', 'WorkoutProgram', 'ImportNativeProvenance']) {
++        // Either the privilege was revoked (permission denied) or RLS yields no rows; both are a
++        // denial. The owner session switches role inside the statement.
++        let denied = false;
++        try {
++          const n = sql(`SET ROLE ${role}; SELECT count(*) FROM "${table}"`);
++          denied = n === '0';
++        } catch (e) {
++          denied = String(e).includes('permission denied');
++        }
++        expect(denied).toBe(true);
++      }
++    }
++  });
++});
++
++describe('S8-F stage 2: provenance denial on the real S8-B table (F05)', () => {
++  beforeAll(() => {
++    resetData();
++    settle('coach', 'intent');
++    // Plan exists, same coach, but NO provenance at all.
++    plan('plan-unvouched');
++    ledger({ source: 'w-unvouched', targetId: 'plan-unvouched', kind: 'workout_plan' });
++    // Plan exists; provenance exists but is `unresolved` (native_id NULL by CHECK).
++    plan('plan-unresolved');
++    vouch({ kind: 'workout_plan', nativeId: null, source: 'w-unresolved', outcome: 'unresolved' });
++    ledger({ source: 'w-unresolved', targetId: 'plan-unresolved', kind: 'workout_plan' });
++    // Plan exists; provenance names the SAME id under the WRONG native kind.
++    plan('plan-kind-mismatch');
++    vouch({ kind: 'workout_program', nativeId: 'plan-kind-mismatch', source: 'w-mismatch' });
++    ledger({ source: 'w-mismatch', targetId: 'plan-kind-mismatch', kind: 'workout_plan' });
++    // Ledger says workout_plan, provenance says workout_plan, but the row lives in WorkoutProgram.
++    program('prog-as-plan');
++    vouch({ kind: 'workout_plan', nativeId: 'prog-as-plan', source: 'w-table-mismatch' });
++    ledger({ source: 'w-table-mismatch', targetId: 'prog-as-plan', kind: 'workout_plan' });
++    // Properly vouched control row.
++    plan('plan-ok');
++    vouch({ kind: 'workout_plan', nativeId: 'plan-ok', source: 'w-ok' });
++    ledger({ source: 'w-ok', targetId: 'plan-ok', kind: 'workout_plan' });
++  });
++
++  it('F05: only the vouched row surfaces; every denial keeps its ledger slot in the page', async () => {
++    const r = await entities();
++    expect(r.failure).toBeUndefined();
++    expect(ids(r)).toEqual(['plan-ok']);
++    expect(r.result.page_count).toBe(1);
++    expect(r.result.next_cursor).toBeNull();
++  });
++
++  it('F05: the S8-B CHECKs make a forged "resolved without native_id" record impossible', () => {
++    refused(
++      `INSERT INTO "ImportNativeProvenance" (id,coach_id,source_namespace,entity_type,source_id,native_kind,native_id,outcome)
++       VALUES ('forge-1','coach','truecoach','workouts','w-forge','workout_plan',NULL,'created')`,
++      'ImportNativeProvenance_native_id_shape_check',
++    );
++    refused(
++      `INSERT INTO "ImportNativeProvenance" (id,coach_id,source_namespace,entity_type,source_id,native_kind,native_id,outcome)
++       VALUES ('forge-2','coach','truecoach','workouts','w-forge','meal_plan','x','created')`,
++      'ImportNativeProvenance_native_kind_check',
++    );
++  });
++
++  it('F05: a typed ledger row cannot exist without a target_id (shape CHECK)', () => {
++    refused(
++      `INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id,target_kind)
++       VALUES (gen_random_uuid(),'coach','intent','workouts','w-shape','truecoach','reconstructed',NULL,'workout_plan')`,
++      'ScoutReconstructionLedger_target_kind_shape_check',
++    );
++  });
++});
++
++describe('S8-F stage 3: archived-row paging on a real ledger (F07)', () => {
++  beforeAll(() => {
++    resetData();
++    settle('coach', 'intent');
++    // Lexical ledger order: w1 (live) < w2 (archived) < w3 (live) < w4 (archived) < w5 (live).
++    for (const [n, archived] of [
++      ['1', false],
++      ['2', true],
++      ['3', false],
++      ['4', true],
++      ['5', false],
++    ] as const) {
++      plan(`plan-${n}`, 'coach', `Plan ${n}`, archived);
++      vouch({ kind: 'workout_plan', nativeId: `plan-${n}`, source: `w${n}` });
++      ledger({ source: `w${n}`, targetId: `plan-${n}`, kind: 'workout_plan' });
++    }
++  });
++
++  it('F07: archived natives are dropped from the body while the cursor walks every ledger row', async () => {
++    const p1 = await entities({ limit: 2 });
++    expect(p1.failure).toBeUndefined();
++    expect(ids(p1)).toEqual(['plan-1']);
++    expect(p1.result.page_count).toBe(1);
++    expect(p1.result.next_cursor).not.toBeNull();
++
++    const p2 = await entities({ limit: 2, cursor: p1.result.next_cursor });
++    expect(ids(p2)).toEqual(['plan-3']);
++    expect(p2.result.page_count).toBe(1);
++    expect(p2.result.next_cursor).not.toBeNull();
++
++    const p3 = await entities({ limit: 2, cursor: p2.result.next_cursor });
++    expect(ids(p3)).toEqual(['plan-5']);
++    expect(p3.result.page_count).toBe(1);
++    expect(p3.result.next_cursor).toBeNull();
++  });
++
++  it('F07: un-archiving a row makes it reappear on the same page position (no cached truth)', async () => {
++    sql(`UPDATE "WorkoutPlan" SET archived_at=NULL WHERE id='plan-2'`);
++    const p1 = await entities({ limit: 2 });
++    expect(ids(p1)).toEqual(['plan-1', 'plan-2']);
++  });
++});
++
++describe('S8-F stage 4: roster stays the Person bridge on a real ledger (F10)', () => {
++  beforeAll(() => {
++    resetData();
++    settle('coach', 'intent');
++    ensureUser('coach');
++    // Prisma enum PersonState maps to the DB enum literal 'InvitePending' (the model default).
++    sql(`INSERT INTO "Person" (id,coach_id,source_platform,source_person_id,display_name)
++      VALUES ('person-1','coach','truecoach','tc_1','Synthetic Person')`);
++    ledger({ source: 'c1', family: 'clients', targetId: 'person-1', kind: null });
++    // A typed non-person row that points at the very same Person id.
++    ledger({ source: 'c2', family: 'clients', targetId: 'person-1', kind: 'workout_plan' });
++  });
++
++  it('F10: the response is qualified and only the NULL/person-kind row is served', async () => {
++    const r = await roster();
++    expect(r.failure).toBeUndefined();
++    expect(r.result.roster_bridge_pending).toBe(true);
++    expect(r.result.persons.map((p: any) => p.source_person_id)).toEqual(['tc_1']);
++    expect(r.result.accounting.reconstructed).toBe(2);
++  });
++
++  it('F10: an unsettled intent is still the uniform 404 for both readers', async () => {
++    resetData();
++    settle('coach', 'intent', null);
++    const e = await entities();
++    expect(e.failure).toMatchObject({ status: 404 });
++    const ro = await roster();
++    expect(ro.failure).toMatchObject({ status: 404 });
++    // No cross-tenant oracle: the other coach gets the same 404 on this intent.
++    expect((await entities({ coach: OTHER })).failure).toMatchObject({ status: 404 });
++  });
++});
+diff --git a/test/scout/entities/scout-entities.contract.spec.ts b/test/scout/entities/scout-entities.contract.spec.ts
+index ca402ea4..1b2f183e 100644
+--- a/test/scout/entities/scout-entities.contract.spec.ts
++++ b/test/scout/entities/scout-entities.contract.spec.ts
+@@ -10,6 +10,8 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
++  ENTITY_TARGET_KINDS,
+   ReconstructedEntityDto,
+   ScoutEntitiesResult,
+ } from '../../../src/scout/scout-entities.dto';
+@@ -149,15 +151,38 @@ describe('IMPORTER-I OpenAPI route shape', () => {
+         'entity_type',
+         'id',
+         'label',
++        'native_id',
+         'source_id',
+         'source_platform',
++        'target_kind',
+         'updated_at',
+       ].sort(),
+     );
+-    for (const banned of ['email', 'price', 'billing', 'coach_id', 'payload']) {
++    for (const banned of ['email', 'price', 'billing', 'coach_id', 'payload', 'owner_user_id']) {
+       expect(props).not.toContain(banned);
+     }
+   });
++
++  it('S8-F: publishes target_kind as the closed non-person kind enum and native_id nullable', () => {
++    const props = rec(
++      dig(document, 'components', 'schemas', 'ReconstructedEntityDto', 'properties'),
++    );
++    const kind = rec(props.target_kind);
++    expect((kind.enum as string[]).slice().sort()).toEqual([...ENTITY_TARGET_KINDS].sort());
++    expect(kind.enum).not.toContain('person');
++    const nativeId = rec(props.native_id);
++    expect(nativeId.nullable).toBe(true);
++    expect(nativeId.type).toBe('string');
++    // Both are required members of the row (additive, always present).
++    const required = dig(
++      document,
++      'components',
++      'schemas',
++      'ReconstructedEntityDto',
++      'required',
++    ) as string[];
++    expect(required).toEqual(expect.arrayContaining(['target_kind', 'native_id']));
++  });
+ });
+ 
+ describe('IMPORTER-I frozen-slice membership (R80)', () => {
+@@ -183,6 +208,8 @@ describe('IMPORTER-I PR-M4 fixture consumer', () => {
+   function entity(sourceId: string): ReconstructedEntityDto {
+     return {
+       id: `id-${sourceId}`,
++      target_kind: ENTITY_TARGET_KIND.scout_entity,
++      native_id: null,
+       source_platform: 'truecoach',
+       entity_type: RECONSTRUCT_FAMILY.workouts,
+       source_id: sourceId,
+@@ -254,4 +281,19 @@ describe('IMPORTER-I PR-M4 fixture consumer', () => {
+       expect(Object.prototype.hasOwnProperty.call(row, banned)).toBe(false);
+     }
+   });
++
++  it('S8-F: a consumer can distinguish evidence from native rows by target_kind alone', () => {
++    const evidence = entity('a');
++    const native: ReconstructedEntityDto = {
++      ...entity('b'),
++      id: 'plan-b',
++      target_kind: ENTITY_TARGET_KIND.workout_plan,
++      native_id: 'plan-b',
++      client_source_id: null,
++    };
++    expect(evidence.native_id).toBeNull();
++    expect(native.native_id).toBe(native.id);
++    expect(ENTITY_TARGET_KINDS).toContain(evidence.target_kind);
++    expect(ENTITY_TARGET_KINDS).toContain(native.target_kind);
++  });
+ });
+diff --git a/test/scout/entities/scout-entities.service.spec.ts b/test/scout/entities/scout-entities.service.spec.ts
+index 30c418fa..b16d0b75 100644
+--- a/test/scout/entities/scout-entities.service.spec.ts
++++ b/test/scout/entities/scout-entities.service.spec.ts
+@@ -8,6 +8,7 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
+ } from '../../../src/scout/scout-entities.dto';
+ import { RECONSTRUCT_FAMILY } from '../../../src/scout/scout-reconstruct.dto';
+ import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+@@ -35,6 +36,28 @@ interface LedgerRow {
+   source_platform: string;
+   status: string;
+   target_id: string | null;
++  /** S8-F: the ledger's nullable kind. Omitted (legacy) reads back as NULL. */
++  target_kind?: string | null;
++}
++/** S8-F: a native WorkoutPlan / WorkoutProgram row (only the columns the reader touches). */
++interface NativeRow {
++  id: string;
++  coach_id: string;
++  name: string;
++  archived_at: Date | null;
++  created_at: Date;
++  updated_at: Date;
++}
++/** S8-F: an ImportNativeProvenance row (identity columns kept for realism; never joined on). */
++interface ProvenanceRow {
++  coach_id: string;
++  import_intent_id: string | null;
++  source_namespace: string;
++  entity_type: string;
++  source_id: string;
++  native_kind: string;
++  native_id: string | null;
++  outcome: string;
+ }
+ interface EntityRow {
+   id: string;
+@@ -57,6 +80,10 @@ interface Where {
+   source_platform?: { gt?: string };
+   OR?: Where[];
+   id?: { in?: string[] };
++  archived_at?: null;
++  native_kind?: string;
++  native_id?: { in?: string[] };
++  outcome?: { in?: string[] };
+ }
+ 
+ class FakePrisma {
+@@ -116,10 +143,63 @@ class FakePrisma {
+         source_id: r.source_id,
+         source_platform: r.source_platform,
+         target_id: r.target_id,
++        target_kind: r.target_kind ?? null,
+       }));
+     },
+   };
+ 
++  // S8-F native tables + provenance. Real predicate semantics for the columns
++  // the reader filters on (id IN, coach_id, archived_at IS NULL; coach_id,
++  // outcome IN, OR over (native_kind, native_id IN)) so tenancy, archive and
++  // provenance denial are proven by behaviour, not by a pre-decided answer.
++  plans: NativeRow[] = [];
++  programs: NativeRow[] = [];
++  provenance: ProvenanceRow[] = [];
++  nativeReads: Array<{ table: string; where: Where }> = [];
++
++  private nativeFindMany(table: 'plans' | 'programs') {
++    return async (args: { where: Where }) => {
++      this.noteRead();
++      this.nativeReads.push({ table, where: args.where });
++      const ids = new Set(args.where.id?.in ?? []);
++      return this[table]
++        .filter(
++          (n) =>
++            ids.has(n.id) &&
++            (args.where.coach_id === undefined || n.coach_id === args.where.coach_id) &&
++            (args.where.archived_at === undefined || n.archived_at === null),
++        )
++        .map((n) => ({
++          id: n.id,
++          name: n.name,
++          created_at: n.created_at,
++          updated_at: n.updated_at,
++        }));
++    };
++  }
++
++  workoutPlan = { findMany: this.nativeFindMany('plans') };
++  workoutProgram = { findMany: this.nativeFindMany('programs') };
++
++  importNativeProvenance = {
++    findMany: async (args: { where: Where }) => {
++      this.noteRead();
++      this.nativeReads.push({ table: 'provenance', where: args.where });
++      const matchKind = (p: ProvenanceRow, w: Where): boolean =>
++        (w.native_kind === undefined || p.native_kind === w.native_kind) &&
++        (w.native_id?.in === undefined ||
++          (p.native_id !== null && w.native_id.in.includes(p.native_id)));
++      return this.provenance
++        .filter(
++          (p) =>
++            (args.where.coach_id === undefined || p.coach_id === args.where.coach_id) &&
++            (args.where.outcome?.in === undefined || args.where.outcome.in.includes(p.outcome)) &&
++            (args.where.OR === undefined || args.where.OR.some((o) => matchKind(p, o))),
++        )
++        .map((p) => ({ native_kind: p.native_kind, native_id: p.native_id }));
++    },
++  };
++
+   scoutReconstructedEntity = {
+     findMany: async (args: { where: Where }) => {
+       this.noteRead();
+@@ -708,14 +788,17 @@ describe('ScoutEntitiesService.getEntities', () => {
+         'entity_type',
+         'id',
+         'label',
++        'native_id',
+         'source_id',
+         'source_platform',
++        'target_kind',
+         'updated_at',
+       ].sort(),
+     );
+     expect(row).not.toHaveProperty('email');
+     expect(row).not.toHaveProperty('coach_id');
+     expect(row).not.toHaveProperty('price');
++    expect(row).not.toHaveProperty('payload');
+   });
+ 
+   it('is site-agnostic: projects a non-TrueCoach source platform identically', async () => {
+@@ -762,7 +845,11 @@ describe('ScoutEntitiesService.getEntities', () => {
+   it('every reviewable family is a non-person family (clients excluded)', () => {
+     expect(ENTITY_REVIEW_FAMILIES).not.toContain(RECONSTRUCT_FAMILY.clients);
+     expect(ENTITY_REVIEW_FAMILIES).toEqual(
+-      expect.arrayContaining([RECONSTRUCT_FAMILY.workouts, RECONSTRUCT_FAMILY.client_history]),
++      expect.arrayContaining([
++        RECONSTRUCT_FAMILY.workouts,
++        RECONSTRUCT_FAMILY.client_history,
++        RECONSTRUCT_FAMILY.programs,
++      ]),
+     );
+   });
+ 
+@@ -876,3 +963,402 @@ describe('ScoutEntitiesService.getEntities', () => {
+     });
+   });
+ });
++
++/**
++ * S8-F — native target materialization (readiness F01–F09, F11). Legacy and
++ * `scout_entity` rows keep the generic evidence join; typed `workout_plan` /
++ * `workout_program` rows resolve to the coach's own live native row ONLY when a
++ * same-coach provenance row with a `created` / `already_present` outcome vouches
++ * for that exact (native_kind, native_id). Everything else is dropped, and the
++ * ledger-anchored cursor still advances past dropped rows.
++ */
++describe('ScoutEntitiesService S8-F native targets', () => {
++  const T0 = new Date('2026-09-01T00:00:00.000Z');
++  const T1 = new Date('2026-09-02T00:00:00.000Z');
++  // The `programs` family joined RECONSTRUCT_FAMILY in S8-C (N3), so it is a
++  // reviewable non-person family here and F03 runs unconditionally (composed
++  // onto S8-C; the former `it.skip` fallback is gone — a missing family now FAILS
++  // the allow-list assertion below rather than skipping).
++  const PROGRAMS_FAMILY = RECONSTRUCT_FAMILY.programs;
++
++  function ledger(
++    fake: FakePrisma,
++    row: Partial<LedgerRow> & { source_id: string; target_id: string | null },
++  ): void {
++    fake.ledgerRows.push({
++      coach_id: COACH,
++      intent_id: INTENT,
++      entity_type: FAM,
++      source_platform: 'truecoach',
++      status: 'reconstructed',
++      ...row,
++    });
++  }
++  function plan(fake: FakePrisma, id: string, opts: Partial<NativeRow> = {}): void {
++    fake.plans.push({
++      id,
++      coach_id: COACH,
++      name: `Plan ${id}`,
++      archived_at: null,
++      created_at: T0,
++      updated_at: T1,
++      ...opts,
++    });
++  }
++  function program(fake: FakePrisma, id: string, opts: Partial<NativeRow> = {}): void {
++    fake.programs.push({
++      id,
++      coach_id: COACH,
++      name: `Program ${id}`,
++      archived_at: null,
++      created_at: T0,
++      updated_at: T1,
++      ...opts,
++    });
++  }
++  function vouch(
++    fake: FakePrisma,
++    nativeKind: string,
++    nativeId: string | null,
++    opts: Partial<ProvenanceRow> = {},
++  ): void {
++    fake.provenance.push({
++      coach_id: COACH,
++      // S8-C C2: written NULL by the native writer; the reader must never join on it.
++      import_intent_id: null,
++      source_namespace: 'truecoach',
++      entity_type: FAM,
++      source_id: `src-${nativeId ?? 'none'}`,
++      native_kind: nativeKind,
++      native_id: nativeId,
++      outcome: 'created',
++      ...opts,
++    });
++  }
++
++  it('F01: a legacy NULL-kind row is unchanged apart from the additive fields', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: `e-${COACH}-${FAM}-s000`,
++        target_kind: ENTITY_TARGET_KIND.scout_entity,
++        native_id: null,
++        source_platform: 'truecoach',
++        entity_type: FAM,
++        source_id: 'truecoach_s000',
++        client_source_id: 'truecoach_client_0',
++        label: 'Item s000',
++        created_at: '2026-07-18T00:00:00.000Z',
++        updated_at: '2026-07-18T00:00:00.000Z',
++      },
++    ]);
++    // The generic evidence join is the ONLY join a legacy page triggers.
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F01: an explicit scout_entity kind takes the identical evidence path', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    fake.ledgerRows[0].target_kind = 'scout_entity';
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toHaveLength(1);
++    expect(res.entities[0]).toMatchObject({
++      target_kind: ENTITY_TARGET_KIND.scout_entity,
++      native_id: null,
++      id: `e-${COACH}-${FAM}-s000`,
++    });
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F02: a workout_plan row resolves to the owned native plan with provenance', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1', { name: 'Upper Body — Week 3' });
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: 'plan-1',
++        target_kind: ENTITY_TARGET_KIND.workout_plan,
++        native_id: 'plan-1',
++        source_platform: 'truecoach',
++        entity_type: FAM,
++        source_id: 'w1',
++        client_source_id: null,
++        label: 'Upper Body — Week 3',
++        created_at: T0.toISOString(),
++        updated_at: T1.toISOString(),
++      },
++    ]);
++    expect(res.page_count).toBe(1);
++    // Same-coach, live-only native read; provenance keyed by (kind, id) and
++    // restricted to the qualifying outcomes; no import_intent_id predicate.
++    const planRead = fake.nativeReads.find((r) => r.table === 'plans');
++    expect(planRead?.where).toEqual({ id: { in: ['plan-1'] }, coach_id: COACH, archived_at: null });
++    const prov = fake.nativeReads.find((r) => r.table === 'provenance');
++    expect(prov?.where).toEqual({
++      coach_id: COACH,
++      outcome: { in: ['created', 'already_present'] },
++      OR: [{ native_kind: 'workout_plan', native_id: { in: ['plan-1'] } }],
++    });
++    expect(JSON.stringify(prov?.where)).not.toContain('import_intent_id');
++    expect(fake.readsOutsideTx).toBe(0);
++  });
++
++  it('F02: an already_present outcome qualifies exactly like created', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1', { outcome: 'already_present' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities.map((e) => e.native_id)).toEqual(['plan-1']);
++  });
++
++  it('F03: a workout_program row resolves to the owned native program', async () => {
++    expect(ENTITY_REVIEW_FAMILIES).toContain(PROGRAMS_FAMILY);
++    const fake = new FakePrisma();
++    seed(fake, { family: PROGRAMS_FAMILY });
++    ledger(fake, {
++      entity_type: PROGRAMS_FAMILY,
++      source_id: 'p1',
++      target_id: 'prog-1',
++      target_kind: 'workout_program',
++    });
++    program(fake, 'prog-1', { name: '12-Week Strength' });
++    vouch(fake, 'workout_program', 'prog-1', { entity_type: PROGRAMS_FAMILY });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, PROGRAMS_FAMILY, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: 'prog-1',
++        target_kind: ENTITY_TARGET_KIND.workout_program,
++        native_id: 'prog-1',
++        source_platform: 'truecoach',
++        entity_type: PROGRAMS_FAMILY,
++        source_id: 'p1',
++        client_source_id: null,
++        label: '12-Week Strength',
++        created_at: T0.toISOString(),
++        updated_at: T1.toISOString(),
++      },
++    ]);
++    expect(fake.nativeReads.find((r) => r.table === 'programs')?.where).toEqual({
++      id: { in: ['prog-1'] },
++      coach_id: COACH,
++      archived_at: null,
++    });
++  });
++
++  it("F04: another tenant's native row is never served, even with that tenant's provenance", async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-x', target_kind: 'workout_plan' });
++    plan(fake, 'plan-x', { coach_id: OTHER });
++    vouch(fake, 'workout_plan', 'plan-x', { coach_id: OTHER });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++    expect(res.page_count).toBe(0);
++    expect(res.next_cursor).toBeNull();
++  });
++
++  it('F04: a same-coach native row vouched only by cross-tenant provenance is dropped', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1', { coach_id: OTHER });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F05: a native row with no provenance is dropped (fail closed)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F05: an unresolved provenance row (NULL native_id) never qualifies a native row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    // S8-C N2: client-linked workouts leave an `unresolved` workout_plan
++    // provenance row with native_id NULL. It vouches for nothing.
++    vouch(fake, 'workout_plan', null, { outcome: 'unresolved' });
++    vouch(fake, 'workout_plan', 'plan-1', { outcome: 'unresolved' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F06: a kind mismatch between the ledger and provenance is dropped', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    // Ledger says plan, provenance says program for the same id: no match.
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_program', 'plan-1');
++    // Ledger says program, but the id is a plan: the program join finds nothing.
++    ledger(fake, { source_id: 'w2', target_id: 'plan-2', target_kind: 'workout_program' });
++    plan(fake, 'plan-2');
++    vouch(fake, 'workout_plan', 'plan-2');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F06: a typed kind with a NULL target_id is dropped without any native read', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: null, target_kind: 'workout_plan' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F07: an archived native row is absent while the ledger-anchored cursor advances past it', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    for (const [sid, id] of [
++      ['w1', 'plan-1'],
++      ['w2', 'plan-2'],
++      ['w3', 'plan-3'],
++    ] as const) {
++      ledger(fake, { source_id: sid, target_id: id, target_kind: 'workout_plan' });
++      plan(fake, id, id === 'plan-2' ? { archived_at: T1 } : {});
++      vouch(fake, 'workout_plan', id);
++    }
++    const { service } = await makeService(fake);
++    const page1 = await service.getEntities(COACH, INTENT, FAM, undefined, 2);
++    // Page 1 covers ledger rows w1,w2; the archived plan-2 is dropped but the
++    // cursor is anchored to the LAST LEDGER row (w2), so nothing is re-read.
++    expect(page1.entities.map((e) => e.native_id)).toEqual(['plan-1']);
++    expect(page1.page_count).toBe(1);
++    expect(page1.next_cursor).toBe(expectedV2(COACH, INTENT, FAM, 'w2', 'truecoach'));
++    const page2 = await service.getEntities(COACH, INTENT, FAM, page1.next_cursor ?? undefined, 2);
++    expect(page2.entities.map((e) => e.native_id)).toEqual(['plan-3']);
++    expect(page2.next_cursor).toBeNull();
++  });
++
++  it('F08: a mixed page keeps ledger order across evidence and native rows', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 }); // s000, s001 legacy evidence
++    ledger(fake, { source_id: 'a-native', target_id: 'plan-a', target_kind: 'workout_plan' });
++    plan(fake, 'plan-a');
++    vouch(fake, 'workout_plan', 'plan-a');
++    ledger(fake, { source_id: 's000z', target_id: 'plan-z', target_kind: 'workout_plan' });
++    plan(fake, 'plan-z');
++    vouch(fake, 'workout_plan', 'plan-z');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    // Ledger (source_id, source_platform) order: a-native < s000 < s000z < s001.
++    expect(res.entities.map((e) => [e.target_kind, e.native_id, e.source_id])).toEqual([
++      ['workout_plan', 'plan-a', 'a-native'],
++      ['scout_entity', null, 'truecoach_s000'],
++      ['workout_plan', 'plan-z', 's000z'],
++      ['scout_entity', null, 'truecoach_s001'],
++    ]);
++    expect(res.page_count).toBe(4);
++  });
++
++  it('F09: an unknown or person kind is dropped and never joined anywhere', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    ledger(fake, { source_id: 'u1', target_id: 'e-whatever', target_kind: 'meal_plan' });
++    ledger(fake, { source_id: 'u2', target_id: 'person-1', target_kind: 'person' });
++    // Even if the ids happen to exist somewhere, the unknown kind is not served.
++    plan(fake, 'e-whatever');
++    vouch(fake, 'workout_plan', 'e-whatever');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities.map((e) => e.source_id)).toEqual(['truecoach_s000']);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F11: native rows carry the ledger provenance, the native name and no invented client link', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { sourcePlatform: 'trainerize' });
++    ledger(fake, {
++      source_id: 'tz-77',
++      source_platform: 'trainerize',
++      target_id: 'plan-77',
++      target_kind: 'workout_plan',
++    });
++    plan(fake, 'plan-77', { name: 'Leg Day' });
++    vouch(fake, 'workout_plan', 'plan-77', { source_namespace: 'trainerize' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    const row = res.entities[0];
++    expect(row).toMatchObject({
++      id: 'plan-77',
++      native_id: 'plan-77',
++      source_platform: 'trainerize',
++      source_id: 'tz-77',
++      label: 'Leg Day',
++      client_source_id: null,
++    });
++    expect(Object.keys(row).sort()).toEqual(
++      [
++        'client_source_id',
++        'created_at',
++        'entity_type',
++        'id',
++        'label',
++        'native_id',
++        'source_id',
++        'source_platform',
++        'target_kind',
++        'updated_at',
++      ].sort(),
++    );
++    for (const banned of ['coach_id', 'owner_user_id', 'payload', 'email', 'visibility']) {
++      expect(row).not.toHaveProperty(banned);
++    }
++  });
++
++  it('F11: the settled-intent gate is unchanged — a typed page for an unsettled intent is a uniform 404', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { terminalStatus: null });
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service } = await makeService(fake);
++    await expect(
++      service.getEntities(COACH, INTENT, FAM, undefined, undefined),
++    ).rejects.toBeInstanceOf(NotFoundException);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('analytics stays counts-only with native rows (no names, no native ids)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1', { name: 'Secret Name' });
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service, capture } = await makeService(fake);
++    await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(capture).toHaveBeenCalledWith(COACH, Events.SCOUT_RECONSTRUCT_ENTITIES_READ, {
++      intent_id: INTENT,
++      entity_type: FAM,
++      returned: 1,
++      has_more: false,
++    });
++    expect(JSON.stringify(capture.mock.calls)).not.toContain('Secret Name');
++    expect(JSON.stringify(capture.mock.calls)).not.toContain('plan-1');
++  });
++});
+diff --git a/test/scout/g2-s8f-db-guard.spec.ts b/test/scout/g2-s8f-db-guard.spec.ts
+new file mode 100644
+index 00000000..9d1042a4
+--- /dev/null
++++ b/test/scout/g2-s8f-db-guard.spec.ts
+@@ -0,0 +1,137 @@
++// S8-F guard unit test: derived by substitution from test/scout/g2-s8b-db-guard.spec.ts (unchanged).
++// 55643 is only an EXAMPLE loopback port for the guard test; the real lane port is chosen by S1.
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S8F_CLUSTER_MARKER,
++  G2_S8F_DATABASE_MARKER,
++  g2S8fTestTarget,
++  withFixturePassword,
++} from '../utils/g2-s8f-db';
++
++const base = 'postgresql://s8f_super@127.0.0.1:55643/g2_s8f_disposable';
++const ack = 'g2_s8f_disposable:55643';
++
++describe('S8-F PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2S8fTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://s8f_super@127.0.0.1:55643/postgres?connect_timeout=5`,
++      port: 55643,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55643', '5432'),
++    base.replace('55643', '6543'),
++    base.replace('55643', '55439'),
++    base.replace('55643', '70000'),
++    base.replace('55643', '55461'),
++    base.replace('55643', '55471'),
++    base.replace('55643', '55481'),
++    base.replace('55643', '55491'),
++    base.replace('55643', '55501'),
++    base.replace('55643', '55511'),
++    base.replace('55643', '55641'),
++    base.replace('55643', '55642'),
++    base.replace('g2_s8f_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_r_ready_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_nq1_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_c_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_s7l_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_s8b_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_s8c_disposable'),
++    base.replace('s8f_super@', 'b_super@'),
++    base.replace('s8f_super@', 'r_super@'),
++    base.replace('s8f_super@', 'nq1_super@'),
++    base.replace('s8f_super@', 'c_super@'),
++    base.replace('s8f_super@', 's7l_super@'),
++    base.replace('s8f_super@', 's8b_super@'),
++    base.replace('s8f_super@', 's8c_super@'),
++    base.replace('g2_s8f_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_s8f_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55643', '54325'),
++    base.replace('g2_s8f_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_s8f_disposable', 'postgres'),
++    base.replace('s8f_super@', 'service_role@'),
++    base.replace('s8f_super@', 's8f_super:secret@'),
++    base.replace('s8f_super@', 'postgres@'),
++    base.replace('55643', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2S8fTestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2S8fTestTarget(base)).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_s8f_disposable')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_s8f_disposable:55644')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_tq0_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_b_drain_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_r_ready_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_nq1_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_c_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_s7l_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_s8b_disposable:55643')).toThrow();
++    expect(() => g2S8fTestTarget(base, 'g2_s8c_disposable:55643')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_S8F_CLUSTER_MARKER).toBe('s8f-disposable-pg17');
++    expect(G2_S8F_DATABASE_MARKER).toBe(
++      's8f-g2-native-reader-synthetic-disposable-fixture-safe-to-drop',
++    );
++    for (const marker of [G2_S8F_CLUSTER_MARKER, G2_S8F_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^s8f-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s8f-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_S8F_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_S8F_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://s8f_super:local_fixture@127.0.0.1:55643/g2_s8f_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55643/g2_s8f_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55643/g2_s8f_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      'nq1_super',
++      'c_super',
++      's7l_super',
++      's8b_super',
++      's8c_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++});
+diff --git a/test/scout/roster/scout-roster.controller.spec.ts b/test/scout/roster/scout-roster.controller.spec.ts
+index 7ac81129..1c94e4de 100644
+--- a/test/scout/roster/scout-roster.controller.spec.ts
++++ b/test/scout/roster/scout-roster.controller.spec.ts
+@@ -53,6 +53,8 @@ const emptyResult: ScoutRosterResult = {
+   accounting: { staged: 0, reconstructed: 0, skipped: 0, failed: 0 },
+   persons: [],
+   page: { limit: 50, next_cursor: null, has_more: false },
++  // S8-F: response-level interim Person bridge qualifier, present on empty pages too.
++  roster_bridge_pending: true,
+ };
+ 
+ describe('ScoutRosterQueryDto validation', () => {
+diff --git a/test/scout/roster/scout-roster.service.spec.ts b/test/scout/roster/scout-roster.service.spec.ts
+index c9333591..882ad737 100644
+--- a/test/scout/roster/scout-roster.service.spec.ts
++++ b/test/scout/roster/scout-roster.service.spec.ts
+@@ -5,8 +5,10 @@ import { Events } from '../../../src/analytics/events';
+ import { PrismaService } from '../../../src/prisma.service';
+ import { ScoutRosterService } from '../../../src/scout/scout-roster.service';
+ import {
++  ROSTER_BRIDGE_PENDING,
+   ROSTER_DEFAULT_PAGE_SIZE,
+   ROSTER_MAX_PAGE_SIZE,
++  ROSTER_TARGET_KIND,
+ } from '../../../src/scout/scout-roster.dto';
+ import { RECONSTRUCT_ENTITY_TYPE } from '../../../src/scout/scout-reconstruct.dto';
+ import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+@@ -40,6 +42,8 @@ interface LedgerRow {
+   source_platform: string;
+   status: string;
+   target_id: string | null;
++  /** S8-F: the ledger's nullable kind. Omitted (legacy) reads back as NULL. */
++  target_kind?: string | null;
+ }
+ interface PersonRow {
+   id: string;
+@@ -144,14 +148,19 @@ class FakePrisma {
+         source_id: r.source_id,
+         source_platform: r.source_platform,
+         target_id: r.target_id,
++        target_kind: r.target_kind ?? null,
+       }));
+     },
+   };
+ 
++  /** Every Person findMany, so tests can prove which target ids were (not) looked up. */
++  personReads: Array<{ ids: string[] }> = [];
++
+   person = {
+     findMany: async (args: { where: Where }) => {
+       this.noteRead();
+       const ids = new Set(args.where.id?.in ?? []);
++      this.personReads.push({ ids: [...ids] });
+       return this.persons
+         .filter(
+           (p) =>
+@@ -764,3 +773,111 @@ describe('ScoutRosterService.getRoster', () => {
+     });
+   });
+ });
++
++/**
++ * S8-F — roster qualifier and kind fence (readiness F10). The roster stays the
++ * interim accepted Person bridge: every response says so at the top level
++ * (`roster_bridge_pending: true`, empty pages included), and only NULL-kind
++ * (legacy) or `person`-kind ledger rows are ever joined to Person. A typed
++ * non-person row is dropped while the ledger-anchored cursor still advances.
++ */
++describe('ScoutRosterService S8-F interim bridge qualifier', () => {
++  it('exposes roster_bridge_pending: true on a populated page', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.roster_bridge_pending).toBe(true);
++    expect(ROSTER_BRIDGE_PENDING).toBe(true);
++    expect(Object.keys(res).sort()).toEqual(
++      ['accounting', 'intent_id', 'page', 'persons', 'roster_bridge_pending'].sort(),
++    );
++  });
++
++  it('exposes roster_bridge_pending: true on an EMPTY page too (settled, nothing reconstructed)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 0, skipped: 1 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons).toEqual([]);
++    expect(res.roster_bridge_pending).toBe(true);
++  });
++
++  it('is response-level only: no per-row flag is added to a roster row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons[0]).not.toHaveProperty('roster_bridge_pending');
++    expect(res.persons[0]).not.toHaveProperty('target_kind');
++    expect(res.persons[0]).not.toHaveProperty('native_id');
++  });
++
++  it('F10: an explicit person kind materializes exactly like a legacy NULL kind', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 });
++    fake.ledgerRows[1].target_kind = ROSTER_TARGET_KIND;
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons.map((p) => p.source_person_id)).toEqual(['tc_s000', 'tc_s001']);
++  });
++
++  it('F10: a non-person kind is never joined to Person, even when the id matches a Person row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    // A typed native row whose target_id happens to equal an existing Person id
++    // of this coach: it must not be looked up, let alone served as a Person.
++    const decoy = fake.persons[0].id;
++    for (const kind of ['workout_plan', 'workout_program', 'scout_entity', 'meal_plan']) {
++      fake.ledgerRows.push({
++        coach_id: COACH,
++        intent_id: INTENT,
++        entity_type: ET,
++        source_id: `z-${kind}`,
++        source_platform: 'truecoach',
++        status: 'reconstructed',
++        target_id: decoy,
++        target_kind: kind,
++      });
++    }
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons.map((p) => p.source_person_id)).toEqual(['tc_s000']);
++    // The Person lookup carried only the legacy row's id — once.
++    expect(fake.personReads).toEqual([{ ids: [decoy] }]);
++    // Accounting is ledger truth and still counts the typed rows as reconstructed.
++    expect(res.accounting.reconstructed).toBe(5);
++  });
++
++  it('F10: a page made only of non-person kinds is empty, and the cursor still advances', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 }); // s000 (legacy person)
++    for (const sid of ['a-typed', 'b-typed']) {
++      fake.ledgerRows.push({
++        coach_id: COACH,
++        intent_id: INTENT,
++        entity_type: ET,
++        source_id: sid,
++        source_platform: 'truecoach',
++        status: 'reconstructed',
++        target_id: `plan-${sid}`,
++        target_kind: 'workout_plan',
++      });
++    }
++    const { service } = makeService(fake);
++    const page1 = await service.getRoster(COACH, INTENT, undefined, 2);
++    expect(page1.persons).toEqual([]);
++    expect(page1.page.has_more).toBe(true);
++    expect(page1.roster_bridge_pending).toBe(true);
++    expect(decodeScoutCursor(page1.page.next_cursor as string, COACH, INTENT, ET)).toEqual({
++      s: 'b-typed',
++      p: 'truecoach',
++    });
++    // No Person read happened at all for the typed-only page.
++    expect(fake.personReads).toEqual([]);
++    const page2 = await service.getRoster(COACH, INTENT, page1.page.next_cursor ?? undefined, 2);
++    expect(page2.persons.map((p) => p.source_person_id)).toEqual(['tc_s000']);
++    expect(page2.page.has_more).toBe(false);
++    expect(page2.roster_bridge_pending).toBe(true);
++  });
++});
+diff --git a/test/utils/g2-s8f-bootstrap.sh b/test/utils/g2-s8f-bootstrap.sh
+new file mode 100755
+index 00000000..5ac2753b
+--- /dev/null
++++ b/test/utils/g2-s8f-bootstrap.sh
+@@ -0,0 +1,132 @@
++#!/usr/bin/env bash
++# S8-F G2 proof bootstrap, derived by substitution and REDUCTION from the S8-B bootstrap
++# test/utils/g2-s8b-bootstrap.sh (unchanged; it keeps governing the S8-B proof). S8-F ships NO
++# migration and NO writer, so there is no OLD side, no OLD client and no pending-migration
++# choreography here: the disposable database receives the whole accepted history of the candidate
++# root (the S8-F reader source composed onto the accepted S8-C head) through `prisma migrate deploy`,
++# and the spec then exercises the real readers against seeded synthetic rows. Validation harness
++# only: it never touches a hosted or application database and never edits schema/migration/generator
++# sources. PREPARED, NOT EXECUTED by the S8-F source-preparation lane.
++#
++# Required environment (operator; nothing here is read from a checked-in file):
++#   G2_S8F_DATABASE_URL  postgresql://s8f_super@127.0.0.1:<port>/g2_s8f_disposable?schema=public&connection_limit=2
++#   G2_S8F_CONFIRM       g2_s8f_disposable:<port>
++#   G2_S8F_PASSWORD      disposable local fixture password shared by s8f_super/postgres/service_role
++#                         (must equal the password the lane superuser was created with)
++#   G2_S8F_PSQL          absolute path of a psql binary compatible with the PG17 server
++# Optional:
++#   G2_S8F_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
++EXPECTED_VERSION="${G2_S8F_SERVER_VERSION:-170006}"
++# Distinctive S8-F fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-s8f-db.ts G2_S8F_CLUSTER_MARKER / G2_S8F_DATABASE_MARKER, kept identical by
++# test/scout/g2-s8f-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's8f-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s8f-disposable-pg17
++DB_MARKER=s8f-g2-native-reader-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_S8F_DATABASE_URL G2_S8F_CONFIRM G2_S8F_PASSWORD G2_S8F_PSQL; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++[[ -x "$G2_S8F_PSQL" ]] || { echo "psql binary not executable: $G2_S8F_PSQL" >&2; exit 2; }
++# The candidate client must already be generated in the pinned tree (no install/generate here).
++[[ -f "$ROOT/node_modules/.prisma/client/schema.prisma" ]] \
++  || { echo "candidate Prisma client is not generated in $ROOT/node_modules; generate it in the pinned tree first" >&2; exit 2; }
++grep -q 'model ImportNativeProvenance ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client lacks ImportNativeProvenance; the S8-F readers need the S8-B/S8-C-composed client" >&2; exit 2; }
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2S8fTestTarget, withFixturePassword } = require("./test/utils/g2-s8f-db");
++  const t = g2S8fTestTarget(process.env.G2_S8F_DATABASE_URL, process.env.G2_S8F_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_S8F_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_S8F_PASSWORD"
++
++psql_maint() { "$G2_S8F_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_S8F_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version, superuser bootstrap role.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S8-F lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S8-F fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (identical shape to the S8-B/N/Q1/S1 fixtures):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator + seeder)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for the reader worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++psql_maint -v pw="$G2_S8F_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Stamped with DB_MARKER at creation; a same-named database without exactly that comment is
++#    foreign and refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s8f_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_s8f_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s8f_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s8f_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s8f_disposable exists without the S8-F disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_s8f_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_s8f_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++# 4. Whole accepted history of the CANDIDATE root through the real release mechanism. S8-F adds no
++#    migration, so the candidate's migrations directory must be exactly the composed head's.
++git -C "$ROOT" diff --quiet HEAD -- prisma/migrations prisma/schema.prisma \
++  || { echo "candidate has uncommitted schema/migration changes; S8-F must not carry any" >&2; exit 4; }
++(cd "$ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++TRACKED="$(find "$ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$TRACKED" ]] || { echo "applied $APPLIED migrations, candidate tracks $TRACKED" >&2; exit 5; }
++# The readers' native joins need the S8-B catalog shape to be present after the history.
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='ImportNativeProvenance'")" == "1" ]] \
++  || { echo "ImportNativeProvenance is absent after the accepted history; not the S8-B-composed head" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='ScoutReconstructionLedger' AND column_name='target_kind'")" == "1" ]] \
++  || { echo "ScoutReconstructionLedger.target_kind is absent after the accepted history; not the S8-B-composed head" >&2; exit 5; }
++
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version'),
++  'cluster',current_setting('cluster_name'),'marker',shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()),'pg_database'),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_S8F_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-s8f-db.ts b/test/utils/g2-s8f-db.ts
+new file mode 100644
+index 00000000..aeff4cb0
+--- /dev/null
++++ b/test/utils/g2-s8f-db.ts
+@@ -0,0 +1,122 @@
++/**
++ * S8-F G2 proof target guard: derived by literal substitution from the S8-B guard
++ * test/utils/g2-s8b-db.ts (which stays byte-identical and keeps governing the S8-B proof), itself
++ * derived from the committed N/Q1 guard test/utils/g2-nq1-db.ts. One dedicated disposable database
++ * on an S8-F-only disposable PostgreSQL 17 cluster; a NEW identity, separate from the E, T/Q0, S5,
++ * B, R, N/Q1, C, S7-L, S8-B and S8-C targets, so no earlier proof state is reused and no earlier
++ * fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_S8F_DATABASE = 'g2_s8f_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      s8f_super    cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy`, all S8-F harness DDL/data (no S8-F migration exists)
++ *  - runtime    service_role  BYPASSRLS runtime role used by the reader worker processes (ScoutEntitiesService / ScoutRosterService)
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_S8F_ROLE = 's8f_super';
++export const G2_S8F_ADMIN_ROLE = G2_S8F_ROLE;
++export const G2_S8F_MIGRATION_ROLE = 'postgres';
++export const G2_S8F_RUNTIME_ROLE = 'service_role';
++export const G2_S8F_LOGIN_ROLES = new Set([
++  G2_S8F_ADMIN_ROLE,
++  G2_S8F_MIGRATION_ROLE,
++  G2_S8F_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_S8F_PASSWORD_ENV = 'G2_S8F_PASSWORD';
++/**
++ * Distinctive S8-F fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's8f-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s8f_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * the S8-F bootstrap (operator-derived from test/utils/g2-s8b-bootstrap.sh) and the S8-F fixture binding under execution/64e33dc7/s8f/ must carry the same literals.
++ */
++export const G2_S8F_CLUSTER_MARKER = 's8f-disposable-pg17';
++export const G2_S8F_DATABASE_MARKER =
++  's8f-g2-native-reader-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
++// S7-L lane.
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++  '55491',
++  '55501',
++  // Later lanes: 55511 is the S8-B lane, 55641 the S7-L worktree lane, 55642 the S8-C lane.
++  '55511',
++  '55641',
++  '55642',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2S8fTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_S8F_DATABASE}` ||
++    url.username !== G2_S8F_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_S8F_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'S8-F G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('S8-F G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_S8F_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('S8-F G2 proof requires a plain fixture password in the environment');
++  if (!G2_S8F_LOGIN_ROLES.has(username))
++    throw new Error('S8-F G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
+diff --git a/test/utils/g2-s8f-pg-harness.ts b/test/utils/g2-s8f-pg-harness.ts
+new file mode 100644
+index 00000000..a8acd231
+--- /dev/null
++++ b/test/utils/g2-s8f-pg-harness.ts
+@@ -0,0 +1,232 @@
++/**
++ * S8-F G2 live-proof helpers: derived by substitution and REDUCTION from the S8-B harness
++ * test/utils/g2-s8b-pg-harness.ts (unchanged; it keeps governing the S8-B proof). Same real psql,
++ * same real generated Prisma client in a separate OS process (the committed, unchanged
++ * test/utils/g2-tq0-worker.cjs drives the real ScoutEntitiesService / ScoutRosterService readers),
++ * no transaction or query mocks; bound to the S8-F-only identity guard test/utils/g2-s8f-db.ts and
++ * the G2_S8F_* environment. Only test/rls-g2-s8f.spec.ts imports this.
++ *
++ * S8-F ships no migration and no writer, so there is NO "old" side here: the candidate client is
++ * the only image, and the fixture rows a writer would have produced (typed ledger rows, native
++ * WorkoutPlan/WorkoutProgram rows, ImportNativeProvenance rows) are seeded by SQL as the
++ * non-superuser BYPASSRLS owner `postgres`. Synthetic identifiers only; no customer data.
++ *
++ * PREPARED, NOT EXECUTED by the S8-F source-preparation lane.
++ */
++import { execFileSync, fork } from 'child_process';
++import { resolve } from 'path';
++import {
++  G2_S8F_ADMIN_ROLE,
++  G2_S8F_MIGRATION_ROLE,
++  G2_S8F_RUNTIME_ROLE,
++  g2S8fTestTarget,
++  withFixturePassword,
++} from './g2-s8f-db';
++
++export const root = resolve(__dirname, '..', '..');
++
++const raw = process.env.G2_S8F_DATABASE_URL;
++const password = process.env.G2_S8F_PASSWORD;
++export const psql = process.env.G2_S8F_PSQL;
++export const expectedVersion = Number(process.env.G2_S8F_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql) {
++  throw new Error('S8-F G2 proof requires explicit database, password and psql');
++}
++export const target = g2S8fTestTarget(raw, process.env.G2_S8F_CONFIRM);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_S8F_MIGRATION_ROLE);
++/** Cluster superuser: identity observation only (cluster_name, database comment). */
++const adminUrl = asRole(G2_S8F_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** The same statement text as another fixture-matrix role (runtime `service_role`, or an API
++ *  role reached through SET ROLE from the owner session in the statement itself). */
++export const sqlAs = (role: string, text: string): string => psqlRun(asRole(role), [], text);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string, role?: string): void {
++  let error: unknown;
++  try {
++    if (role) sqlAs(role, statement);
++    else sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++
++export type Result = { result?: any; failure?: any; queries: string[]; events: any[]; pid: number };
++let sequence = 0;
++/** One real reader call in an independent OS process with the candidate generated client.
++ *  `options.action` ∈ `entities` | `roster`; see the unchanged test/utils/g2-tq0-worker.cjs. The
++ *  worker never receives a raw payload, and the harness logs query shapes/outcomes only. */
++export function worker(options: Record<string, unknown> = {}) {
++  const name = `g2f_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_S8F_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root,
++    client: resolve(root, 'node_modules/.prisma/client'),
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    family: 'workouts',
++    action: 'entities',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-tq0-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_TQ0_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.done) result = message;
++    });
++    child.on('error', reject);
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          options,
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return { done, stop: () => child.kill(), name };
++}
++export const run = (options: Record<string, unknown> = {}) => worker(options).done;
++
++// ─── Synthetic fixture seeding (owner role; BYPASSRLS; no customer data) ───────────────────────
++
++/** Synthetic owner row (User is the FK target of WorkoutPlan/WorkoutProgram.coach_id). */
++export function ensureUser(coach: string) {
++  sql(`INSERT INTO "User" (id,supabase_id,email,name,role)
++    VALUES (${quote(coach)},${quote(`sb-${coach}`)},${quote(`${coach}@synthetic.invalid`)},${quote(`Synthetic ${coach}`)},'coach')
++    ON CONFLICT (id) DO NOTHING`);
++}
++/** Settled run row: the gate both readers re-run inside their one RepeatableRead snapshot. */
++export function settle(coach = 'coach', intent = 'intent', terminal: string | null = 'success') {
++  ensureUser(coach);
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},
++      ${terminal === null ? "'in_progress'" : "'settled'"},${terminal === null ? 'NULL' : quote(terminal)})
++    ON CONFLICT DO NOTHING`);
++}
++/** One ledger row in the S8-B shape (nullable target_kind). `kind` null = legacy row. */
++export function ledger(row: {
++  source: string;
++  status?: string;
++  targetId?: string | null;
++  kind?: string | null;
++  family?: string;
++  platform?: string;
++  coach?: string;
++  intent?: string;
++}) {
++  const coach = row.coach ?? 'coach';
++  const intent = row.intent ?? 'intent';
++  sql(`INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id,target_kind)
++    VALUES (gen_random_uuid(),${quote(coach)},${quote(intent)},${quote(row.family ?? 'workouts')},${quote(row.source)},
++      ${quote(row.platform ?? 'truecoach')},${quote(row.status ?? 'reconstructed')},
++      ${row.targetId === null || row.targetId === undefined ? 'NULL' : quote(row.targetId)},
++      ${row.kind === null || row.kind === undefined ? 'NULL' : quote(row.kind)})`);
++}
++/** Generic evidence row (the legacy NULL-kind target of a `scout_entity` ledger row). */
++export function evidence(id: string, source: string, coach = 'coach', family = 'workouts') {
++  sql(`INSERT INTO "ScoutReconstructedEntity" (id,coach_id,source_platform,entity_type,source_id,client_source_id,label,created_at,updated_at)
++    VALUES (${quote(id)},${quote(coach)},'truecoach',${quote(family)},${quote(source)},'tc_client_1',${quote(`Evidence ${source}`)},now(),now())`);
++}
++/** Native WorkoutPlan row; synthetic name; optionally archived. */
++export function plan(id: string, coach = 'coach', name = `Plan ${id}`, archived = false) {
++  ensureUser(coach);
++  sql(`INSERT INTO "WorkoutPlan" (id,coach_id,name,type,created_at,updated_at,archived_at)
++    VALUES (${quote(id)},${quote(coach)},${quote(name)},'strength',now(),now(),${archived ? 'now()' : 'NULL'})`);
++}
++/** Native WorkoutProgram row; owner = coach; default visibility; synthetic name. */
++export function program(id: string, coach = 'coach', name = `Program ${id}`, archived = false) {
++  ensureUser(coach);
++  sql(`INSERT INTO "WorkoutProgram" (id,coach_id,owner_user_id,name,weeks,days_per_week,created_at,updated_at,archived_at)
++    VALUES (${quote(id)},${quote(coach)},${quote(coach)},${quote(name)},1,1,now(),now(),${archived ? 'now()' : 'NULL'})`);
++}
++let provenanceSequence = 0;
++/** One provenance record in the S8-B/S8-C writer's shape (no import_intent_id: the reader must
++ *  not need one). `outcome` unresolved ⇒ native_id NULL + reason, per the shape CHECKs. */
++export function vouch(row: {
++  kind: string;
++  nativeId: string | null;
++  source: string;
++  outcome?: string;
++  coach?: string;
++  family?: string;
++  namespace?: string;
++}) {
++  const outcome = row.outcome ?? 'created';
++  sql(`INSERT INTO "ImportNativeProvenance" (id,coach_id,import_intent_id,source_namespace,entity_type,source_id,native_kind,native_id,outcome,reason)
++    VALUES (${quote(`prov-${++provenanceSequence}`)},${quote(row.coach ?? 'coach')},NULL,${quote(row.namespace ?? 'truecoach')},
++      ${quote(row.family ?? 'workouts')},${quote(row.source)},${quote(row.kind)},
++      ${row.nativeId === null ? 'NULL' : quote(row.nativeId)},${quote(outcome)},
++      ${outcome === 'unresolved' ? "'fixture:unresolved'" : 'NULL'})`);
++}
++export function resetData() {
++  sql(`DELETE FROM "ImportNativeProvenance"; DELETE FROM "ScoutReconstructionLedger";
++    DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "WorkoutPlan"; DELETE FROM "WorkoutProgram";
++    DELETE FROM "Person"; DELETE FROM "ScoutImport";`);
++}
