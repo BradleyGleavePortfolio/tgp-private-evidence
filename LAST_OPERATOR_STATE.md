@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live proof cursor: 2026-09-25 05:07Z
+
+S7-L follow-up `54970cd937afc8dea689b33243961abfef8b9dd6`, tree `513c71d7c1390787e1521ccbfa46b30bb52b5462`, has dual independent v2 GO, closing F1 A and F2 B. `execution/64e33dc7/S7L_SINGLE_PG_PROOF_GRANT.md` authorizes its first and only current real-PG execution through the exact v2 driver; S7-L is sole heavy-slot grantee. No runtime acceptance is yet claimed.
+
+S8-C one-test follow-up `af9f7f5438fa545394b6d28792411439ded66caf`, tree `62a8071e544e6a307537bd08c55b52e2a9af4e7d`, passed40/40 and genuine hooks, released05:02:44Z, and is frozen with exact v4 export/v2 binding. Both independent new-source reviewers have final pins; no S8-C PG grant yet. S8-F remains drafted and frozen, S8-G remains readiness-only. Parent freshly verified backend integration `93389265` is unprotected and production main remains `c23b9d9f`; any accepted dependency-valid landing goes only to integration.
+
 ## Live cursor: 2026-09-25 04:57Z
 
 S7-L `839b54c5` and its original filled binding are preserved, not accepted. Review A returned GO; Review B identified F1 A (a newly committed future-deadline Start can be permanently timed out) and F2 B (L06 attempts login as NOLOGIN roles). Parent granted only the service guard, one regression unit case and L06 owner-session SET ROLE under `execution/64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`. The builder received the explicit source-gate relay at04:55Z after verified S8-C release. A new ordinary head and versioned binding require only changed-question re-attestation by the same two reviewers before a separately granted first PG proof.

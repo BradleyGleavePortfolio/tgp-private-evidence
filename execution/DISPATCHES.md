@@ -6,9 +6,9 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 
 | New lane | Tier / requested route | Sole writable surface | State |
 |---|---|---|---|
-| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`; three exact paths, versioned exports/binding | Follow-up `54970cd9`, tree `513c71d7`, targeted29/29 and hooks pass; released04:57:54Z; filled v2 binding frozen, no PG |
-| `s7_l_independent_review_a_muggs3qw` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original report preserved, `REVIEW_A_V2.md` next | ACTIVE changed-question re-attestation of `54970cd9` and filled v2 binding |
-| `s7_l_independent_review_b_muggs3ql` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original report preserved, `REVIEW_B_V2.md` next | ACTIVE F1/F2 closure and exact v2 binding review; no broad re-audit |
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_SINGLE_PG_PROOF_GRANT.md`; exact v2 driver only | Dual GO at `54970cd9`; sole heavy-slot grantee for first single real-PG proof, activated05:06Z |
+| `s7_l_independent_review_a_muggs3qw` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original and v2 reports preserved | V2 GO; await observed one-run runtime receipts for disposition, no repeated source audit |
+| `s7_l_independent_review_b_muggs3ql` | T4 / `claude_fable_5_1`, high | Read-only S7-L; original and v2 reports preserved | V2 GO, F1/F2 closed; await new runtime receipts, no repeated source audit |
 | `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md` plus `S8C_SOURCE_GATES_GRANT.md`; native writers/typed handoff and own-worktree derived artifact only | Committed `527fe2bc`, tree `d87a9626`; genuine hooks rc0, slot released04:52:24Z; exports/final receipt/filled binding source-only |
 | `s8_c_independent_review_a_mughlv0v` | T4 / `claude_fable_5_1`, high | Read-only committed S8-C delta and filled binding; `s8c/reviews/REVIEW_A.md` only | ACTIVE under `S8C_INDEPENDENT_REVIEW_GRANT.md`; final GO waits for one-test B closure and v2 exact binding |
 | `s8_c_independent_review_b_mughlv1e` | T4 / `claude_fable_5_1`, high | Read-only committed S8-C delta and filled binding; `s8c/reviews/REVIEW_B.md` only | ACTIVE independently of A; no accepted-source audit or runtime |
@@ -27,6 +27,8 @@ Current S7-L disposition supersedes its original single-review GO: F1 is a concr
 S8-C one-test B closure is authorized source-only under `S8C_MAPPING_EXPECTATION_CORRECTION_GRANT.md`: preserve original committed product, correct only the changed-dependency assumption that TrueCoach supports every canonical family, explicitly retain `programs` as unresolved. Its targeted gate/ordinary follow-up queues after S7-L correction gates. Reviewers continue against the frozen committed object, then bind only the final test-only delta and v2 driver.
 
 05:01Z relay supersedes earlier slot entries: S7-L correction released04:57:54Z; parent verified no holder/heavy process. S8-C now owns only its one-test correction gate and genuine ordinary follow-up commit. S7-L is frozen at `54970cd9` for the two changed-question reviews. First PG proofs remain ungranted.
+
+05:06Z activation supersedes earlier slot entries: S8-C correction at `af9f7f54` passed40/40 and genuine hooks, released05:02:44Z; parent verified no holder/postgres and absent S7-L lane05:05:01Z. S7-L dual v2 reviews are GO, F1/F2 closed. `S7L_SINGLE_PG_PROOF_GRANT.md` grants exactly one bound new real-PG execution to the S7-L builder. S8-C reviews continue on final `af9f7f54` and its v2 binding; it has no PG grant.
 
 ## Earlier checkpoint, preserved
 

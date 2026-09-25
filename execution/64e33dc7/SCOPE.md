@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live proof cursor, 2026-09-25 05:07Z
+
+S7-L dual v2 GO closes its F1/F2 findings at `54970cd9`; `S7L_SINGLE_PG_PROOF_GRANT.md` is the only active heavy-runtime authority, for one exact v2 execution. S8-C's test-only B correction is committed at `af9f7f54`, changed-file40/40 and genuine hooks passed; final head/v2 binding are under dual independent review, no PG granted. S8-F's existing draft stays frozen until accepted S8-C composition. All accepted history and reserved boundaries remain unchanged.
+
 ## Live correction cursor, 2026-09-25 04:57Z
 
 S7-L original head `839b54c5`, filled binding and reviews are preserved. Review B's concrete F1 A and F2 B supersede one-review GO for execution. `S7L_MINIMUM_CORRECTION_GRANT.md` authorizes only the three-path correction, ordinary follow-up, versioned binding and changed-question dual re-review; source gates were explicitly relayed04:55Z. S8-C committed `527fe2bc` and released04:52:24Z, has independent reviews active, and receives only the one-test changed-dependency correction in `S8C_MAPPING_EXPECTATION_CORRECTION_GRANT.md`, queued next for gates. Neither has a PG grant. S8-F's exact 15-path draft is frozen and published, awaiting accepted S8-C composition. No accepted-proof rerun or owner decision is needed.

@@ -1,5 +1,9 @@
 # LAST OPERATOR HANDOFF
 
+## Live continuation: 2026-09-25 05:07Z
+
+S7-L now has dual v2 GO at `54970cd9` and a separate active `S7L_SINGLE_PG_PROOF_GRANT.md`; do not restart or retry its one-shot driver. Read the actual pending run/sentinel before deciding its next step. S8-C is frozen at `af9f7f54` after the one-test40/40 correction, with v2 binding delivered to both active independent reviewers; no PG granted there. Preserve all earlier candidates/failures, accept only observed proof, and land accepted dependency-valid work to integration automatically. Backend main is unchanged and production-reserved.
+
 ## Live continuation: 2026-09-25 04:57Z
 
 Continue the minimum S7-L F1 A/F2 B correction, not the original single-review GO. Read `execution/64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`: three exact product paths, ordinary follow-up from preserved `839b54c5`, source gates explicitly relayed04:55Z, versioned filled binding, then the same reviewers on changed questions only. S8-C committed `527fe2bc`, released04:52:24Z and has two independent reviews active; its remaining one-test B correction is source-only under `S8C_MAPPING_EXPECTATION_CORRECTION_GRANT.md`, gates queued after S7-L. No PG is yet granted. S8-F's published exact draft is frozen until accepted S8-C composition. Accepted history is closed and all reserved boundaries remain unchanged.

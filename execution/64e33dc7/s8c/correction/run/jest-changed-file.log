@@ -1,0 +1,53 @@
+PASS test/scout/reconstruct/mapping-spec.spec.ts (9.379 s)
+  parseSourceMappingSpec — strict, fail-closed validation
+    ✓ accepts a well-formed spec and freezes it (3 ms)
+    ✓ rejects a non-object spec (22 ms)
+    ✓ rejects an unknown top-level key (16 ms)
+    ✓ rejects a missing top-level key (1 ms)
+    ✓ rejects a wrong specVersion (1 ms)
+    ✓ rejects a non-canonical platform (1 ms)
+    ✓ rejects a blank platform
+    ✓ rejects a non-canonical family (billing)
+    ✓ rejects a step targeting a non-canonical family (1 ms)
+    ✓ rejects a step targeting a family the spec does not map (1 ms)
+    ✓ rejects an unknown field (e.g. an email field) (1 ms)
+    ✓ rejects a missing field (1 ms)
+    ✓ rejects empty paths (1 ms)
+    ✓ rejects an empty path (1 ms)
+    ✓ rejects a non-string key
+    ✓ rejects an unknown coercion
+  parseSourceMappingSpec — one id space per canonical family (A3)
+    ✓ rejects two steps mapping to one family without a declared shared id space (1 ms)
+    ✓ accepts the fan-in when the steps explicitly declare a shared id space (2 ms)
+    ✓ rejects a declaration that omits a step of the fan-in (1 ms)
+    ✓ rejects a declaration for a family with no multi-step fan-in
+    ✓ rejects malformed declarations (7 ms)
+    ✓ keeps every shipped 1:1 spec valid with no declaration (1 ms)
+  readField — first non-nullish path, then typed coercion
+    ✓ walks nested own keys and treats a non-object level as absent (1 ms)
+    ✓ does not fall through past a present-but-unusable value (?? semantics) (1 ms)
+    ✓ stringifies finite numbers only under string_or_finite_number
+    ✓ never reads an inherited prototype property
+  interpreter — identity guard and unresolved families
+    ✓ keys the person on the once-trimmed source_id (unchanged persisted identity) (1 ms)
+    ✓ fails a foreign platform and a blank id with the legacy reasons
+    ✓ reports a canonical family the spec does not map as unresolved_family (1 ms)
+    ✓ resolves mapped steps and reports unmapped steps as unresolved_family:<token> (1 ms)
+  repository specs — the live sources
+    ✓ TrueCoach `notes` and the undeclared canonical `programs` family are unresolved
+    ✓ conformance_alpha maps its own step tokens and leaves `coaches` unresolved
+    ✓ an unregistered platform stays unsupported_platform:<token>
+    ✓ every shipped spec parses and is keyed by its own sourcePlatform (5 ms)
+    ✓ field meaning is data: no reconstruct TypeScript names a source field key (19 ms)
+  loadSourceMappingSpecs — fail closed on the spec directory
+    ✓ throws on an empty directory instead of registering nothing (2 ms)
+    ✓ throws on a missing directory (13 ms)
+    ✓ throws on two specs claiming one sourcePlatform (1 ms)
+    ✓ throws on a malformed spec, naming the file (1 ms)
+    ✓ loads in byte-sorted filename order and ignores non-JSON files (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       40 passed, 40 total
+Snapshots:   0 total
+Time:        9.617 s, estimated 10 s
+Ran all test suites within paths "test/scout/reconstruct/mapping-spec.spec.ts".
