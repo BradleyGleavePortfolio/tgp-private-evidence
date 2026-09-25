@@ -4,7 +4,7 @@
 
 S7-L builder is sole heavy grantee under `64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md`: one exact a68cdac7/v3 invocation on fresh proof-v3 paths. Both RUNTIME_CORRECTION_REVIEW_A/B are GO; parent read full reports and verified no holder/heavy process/listener, both retained lanes stopped05:38:04Z. No automatic repair or retry; terminal receipt then runtime-only independent review.
 
-S8-C builder is frozen; its two independent runtime reviewers diagnose only the bootstrap schema-copy refusal at87018a42/v3. No S8 source or runtime authority. Earlier failed lanes/receipts remain immutable; F frozen, G prerequisite-gated, no replacement acceptance or landing.
+S8-C runtime reviews are complete and both classify the raw client-schema comparison as a proof/tool defect, not a stale client. Its builder has only the one-bootstrap-file source-preparation grant in `64e33dc7/S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md`, plus fresh v4 binding preparation; gates wait for explicit post-S7 relay, no runtime or generation. Its reviewers await final pins for BOOTSTRAP_CORRECTION_REVIEW_A/B, changed-question only. Earlier failed lanes/receipts remain immutable; F frozen, G prerequisite-gated, no replacement acceptance or landing.
 
 ## Live override, 2026-09-25 05:35Z
 

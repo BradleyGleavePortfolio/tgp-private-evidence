@@ -4,7 +4,7 @@
 
 S7-L a68cdac7/tree6c00e248 has dual independent changed-question GO, closing the observed message assertion and leaked-holder proof defects. `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md` activates one new exact v3 invocation on fresh `proof-v3` paths; S7-L alone owns the heavy slot. Parent verified no holder/process/listener and both retained lanes stopped05:38:04Z. No acceptance yet.
 
-S8-C87018a42 remains frozen after bootstraprc7 before Jest; both runtime-only causal reviews are active. Failed S7 v2 and S8 v3 clusters/receipts remain untouched. Neither replacement is accepted or landed; F stays frozen and G prerequisite-gated.
+S8-C's two runtime dispositions confirm a proof/tool defect: the expected generated client schema is normalized, so raw byte comparison against the committed schema falsely refuses. `execution/64e33dc7/S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` grants only a one-file hash-pin correction and fresh v4 binding preparation; no lock/gates/commit until explicit relay after S7-L release, no regeneration or PG. Failed S7 v2 and S8 v3 clusters/receipts remain untouched. Neither replacement is accepted or landed; F stays frozen and G prerequisite-gated.
 
 ## Live proof cursor: 2026-09-25 05:35Z
 

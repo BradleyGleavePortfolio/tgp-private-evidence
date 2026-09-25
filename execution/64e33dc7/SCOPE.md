@@ -2,7 +2,7 @@
 
 ## Live proof cursor, 2026-09-25 05:39Z
 
-`S7L_V3_SINGLE_PG_PROOF_GRANT.md` is the sole active heavy authority: one exact a68cdac7/v3 proof on fresh proof-v3 paths after dual GO and verified stopped retained lanes. S8-C's first bootstrap failure is under independent read-only diagnosis only. No source correction, S8 retry or product acceptance is implied.
+`S7L_V3_SINGLE_PG_PROOF_GRANT.md` is the sole active heavy authority: one exact a68cdac7/v3 proof on fresh proof-v3 paths after dual GO and verified stopped retained lanes. S8-C's two runtime diagnoses are complete; `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` separately authorizes only one-bootstrap-file source preparation and fresh v4 binding, with later gates requiring explicit relay. No S8 retry, regeneration or product acceptance is granted.
 
 ## Live failed-proof cursor, 2026-09-25 05:35Z
 

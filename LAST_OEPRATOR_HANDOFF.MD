@@ -2,7 +2,7 @@
 
 ## Live continuation: 2026-09-25 05:39Z
 
-Read `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md`: both changed-question reviewers are GO on a68cdac7/tree6c00e248 with driver0c33b222/fixture721468ac/manifest82f501a3. S7-L alone receives one new proof on fresh proof-v3 paths after verified S8 cleanup and free slot. Never restart that driver on a tool return. S8-C's bootstrap refusal remains under runtime-only diagnosis, with no correction or retry granted. Check terminal receipts before later action; neither candidate is accepted.
+Read `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md`: both changed-question reviewers are GO on a68cdac7/tree6c00e248 with driver0c33b222/fixture721468ac/manifest82f501a3. S7-L alone receives one new proof on fresh proof-v3 paths after verified S8 cleanup and free slot. Never restart that driver on a tool return. Both S8-C runtime reviews confirm the normalized-client raw-byte comparison is a proof defect; `S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT.md` permits only source preparation now, with source gates waiting for explicit post-S7 relay and no PG grant. Check terminal receipts before later action; neither candidate is accepted.
 
 ## Live continuation: 2026-09-25 05:35Z
 
