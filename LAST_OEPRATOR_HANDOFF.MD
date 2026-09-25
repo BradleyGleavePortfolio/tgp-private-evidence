@@ -1,5 +1,11 @@
 # LAST OPERATOR HANDOFF
 
+## Current continuation: owner reset, 2026-09-25 03:16Z
+
+Read `execution/64e33dc7/OWNER_RECOVERY_RESET.md` and current DISPATCHES first. Bradley revoked all predecessor S7-L/S8-C workers/runtime and authorized new candidate lineages from accepted integration `93389265`; old exact bytes remain unrecovered and must not be approximated or treated as accepted. Earlier requests for exports/release below no longer block execution.
+
+Continue new disjoint S7-L and S8-C builds under their replacement grants. Runtime setup gets the first canonical heavy slot after verified local absence; builders draft in parallel and wait only for the slot when heavy gates are needed. Preserve old receipts, independently prove/review new bytes, then land accepted dependency-valid work to non-production integration automatically. S8-D/E and all existing production/security/store/protection boundaries remain reserved.
+
 ## Current handoff: EXEC-64E33DC7, September 25, 2026
 
 Read the current leading section of `LAST_OPERATOR_STATE.md` and `execution/64e33dc7/SCOPE.md` first. The historical text below remains unchanged. The canonical misspelled filename is retained.

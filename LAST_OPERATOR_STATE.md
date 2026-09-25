@@ -1,5 +1,13 @@
 # LAST OPERATOR STATE
 
+## Owner-directed recovery reset: 2026-09-25 03:16Z
+
+Latest authority: `execution/64e33dc7/OWNER_RECOVERY_RESET.md`. Predecessor S7-L/S8-C ownership is revoked. Do not wait for exact exports; old unaccepted candidates and receipts remain historical, not replacement acceptance evidence. Backend integration was reverified at accepted `93389265a846095b846fa8f1fb0dad782fb6ee9f`; new S7-L and coach-owned S8-C lineages start there under the two replacement build grants.
+
+Parallel source work is authorized on disjoint paths. S7-L owns lifecycle/schema/generator; S8-C owns native writers/family registration. Parent verified no canonical local lock/process; initial heavy slot is assigned only through `RUNTIME_SETUP_GRANT.md`, then relayed for candidate-specific gates and separately granted proofs. Current assignments are the leading section of `execution/DISPATCHES.md`. No production, principal-policy or branch-protection boundary changed.
+
+Prior recovery-block statements below are preserved history and superseded by this owner-directed reset.
+
 ## Current takeover: EXEC-64E33DC7, September 25, 2026
 
 Current scope: `execution/64e33dc7/SCOPE.md`. Current ownership: the leading section of `execution/DISPATCHES.md`. Bradley's current-session EXECUTE and the autonomous-landing amendment remain active. The older cursor below is preserved verbatim as history, not current execution.

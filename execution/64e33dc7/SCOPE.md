@@ -1,5 +1,17 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Current owner-directed reset, 2026-09-25 03:16Z
+
+`OWNER_RECOVERY_RESET.md` is the latest owner authority. Predecessor S7-L/S8-C writers and runtime are revoked. Exact old candidates remain unrecovered, unaccepted history; their records are preserved and cannot prove replacement bytes. The prior RECOVERY-S7L, RECOVERY-S8C and RUNTIME-OWNERSHIP prerequisites below are superseded by this explicit reset, not by a claim of recovery.
+
+New parallel T4 lineages start from freshly verified accepted backend integration `93389265a846095b846fa8f1fb0dad782fb6ee9f`: S7-L under `S7L_REPLACEMENT_BUILD_GRANT.md`, coach-owned S8-C under `S8C_REPLACEMENT_BUILD_GRANT.md`. Their writable product surfaces are disjoint; S7-L alone owns schema and contract generator. No accepted proof is rerun. New candidate bytes require their own gates, dual reviews and separately granted real-PG proof.
+
+Canonical local lock/process absence was verified. Initial slot may be assigned to `RUNTIME_SETUP_GRANT.md`; source builders run concurrently without heavy tooling until relay. Fresh runtime namespace is `execution/64e33dc7/recovery-reset`, proof ports 55641/55642, distinct fresh data directories. Every acquisition still uses the canonical nonblocking lock, never deletion.
+
+After acceptance and dependency reconciliation, land automatically to `integration/importer`. Production main, branch protection, G3-AUTH, S8-D/E principal/roster direction and real accounts remain reserved. Mobile CI lane stays accepted and closed at `affc2818`.
+
+## Prior takeover snapshot, preserved
+
 Parent session: `64e33dc7-18e7-42d0-add5-7db69dc37a24`. Observed September 25, 2026, beginning 00:37Z. This scope continues the accepted importer program. It does not reopen accepted work or supersede reserved owner authority.
 
 ## Authority and reading

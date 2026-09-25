@@ -1,0 +1,15 @@
+# Replacement runtime setup grant
+
+Tier T3: shared validation environment and runtime ownership. Requested `claude_opus_5_5`, high. Tooling only, not product implementation or acceptance. Sole executor is the new runtime worker in current DISPATCHES.
+
+Owner reset `OWNER_RECOVERY_RESET.md` revoked predecessor ownership. Parent verified canonical lock/runtime absent and no live relevant process at 03:16Z. Recheck before acquiring `/home/user/workspace/execution/test-validation.lock` with nonblocking flock. Never delete or steal a live lock. This grant assigns the initial heavy slot to setup only, then requires a release receipt before builder gates.
+
+Fresh writable runtime root `/home/user/workspace/execution/64e33dc7/recovery-reset/**`; private setup recipes/logs/receipt under `tgp-private-evidence/execution/64e33dc7/runtime/**`. Create a detached environment worktree at `/home/user/workspace/worktrees/64e33dc7-env` from accepted backend `93389265a846095b846fa8f1fb0dad782fb6ee9f`. Do not write either builder worktree. No product/dependency/lockfile changes.
+
+Prepare bounded reusable local tooling and an isolated dependency donor from the committed lock. Use the current repository-required toolchain and genuine install/prepare/postinstall hooks; no hook bypass and no platform `/home/user/node_modules` mutation. Node 20.20.1/npm 10.8.2 currently exist; establish the exact suitable Node/toolchain from current CI/record before installation. If a different local Node is needed, install under this fresh namespace and record identity. No broad toolchain upgrades.
+
+Read the existing pinned setup recipe `execution/cf8ff737/B_PG_TOOLING_RECOVERY_GRANT.md`, its driver under `b-drain/pg-tooling/`, and `nq1/env/ENV_RECOVERY.md`. PostgreSQL 17.6 distribution pins remain reusable tooling inputs: jar `23da5a044b4fb7a5a081a45008c95749c873305328d73f86aefd56922ce1d29d`; txz `26fa633461a3340913015503d0783d73a28384110257e2f17d9936bdf8b067c0`; postgres `23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a`; initdb `b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a`. Install server into fresh root's `pg17/dist`; suitable psql client at least 17 via existing recorded route if necessary. Reuse tooling pins, not old candidate proof.
+
+No initdb, server start, database, migration, bootstrap, test, accepted proof, live account, production connection, spending or external publication is authorized. Compiler/Jest gates belong to builders later. Scope permits ordinary dependency install and Prisma generate for the accepted environment donor, plus genuine hook installation, under the single slot. Do not turn environment setup into new harness controls.
+
+Return exact tool paths/versions/hashes, lockfile identity, generated-client identity, hook installation, reproducible donor-copy instructions, raw outcomes and observed release/no-live-process receipt. New proofs will use independent fresh directories/ports 55641 and 55642 and separately pinned new bindings, not historical runtime paths.

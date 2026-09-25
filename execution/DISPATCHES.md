@@ -1,5 +1,20 @@
 # Current execution dispatches
 
+## EXEC-64E33DC7 owner-reset assignments, 2026-09-25 03:16Z
+
+Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers and runtime owners are REVOKED; any later predecessor output is unauthorized until reconciled. Old rows below are history.
+
+| New lane | Tier / requested route | Sole writable surface | State |
+|---|---|---|---|
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, lifecycle/schema/generator | ACTIVE source/test/binding drafting; heavy gates await relay |
+| `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, native writers/families | ACTIVE source/test/binding drafting; heavy gates await relay |
+| `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | `64e33dc7/RUNTIME_SETUP_GRANT.md`; fresh tooling/donor namespace only | ACTIVE; sole initial heavy-slot grantee |
+| Parent | Executive | Scope, grants, evidence publication, acceptance/landing | ACTIVE |
+
+Heavy slot: canonical `execution/test-validation.lock`, no live lock/process observed before grant. Setup first; builder gate queue relayed when each is ready, no simultaneous heavy execution. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
+
+## Earlier checkpoint, preserved
+
 ## EXEC-64E33DC7, September 25, 2026
 
 Current scope: `64e33dc7/SCOPE.md`. Entries below the historical heading are not live-worker assertions.
