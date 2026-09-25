@@ -1,5 +1,13 @@
 # LAST OPERATOR STATE
 
+## EXEC-DACEDDC8 takeover: 2026-09-25 16:25Z
+
+Execution RESUMED under Bradley's current takeover prompt, which supersedes the 05:56Z freeze. Durable state and live GitHub agree: backend integration `93389265`, prod main unchanged, and live is not ahead. The prior sandbox is gone. The half-done inventory is reconstructed in `execution/daceddc8/HALF_DONE_WORK.md`, and grants are in `execution/daceddc8/SCOPE.md`.
+
+Both worktrees are restored from verified bundles here. S7-L is at `a68cdac7`, clean. S8-C is at `87018a42`, with its exact bootstrap WIP reapplied.
+
+RT-2 re-provisions the runtime at the same pins and root, with new receipts under `daceddc8/runtime/`. The S7-L worker correction has started (T4 builder `s7_l_worker_correction_muh68jv6`). S8-C's gate commit and v4 binding follow on the slot. Neither replacement is accepted or landed. F waits on accepted C. G waits on L and C.
+
 ## Owner handoff freeze: 2026-09-25 05:56Z
 
 ALL EXECUTION IS FROZEN. The owner requested handoff, not continuation. `execution/64e33dc7/HANDOFF_FREEZE.md` supersedes every active grant and cursor below; `execution/64e33dc7/OPERATOR_HANDOFF_GUIDE.md` is the new operator's start document. Only evidence capture and publication are authorized during handoff.

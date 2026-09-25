@@ -1,5 +1,16 @@
 # Current execution dispatches
 
+## EXEC-DACEDDC8 takeover, 2026-09-25 16:25Z
+
+Bradley's current takeover prompt supersedes the 05:56Z freeze, and new grants are in `daceddc8/SCOPE.md`. Half-done work was reconstructed from durable and live state, because the prior disk is gone (`daceddc8/HALF_DONE_WORK.md`). The checkpoint is `daceddc8/TAKEOVER.md`.
+
+| Lane | Tier / requested route | Sole writable surface | State |
+|---|---|---|---|
+| parent daceddc8 | executive | runtime (RT-2), S8-C mechanical completion (S8C-BC-2), evidence publication, landing | RT-2 `rt-setup.sh` running under the lock since 16:22:50Z |
+| `s7_l_worker_correction_muh68jv6` | T4 / `claude_fable_5_1`, high | `worktrees/64e33dc7-s7l`, `test/utils/g2-s7l-worker.cjs` only; `64e33dc7/s7l/worker-correction/`, `s7l/bundle/v4/`, `s7l/binding/v4/` | Phase 1 source only; gates only on parent relay |
+
+Heavy queue: RT-2, then S8-C gate commit, then S7-L gates, then the S8-C v4 proof, then the S7-L v4 proof. Every row below is historical.
+
 ## Owner-directed freeze, 2026-09-25 05:56Z
 
 ALL LANES FROZEN. No active builder, reviewer, heavy-slot or PostgreSQL grantee remains. `64e33dc7/HANDOFF_FREEZE.md` supersedes every prior row and relay; `64e33dc7/OPERATOR_HANDOFF_GUIDE.md` and `64e33dc7/handoff/AGENT_FREEZE_REGISTER.md` hold the final inventory and resume prerequisites.
