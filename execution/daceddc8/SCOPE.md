@@ -149,3 +149,14 @@ Acceptance and the fast-forward happen only on the parent's word, after the S7-L
 - **Launch:** exactly once, `S7L_PG4_GRANT=1 bash …/s7l/binding/v4/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s7l/binding/v4/s7l-pg-proof.sh` against `df713fd9…` (tree `796f437f…`), with driver `8b03f4c2…`, fixture `74aed261…` and manifest `6c912b96…`.
 - **Rules:** a lock-busy refusal before `LAUNCH.txt` or the sentinel does not consume the grant. No rerun on any consumed rc. A full pass means accept, then land by FF under LAND-1.
 - **Slot:** the S8-C diagnostics yield until this run ends.
+
+## S7-L accepted; LAND-1 fast-forward authorized (17:03Z)
+
+See `64e33dc7/S7L_ACCEPTANCE.md`. `landing_composition_prep` may, once the draft PR's CI shows green apart from the known class C Danger title rule:
+1. mark the PR ready;
+2. fast-forward `integration/importer` from `93389265` to `df713fd9` with one ordinary push, no force;
+3. verify the remote head and record it.
+
+Owner-reserved limits are unchanged: never touch `main`.
+
+The canonical slot passes to S8-C BC-3 diagnostics.
