@@ -1,5 +1,11 @@
 # LAST OPERATOR HANDOFF
 
+## Live continuation: 2026-09-25 05:29Z
+
+S8-C87018a42 now has both independent v3 GO reports; `execution/64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md` is active for one exact-bound first database proof. S8-C alone has the heavy slot. Read its live run/sentinel before any later action; no retry, source correction or acceptance is implied. The unauthorized earlier source-gate retry is fully recorded and was not retrospectively authorized.
+
+S7-L correctiona68cdac7 passed its narrow source gates and genuine hooks, released05:25:39Z, and its v3 binding is frozen05:30:27Z in fresh versioned paths while preserving failedv2. Both existing reviewers have exact final pins and are active for RUNTIME_CORRECTION_REVIEW_A/B only; driver0c33b222, fixture721468ac, manifest82f501a3. No S7-L PG rerun yet. Continue runtime receipt review and dependency-valid automatic integration landing only after acceptance. Production and all reserved boundaries remain unchanged.
+
 ## Live continuation: 2026-09-25 05:22Z
 
 S7-L's v2 PG run at54970cd9 failed21/24 and did not apply its schema. Cleanup ended05:14:22Z after the parent terminated only the completed, stuck Jest stage; logs, failed data and old-root are retained. Read both runtime reviews and `execution/64e33dc7/S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`: one-spec message correction plus same-stanza unconditional release, ordinary follow-up and fresh versioned binding. S7-L alone now has its narrow source-gate relay after verified S8-C release and no live holder/process; no PG rerun is granted.

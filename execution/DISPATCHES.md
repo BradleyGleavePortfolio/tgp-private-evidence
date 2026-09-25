@@ -1,5 +1,11 @@
 # Current execution dispatches
 
+## Live override, 2026-09-25 05:29Z
+
+S8-C builder is the sole heavy grantee for exactly one first real-PG run under `64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md`, head87018a42/treecec7d05a/v3driver9ddb52de. Both REVIEW_A_V3 and REVIEW_B_V3 are GO; all four findings closed, source-gate deviation recorded without retroauthorization. Parent verified slot/process/lane preconditions05:29:07Z. No retry or source edit is granted.
+
+S7-L builder's one-spec correctiona68cdac7/tree6c00e248 passed genuine hooks and released05:25:39Z; its source-only v3 binding/receipt is complete and frozen05:30:27Z. Existing S7 reviewers received head/tree/spec plus driver0c33b222/fixture721468ac/manifest82f501a3 and are active for RUNTIME_CORRECTION_REVIEW_A/B. Builder is idle; no S7-L PG rerun. S8-C's explicit first-PG execution relay has been delivered; its reviewers await terminal observed receipts, with no unchanged source audit. F frozen; G prerequisite-gated; no replacement acceptance or landing yet.
+
 ## Live override, 2026-09-25 05:22Z
 
 S8-C's seven-path correction is committed87018a42, treecec7d05a,44/44 and genuine hooks passed, released05:20:40Z. Builder completes only source-only export/v3 binding; no further gates or PG. Existing reviewers A/B await final pins for new immutable REVIEW_A_V3/REVIEW_B_V3 changed-question reports.

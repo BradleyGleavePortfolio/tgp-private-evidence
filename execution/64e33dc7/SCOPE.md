@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live proof cursor, 2026-09-25 05:29Z
+
+S8-C87018a42 is dual-GO for its exact v3 proof binding. `S8C_SINGLE_PG_PROOF_GRANT.md` grants one first real-PG execution after verified free canonical slot/processes, with S8-C sole heavy owner; the explicit execution relay has been delivered. It is not product acceptance. S7-L corrected spec is committeda68cdac7, source gates done and released; its fresh v3 binding froze05:30:27Z and final pins have been delivered to both changed-question reviewers. No S7-L rerun or other heavy work is granted.
+
 ## Live correction cursor, 2026-09-25 05:22Z
 
 S7-L's first v2 proof failed21/24 with its schema never applied; existing cleanup completed and the failed lane is retained. Both runtime reviews are complete. `S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md` authorizes only the observed error-message assertion and same-stanza unconditional holder release, new ordinary head and fresh versioned binding, not PG execution. S8-C's seven-path correction is committed at87018a42,44/44 and genuine hooks passed, released05:20:40Z. Parent verified slot/process absence05:22:14Z and relayed the narrow source gates to S7-L. Both candidates require changed-question dual attestations before separate PG grants.

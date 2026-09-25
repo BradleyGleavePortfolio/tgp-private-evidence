@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live proof cursor: 2026-09-25 05:29Z
+
+S8-C87018a42/treecec7d05a has dual independent v3 GO with all four review findings closed. `execution/64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md` now grants its first single exact-bound database proof; S8-C alone owns the heavy slot. Parent verified no holder/process and absent fresh lane/sentinel at05:29:07Z. The earlier unauthorized source-gate retry remains expressly recorded, not retrospectively authorized.
+
+S7-L's one-spec runtime correction is committeda68cdac7/tree6c00e248 with genuine hooks, released05:25:39Z. Its source-only v3 binding froze05:30:27Z: driver0c33b222, fixture721468ac, manifest82f501a3. Parent read the complete correction receipt and filled delta, verified the manifest/supplement, and delivered final pins to both changed-question reviewers. No S7-L PG rerun is granted. Failed v2 proof/data remain intact. Neither replacement has runtime acceptance or landing yet; F stays frozen, G prerequisite-gated.
+
 ## Live correction cursor: 2026-09-25 05:22Z
 
 Both S7-L runtime reviews are complete: the first proof remains failed and unaccepted, with no product defect evidenced because the S7-L schema was never reached. Parent granted only the SQLSTATE-message correction and unconditional release in that same held-transaction test, ordinary follow-up on54970cd9, and a v3 binding using fresh versioned data/socket/old-root paths. The failed v2 lane and all receipts stay intact. See `execution/64e33dc7/S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`; this explicitly updates the earlier one-line-only disposition after the second independent finding.

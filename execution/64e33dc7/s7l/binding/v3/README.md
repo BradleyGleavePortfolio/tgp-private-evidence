@@ -1,0 +1,15 @@
+# S7-L real-PG proof binding v3 (source-only; NOT RUN; no PG granted)
+
+Version 3 under `S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`: binds the ordinary follow-up commit that closes the two proof-only B findings from the failed first proof (`../v2/run/PROOF_RUN_RECEIPT.md`): P1 the stage-1 lock-timeout assertion now expects psql's observed message `canceling statement due to lock timeout` (not the SQLSTATE `55P03`), P2 the held-transaction assertions run in `try` with the existing `holder.release()` in `finally` (accepted S8-B pattern). One file changed: `test/rls-g2-s7l.spec.ts`. Bindings v1 (`../`) and v2 (`../v2`, including its run receipts) are unchanged. Exact delta: `DELTA-v2-to-v3.md`, `driver-v2-to-v3.diff`, `fixture-v2-to-v3.diff`, `freeze-v2-to-v3.diff`.
+
+Candidate: `exec64/s7l-replacement` head `a68cdac70d81aea384fdc99c01c9c983a08e80eb`, tree `6c00e2483d0407e1ba8b8e97d03ff0e1ea2b88eb`; exact parent (preserved failed v2 candidate) `54970cd937afc8dea689b33243961abfef8b9dd6` (tree 513c71d7); grandparent (preserved v1) `839b54c53ccb252f95b4ec63df0b08595bbe7698` (tree f02205c6); accepted base `93389265a846095b846fa8f1fb0dad782fb6ee9f`. Worktree `/home/user/workspace/worktrees/64e33dc7-s7l` (frozen for the two independent re-attestations; no further builder edits). Gate receipts: `../../runtime-correction/` (slot-5.log: prettier/eslint rc0, genuine lefthook pre-commit + commit-msg, heap 4096, Bradley identity, lock 05:24:48Z–05:25:39Z). Exports: `../../bundle/v3/`.
+
+Fresh runtime lane (never the failed v2 lane): data `recovery-reset/proof-v3/clusters/s7l/pg-data`, socket `recovery-reset/proof-v3/run/s7l`, detached OLD root `recovery-reset/proof-v3/s7l/old-root` (+ `.g2-s7l-old-client`). Port 55641, `s7l_super`, `g2_s7l_disposable`, cluster marker `s7l-disposable-pg17`, canonical lock and tool pins unchanged. The retained v2 lane `recovery-reset/clusters/s7l` is checked as another stopped lane (postmaster.pid absent, conf/control hashes unchanged) and never started, adopted, repaired or destroyed.
+
+Files
+- `s7l-pg-proof.sh` — the candidate-bound driver (same sequence, bounds and exit codes as v2; see `DELTA-v2-to-v3.md`). Outer wrapper when granted: `timeout -k 30 3900`. Single-shot (sentinel), first failure stops, bounded stop only, data dir retained.
+- `s7l-fixture.sh` — disposable PG 17.6 cluster fixture on the fresh v3 lane; requires `S7L_RUNNER_PID` naming a live `s7l-pg-proof.sh`.
+- `freeze-v3.sh` — read-only re-derivation of every head pin from the committed clean head, tool-pin sha256 re-check (report only), lineage/one-path/fixture-delta/v1+v2-intact refusals, fills the four placeholders, writes `BINDING.sha256`.
+- `PINS.txt` — pins and derivation commands. `BINDING.sha256` — frozen hashes of this directory.
+
+What this is not: no PG run, no fixture initialised, no test executed, no retry, no inherited proof replay, no acceptance of the failed 54970cd9 run. Execution requires both `RUNTIME_CORRECTION_REVIEW_A/B` GO and a separate parent single-run grant bound to this head and driver.

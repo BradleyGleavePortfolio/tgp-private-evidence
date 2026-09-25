@@ -1,0 +1,14 @@
+test(scout): S7-L PG proof spec — assert observed lock-timeout text; always release held transaction
+
+Stage-1 held-transaction test of test/rls-g2-s7l.spec.ts only:
+
+- P1: refusedFile(upFile, ...) now expects psql's observed stderr message
+  "canceling statement due to lock timeout" instead of the SQLSTATE 55P03,
+  which psql's default verbosity does not print (same assertion as the
+  accepted S8-B proof). psql verbosity and migration behavior unchanged.
+- P2: the assertions made while the transaction is held run inside try, and
+  the existing holder.release() runs in finally, so a failed assertion can no
+  longer leak the held lock into later tests (S8-B pattern). Held barrier,
+  timing, unchanged-shape and released-lock assertions preserved.
+
+Proof-only correction; no src/, prisma/, contract, helper or dependency change.

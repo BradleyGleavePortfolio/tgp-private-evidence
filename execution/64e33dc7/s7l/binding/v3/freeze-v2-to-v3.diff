@@ -1,0 +1,47 @@
+2c2
+< # S7-L binding v2 freeze (S7L_MINIMUM_CORRECTION_GRANT; source-only preparation, NOT a PG run, needs no slot). Read-only against the worktree: re-derives
+---
+> # S7-L binding v3 freeze (S7L_RUNTIME_MINIMUM_CORRECTION_GRANT; source-only preparation, NOT a PG run, needs no slot). Read-only against the worktree: re-derives
+5c5
+< # placeholder, and records BINDING.sha256 (filled runner + fixture + this file). Runs nothing else. Usage: bash freeze.sh
+---
+> # placeholder, and records BINDING.sha256 (filled runner + fixture + this file). Runs nothing else. Usage: bash freeze-v3.sh
+7c7
+< D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v2
+---
+> D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v3
+9c9,11
+< PARENT=839b54c53ccb252f95b4ec63df0b08595bbe7698
+---
+> V2=$V1/v2
+> PARENT=54970cd937afc8dea689b33243961abfef8b9dd6   # preserved failed v2 candidate
+> V1HEAD=839b54c53ccb252f95b4ec63df0b08595bbe7698
+19,24c21,30
+< [ "$HEAD" != "$PARENT" ] || { echo "REFUSED: HEAD is still the v1 candidate; the follow-up commit does not exist yet" >&2; exit 70; }
+< [ "$(git -C "$W" rev-parse HEAD^)" = "$PARENT" ] || { echo "REFUSED: HEAD^ != $PARENT (ordinary follow-up on the preserved v1 candidate required; no amend/replace)" >&2; exit 70; }
+< [ "$(git -C "$W" rev-parse "$PARENT^{tree}")" = f02205c60ad0bfeb24ce82d74b0025ee9a185df6 ] || { echo "REFUSED: v1 candidate tree changed" >&2; exit 70; }
+< [ "$(git -C "$W" diff --name-only "$PARENT" HEAD | sort | tr '\n' ' ')" = "src/scout/lifecycle/lifecycle.service.ts test/rls-g2-s7l.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts " ] \
+<   || { echo "REFUSED: follow-up delta is not exactly the three granted paths" >&2; exit 70; }
+< cmp -s "$V1/s7l-fixture.sh" "$D/s7l-fixture.sh" || { echo "REFUSED: v2 fixture is not byte-identical to v1" >&2; exit 70; }
+---
+> [ "$HEAD" != "$PARENT" ] && [ "$HEAD" != "$V1HEAD" ] || { echo "REFUSED: HEAD is still the v2 (or v1) candidate; the follow-up commit does not exist yet" >&2; exit 70; }
+> [ "$(git -C "$W" rev-parse HEAD^)" = "$PARENT" ] || { echo "REFUSED: HEAD^ != $PARENT (ordinary follow-up on the preserved v2 candidate required; no amend/replace)" >&2; exit 70; }
+> [ "$(git -C "$W" rev-parse "$PARENT^{tree}")" = 513c71d7c1390787e1521ccbfa46b30bb52b5462 ] || { echo "REFUSED: v2 candidate tree changed" >&2; exit 70; }
+> [ "$(git -C "$W" rev-parse "$PARENT^")" = "$V1HEAD" ] && [ "$(git -C "$W" rev-parse "$V1HEAD^")" = "$BASE" ] || { echo "REFUSED: lineage is not base -> 839b54c5 -> 54970cd9 -> HEAD" >&2; exit 70; }
+> [ "$(git -C "$W" rev-parse "$V1HEAD^{tree}")" = f02205c60ad0bfeb24ce82d74b0025ee9a185df6 ] || { echo "REFUSED: v1 candidate tree changed" >&2; exit 70; }
+> [ "$(git -C "$W" diff --name-only "$PARENT" HEAD | sort | tr '\n' ' ')" = "test/rls-g2-s7l.spec.ts " ] \
+>   || { echo "REFUSED: follow-up delta is not exactly the one granted path test/rls-g2-s7l.spec.ts" >&2; exit 70; }
+> # v3 fixture delta from v2 is exactly the recorded fresh-lane/socket diff (paths + one directly corresponding comment); nothing else
+> [ "$(diff "$V2/s7l-fixture.sh" "$D/s7l-fixture.sh" || true)" = "$(cat "$D/fixture-v2-to-v3.diff")" ] || { echo "REFUSED: v3 fixture delta from v2 differs from the recorded fixture-v2-to-v3.diff" >&2; exit 70; }
+> [ "$(diff "$V2/s7l-fixture.sh" "$D/s7l-fixture.sh" | grep -cE '^> ' || true)" = 3 ] || { echo "REFUSED: fixture delta is not exactly the 3 granted lines (LANE, DATA/SOCK, comment)" >&2; exit 70; }
+25a32,33
+> [ -e "$V2/BINDING.sha256" ] && ( cd "$V2" && sha256sum -c --quiet BINDING.sha256 ) || { echo "REFUSED: v2 binding missing or altered" >&2; exit 70; }
+> [ "$(sha256sum "$V2/run/jest.log" | cut -c1-64)" = d6253d28d1a3e432959857dd17d8c9b258609a5855adc35058a909adae1892a5 ] || { echo "REFUSED: v2 run receipt jest.log altered" >&2; exit 70; }
+66,68c74,76
+< { echo "# S7-L PG proof binding v2, frozen $(date -u +%FT%TZ) against head $HEAD (source-only; NOT RUN; no PG granted)"
+<   ( cd "$D" && sha256sum s7l-pg-proof.sh s7l-fixture.sh freeze-v2.sh PINS.txt README.md DELTA-v1-to-v2.md ); } > "$D/BINDING.sha256"
+< cat "$D/BINDING.sha256"; echo "FROZEN_V2 head=$HEAD parent=$PARENT fixture_sha=$FIXSHA"
+---
+> { echo "# S7-L PG proof binding v3, frozen $(date -u +%FT%TZ) against head $HEAD (source-only; NOT RUN; no PG granted)"
+>   ( cd "$D" && sha256sum s7l-pg-proof.sh s7l-fixture.sh freeze-v3.sh PINS.txt README.md DELTA-v2-to-v3.md driver-v2-to-v3.diff fixture-v2-to-v3.diff ); } > "$D/BINDING.sha256"
+> cat "$D/BINDING.sha256"; echo "FROZEN_V3 head=$HEAD parent=$PARENT fixture_sha=$FIXSHA"
