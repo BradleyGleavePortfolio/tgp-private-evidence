@@ -69,3 +69,31 @@ Reviews and source work run in parallel with the slot.
 ## Routing
 
 T4 builders and reviewers request `claude_fable_5_1` (doctrine). Requested route is not telemetry. Any platform refusal of that route is recorded here verbatim; no local substitution is invented. 16:27Z: the platform accepted `claude_fable_5_1` for `s7_l_worker_correction_muh68jv6`.
+
+## RT-2 result (16:34Z)
+
+All three steps finished RC=0: rt-setup 16:29:20Z, fmt-tool 16:30:03Z, lane-provision 16:33:54Z. Every pin reproduced:
+
+- psql 18.6 `a200e38c…`
+- PG 17.6 jar, txz, postgres, initdb and pg_ctl
+- donor hidden lock `05bc530a…`, client `b6716a86…`
+- hooks: pre-commit `3b741de3…`, commit-msg `71029ce8…`
+- S7-L in-lane client `9042e713…` and client schema `b8439203…`
+- S8-C client `b6716a86…`
+- both prettier prefixes: 56 files, `npx prettier` 3.9.9
+
+Canonical lock inode is 674373, new in this sandbox. The first lane-provision launch refused at preflight: rc75, lock busy in the same second fmt-tool exited, no work done, no sentinel written. It was relaunched once and the attempt is preserved. Slot was free at 16:34:00Z.
+
+## Orchestrator-only operating mode (Bradley, 16:32Z)
+
+Per Bradley's 16:32Z instruction, the parent orchestrates only. Coding, gates, bindings and reviews go to subagents. Parent-prepared helper scripts (`s8c/bootstrap-correction/prepare-binding-v4-daceddc8.sh` `7c21f142…`, `export-v6-daceddc8.sh`) are handed to the S8-C builder, which verifies and owns them.
+
+## Additional grants (16:35Z)
+
+- **S8C-BC-2 builder:** `s8c_bootstrap_completion` (T4, `claude_fable_5_1`) owns `worktrees/64e33dc7-s8c` plus new `s8c/bootstrap-correction/run/`, `s8c/checkpoints/v6/`, `s8c/binding/v4/` and `CORRECTION_RECEIPT.md`. It is sole heavy-slot grantee now, for the gate commit only.
+- **S8F-COMP-1:** `s8f_composition_prep` (T4, `claude_fable_5_1`) owns new worktree `worktrees/daceddc8-s8f` (detached at `87018a42`, later moved onto the accepted S8-C head) plus `64e33dc7/s8f/composition/**`.
+  - Scope: compose the frozen 15-path draft onto S8-C, the F03 `programs` unskip, and a contract-regeneration plan.
+  - Source only. No lock, gates, commit or PG.
+- **S8G-DRAFT-1:** `s8g_design_test_draft` (T4, `claude_fable_5_1`). Evidence only, under `64e33dc7/s8g/draft/**`: design and acceptance-test drafting from READINESS E1–E6/N1–N4 on the DRAFT_READY pins. No product bytes, worktree writes, gates or PG.
+- **LAND-PREP-1:** `landing_composition_prep` (T3, `claude_opus_5_5`). Read-only plan and scripts under `daceddc8/landing/**` for landing S7-L and S8-C onto `integration/importer`: order, the `importer-openapi.json` overlap and regeneration ownership, CI, and the PR/FF procedure. No pushes, PRs or heavy runs.
+- **S9-READY-1:** `s9_readiness` (T4, `claude_fable_5_1`). Read-only readiness brief under `daceddc8/s9/READINESS.md`. No product writes.
