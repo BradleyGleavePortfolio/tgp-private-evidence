@@ -1,0 +1,157 @@
+--- a/binding/v2/s9b-pg-proof.sh
++++ b/binding/v2/s9b-pg-proof.sh
+@@ -1,7 +1,9 @@
+ #!/usr/bin/env bash
+-# S9-B real-PG proof — complete source-only execution binding DRAFT v2 (base re-pinned to M2, S9-A blobs = be88909f post-format, PORT=55645; UNFILLED head/runtime/tool pins; NOT RUN; NOT GRANTED).
++# S9-B real-PG proof — complete source-only execution binding DRAFT v2 (base re-pinned to M2, S9-A blobs = be88909f post-format, PORT=55645,
++# RUNTIME_ROOT = the 1910a060 runtime, real psql binary pinned (CB1 mirror of 64e33dc7/s8f/binding/v2), EXPECT_TESTS=10, lock inode 667698 asserted,
++# other-lane fingerprint scan covers clusters/* and proof-*/clusters/*; UNFILLED head + remaining tool pins; NOT RUN; NOT GRANTED).
+ # Derived by substitution from the accepted S8-C binding execution/64e33dc7/s8c/binding/s8c-pg-proof.sh (unfilled
+-# template, unchanged there) with the EXEC-1910A060 deltas: standalone clone worktrees/1910a060-s9b at base 1c5fbb04,
++# template, unchanged there) with the EXEC-1910A060 deltas: standalone clone worktrees/1910a060-s9b re-based onto M2 (S9-A be88909f on 62471b11; schema/lock identical to 1c5fbb04),
+ # lane port 55645 / s9_super / g2_s9_disposable / cluster s9-disposable-pg17, NO OLD side (S9-B ships no
+ # migration, D-S9-5: the base 1c5fbb04 prisma tree — 172 migrations, S8-B and S7-L included — is the only schema and
+ # the accepted S7-L + S8-B + S8-C objects are the proof target), the candidate binding G2_S9_CANDIDATE_HEAD, and the
+@@ -16,17 +18,17 @@
+ # is the observed terminal evidence — sentinel/log lines, `pgrep -cx postgres`, the port listener count and any
+ # survivor pid the stop reports — not this header. Data dir RETAINED after stop (destroy = separate marker-gated grant).
+ # Inner stage bounds: init 60 + start 60 + bootstrap 900 + identity 5x15 + jest 1500 + stop 75 = 2670 s soft sum.
+-# Usage (later, under the separate single-run PG grant): timeout -k 30 3900 bash .../binding/v1/s9b-pg-proof.sh
+-# Pre-steps (each its own receipt, BEFORE the pins are filled): runtime setup for 1c5fbb04 (isolated node_modules copy +
+-# in-lane `npx prisma generate` from the committed schema; its receipt fills RUNTIME_ROOT and the tool pins) → S9-A
++# Usage (later, under the separate single-run PG grant after dual review of v2): timeout -k 30 3900 bash .../binding/v2/s9b-pg-proof.sh
++# Pre-steps (each its own receipt, BEFORE the head pins are filled): runtime setup DONE (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md
++# fixes RUNTIME_ROOT, the real psql pin and the lock inode here; the remaining tool pins are copied from it at fill after re-verification) → S9-A
+ # gates/commit (parent composition) → S9-B source gates (prettier --check, eslint --max-warnings 0, tsc, check-r75,
+ # default jest incl. test/scout/reconciliation/facts.service.spec.ts and test/scout/g2-s9-db-guard.spec.ts) → ordinary
+ # Bradley-authored hooked commit → source/binding export → two independent non-builder final-head attestations → fill
+ # EXPECT_HEAD/EXPECT_TREE/EXPECT_*_BLOB/EXPECT_FIXTURE_SHA from the attested head (PINS.txt) → separate PG grant → this
+ # script, once.
+ set -uo pipefail
+-D=/home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/binding/v1
+-RUNTIME_ROOT=__FILL_FROM_RUNTIME_RECEIPT__                                       # fresh runtime namespace for 1c5fbb04 (runtime setup lane; the 64e33dc7 root is the prior record)
++D=/home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/binding/v2
++RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime                     # 1910a060 runtime namespace (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md); the fixture carries the same literal and is cross-checked below
+ W=/home/user/workspace/worktrees/1910a060-s9b
+ R=$D/run; LOG=$R/s9b-pg-proof.log; SENT=$R/s9b-pg-proof.sentinel; JLOG=$R/jest.log
+ LOCK=/home/user/workspace/execution/test-validation.lock
+@@ -41,13 +43,16 @@
+ EXPECT_PGH_BLOB=__FILL_AFTER_ATTESTATION__                                  # test/utils/g2-s9-pg-harness.ts
+ EXPECT_HARNESS_BLOB=__FILL_AFTER_ATTESTATION__                              # test/utils/g2-s9-harness.ts
+ EXPECT_WORKER_BLOB=__FILL_AFTER_ATTESTATION__                               # test/utils/g2-s9-worker.cjs
+-EXPECT_FIXTURE_SHA=__FILL_AFTER_ATTESTATION__                               # sha256 of binding/v1/s9b-fixture.sh (frozen with this file)
+-# ---- tool pins: filled from the 1c5fbb04 runtime setup receipt (compare only, never adjusted at run time). Prior
++EXPECT_FIXTURE_SHA=1ee369641ca0d5b2706947eeb6abf46770a51f648700f235dc3d72936a56a66b                                          # sha256 of binding/v2/s9b-fixture.sh (frozen with this file; filled below by the CLOSURES-2 pin step, not at attestation)
++# ---- tool pins: filled from the 1910a060 runtime setup receipt (compare only, never adjusted at run time). Prior
+ #      64e33dc7 records are listed in PINS.txt for comparison; a pin is copied only when the receipt re-verifies it.
+ EXPECT_POSTGRES_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+ EXPECT_INITDB_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+ EXPECT_PGCTL_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+-EXPECT_PSQL_SHA=__FILL_FROM_RUNTIME_RECEIPT__       # readlink -f /usr/bin/psql
++PSQL=/usr/lib/postgresql/18/bin/psql                # CB1: the real client binary, not the /usr/bin/psql pg_wrapper dispatcher (64e33dc7/s8f/binding/v2 mirror)
++EXPECT_PSQL_REAL_SHA=d1108fdb45b87f2313d7acfbb91a0a65ca97c6c2195f15d8ae9295121029ef67   # sha256 of $PSQL (postgresql-client-18 18.6-0ubuntu0.26.04.1; RUNTIME_SETUP_RECEIPT.md, re-measured 2026-09-25)
++EXPECT_TESTS=10                                     # it() count in test/rls-g2-s9.spec.ts (verified by grep on the source; re-verify at fill against the attested head)
++EXPECT_LOCK_INODE=667698                            # execution/1910a060/runtime/LOCK_ESTABLISHED.txt
+ EXPECT_NODE_SHA=__FILL_FROM_RUNTIME_RECEIPT__       # node v20.x
+ EXPECT_NM_LOCK_SHA=__FILL_FROM_RUNTIME_RECEIPT__    # node_modules/.package-lock.json (donor; package-lock unchanged since 93389265)
+ EXPECT_NM_CLIENT_SHA=__FILL_FROM_RUNTIME_RECEIPT__  # node_modules/.prisma/client/index.d.ts generated from schema 0eb41f9a (S9-B ships no schema change)
+@@ -59,9 +64,9 @@
+ export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1 NODE_OPTIONS=--max-old-space-size=4096 CHECKPOINT_DISABLE=1 \
+        PRISMA_HIDE_UPDATE_MESSAGE=1 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false \
+        npm_config_cache=$RUNTIME_ROOT/npm-cache XDG_CACHE_HOME=$RUNTIME_ROOT/xdg-cache
+-# S9-only identity: exactly the G2_S9_* names the guard/harness/bootstrap read. Nothing G2_S9_*, G2_S8B_*, G2_S7L_* or earlier is exported.
++# S9-only identity: exactly the G2_S9_* names the guard/harness/bootstrap read. Nothing G2_S8G_*, G2_S8F_*, G2_S8C_*, G2_S8B_*, G2_S7L_* or earlier is exported.
+ export G2_S9_DATABASE_URL="postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME?schema=public&connection_limit=4" \
+-       G2_S9_CONFIRM="$DBNAME:$PORT" G2_S9_PASSWORD=$FIXPASS G2_S9_PSQL=/usr/bin/psql \
++       G2_S9_CONFIRM="$DBNAME:$PORT" G2_S9_PASSWORD=$FIXPASS G2_S9_PSQL=$PSQL \
+        G2_S9_DATA_DIRECTORY=$LANE/pg-data G2_S9_SERVER_VERSION=170006 \
+        G2_S9_CANDIDATE_HEAD=$EXPECT_HEAD
+ export S9B_RUNNER_PID=$$ S9B_STOP_TIMEOUT=45
+@@ -69,6 +74,7 @@
+ [ -e "$SENT" ] && { echo "REFUSED: $SENT exists; this proof runs once, no retry" >&2; exit 76; }
+ [ -e "$LOCK" ] || { echo "REFUSED: canonical lock file $LOCK absent; runtime setup created it and it is never deleted or recreated here" >&2; exit 75; }
+ exec 9>>"$LOCK"; flock -n 9 || { echo "REFUSED: canonical lock busy ($LOCK)" >&2; exit 75; }
++[ "$(stat -c %i "$LOCK")" = "$EXPECT_LOCK_INODE" ] || { echo "REFUSED: $LOCK inode $(stat -c %i "$LOCK") != $EXPECT_LOCK_INODE (LOCK_ESTABLISHED.txt); not the canonical lock file" >&2; exit 75; }
+ ts(){ date -u +%FT%TZ; }
+ log(){ echo "$*" | tee -a "$LOG"; }
+ sha(){ sha256sum "$1" | cut -c1-64; }
+@@ -85,9 +91,12 @@
+   finish "$rc"; }
+ log "START $(ts) pid=$$ user=$(id -un) lock=$LOCK(held nonblocking fd9, inode $(stat -c %i "$LOCK")) head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA"
+ # ---- preconditions (read-only)
+-case "$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_DB_BLOB$EXPECT_PGH_BLOB$EXPECT_HARNESS_BLOB$EXPECT_WORKER_BLOB$EXPECT_FIXTURE_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA$EXPECT_NM_CLIENT_SHA$BASE_HEAD$BASE_TREE" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: head, port, runtime root or tool pins)"; fail 70;; esac
++case "$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_DB_BLOB$EXPECT_PGH_BLOB$EXPECT_HARNESS_BLOB$EXPECT_WORKER_BLOB$EXPECT_FIXTURE_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA$EXPECT_NM_CLIENT_SHA$BASE_HEAD$BASE_TREE" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: head, port, runtime root or tool pins)"; fail 70;; esac
+ [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base, not a candidate"; fail 70; }
+ [ "$(sha "$FIX")" = "$EXPECT_FIXTURE_SHA" ] || { log "PRECONDITION_FAIL fixture sha256 mismatch"; fail 70; }
++# the fixture must carry exactly this runner's lane constants (whole-line, literal): one runtime root, one port, one marker
++grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT" "$FIX" || { log "PRECONDITION_FAIL fixture RUNTIME_ROOT line != $RUNTIME_ROOT"; fail 70; }
++grep -qx "PORT=$PORT; SUPER=$ADMIN; PASS=$FIXPASS; MARKER=s9-disposable-pg17" "$FIX" || { log "PRECONDITION_FAIL fixture PORT/SUPER/PASS/MARKER line != runner (PORT=$PORT ADMIN=$ADMIN MARKER=s9-disposable-pg17)"; fail 70; }
+ [ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL HEAD != $EXPECT_HEAD"; fail 70; }
+ [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] || { log "PRECONDITION_FAIL tree mismatch"; fail 70; }
+ [ "$(git -C "$W" rev-parse "$BASE_HEAD^{tree}")" = "$BASE_TREE" ] || { log "PRECONDITION_FAIL base tree mismatch"; fail 70; }
+@@ -128,30 +137,32 @@
+ [ "$(sha "$W/prisma/schema.prisma")" = "$EXPECT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL prisma/schema.prisma != 0eb41f9a"; fail 70; }
+ [ "$(sha "$W/node_modules/.prisma/client/index.d.ts")" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client != runtime receipt record (no S9-B generate expected)"; fail 70; }
+ [ -x "$W/node_modules/.bin/jest" ] && [ -x "$W/node_modules/.bin/ts-node" ] && [ -x "$W/node_modules/.bin/prisma" ] || { log "PRECONDITION_FAIL jest/ts-node/prisma missing"; fail 70; }
+-# tools: pinned PG 17.6 server binaries in the fresh namespace, the recorded psql 18.6 client and Node 20
++# tools: pinned PG 17.6 server binaries in the 1910a060 namespace, the real psql 18.6 client binary (CB1) and Node 20
+ [ -x "$DIST/bin/postgres" ] && [ -x "$DIST/bin/initdb" ] && [ -x "$DIST/bin/pg_ctl" ] || { log "PRECONDITION_FAIL PG17 dist absent at $DIST"; fail 70; }
+ [ "$(sha "$DIST/bin/postgres")" = "$EXPECT_POSTGRES_SHA" ] || { log "PRECONDITION_FAIL postgres binary sha256 != pin"; fail 70; }
+ [ "$(sha "$DIST/bin/initdb")" = "$EXPECT_INITDB_SHA" ] || { log "PRECONDITION_FAIL initdb binary sha256 != pin"; fail 70; }
+ [ "$(sha "$DIST/bin/pg_ctl")" = "$EXPECT_PGCTL_SHA" ] || { log "PRECONDITION_FAIL pg_ctl binary sha256 != pin"; fail 70; }
+ PGV=$(LD_LIBRARY_PATH=$DIST/lib "$DIST/bin/postgres" --version 2>/dev/null); [ "${PGV##* }" = 17.6 ] || { log "PRECONDITION_FAIL server not 17.6: $PGV"; fail 70; }
+-[ -x /usr/bin/psql ] && [ "$(sha "$(readlink -f /usr/bin/psql)")" = "$EXPECT_PSQL_SHA" ] || { log "PRECONDITION_FAIL /usr/bin/psql absent or sha256 != pin"; fail 70; }
++[ -x "$PSQL" ] && [ "$(sha "$PSQL")" = "$EXPECT_PSQL_REAL_SHA" ] || { log "PRECONDITION_FAIL $PSQL absent or sha256 != pin"; fail 70; }
++"$PSQL" --version | grep -qE "^psql \(PostgreSQL\) 18\." || { log "PRECONDITION_FAIL psql major != 18: $("$PSQL" --version)"; fail 70; }
+ NODE=$(command -v node); [ "$(sha "$(readlink -f "$NODE")")" = "$EXPECT_NODE_SHA" ] || { log "PRECONDITION_FAIL node sha256 != pin ($NODE)"; fail 70; }
+ node --version | grep -q '^v20\.' || { log "PRECONDITION_FAIL node major != 20"; fail 70; }
+ [ "$(readlink -f "$RUNTIME_ROOT")" = "$RUNTIME_ROOT" ] || { log "PRECONDITION_FAIL $RUNTIME_ROOT is not a real path"; fail 70; }
+ grep -q '^result=success' "$RUNTIME_ROOT/pg17/PROVENANCE.txt" 2>/dev/null || { log "PRECONDITION_FAIL pg17 PROVENANCE.txt lacks result=success"; fail 70; }
+-log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$(/usr/bin/psql --version)' node=$(node --version) jest=$(cd "$W" && ./node_modules/.bin/jest --version) ts_node=$(cd "$W" && ./node_modules/.bin/ts-node --version 2>/dev/null | head -1) prisma=$(cd "$W" && ./node_modules/.bin/prisma --version 2>/dev/null | awk '/^prisma /{print $3}')"
+-# ---- step 1 preflight (read-only): S9-B lane absent; lane port free; no postgres; other lanes under the runtime root recorded and never started
++log "PRECONDITIONS_OK $(ts) server='$PGV' psql='$("$PSQL" --version)' node=$(node --version) jest=$(cd "$W" && ./node_modules/.bin/jest --version) ts_node=$(cd "$W" && ./node_modules/.bin/ts-node --version 2>/dev/null | head -1) prisma=$(cd "$W" && ./node_modules/.bin/prisma --version 2>/dev/null | awk '/^prisma /{print $3}')"
++# ---- step 1 preflight (read-only): S9-B lane absent; lane port free; no postgres; other lanes under the runtime root (clusters/* incl. S8-G's
++#      clusters/s8-g, and proof-*/clusters/* incl. S8-F's proof-s8f-v2/clusters/s8-f) fingerprinted and never started
+ STAGE=preflight
+ [ ! -e "$LANE" ] || { log "PREFLIGHT_FAIL $LANE exists (fresh init only; never adopt)"; fail 71; }
+ [ ! -e "$SOCK" ] || [ -z "$(ls -A "$SOCK" 2>/dev/null)" ] || { log "PREFLIGHT_FAIL socket dir $SOCK not empty"; fail 71; }
+ L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true); [ "$L" = 0 ] || { log "PREFLIGHT_FAIL port $PORT listeners=$L"; fail 71; }
+ P=$(pgrep -cx postgres || true); [ "$P" = 0 ] || { log "PREFLIGHT_FAIL postgres procs=$P (another lane live; this proof never shares a server)"; fail 71; }
+ OTHER0=""
+-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s9-b ] || continue
++for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-*/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}
+   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL $n postmaster.pid present"; fail 71; }
+   h="$n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; OTHER0="$OTHER0 $h"
+   log "PREFLIGHT other_lane=$h (must be unchanged at end; never started)"; done
+-[ -e "$CLUSTERS" ] || log "PREFLIGHT clusters_dir=ABSENT (first lane under the runtime root)"
++[ -e "$CLUSTERS" ] || log "PREFLIGHT clusters_dir=ABSENT (no clusters/* lane yet under the runtime root; proof-*/clusters/* scanned above)"
+ PORC0=$(git -C "$W" status --porcelain --untracked-files=all | sha256sum | cut -c1-64)
+ log "PREFLIGHT_OK $(ts) lane=absent port$PORT=free postgres_procs=0 worktree_porcelain_sha=$PORC0 lock_inode=$(stat -c %i "$LOCK")"
+ # ---- step 2 init (bound 60 s)
+@@ -169,7 +180,7 @@
+ grep -q "^CANDIDATE_HEAD=$EXPECT_HEAD" "$LOG" || { log "BOOTSTRAP candidate binding line missing"; fail 72; }
+ # ---- step 5 identity (read-only, bound 15 s each; admin login with PGPASSWORD only, never a URL password)
+ STAGE=identity
+-psqlq(){ PGPASSWORD=$FIXPASS timeout -k 30 15 /usr/bin/psql -X -v ON_ERROR_STOP=1 -At "postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME" -c "$1" 2>>"$LOG"; }
++psqlq(){ PGPASSWORD=$FIXPASS timeout -k 30 15 "$PSQL" -X -v ON_ERROR_STOP=1 -At "postgresql://$ADMIN@127.0.0.1:$PORT/$DBNAME" -c "$1" 2>>"$LOG"; }
+ DD=$(psqlq 'SHOW data_directory'); [ "$DD" = "$G2_S9_DATA_DIRECTORY" ] || { log "IDENTITY_FAIL data_directory='$DD'"; fail 73; }
+ VN=$(psqlq 'SHOW server_version_num'); [ "$VN" = 170006 ] || { log "IDENTITY_FAIL server_version_num='$VN'"; fail 73; }
+ CN=$(psqlq "SELECT current_setting('cluster_name')"); [ "$CN" = s9-disposable-pg17 ] || { log "IDENTITY_FAIL cluster_name='$CN'"; fail 73; }
+@@ -183,6 +194,8 @@
+ log "JEST_END rc=$JRC $(ts)"; grep -E '^(Test Suites|Tests|Snapshots|Time):' "$JLOG" | tee -a "$LOG"
+ grep -E 'requires an explicitly acknowledged|not the permitted disposable database|server identity mismatch|G2 proof requires|not the attested candidate|uncommitted changes' "$JLOG" >/dev/null && log "GUARD_REFUSAL_OBSERVED_IN_JEST_LOG"
+ [ $JRC = 0 ] || fail $JRC
++grep -qE "^Tests: +$EXPECT_TESTS passed, $EXPECT_TESTS total" "$JLOG" || { log "JEST_COUNT_FAIL expected 'Tests: $EXPECT_TESTS passed, $EXPECT_TESTS total' (got: $(grep -E '^Tests:' "$JLOG" | head -1))"; fail 72; }
++log "JEST_COUNT_OK tests=$EXPECT_TESTS"
+ # ---- step 7 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: s9b-fixture.sh destroy)
+ STAGE=fixture-stop; STARTED=0; timeout -k 30 75 bash "$FIX" stop >>"$LOG" 2>&1; rc=$?; log "FIXTURE_STOP rc=$rc $(ts)"; [ $rc = 0 ] || fail $rc
+ P=$(pgrep -cx postgres || true); L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true)
+@@ -191,7 +204,7 @@
+ # ---- step 8 post (read-only)
+ STAGE=post
+ OTHER1=""
+-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s9-b ] || continue
++for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-*/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}
+   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "POST_FAIL $n postmaster.pid appeared"; fail 74; }
+   OTHER1="$OTHER1 $n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; done
+ [ "$OTHER0" = "$OTHER1" ] || { log "POST_FAIL other lanes changed: before=[$OTHER0] after=[$OTHER1]"; fail 74; }

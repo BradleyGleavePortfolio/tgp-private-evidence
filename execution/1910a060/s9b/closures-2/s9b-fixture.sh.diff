@@ -1,0 +1,35 @@
+--- a/binding/v2/s9b-fixture.sh
++++ b/binding/v2/s9b-fixture.sh
+@@ -2,16 +2,18 @@
+ # S9-B disposable PostgreSQL 17.6 cluster helper (lane s9-b only, EXEC-1910A060), derived by substitution from the
+ # accepted S8-C fixture execution/64e33dc7/s8c/binding/s8c-fixture.sh (unchanged there). LOCK-FREE BY DESIGN: it
+ # takes no flock itself and must be invoked only by the S9-B proof binding
+-# execution/1910a060/s9b/binding/v1/s9b-pg-proof.sh, the single canonical lock holder. Standalone use is refused
++# execution/1910a060/s9b/binding/v2/s9b-pg-proof.sh, the single canonical lock holder. Standalone use is refused
+ # unless S9B_RUNNER_PID names a live s9b-pg-proof.sh process.
+ #   * cluster_name = 's9-disposable-pg17' (pinned marker required by start, bootstrap and destroy; identical to
+ #     test/utils/g2-s9-db.ts G2_S9_CLUSTER_MARKER)
+ #   * FRESH INIT ONLY: init refuses if the data directory exists (no marking/adopting unknown clusters)
+-#   * listen 127.0.0.1 only, port 55645 (lane port chosen by the parent, execution/1910a060; 55645 suggested), superuser s9_super / s9_local_synthetic
++#   * listen 127.0.0.1 only, port 55645 (lane port chosen by the parent 14:59 PT, execution/1910a060), superuser s9_super / s9_local_synthetic
+ #     (synthetic value; scram, S5 shape)
+-#   * FRESH NAMESPACE (RUNTIME_SETUP_RECEIPT §Donor-copy 6-7): binaries from the SHA-pinned
+-#     recovery-reset/pg17/dist; data and socket directories under recovery-reset/clusters/s9-b and
+-#     recovery-reset/run/s9-b — never pg17/dist as a data root, never the historical /home/user/pg17 paths.
++#   * 1910a060 NAMESPACE (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md): binaries from the SHA-pinned
++#     1910a060/runtime/pg17/dist; data and socket directories under 1910a060/runtime/clusters/s9-b and
++#     1910a060/runtime/run/s9-b — never pg17/dist as a data root, never the historical /home/user/pg17 or
++#     64e33dc7/recovery-reset paths. The RUNTIME_ROOT / PORT / MARKER lines below are literals the runner
++#     cross-checks whole-line (grep -qx) against its own before init.
+ # `destroy` never discards a stop failure (S5-R3-A-03 revision 2 inherited): a running marked cluster is stopped
+ # with a bounded fast stop; a failed stop, a surviving postmaster or any process still referencing the data
+ # directory REFUSES removal (rc 4); a failed or incomplete removal is propagated (rc 5) and DESTROY_OK is printed
+@@ -19,7 +21,7 @@
+ # Usage (via runner): s9b-fixture.sh init|start|stop|status|destroy
+ set -euo pipefail
+ # ---- lane constants
+-RUNTIME_ROOT=/home/user/workspace/execution/64e33dc7/recovery-reset
++RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime
+ # ---- end lane constants
+ PGHOME=$RUNTIME_ROOT/pg17/dist
+ PORT=55645; SUPER=s9_super; PASS=s9_local_synthetic; MARKER=s9-disposable-pg17

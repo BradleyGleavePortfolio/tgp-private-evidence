@@ -1,8 +1,7 @@
-# S9-B PG proof binding pins — DRAFT v2 (execution/1910a060/s9b/binding/v2; CLOSURES-2 revision). NOTHING HERE HAS BEEN EXECUTED.
+# S9-B PG proof binding pins — DRAFT v1 (execution/1910a060/s9b/binding/v1). NOTHING HERE HAS BEEN EXECUTED.
 # Every value marked __FILL_*__ is unfilled; s9b-pg-proof.sh refuses to run while any pin is unfilled.
-# Fill ORDER (same doctrine as 64e33dc7/s8c/binding/PINS.txt): runtime setup DONE (execution/1910a060/runtime/
-# RUNTIME_SETUP_RECEIPT.md: RUNTIME_ROOT, real-psql pin and lock inode are literal below; the remaining tool pins are
-# copied from it at fill after re-verification) -> lane port 55645 chosen (14:59 PT) -> M2 fills BASE_* -> S9-B gates -> hooked Bradley commit
+# Fill ORDER (same doctrine as 64e33dc7/s8c/binding/PINS.txt): runtime setup for 1c5fbb04 (its receipt fills
+# RUNTIME_ROOT + tool pins) -> parent chooses the lane port -> S9-A composition + S9-B gates -> hooked Bradley commit
 # -> fill the head pins from that head (authorized preparation, not a PG run) -> record template->filled diff + sha256
 # in BINDING.sha256 -> dual independent review attests final head + FILLED binding -> separate execution grant.
 # Never fill from an uncommitted tree. Never adjust a tool pin to pass: a mismatch is reported.
@@ -15,9 +14,8 @@
 #   EXPECT_PGH_BLOB       = git -C $W rev-parse HEAD:test/utils/g2-s9-pg-harness.ts
 #   EXPECT_HARNESS_BLOB   = git -C $W rev-parse HEAD:test/utils/g2-s9-harness.ts
 #   EXPECT_WORKER_BLOB    = git -C $W rev-parse HEAD:test/utils/g2-s9-worker.cjs
-#   EXPECT_FIXTURE_SHA    = sha256sum binding/v2/s9b-fixture.sh                  (FILLED at CLOSURES-2; the fixture is head-independent and frozen with the runner)
-#   PORT                  = 55645 (parent 14:59 PT; 55642 S8-C, 55643 S8-F and 55644 S8-G are refused by g2-s9-db.ts)
-#   EXPECT_TESTS          = grep -c '^\s*it(' test/rls-g2-s9.spec.ts at the attested head (10 on the reviewed source; re-verify at fill)
+#   EXPECT_FIXTURE_SHA    = sha256sum binding/v1/s9b-fixture.sh                  (frozen together with the filled runner)
+#   PORT                  = lane port chosen by the parent (55645 suggested; 55642 S8-C and 55643 S8-G are refused by g2-s9-db.ts)
 BASE_HEAD=__FILL_M2__   # M2 (S9-A be88909f composed onto 62471b11); accepted-path blobs below verified identical at 1c5fbb04 and 62471b11
 BASE_TREE=__FILL_M2__
 EXPECT_HEAD=__FILL_AFTER_ATTESTATION__
@@ -28,22 +26,19 @@ EXPECT_DB_BLOB=__FILL_AFTER_ATTESTATION__
 EXPECT_PGH_BLOB=__FILL_AFTER_ATTESTATION__
 EXPECT_HARNESS_BLOB=__FILL_AFTER_ATTESTATION__
 EXPECT_WORKER_BLOB=__FILL_AFTER_ATTESTATION__
-EXPECT_FIXTURE_SHA=1ee369641ca0d5b2706947eeb6abf46770a51f648700f235dc3d72936a56a66b   # binding/v2/s9b-fixture.sh after CLOSURES-2 (v1 draft was 6fb78034…)
+EXPECT_FIXTURE_SHA=__FILL_AFTER_ATTESTATION__   # current draft s9b-fixture.sh sha256 = 6fb78034d87ebf429bb041cfe537f8d7db04445ab96ad97954f9f28ad2062b4c (changes when PORT is filled)
 PORT=55645
-RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime   # literal in runner AND fixture; runner grep -qx cross-checks the fixture's RUNTIME_ROOT= and PORT=/SUPER=/PASS=/MARKER= lines
-PSQL=/usr/lib/postgresql/18/bin/psql                            # CB1: real client binary (never the /usr/bin/psql pg_wrapper dispatcher a200e38c…)
-EXPECT_PSQL_REAL_SHA=d1108fdb45b87f2313d7acfbb91a0a65ca97c6c2195f15d8ae9295121029ef67   # RUNTIME_SETUP_RECEIPT.md; re-measured 2026-09-25 15:3x PT: sha256sum == d1108fdb…, `psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)`
-EXPECT_TESTS=10
-EXPECT_LOCK_INODE=667698                                        # execution/1910a060/runtime/LOCK_ESTABLISHED.txt; asserted right after flock -n, refusal 75
+RUNTIME_ROOT=__FILL_FROM_RUNTIME_RECEIPT__
 # Tool pins: filled from the 1c5fbb04 runtime setup receipt. Prior 64e33dc7 records (compare only; copy a value ONLY
 # when the new receipt re-verifies the same binary/file):
 #   postgres 23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a  initdb b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
-#   pg_ctl   af53d826845af4679a0aaba2bda319f5e527f3b94f3794c67fa174049c9b9401  (psql wrapper a200e38c… is NOT a pin any more; the real binary is pinned above)
+#   pg_ctl   af53d826845af4679a0aaba2bda319f5e527f3b94f3794c67fa174049c9b9401  psql   a200e38c89b111d3abdf26927b186fdd423bef3d84f157af0f4b65db6f8e6c94
 #   node     a03953a7b16bff002b94d6fb58ada900b68241cbcaee6efc400b20dadd36dddc  nm-lock 05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
 #   generated client for schema 0eb41f9a (S7-L lane record, lane-provision.sh S7L_CLIENT): 9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
 EXPECT_POSTGRES_SHA=__FILL_FROM_RUNTIME_RECEIPT__
 EXPECT_INITDB_SHA=__FILL_FROM_RUNTIME_RECEIPT__
 EXPECT_PGCTL_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_PSQL_SHA=__FILL_FROM_RUNTIME_RECEIPT__
 EXPECT_NODE_SHA=__FILL_FROM_RUNTIME_RECEIPT__
 EXPECT_NM_LOCK_SHA=__FILL_FROM_RUNTIME_RECEIPT__
 EXPECT_NM_CLIENT_SHA=__FILL_FROM_RUNTIME_RECEIPT__

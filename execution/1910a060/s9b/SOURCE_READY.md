@@ -156,3 +156,12 @@ choice (55645 suggested).
 - Binding: `binding/v1` historical, not to be used; `binding/v2` is the binding.
 - S9-A pre-format copies (four paths, §2b) are NOT in commit ownership; the gate runs on M2 where the accepted
   post-format bytes are tracked and asserts the copies are gone.
+
+## 9. CLOSURES-2 (15:31 PT disposition) — see `CLOSURES-2.md`
+
+- Owned test util: `test/utils/g2-s9-db.ts` → `39ba033b…` (refuses 55644, S8-G's lane; comment corrected: 55643 = S8-F);
+  `test/scout/g2-s9-db-guard.spec.ts` → `a99cf9c9…` (matrix adds 55642/55643/55644). `gate/PINS.env` re-pinned.
+- Binding v2 closed per items 1-6: runner `7ba9353b…`, fixture `1ee36964…` (EXPECT_FIXTURE_SHA filled), PINS.txt
+  `11882143…`, README `c9210cbd…`, `BINDING.sha256` added. RUNTIME_ROOT literal = 1910a060 runtime in both files with a
+  whole-line cross-check; real psql `d1108fdb…` pinned + `18.` asserted; `EXPECT_TESTS=10`; lock inode 667698 asserted;
+  other-lane scan covers `clusters/*` and `proof-*/clusters/*`. Not run. Gate still waits for M2.

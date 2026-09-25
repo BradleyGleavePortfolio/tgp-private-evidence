@@ -1,0 +1,28 @@
+feat(scout): S8-G run orchestration — reconstruct-then-arbitrate settle hook
+
+Adds src/scout/reconstruct/orchestration/{run-context,family-plan}.ts and
+threads a RunContext through ScoutReconstructService: the new public
+reconstructRun(coachId, intentId, ctx) plans the staged (platform, token)
+groups once through the accepted source specs (contract §3.8 family order),
+runs each planned source as the legacy engine does (count-bound, paged, one
+transaction per row) with this run's §3.1 gate as the FIRST statement of
+every per-row transaction and the settle-observed epoch as the per-row CAS,
+forwards the staged token to the native families and the ledger, ledgers
+unmapped tokens skipped with the exact S8-A reason, isolates an over-ceiling
+or structurally conflicting source to that source, and never writes a
+terminal field. The legacy reconstruct() path passes LEGACY_RUN and its
+statement sequence is unchanged.
+
+ScoutLifecycleService.onTransferSettled now runs one reconstruction pass
+first (gate = assertRunOpen for this run, epoch = the settle's), classifies a
+closed gate once so a past-deadline run is fenced timed_out truthfully, then
+runs the S7-L tail unchanged: lock, CAS on epoch, collect durable facts,
+arbitrate, single terminal write. No S9 wiring; reconciliation stays null.
+
+Tests: test/scout/orchestration/{family-plan,reconstruct-run,settle-hook}.spec.ts
+(planner tables, gate-first per outcome, epoch mismatch, closed gate stops
+without a fabricated failure, family isolation, tenancy, hook ordering and
+verdicts); test/scout/g2-s8g-db-guard.spec.ts and the guarded live suite
+test/rls-g2-s8g.spec.ts with its s8g-only harness under test/utils/
+(disposable PG17 lane, separate worker processes, barriers). No migration.
+

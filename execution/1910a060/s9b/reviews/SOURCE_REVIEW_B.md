@@ -397,3 +397,99 @@ binding; S9-A copies not commit-owned; `test/rls-g2-s9.spec.ts` recorded as a pa
 edits; the added negative case pins the corrected join semantics; no assertion was weakened; Addendum A is
 append-only (+99/−0) and its two rewritten sentences are accurate. Not run by me: tsc, eslint, prettier, R75
 checker, jest — these remain the gate's job.
+
+---
+
+## Binding v2 review (reviewer B, independent; read-only; nothing executed)
+
+Scope: `tgp-private-evidence/execution/1910a060/s9b/binding/v2/{s9b-pg-proof.sh,s9b-fixture.sh,PINS.txt,README.md}`
+(sha256 prefixes `0633ec92` / `02dd93da` / `84b548f9` / `4de31052`). Compared against `../v1` by `diff`, against
+git objects in the read-only clone `/home/user/workspace/growth-project-backend`, against
+`execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md` + `LOCK_ESTABLISHED.txt`, and against the executed S8-F v2
+binding (`execution/64e33dc7/s8f/binding/v2`) as the only precedent bound to the same 1910a060 runtime. Reviewer A's
+files were not opened. No git/object writes, no scripts run (the `--version` calls below are read-only binary probes).
+
+### V2.1 What v1 → v2 changed (verified by diff, nothing else)
+Runner: header, `PORT=55645`, `BASE_HEAD/BASE_TREE=__FILL_M2__`, `$BASE_HEAD$BASE_TREE` appended to the L88 fill
+`case`, S9-A pins → be88909f post-format blobs (L115-119). Fixture: `PORT=55645` (L10 comment, L25). PINS: same three
+deltas. README claim "nothing else" holds.
+
+### V2.2 Verified pins and invariants
+| Check | Result |
+|---|---|
+| Refusal while unfilled | L88 `case … in *__*)` covers all 20 pins incl. `BASE_HEAD`/`BASE_TREE` → `fail 70`. Ordering note: refusal happens after the flock (L71) and START log line (L86) and `finish` writes the sentinel → a premature invocation consumes the once-only sentinel (inherited S8-C design; operator must not invoke before fill). |
+| Accepted-path blobs/trees (13) | All 13 `ACCEPTED_*` values equal `git rev-parse` at **both** 1c5fbb04 and 62471b11: `2e328bbc 654550cb 44c96915 c4ae4b8e c345dd54 711bfb09 a7d67217 4059883d 1a8f1797 7c3fba47 48403063 c3fc6bde 9d701783`. |
+| Migrations | `git ls-tree 62471b11 prisma/migrations/` → 172 tree entries (+ `migration_lock.toml`, `rls_fitness_backend.sql` blobs); runner identity asserts `count=172` applied (L178). |
+| Schema / lockfile | `git show 62471b11:prisma/schema.prisma | sha256sum` = `0eb41f9a…` = `EXPECT_SCHEMA_SHA`; `package-lock.json` blob `354de3da`, sha256 `b7fed5ed…` = `EXPECT_PKG_LOCK_SHA`; receipt §3 records the same. |
+| S9-A blobs | `b7599427 f50d9401 bcc85e49 11f2a524` = be88909f post-format (already verified in §2 of this review vs `1910a060-s9a`). |
+| M2 / predicted tree 737c34a3 | Not verifiable read-only (no M2 object on disk; 62471b11 tree is `23614f0b`). Acceptable: the runner re-derives `BASE_TREE == rev-parse BASE_HEAD^{tree}` (L93) and `merge-base --is-ancestor` (L94) at run time, so a wrong fill fails closed. |
+| Runtime tool pins vs receipt/disk | `pg17/dist/bin/{postgres,initdb,pg_ctl}` on disk = `23cd1748… b7db9bc2… af53d826…` = receipt = PINS "prior record" comparison values; `postgres --version` = 17.6; `pg17/PROVENANCE.txt` has `result=success`; node `/usr/local/bin/node` v20.20.1 `a03953a7…` = receipt; nm-lock `05bc530a…` and client `9042e713…` per receipt §4 (not re-hashed: the s9b worktree has **no** `node_modules` yet — runner L124 will refuse until the donor copy exists). `RUNTIME_ROOT` per receipt = `/home/user/workspace/execution/1910a060/runtime` (exists; contains `pg17 npm-cache xdg-cache tools proof-s8f-v2`, no `clusters/`). |
+| psql | `/usr/bin/psql` → `readlink -f` = `/usr/share/postgresql-common/pg_wrapper` (`a200e38c…`, perl dispatcher). Real 18.6 binary `/usr/lib/postgresql/18/bin/psql` = `d1108fdb…`, `psql (PostgreSQL) 18.6`. Receipt §4 designates the real binary as "binding v2 pin, CB1". **See B-v2-3.** |
+| Port | `55645` in runner L57, fixture L25, PINS, guard spec example/ack (L13-14,21-22; 55646 mismatch probe). `g2-s9-db.ts` REFUSED_PORTS contains 55641/55642/55643 (not 55644 — see C-v2-1). 55643 is the retained S8-F v2 lane on this runtime; no other binding under 1910a060 pins 55645. |
+| Lane dir / cluster marker | Marker `s9-disposable-pg17` identical in runner (L159,175), fixture (L25), `g2-s9-db.ts`; DB marker literal L177 matches bootstrap. Lane **paths are inconsistent** — see B-v2-2. |
+| Lock | `LOCK=/home/user/workspace/execution/test-validation.lock`; on disk inode **667698** = `LOCK_ESTABLISHED.txt`; `exec 9>>` + `flock -n 9` (L71), never deleted; fixture is lock-free and closes fd 9 for children (`9>&-`, L36) and refuses standalone use unless `S9B_RUNNER_PID` is a live `s9b-pg-proof.sh` (L31-32). |
+| Once-only sentinel | L69 refuses if `$SENT` exists (rc 76); `finish` always writes it (L78). |
+| Read-only assertions | Worktree porcelain sha before/after (L155/L199), HEAD unchanged, generated client unchanged (L200), other lanes' `postgresql.conf`/`pg_control` hashes unchanged (L150-153/L194-197), prisma tree == base (L106), no sidecar dir (L122). Fixture `init` refuses an existing data dir (L48), `start` refuses an unmarked cluster (L71), `destroy` is marker-gated and never invoked by the runner (data dir retained, L189). |
+| Bounded stop | Stage timeouts 60/60/900/15×5/1500/75 (+`-k 30`); fixture stop `pg_ctl -m fast -w -t 45` (`S9B_STOP_TIMEOUT`), survivor pid reported (L77, L83); post-stop asserts `pgrep -cx postgres`=0, no listener, no `postmaster.pid`, data dir present (L189). |
+| Prod URLs / secrets | `rg supabase|pooler|amazonaws|https?://|5432|6543` over the four files → no hits (only the PROVENANCE Maven URL lives outside the binding). Password passed via `PGPASSWORD`, never in a URL (L172). |
+| Expected Tests count | **Absent** — see B-v2-4. `test/rls-g2-s9.spec.ts` has 10 `it(` in 4 `describe(` (no `it.skip`/`it.each`/`test(`). |
+
+### V2.3 Findings
+
+**B-v2-1 — runner `D` still points at `binding/v1` (L28).** `FIX=$D/s9b-fixture.sh`, `R=$D/run`, `LOG/SENT/JLOG` all
+resolve into the immutable v1 directory. Harm: the fixture-sha precondition (L90) hashes the **v1** fixture
+(`6fb78034…`, PORT unfilled) against a pin filled from the v2 fixture → guaranteed `fail 70` after the lock is taken,
+with log + sentinel written into `v1/run/` (contaminates history, burns the once-only sentinel for a path nobody
+intends to run). If instead the pin were filled from the v1 fixture, v1 refuses at L30 (PORT unfilled, rc 2). Either
+way the v2 proof cannot succeed as written. Decision: NO-GO until fixed. Min closure: `D=…/s9b/binding/v2`; also fix
+the stale `binding/v1` mentions at runner L19 (usage) and L44 (comment), fixture L5, PINS L1/L28 comment (fixture sha
+`6fb78034…` is v1's; v2's is `02dd93da…` and will change again with the closures).
+
+**B-v2-2 — fixture `RUNTIME_ROOT` is the absent predecessor root (fixture L22
+`/home/user/workspace/execution/64e33dc7/recovery-reset`; comments L12-14).** The runner's `RUNTIME_ROOT` is
+`__FILL_FROM_RUNTIME_RECEIPT__` (→ `/home/user/workspace/execution/1910a060/runtime`), so runner
+`LANE=$RUNTIME_ROOT/clusters/s9-b` and fixture `LANE`/`SOCK`/`PGHOME` disagree; the runner's INIT marker grep
+(L159, `data=$LANE/pg-data`) can never match the fixture's echoed `$DATA`. Receipt §1 states the 64e33dc7 root does not
+exist on this host, so in practice the fixture exits 2 at L33 (`pg_ctl` missing) before `mkdir -p` — a safe failure,
+but the lane-dir/cluster consistency the parent asked for does not hold. Min closure: fixture L22 =
+`/home/user/workspace/execution/1910a060/runtime` (the same literal the runner fill will carry), update L12-14
+comments; recommended cheap guard in the runner preconditions:
+`grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT" "$FIX" || fail 70` (S8-F v2 kept the two literals equal by construction).
+
+**B-v2-3 — psql pin targets the pg_wrapper dispatcher, not the 18.6 binary (runner L137, L64, L172; PINS L26
+comment `readlink -f /usr/bin/psql`).** `readlink -f /usr/bin/psql` resolves to the perl `pg_wrapper`
+(`a200e38c…`), whose dispatch target depends on postgresql-common configuration at run time. The receipt fills
+`EXPECT_PSQL_SHA` with the real binary `d1108fdb…` ("binding v2 pin, CB1"); with that fill L137 fails 70 on every
+run; with the wrapper sha the binding pins the wrong artifact and asserts nothing about 18.6. Min closure (mirror S8-F
+v2 L49-50/L144-145): `PSQL=/usr/lib/postgresql/18/bin/psql`; `[ -x "$PSQL" ] && [ "$(sha "$PSQL")" = "$EXPECT_PSQL_SHA" ]`;
+`"$PSQL" --version | grep -qE '^psql \(PostgreSQL\) 18\.'`; use `$PSQL` for `G2_S9_PSQL` (L64) and `psqlq` (L172);
+fix the PINS comment.
+
+**B-v2-4 — no expected `Tests:` count assertion (L183-185).** Jest rc 0 alone accepts `Tests: 10 skipped` or a
+partially matched file; the proof's strength depends on all 10 cases executing. S8-F v2 (L58/L197) pins
+`EXPECT_TESTS` and greps `^Tests: +N passed, N total`. Min closure: `EXPECT_TESTS=10` (the `it(` count at the attested
+head — re-grep after the hooked commit; the L88 `case` need not include it) and
+`grep -qE "^Tests: +$EXPECT_TESTS passed, $EXPECT_TESTS total" "$JLOG" || fail 72` after L185.
+
+Class C (recorded, no closure required for one run):
+- C-v2-1: `g2-s9-db.ts` REFUSED_PORTS omits 55644 and its comment calls 55643 "S8-G" while S8-F v2 runs on 55643 on
+  this runtime. Committed-code nit, not binding; the literal 55645 plus `G2_S9_CONFIRM` double entry mitigate.
+- C-v2-2: the other-lane scan (L150-153/L194-197) walks `$RUNTIME_ROOT/clusters/*/` only; the retained S8-F lane lives
+  at `$RUNTIME_ROOT/proof-s8f-v2/clusters/s8-f` and is not covered by the "unchanged/never started" invariant. Live
+  servers are still caught by `pgrep -cx postgres`=0 and the port check. Suggest adding that path to both loops.
+- C-v2-3: a refused run (unfilled pins, tool mismatch) still consumes the once-only sentinel and writes RECEIPTS —
+  inherited S8-C semantics, acceptable, but the grant must say "fill, attest, then invoke exactly once".
+- C-v2-4: `BASE_TREE` predicted `737c34a3` cannot be checked here; runtime L93/L94 make a wrong fill fail closed.
+- C-v2-5: the s9b worktree has no `node_modules`; L124-129 will refuse until the donor copy (receipt §Donor-copy step
+  1) lands and `EXPECT_NM_*` are filled from it.
+- C-v2-6: fixture header L5 names the v1 runner path, but its runner check is by `/proc/<pid>/cmdline` grep of
+  `s9b-pg-proof.sh`, so it is path-agnostic; cosmetic once B-v2-1 is fixed.
+
+### V2.4 Verdict
+**NO-GO for the v2 files as they stand**; **GO-for-one-run-after-fill** once B-v2-1..B-v2-4 are applied (as a v3 or an
+in-place v2.1 with template→filled diff + BINDING.sha256 per PINS doctrine) and the head/runtime/tool/M2 pins are filled
+from the attested hooked head and the runtime receipt. None of the four defects can damage data or another lane — each
+fails closed — but B-v2-1/B-v2-2/B-v2-3 make a successful run impossible and B-v2-4 weakens what a success would prove.
+Everything else the parent listed (refusal while unfilled, 13 accepted-path pins at both bases, 172 migrations, schema
+`2e328bbc`/`0eb41f9a`, lockfile `b7fed5ed`, PG17.6 binaries, node 20, lock inode 667698, once-only, read-only and
+bounded-stop assertions, no prod URLs) verifies. Not read: reviewer A. Not run: any script.
