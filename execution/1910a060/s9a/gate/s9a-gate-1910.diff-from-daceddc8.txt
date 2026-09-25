@@ -40,7 +40,7 @@
 > BRANCH=exec1910/s9a
 19a28
 > STAGED_EXPECT="src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/types.ts test/scout/reconciliation/reconcile.spec.ts "
-20a30,43
+20a30,46
 > # Frozen source pins (S9_A_SOURCE_READY.md, verified by reviews A/B Phase 1 and by SOURCE_RECOVERED.md)
 > SHA_TYPES=eff1479cd2b735aacadc42ee3e2280dcfaf2e4fcc27a1fb90fd2c2bf2db1dbfa
 > SHA_COVERAGE=c6b224fa860261d6240c5bd62b07d419c6b9346c0b0de4eaac64dd9215926701
@@ -53,9 +53,12 @@
 > NM_HIDDEN_LOCK=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
 > CLIENT_INDEX_DTS=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
 > CLIENT_SCHEMA=b84392033ab86776533007505c31f57930307a210844067a7407ed20d25abf3e
-> HOOK_PRECOMMIT=3b741de3dd006d6265c6ca6698b7b5ce8aa9a2a5ba2743a8615d85e72b4a140d
-> HOOK_COMMITMSG=71029ce88d76d5b885e12f978093ad3e046e93f5c5fc629b6fbba635d9f8a61b
-23a47,54
+> # lefthook 2.1.9 hook bodies embed the owning clone's absolute node_modules path, so raw hashes differ per clone
+> # (historical shared-clone 3b741de3/71029ce8; S8-F clone e21bece6/277018c4). Comparison is path-normalized against the
+> # reference clone's hooks: substitute each clone's absolute root with a placeholder, then require equality.
+> HOOK_REF_ROOT=/home/user/workspace/worktrees/1910a060-s8f
+> LEFTHOOK_EXPECT=2.1.9
+23a50,57
 > mkdir -p "$E"
 > # ---- 0 relay + one-shot sentinel (a refusal before ACQUIRED does not consume the grant)
 > [ "${S9A_GATE_RELAY:-}" = 1 ] || { echo "REFUSED: S9A_GATE_RELAY=1 (parent relay) not set" >&2; exit 78; }
@@ -64,7 +67,7 @@
 > DONOR=$S9A_DONOR; B=$S9A_PRETTIER_PREFIX
 > [ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
 > # ---- lock: existing canonical file, recorded inode, nonblocking flock in this process
-25,26c56,61
+25,26c59,64
 < exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting"; exit 75; }
 < log "ACQUIRED pid=$$ fd9 inode=$(stat -c %i "$LOCK") lslocks=$(lslocks 2>/dev/null | grep -c test-validation || true)"
 ---
@@ -74,20 +77,20 @@
 > exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
 > date -u +%FT%TZ > "$E/STARTED"
 > log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(lslocks 2>/dev/null | grep -c test-validation || true) donor=$DONOR prefix=$B"
-28c63
+28c66
 < finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; exit "$1"; }
 ---
 > finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
-30a66
+30a69
 > log "node=$(node --version) npm=$(npm --version)"
-33,34c69,71
+33,34c72,74
 < [ "$(git rev-parse --abbrev-ref HEAD)" = exec-dace/s9-a2 ] || { log "PRECONDITION_FAIL branch"; finish 70; }
 < [ "$(git status --porcelain --untracked-files=all | sed 's/^?? //' | sort | tr '\n' ' ')" = "src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/types.ts test/scout/reconciliation/reconcile.spec.ts " ] \
 ---
 > [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || { log "PRECONDITION_FAIL branch != $BRANCH"; finish 70; }
 > [ -z "$(git config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath set"; finish 70; }
 > [ "$(git status --porcelain --untracked-files=all | sed 's/^?? //' | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] \
-36,39c73,77
+36,39c76,80
 < [ "$(sha src/scout/reconciliation/types.ts)" = eff1479cd2b735aacadc42ee3e2280dcfaf2e4fcc27a1fb90fd2c2bf2db1dbfa ] || { log "PRECONDITION_FAIL types.ts sha"; finish 70; }
 < [ "$(sha src/scout/reconciliation/coverage.ts)" = c6b224fa860261d6240c5bd62b07d419c6b9346c0b0de4eaac64dd9215926701 ] || { log "PRECONDITION_FAIL coverage.ts sha"; finish 70; }
 < [ "$(sha src/scout/reconciliation/reconcile.ts)" = 83d7673b024513bbee938bf4a5467c4faa9306739f15ae53b69722936d7d9e1f ] || { log "PRECONDITION_FAIL reconcile.ts sha"; finish 70; }
@@ -98,19 +101,19 @@
 > [ "$(sha src/scout/reconciliation/reconcile.ts)" = "$SHA_RECONCILE" ] || { log "PRECONDITION_FAIL reconcile.ts sha"; finish 70; }
 > [ "$(sha test/scout/reconciliation/reconcile.spec.ts)" = "$SHA_SPEC" ] || { log "PRECONDITION_FAIL spec sha"; finish 70; }
 > for f in $FILES; do cmp -s "$f" "$FREEZE/preformat-$(basename "$f")" || { log "PRECONDITION_FAIL $f != freeze copy"; finish 70; }; done
-41c79,82
+41c82,85
 < [ "$(git -C "$(dirname "$DONOR")" rev-parse HEAD)" = "$H" ] || log "WARN donor worktree HEAD != H (recorded)"
 ---
 > [ "$(sha prisma/schema.prisma)" = "$SCHEMA_SHA" ] || { log "PRECONDITION_FAIL prisma/schema.prisma sha"; finish 70; }
 > [ "$(sha package-lock.json)" = "$PKG_LOCK_SHA" ] || { log "PRECONDITION_FAIL package-lock.json sha"; finish 70; }
 > [ "$(sha docs/decisions/2026-09-25-s9-reconciliation.md)" = cda68d826be08e5bf5cd1152ecbb092b10dfc373c7234bd73943815d0d07bab1 ] || { log "PRECONDITION_FAIL S9-0 doc sha"; finish 70; }
 > for hk in pre-commit commit-msg; do [ ! -e ".git/hooks/$hk" ] || { log "PRECONDITION_FAIL .git/hooks/$hk already present"; finish 70; }; done
-43,44c84
+43,44c87
 < for f in $FILES; do cp "$f" "$E/preformat-$(basename "$f")"; done
 < # ---- 1 node_modules from the landed S8-C worktree (composed schema's prisma client)
 ---
 > # ---- 1 node_modules from the relayed donor (pinned to base H's schema + lockfile); donor is read-only here
-46,47c86,95
+46,47c89,98
 < log "DONOR_HIDDEN_LOCK=$(sha "$DONOR/.package-lock.json" 2>/dev/null || echo absent) DONOR_CLIENT_INDEX_DTS=$(sha "$DONOR/.prisma/client/index.d.ts" 2>/dev/null || echo absent) DONOR_ENTRIES=$(ls "$DONOR" | wc -l)"
 < cp -a "$DONOR" node_modules; rc=$?; log "CP_A rc=$rc NM_ENTRIES=$(ls node_modules | wc -l) NM_HIDDEN_LOCK=$(sha node_modules/.package-lock.json 2>/dev/null || echo absent) NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent)"
 ---
@@ -124,7 +127,7 @@
 > DSIG_BEFORE=$(find "$DONOR" -maxdepth 1 -printf '%p %T@\n' | sort | sha256sum | cut -c1-64)
 > t0=$(date +%s); cp -a "$DONOR" node_modules; rc=$?
 > log "CP_A rc=$rc secs=$(( $(date +%s)-t0 )) NM_ENTRIES=$(ls node_modules | wc -l) NM_HIDDEN_LOCK=$(sha node_modules/.package-lock.json 2>/dev/null || echo absent) NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent)"
-48a97,106
+48a100,109
 > [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules is a symlink"; finish 71; }
 > [ "$(sha node_modules/.package-lock.json)" = "$NM_HIDDEN_LOCK" ] || { log "PRECONDITION_FAIL copied hidden lock"; finish 71; }
 > [ "$(find "$DONOR" -maxdepth 1 -printf '%p %T@\n' | sort | sha256sum | cut -c1-64)" = "$DSIG_BEFORE" ] || log "WARN donor top-level signature changed during copy (recorded)"
@@ -135,7 +138,7 @@
 > fi
 > log "NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent) NM_CLIENT_SCHEMA=$(sha node_modules/.prisma/client/schema.prisma 2>/dev/null || echo absent)"
 > [ "$(sha node_modules/.prisma/client/index.d.ts)" = "$CLIENT_INDEX_DTS" ] && [ "$(sha node_modules/.prisma/client/schema.prisma)" = "$CLIENT_SCHEMA" ] || { log "PRECONDITION_FAIL in-lane prisma client != base-H pins; refusing (no repin)"; finish 71; }
-51c109,118
+51c112,134
 < # ---- 2 prettier prefix: reuse the verified isolated copy (never re-copied)
 ---
 > log "LEFTHOOK_VERSION=$(./node_modules/.bin/lefthook version 2>&1 | head -1)"
@@ -143,60 +146,73 @@
 > STAGE=hooks
 > npx --no-install lefthook install > "$E/lefthook-install.log" 2>&1; rc=$?; log "LEFTHOOK_INSTALL rc=$rc"; [ $rc = 0 ] || finish 71
 > for hk in pre-commit commit-msg; do [ -x ".git/hooks/$hk" ] || { log "HOOK_FAIL .git/hooks/$hk missing or not executable"; finish 71; }; done
+> LHV=$(./node_modules/.bin/lefthook version 2>&1 | head -1 | tr -d '[:space:]'); log "LEFTHOOK_VERSION_CHECK=$LHV expect=$LEFTHOOK_EXPECT"
+> [ "$LHV" = "$LEFTHOOK_EXPECT" ] || { log "HOOK_FAIL lefthook version != $LEFTHOOK_EXPECT"; finish 71; }
 > HP=$(sha .git/hooks/pre-commit); HC=$(sha .git/hooks/commit-msg)
-> log "HOOK_PRECOMMIT=$HP expect=$HOOK_PRECOMMIT HOOK_COMMITMSG=$HC expect=$HOOK_COMMITMSG"
-> [ "$HP" = "$HOOK_PRECOMMIT" ] && [ "$HC" = "$HOOK_COMMITMSG" ] || { log "HOOK_FAIL hook bodies differ from recorded lefthook 2.1.9 hooks; refusing (no repin here)"; finish 71; }
+> normhook(){ sed "s|$2|@CLONE_ROOT@|g" "$1" | sha256sum | cut -c1-64; }
+> for hk in pre-commit commit-msg; do [ -f "$HOOK_REF_ROOT/.git/hooks/$hk" ] || { log "HOOK_FAIL reference hook $HOOK_REF_ROOT/.git/hooks/$hk absent"; finish 71; }; done
+> RP=$(sha "$HOOK_REF_ROOT/.git/hooks/pre-commit"); RC_=$(sha "$HOOK_REF_ROOT/.git/hooks/commit-msg")
+> NP=$(normhook .git/hooks/pre-commit "$W"); NC=$(normhook .git/hooks/commit-msg "$W")
+> NRP=$(normhook "$HOOK_REF_ROOT/.git/hooks/pre-commit" "$HOOK_REF_ROOT"); NRC=$(normhook "$HOOK_REF_ROOT/.git/hooks/commit-msg" "$HOOK_REF_ROOT")
+> log "HOOK_RAW own pre-commit=$HP commit-msg=$HC | ref($HOOK_REF_ROOT) pre-commit=$RP commit-msg=$RC_"
+> log "HOOK_NORMALIZED own pre-commit=$NP commit-msg=$NC | ref pre-commit=$NRP commit-msg=$NRC"
+> [ "$NP" = "$NRP" ] && [ "$NC" = "$NRC" ] || { log "HOOK_FAIL path-normalized hook bodies differ from the reference lefthook $LEFTHOOK_EXPECT hooks; refusing"; finish 71; }
+> for hk in pre-commit commit-msg; do
+>   grep -qF "$W/node_modules/lefthook-linux-x64/bin/lefthook" ".git/hooks/$hk" || { log "HOOK_FAIL .git/hooks/$hk does not reference $W/node_modules/lefthook-linux-x64/bin/lefthook"; finish 71; }
+>   ! grep -qF "$HOOK_REF_ROOT" ".git/hooks/$hk" || { log "HOOK_FAIL .git/hooks/$hk references the reference clone root"; finish 71; }
+> done
+> log "HOOK_OK own hooks reference $W/node_modules/lefthook-linux-x64/bin/lefthook"
 > [ -z "$(git config --get core.hooksPath)" ] || { log "HOOK_FAIL core.hooksPath became set"; finish 71; }
 > # ---- 3 prettier prefix: reuse the relayed verified isolated copy (never re-copied, never installed here)
-54c121
+54c137
 < log "PREFIX_VERIFY rc=$rc ok_lines=$(grep -c ': OK$' "$E/prettier-prefix-verify.log") readlink=$(readlink "$B/bin/prettier")"
 ---
 > log "PREFIX_VERIFY rc=$rc ok_lines=$(grep -c ': OK$' "$E/prettier-prefix-verify.log") manifest_lines=$(wc -l < "$PREFIX_MANIFEST") readlink=$(readlink "$B/bin/prettier")"
-58c125
+58c141
 < # ---- 3 scoped prettier on exactly the 4 files
 ---
 > # ---- 4 scoped prettier on exactly the 4 files (layout only; reviews A/B verified token-stream identity)
-63a131
+63a147
 >   for f in $TOFIX; do case " $FILES " in *" $f "*) ;; *) log "PRETTIER_SCOPE_FAIL $f not in FILES"; finish 72;; esac; done
-67,68c135,137
+67,68c151,153
 < for f in $FILES; do log "POSTFORMAT $f sha256=$(sha "$f") lines=$(wc -l < "$f")"; done
 < # ---- 4 scoped eslint
 ---
 > for f in $FILES; do log "POSTFORMAT $f sha256=$(sha "$f") lines=$(wc -l < "$f")"; cp "$f" "$E/postformat-$(basename "$f")"; done
 > [ "$(git status --porcelain --untracked-files=all | sed 's/^?? //' | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] || { log "SCOPE_FAIL tracked file changed by formatting: $(git status --porcelain | tr '\n' ' ')"; finish 72; }
 > # ---- 5 scoped eslint
-70,71c139,140
+70,71c155,156
 < npx --no-install eslint --no-warn-ignored --max-warnings 0 $FILES > "$E/eslint.raw.log" 2>&1; rc=$?; log "ESLINT rc=$rc"; [ $rc = 0 ] || finish 74
 < # ---- 5 tsc (whole repo; tsconfig has no include so test/ is type-checked)
 ---
 > npx --no-install eslint --no-warn-ignored --max-warnings 0 $FILES > "$E/eslint.raw.log" 2>&1; rc=$?; log "ESLINT rc=$rc"; [ $rc = 0 ] || { tail -40 "$E/eslint.raw.log" >> "$LOG"; finish 74; }
 > # ---- 6 tsc (whole repo; tsconfig has no include so test/ is type-checked)
-74c143
+74c159
 < # ---- 6 jest, affected suites (default config, no PG)
 ---
 > # ---- 7 jest, affected suites (default config, no PG)
-79c148
+79c164
 < # ---- 7 stage + genuine hooked commit
 ---
 > # ---- 8 stage exactly the 4 paths + one genuine hooked commit (hooks run R75 staged, tsc, eslint, prettier --check, prod-readiness-quick, commit-msg)
-82c151
+82c167
 < [ "$(git diff --cached --name-only | sort | tr '\n' ' ')" = "src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/types.ts test/scout/reconciliation/reconcile.spec.ts " ] || { log "STAGED_SET_FAIL"; finish 70; }
 ---
 > [ "$(git diff --cached --name-only | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] || { log "STAGED_SET_FAIL"; finish 70; }
-91c160,161
+91c176,177
 < [ "$(git diff --name-only "$H" HEAD | sort | tr '\n' ' ')" = "src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/types.ts test/scout/reconciliation/reconcile.spec.ts " ] || { log "DELTA_FAIL"; finish 76; }
 ---
 > [ "$(git diff --name-only "$H" HEAD | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] || { log "DELTA_FAIL"; finish 76; }
 > [ "$(git log -1 --format='%an <%ae>|%cn <%ce>')" = "Bradley Gleave <bradley@bradleytgpcoaching.com>|Bradley Gleave <bradley@bradleytgpcoaching.com>" ] || { log "IDENTITY_FAIL"; finish 76; }
-94c164
+94c180
 < # ---- 8 receipts
 ---
 > # ---- 9 receipts
-98c168
+98c184
 < { echo "base_H=$H"; echo "head=$HEAD"; echo "tree=$HTREE"; for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f")"; done; echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'; } > "$E/HEAD-${HEAD:0:12}.txt"
 ---
-> { echo "base_H=$H"; echo "head=$HEAD"; echo "tree=$HTREE"; for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f") preformat_sha256=$(sha "$FREEZE/preformat-$(basename "$f")")"; done; echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'; echo "hooks pre-commit=$HP commit-msg=$HC"; echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK client_index_dts=$CLIENT_INDEX_DTS"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
-100c170
+> { echo "base_H=$H"; echo "head=$HEAD"; echo "tree=$HTREE"; for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f") preformat_sha256=$(sha "$FREEZE/preformat-$(basename "$f")")"; done; echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'; echo "hooks raw pre-commit=$HP commit-msg=$HC normalized pre-commit=$NP commit-msg=$NC ref_root=$HOOK_REF_ROOT lefthook=$LHV"; echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK client_index_dts=$CLIENT_INDEX_DTS"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
+100c186
 < STAGE=done; log "DONE head=$HEAD tree=$HTREE"; finish 0
 ---
 > STAGE=done; log "DONE head=$HEAD tree=$HTREE (not pushed; parent owns landing)"; finish 0

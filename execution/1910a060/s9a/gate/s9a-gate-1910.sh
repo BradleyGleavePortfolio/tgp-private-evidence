@@ -39,8 +39,11 @@ PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
 NM_HIDDEN_LOCK=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
 CLIENT_INDEX_DTS=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
 CLIENT_SCHEMA=b84392033ab86776533007505c31f57930307a210844067a7407ed20d25abf3e
-HOOK_PRECOMMIT=3b741de3dd006d6265c6ca6698b7b5ce8aa9a2a5ba2743a8615d85e72b4a140d
-HOOK_COMMITMSG=71029ce88d76d5b885e12f978093ad3e046e93f5c5fc629b6fbba635d9f8a61b
+# lefthook 2.1.9 hook bodies embed the owning clone's absolute node_modules path, so raw hashes differ per clone
+# (historical shared-clone 3b741de3/71029ce8; S8-F clone e21bece6/277018c4). Comparison is path-normalized against the
+# reference clone's hooks: substitute each clone's absolute root with a placeholder, then require equality.
+HOOK_REF_ROOT=/home/user/workspace/worktrees/1910a060-s8f
+LEFTHOOK_EXPECT=2.1.9
 ts(){ date -u +%FT%TZ; }
 log(){ echo "$(ts) $*" | tee -a "$LOG"; }
 sha(){ sha256sum "$1" | cut -c1-64; }
@@ -111,9 +114,22 @@ log "LEFTHOOK_VERSION=$(./node_modules/.bin/lefthook version 2>&1 | head -1)"
 STAGE=hooks
 npx --no-install lefthook install > "$E/lefthook-install.log" 2>&1; rc=$?; log "LEFTHOOK_INSTALL rc=$rc"; [ $rc = 0 ] || finish 71
 for hk in pre-commit commit-msg; do [ -x ".git/hooks/$hk" ] || { log "HOOK_FAIL .git/hooks/$hk missing or not executable"; finish 71; }; done
+LHV=$(./node_modules/.bin/lefthook version 2>&1 | head -1 | tr -d '[:space:]'); log "LEFTHOOK_VERSION_CHECK=$LHV expect=$LEFTHOOK_EXPECT"
+[ "$LHV" = "$LEFTHOOK_EXPECT" ] || { log "HOOK_FAIL lefthook version != $LEFTHOOK_EXPECT"; finish 71; }
 HP=$(sha .git/hooks/pre-commit); HC=$(sha .git/hooks/commit-msg)
-log "HOOK_PRECOMMIT=$HP expect=$HOOK_PRECOMMIT HOOK_COMMITMSG=$HC expect=$HOOK_COMMITMSG"
-[ "$HP" = "$HOOK_PRECOMMIT" ] && [ "$HC" = "$HOOK_COMMITMSG" ] || { log "HOOK_FAIL hook bodies differ from recorded lefthook 2.1.9 hooks; refusing (no repin here)"; finish 71; }
+normhook(){ sed "s|$2|@CLONE_ROOT@|g" "$1" | sha256sum | cut -c1-64; }
+for hk in pre-commit commit-msg; do [ -f "$HOOK_REF_ROOT/.git/hooks/$hk" ] || { log "HOOK_FAIL reference hook $HOOK_REF_ROOT/.git/hooks/$hk absent"; finish 71; }; done
+RP=$(sha "$HOOK_REF_ROOT/.git/hooks/pre-commit"); RC_=$(sha "$HOOK_REF_ROOT/.git/hooks/commit-msg")
+NP=$(normhook .git/hooks/pre-commit "$W"); NC=$(normhook .git/hooks/commit-msg "$W")
+NRP=$(normhook "$HOOK_REF_ROOT/.git/hooks/pre-commit" "$HOOK_REF_ROOT"); NRC=$(normhook "$HOOK_REF_ROOT/.git/hooks/commit-msg" "$HOOK_REF_ROOT")
+log "HOOK_RAW own pre-commit=$HP commit-msg=$HC | ref($HOOK_REF_ROOT) pre-commit=$RP commit-msg=$RC_"
+log "HOOK_NORMALIZED own pre-commit=$NP commit-msg=$NC | ref pre-commit=$NRP commit-msg=$NRC"
+[ "$NP" = "$NRP" ] && [ "$NC" = "$NRC" ] || { log "HOOK_FAIL path-normalized hook bodies differ from the reference lefthook $LEFTHOOK_EXPECT hooks; refusing"; finish 71; }
+for hk in pre-commit commit-msg; do
+  grep -qF "$W/node_modules/lefthook-linux-x64/bin/lefthook" ".git/hooks/$hk" || { log "HOOK_FAIL .git/hooks/$hk does not reference $W/node_modules/lefthook-linux-x64/bin/lefthook"; finish 71; }
+  ! grep -qF "$HOOK_REF_ROOT" ".git/hooks/$hk" || { log "HOOK_FAIL .git/hooks/$hk references the reference clone root"; finish 71; }
+done
+log "HOOK_OK own hooks reference $W/node_modules/lefthook-linux-x64/bin/lefthook"
 [ -z "$(git config --get core.hooksPath)" ] || { log "HOOK_FAIL core.hooksPath became set"; finish 71; }
 # ---- 3 prettier prefix: reuse the relayed verified isolated copy (never re-copied, never installed here)
 STAGE=prettier-prefix
@@ -165,6 +181,6 @@ grep -iqE 'co-authored-by|generated' "$E/committed-message.txt" && { log "TRAILE
 STAGE=receipts
 git diff --binary "$H" HEAD > "$E/s9a-${H:0:12}-to-${HEAD:0:12}.patch"
 git diff --name-status "$H" HEAD > "$E/MANIFEST-name-status-${H:0:12}-to-${HEAD:0:12}.txt"
-{ echo "base_H=$H"; echo "head=$HEAD"; echo "tree=$HTREE"; for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f") preformat_sha256=$(sha "$FREEZE/preformat-$(basename "$f")")"; done; echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'; echo "hooks pre-commit=$HP commit-msg=$HC"; echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK client_index_dts=$CLIENT_INDEX_DTS"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
+{ echo "base_H=$H"; echo "head=$HEAD"; echo "tree=$HTREE"; for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f") preformat_sha256=$(sha "$FREEZE/preformat-$(basename "$f")")"; done; echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'; echo "hooks raw pre-commit=$HP commit-msg=$HC normalized pre-commit=$NP commit-msg=$NC ref_root=$HOOK_REF_ROOT lefthook=$LHV"; echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK client_index_dts=$CLIENT_INDEX_DTS"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
 ( cd "$E" && sha256sum * > SHA256SUMS ) 2>/dev/null
 STAGE=done; log "DONE head=$HEAD tree=$HTREE (not pushed; parent owns landing)"; finish 0

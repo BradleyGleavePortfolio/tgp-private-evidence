@@ -1,0 +1,2638 @@
+diff --git a/src/scout/reconciliation/coverage.ts b/src/scout/reconciliation/coverage.ts
+new file mode 100644
+index 00000000..f50d9401
+--- /dev/null
++++ b/src/scout/reconciliation/coverage.ts
+@@ -0,0 +1,82 @@
++import {
++  type ClaimStatus,
++  COMPLETENESS_BASIS_NONE,
++  type CoverageFact,
++  type ReconciliationFacts,
++} from './types';
++
++// S9-A — the F1 completeness predicate (D-S9-3), isolated so that S10's observation contract
++// lands here without a change to `reconcile.ts`. Parent S9 decision: `complete` requires a
++// recorded per-family completeness basis; until S10 supplies one, no run reaches `complete` on
++// native reconciliation alone. PLAN L321: "If the platform provides no reliable completeness
++// basis, final status remains incomplete". A non-success or absent claim is a signal against
++// coverage, never a basis for it.
++
++/** What the report says about one family's coverage (CQ-13 manifest fields). */
++export interface FamilyCoverage {
++  readonly known: boolean;
++  /** `'none'` when unknown; otherwise the S10 basis kind. */
++  readonly completeness_basis: string;
++  readonly observed_unique: number | null;
++}
++
++const UNKNOWN: FamilyCoverage = {
++  known: false,
++  completeness_basis: COMPLETENESS_BASIS_NONE,
++  observed_unique: null,
++};
++
++/**
++ * `coverageKnown(f)` holds when all of these are true: `coverage !== null`, `coverage[f].known`,
++ * `covers_staged_identities` (an identity-set statement S10 establishes, not a count) and a stored
++ * claim of `success`. The predicate reads only these; S10 adds evaluator, basis kinds and any
++ * additive fields on the `known: true` branch.
++ */
++export function familyCoverage(fact: CoverageFact | undefined, claim: ClaimStatus): FamilyCoverage {
++  if (fact === undefined || !fact.known) return UNKNOWN;
++  if (!fact.covers_staged_identities || claim !== 'success') {
++    // The observation exists but does not vouch for the staged set (or the claim contradicts
++    // it): the count is a fact worth showing, the basis is not one worth trusting.
++    return {
++      known: false,
++      completeness_basis: COMPLETENESS_BASIS_NONE,
++      observed_unique: fact.observed_unique,
++    };
++  }
++  return {
++    known: true,
++    completeness_basis: fact.basis_kind,
++    observed_unique: fact.observed_unique,
++  };
++}
++
++/** Coverage for one family name out of the run facts (`coverage: null` → unknown). */
++export const coverageOf = (facts: ReconciliationFacts, family: string): FamilyCoverage =>
++  familyCoverage(facts.coverage === null ? undefined : facts.coverage[family], facts.claim);
++
++/**
++ * D-S9-2 `required_families`: the canonical families of the staged mapped entries ∪ the families
++ * the coverage map names ∪ every family the mapping spec declares. `null` (undeterminable) when
++ * the run has zero staged identities or no staged row named a registered platform
++ * (`spec_families === null`), so the set never depends only on what the evaluator lists and an
++ * empty run is never vacuously complete (R18, R18b). Sorted for determinism.
++ */
++export function requiredFamilies(facts: ReconciliationFacts): readonly string[] | null {
++  const staged = facts.families.reduce((sum, f) => sum + f.identities.length, 0);
++  if (staged === 0 || facts.spec_families === null) return null;
++  const names = new Set<string>(facts.spec_families);
++  for (const f of facts.families) if (f.mapped) names.add(f.family);
++  if (facts.coverage !== null) for (const name of Object.keys(facts.coverage)) names.add(name);
++  return Array.from(names).sort();
++}
++
++/**
++ * C-COV holds (the run is NOT covered) when `required_families` is undeterminable or empty, when
++ * any required family lacks a known basis, or when the stored claim is not `success` (the claim is
++ * already folded into `familyCoverage`, so an empty required set is the only extra case).
++ */
++export const coverageConditionHolds = (facts: ReconciliationFacts): boolean => {
++  const required = requiredFamilies(facts);
++  if (required === null || required.length === 0) return true;
++  return required.some((f) => !coverageOf(facts, f).known);
++};
+diff --git a/src/scout/reconciliation/reconcile.ts b/src/scout/reconciliation/reconcile.ts
+new file mode 100644
+index 00000000..bcc85e49
+--- /dev/null
++++ b/src/scout/reconciliation/reconcile.ts
+@@ -0,0 +1,424 @@
++import { coverageConditionHolds, coverageOf, requiredFamilies } from './coverage';
++import {
++  type FamilyFacts,
++  type IdentityFacts,
++  type LedgerRowFacts,
++  NATIVE_TARGET_KINDS,
++  type NativeTargetKind,
++  type ReasonCount,
++  type ReconciliationFacts,
++  type ReconciliationFamilyV1,
++  type ReconciliationReportV1,
++  type ReconciliationResult,
++  type ReconciliationVerdictV1,
++  type RelationshipClosure,
++  type RelationshipFacts,
++  REJECTION_MISSING_SOURCE_ID,
++  REJECTION_PREFIX_UNSUPPORTED_PLATFORM,
++  S9_REASON_CODE,
++  S9_REASON_CODES,
++  type S9ReasonCode,
++  S9_REPORT_CODE,
++  type TokenReportV1,
++  UNRESOLVED_CATALOGUE,
++  UNRESOLVED_FAMILY_PREFIX,
++  UNRESOLVED_PREFIX,
++  WRITER_CODE,
++} from './types';
++
++// S9-A — the pure reconciler: `reconcile(facts)` → `{verdict, report}` (D-S9-1, D-S9-2). No I/O,
++// no clock, no exceptions, deterministic (identical facts → identical bytes). It is the only code
++// path that can produce `complete`, and it does so only when none of the D-S9-2 conditions hold:
++//   C-FAM  an unmapped entry, or a mapped family without a native destination → `unresolved_family`
++//   C-ID   a mapped family with unresolved/rejected/failed identities, unresolved children or
++//          ledger rows without a staged identity → `unresolved_identities`
++//   C-REL  a bucket-j identity whose closure edge fails → `relationship_unverified`
++//   C-COV  coverage unknown for any family, or the claim is not `success` → `coverage_basis_unknown`
++// `reason_code` is the first condition that holds; the report lists them all. Per-row detail lives
++// in the D-S9-7 histogram, never in the run-level code (CQ-17), and no identity, name, email,
++// label or payload is ever copied into the report (R14).
++
++/** D-S9-4: the per-run split is `null` = "not yet known" until provenance carries intent attribution. */
++export const CREATED_NATIVE_SPLIT: null = null;
++
++/** The four buckets of the staged partition (D-S9-2: `staged_unique = j + rejected + unresolved + failed`). */
++export type Bucket = 'native_present_verified' | 'rejected' | 'unresolved' | 'failed';
++
++export interface Classified {
++  readonly bucket: Bucket;
++  /** D-S9-7 histogram key; `null` only for bucket j. */
++  readonly code: string | null;
++}
++
++/** Tokens the catalogue admits as qualifiers: family, field, model, staged token or platform. */
++const TOKEN = /^[A-Za-z0-9_.-]{1,64}$/;
++const UNRESOLVED_REASON = /^unresolved:([a-z_]+)(?::([A-Za-z0-9_.-]{1,64}))?$/;
++
++/** The bucket-k / unparsable-reason answer: never echoes input. */
++const UNRECOGNISED: Classified = { bucket: 'unresolved', code: S9_REPORT_CODE.reason_unrecognised };
++
++const isNativeKind = (kind: string | null): kind is NativeTargetKind =>
++  kind !== null && (NATIVE_TARGET_KINDS as readonly string[]).includes(kind);
++
++/**
++ * Parse a writer's ledger reason into a bucket and a histogram key. Verbatim only when it parses in
++ * the closed grammar (S8-DOC §3.7; D-S9-7 key rules); anything else is `reason_unrecognised`.
++ */
++export function parseLedgerReason(reason: string | null): Classified {
++  if (reason === null) return UNRECOGNISED;
++  if (reason === REJECTION_MISSING_SOURCE_ID) return { bucket: 'rejected', code: reason };
++  if (reason.startsWith(REJECTION_PREFIX_UNSUPPORTED_PLATFORM)) {
++    const token = reason.slice(REJECTION_PREFIX_UNSUPPORTED_PLATFORM.length);
++    if (TOKEN.test(token)) return { bucket: 'rejected', code: reason };
++    return UNRECOGNISED;
++  }
++  if (reason.startsWith(UNRESOLVED_FAMILY_PREFIX)) {
++    const token = reason.slice(UNRESOLVED_FAMILY_PREFIX.length);
++    if (TOKEN.test(token)) return { bucket: 'unresolved', code: reason };
++    return UNRECOGNISED;
++  }
++  if (reason.startsWith(UNRESOLVED_PREFIX)) {
++    const match = UNRESOLVED_REASON.exec(reason);
++    if (match) {
++      const shape = UNRESOLVED_CATALOGUE[match[1]];
++      const qualified = match[2] !== undefined;
++      if (shape === 'qualified' && qualified) return { bucket: 'unresolved', code: reason };
++      if (shape === 'bare' && !qualified) return { bucket: 'unresolved', code: reason };
++    }
++  }
++  return UNRECOGNISED;
++}
++
++/** One staged identity → exactly one bucket, first match wins (D-S9-2 buckets a–k). */
++export function classifyIdentity(fact: IdentityFacts, family: FamilyFacts): Classified {
++  if (!family.mapped) {
++    // (a) unmapped entry: the resolution reason decides rejected vs unresolved.
++    const parsed = parseLedgerReason(family.resolution_reason);
++    if (parsed.bucket === 'rejected') return parsed;
++    return {
++      bucket: 'unresolved',
++      code: TOKEN.test(family.family)
++        ? `${UNRESOLVED_FAMILY_PREFIX}${family.family}`
++        : S9_REPORT_CODE.reason_unrecognised,
++    };
++  }
++  const row = fact.ledger;
++  if (row === null) {
++    // (b) mapped family, no ledger row for this intent.
++    return {
++      bucket: 'unresolved',
++      code: family.ceiling_exceeded
++        ? S9_REPORT_CODE.pass_ceiling_exceeded
++        : S9_REPORT_CODE.not_reconstructed,
++    };
++  }
++  switch (row.status) {
++    case 'failed':
++      return { bucket: 'failed', code: S9_REPORT_CODE.failed }; // (c)
++    case 'skipped':
++      return parseLedgerReason(row.reason); // (d), (e)
++    case 'reconstructed':
++      return classifyReconstructed(fact, row, family); // (f)–(j)
++    default:
++      // (k) catch-all: an unknown ledger status can only arrive from data outside the type.
++      return UNRECOGNISED;
++  }
++}
++
++type ReconstructedRow = Extract<LedgerRowFacts, { status: 'reconstructed' }>;
++
++function classifyReconstructed(
++  fact: IdentityFacts,
++  row: ReconstructedRow,
++  family: FamilyFacts,
++): Classified {
++  const provenance = row.provenance;
++  if (!isNativeKind(row.target_kind)) {
++    // (f) evidence only, keyed per row (S8-DOC L148-149): a client principal was needed when the
++    // family is client-owned, the row carries a resolved client link, or the writer already said so.
++    const clientPrincipal =
++      family.client_owned ||
++      fact.client_linked ||
++      provenance?.reason === WRITER_CODE.no_native_client_principal;
++    return {
++      bucket: 'unresolved',
++      code: clientPrincipal ? WRITER_CODE.no_native_client_principal : S9_REPORT_CODE.evidence_only,
++    };
++  }
++  if (provenance === null || provenance.outcome === 'unresolved') {
++    // (g) a native kind with no provenance of a native row.
++    return { bucket: 'unresolved', code: S9_REPORT_CODE.provenance_missing };
++  }
++  switch (provenance.native) {
++    case 'foreign_owner':
++    case 'kind_mismatch':
++    case 'provenance_mismatch':
++      return { bucket: 'unresolved', code: WRITER_CODE.identity_conflict }; // (h)
++    case 'removed':
++      return { bucket: 'unresolved', code: WRITER_CODE.native_target_removed }; // (i)
++    case 'present_owned':
++      return { bucket: 'native_present_verified', code: null }; // (j)
++    default:
++      return UNRECOGNISED; // (k)
++  }
++}
++
++const bump = (hist: Map<string, number>, code: string, by = 1): void => {
++  if (by > 0) hist.set(code, (hist.get(code) ?? 0) + by);
++};
++
++/** Deterministic histogram: `{code, count}[]` in code-point order. */
++const toReasonCounts = (hist: ReadonlyMap<string, number>): ReasonCount[] =>
++  Array.from(hist.keys())
++    .sort()
++    .map((code) => ({ code, count: hist.get(code) ?? 0 }));
++
++const byString = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
++
++interface TokenTally {
++  staged_unique: number;
++  native_present_verified: number;
++  rejected: number;
++  unresolved: number;
++  failed: number;
++}
++
++interface FamilyOutcome {
++  readonly facts: FamilyFacts;
++  readonly tally: TokenTally;
++  readonly tokens: readonly TokenReportV1[];
++  readonly reasons: readonly ReasonCount[];
++  readonly child_reasons: readonly ReasonCount[];
++  readonly unresolved_children: number;
++  /** Bucket-j identities, for relationship closure. */
++  readonly verified: ReadonlySet<string>;
++}
++
++const emptyTally = (): TokenTally => ({
++  staged_unique: 0,
++  native_present_verified: 0,
++  rejected: 0,
++  unresolved: 0,
++  failed: 0,
++});
++
++function reconcileFamily(family: FamilyFacts): FamilyOutcome {
++  const reasons = new Map<string, number>();
++  const childReasons = new Map<string, number>();
++  const tokens = new Map<string, TokenTally>();
++  const total = emptyTally();
++  const verified = new Set<string>();
++  let unresolvedChildren = 0;
++
++  for (const fact of family.identities) {
++    const cls = classifyIdentity(fact, family);
++    let token = tokens.get(fact.token);
++    if (token === undefined) {
++      token = emptyTally();
++      tokens.set(fact.token, token);
++    }
++    token.staged_unique += 1;
++    total.staged_unique += 1;
++    token[cls.bucket] += 1;
++    total[cls.bucket] += 1;
++    if (cls.code !== null) bump(reasons, cls.code);
++    if (cls.bucket !== 'native_present_verified') continue;
++    verified.add(fact.identity);
++
++    // Children are counted under bucket-j parents only (D-S9-2); a parent outside j is already
++    // unresolved in its own right and its children never enter the partition.
++    const row = fact.ledger;
++    if (row !== null && row.status === 'reconstructed' && row.provenance !== null) {
++      for (const [code, count] of Object.entries(row.provenance.unresolved_children)) {
++        if (count > 0) {
++          unresolvedChildren += count;
++          bump(childReasons, code, count);
++        }
++      }
++    }
++  }
++
++  return {
++    facts: family,
++    tally: total,
++    tokens: Array.from(tokens.keys())
++      .sort(byString)
++      .map((name) => {
++        const t = tokens.get(name) ?? emptyTally();
++        return { token: name, ...t };
++      }),
++    reasons: toReasonCounts(reasons),
++    child_reasons: toReasonCounts(childReasons),
++    unresolved_children: unresolvedChildren,
++    verified,
++  };
++}
++
++/**
++ * An edge closes iff its target is a bucket-j identity in the target family and S9-B's attribute
++ * comparison did not fail. `consistent === null` is accepted only for `client_link` (E-R3), which
++ * has no native attribute to compare (`client_source_id` is a soft link with no FK, S8-DOC §3.8);
++ * `program_parent` and `child_order` need an explicit `true`, because `program_id`,
++ * `(week_index, day_index)` and `order` are native attributes that must be compared, never assumed.
++ */
++export function edgeVerified(
++  edge: RelationshipFacts,
++  verifiedByFamily: ReadonlyMap<string, ReadonlySet<string>>,
++): boolean {
++  if (verifiedByFamily.get(edge.to_family)?.has(edge.to_identity) !== true) return false;
++  if (edge.consistent === true) return true;
++  return edge.consistent === null && edge.edge === 'client_link';
++}
++
++interface FamilyClosure {
++  readonly closure: RelationshipClosure;
++  readonly unverified: number;
++}
++
++const NO_CLOSURE: FamilyClosure = { closure: 'not_applicable', unverified: 0 };
++
++/**
++ * Per family: the number of bucket-j identities with at least one failing edge. An edge declared
++ * on an identity outside bucket j is not counted — that identity is already unresolved — and a
++ * family with no edge on any bucket-j identity is `not_applicable`.
++ */
++function closeRelationships(
++  outcomes: readonly FamilyOutcome[],
++  relationships: readonly RelationshipFacts[],
++): Map<string, FamilyClosure> {
++  // Union per family name, never overwrite: two entries sharing a family (outside D-S9-2's
++  // grouping, but type-valid) must not hide the first entry's bucket-j identities from an edge.
++  const verifiedByFamily = new Map<string, ReadonlySet<string>>();
++  for (const o of outcomes) {
++    const prev = verifiedByFamily.get(o.facts.family);
++    verifiedByFamily.set(
++      o.facts.family,
++      prev === undefined ? o.verified : new Set([...prev, ...o.verified]),
++    );
++  }
++
++  const checked = new Set<string>();
++  const failing = new Map<string, Set<string>>();
++  for (const edge of relationships) {
++    if (verifiedByFamily.get(edge.from_family)?.has(edge.from_identity) !== true) continue;
++    checked.add(edge.from_family);
++    if (edgeVerified(edge, verifiedByFamily)) continue;
++    let set = failing.get(edge.from_family);
++    if (set === undefined) {
++      set = new Set<string>();
++      failing.set(edge.from_family, set);
++    }
++    set.add(edge.from_identity);
++  }
++
++  const out = new Map<string, FamilyClosure>();
++  for (const o of outcomes) {
++    const family = o.facts.family;
++    const unverified = failing.get(family)?.size ?? 0;
++    const closure: RelationshipClosure =
++      unverified > 0 ? 'unverified' : checked.has(family) ? 'verified' : 'not_applicable';
++    out.set(family, { closure, unverified });
++  }
++  return out;
++}
++
++/** D-S9-2 run-level conditions, in order. `[]` iff `complete`. */
++export function conditions(
++  facts: ReconciliationFacts,
++  families: readonly ReconciliationFamilyV1[],
++): S9ReasonCode[] {
++  const held: S9ReasonCode[] = [];
++  const mapped = families.filter((f) => f.mapped);
++
++  const noDestination = (f: ReconciliationFamilyV1): boolean =>
++    f.reasons.some((r) => r.code.startsWith(WRITER_CODE.no_native_destination_prefix));
++  if (families.some((f) => !f.mapped) || mapped.some(noDestination)) {
++    held.push(S9_REASON_CODE.unresolved_family);
++  }
++  if (
++    facts.ledger_without_staged > 0 ||
++    mapped.some(
++      (f) =>
++        f.unresolved + f.rejected + f.failed > 0 ||
++        f.unresolved_children > 0 ||
++        f.ledger_without_staged > 0,
++    )
++  ) {
++    held.push(S9_REASON_CODE.unresolved_identities);
++  }
++  if (families.some((f) => f.relationship_unverified > 0)) {
++    held.push(S9_REASON_CODE.relationship_unverified);
++  }
++  if (coverageConditionHolds(facts)) held.push(S9_REASON_CODE.coverage_basis_unknown);
++
++  // The order above is D-S9-2's; pin it against the exported catalogue order.
++  return S9_REASON_CODES.filter((code) => held.includes(code));
++}
++
++/** A zero-row entry for a required family the run never staged (D-S9-2 required families). */
++const declaredOnly = (family: string): FamilyFacts => ({
++  family,
++  mapped: true,
++  resolution_reason: null,
++  client_owned: false,
++  ceiling_exceeded: false,
++  identities: [],
++  ledger_without_staged: 0,
++  qualifiers: [],
++});
++
++export function reconcile(facts: ReconciliationFacts): ReconciliationResult {
++  const required = requiredFamilies(facts);
++  const staged = new Set(facts.families.map((f) => f.family));
++  const entries: FamilyFacts[] = [...facts.families];
++  for (const family of required ?? []) if (!staged.has(family)) entries.push(declaredOnly(family));
++
++  const outcomes = entries
++    .sort((a, b) => (a.mapped !== b.mapped ? (a.mapped ? -1 : 1) : byString(a.family, b.family)))
++    .map(reconcileFamily);
++  const closures = closeRelationships(outcomes, facts.relationships);
++
++  const families: ReconciliationFamilyV1[] = outcomes.map((o) => {
++    const coverage = coverageOf(facts, o.facts.family);
++    const closure = closures.get(o.facts.family) ?? NO_CLOSURE;
++    return {
++      family: o.facts.family,
++      mapped: o.facts.mapped,
++      tokens: o.tokens,
++      staged_unique: o.tally.staged_unique,
++      native_present_verified: o.tally.native_present_verified,
++      created_native: CREATED_NATIVE_SPLIT,
++      already_present_verified: CREATED_NATIVE_SPLIT,
++      rejected: o.tally.rejected,
++      unresolved: o.tally.unresolved,
++      failed: o.tally.failed,
++      ledger_without_staged: o.facts.ledger_without_staged,
++      unresolved_children: o.unresolved_children,
++      relationship_closure: closure.closure,
++      relationship_unverified: closure.unverified,
++      reasons: o.reasons,
++      child_reasons: o.child_reasons,
++      qualifiers: [...o.facts.qualifiers].sort(byString),
++      completeness_basis: coverage.completeness_basis,
++      observed_unique: coverage.observed_unique,
++      pagination_terminal_evidence: null,
++      date_window: null,
++      media_policy: null,
++    };
++  });
++
++  const held = conditions(facts, families);
++  const verdict: ReconciliationVerdictV1 =
++    held.length === 0
++      ? { outcome: 'complete', reason_code: null }
++      : { outcome: 'partial', reason_code: held[0] };
++  const report: ReconciliationReportV1 = {
++    report_version: 1,
++    basis: 'recomputed',
++    conditions: held,
++    required_families: required,
++    ledger_without_staged: facts.ledger_without_staged,
++    families,
++  };
++  return { verdict, report };
++}
+diff --git a/src/scout/reconciliation/types.ts b/src/scout/reconciliation/types.ts
+new file mode 100644
+index 00000000..b7599427
+--- /dev/null
++++ b/src/scout/reconciliation/types.ts
+@@ -0,0 +1,382 @@
++import type { ArbiterInput, ReconciliationVerdict } from '../lifecycle/arbiter';
++import type { RunReasonCode, ServerTerminalStatus } from '../lifecycle/reason-codes';
++
++// S9-A — types of the pure reconciler (`reconcile.ts`) and the F1 coverage predicate
++// (`coverage.ts`), following the S9 decision doc `docs/decisions/2026-09-25-s9-reconciliation.md`
++// (D-S9-1 … D-S9-7) on top of the accepted S7-L lifecycle contract (`2026-09-24-s7l-run-lifecycle.md`
++// §8 "S9") and S8 native contract (`2026-09-24-s8-native-contract.md` §3.2, §3.5, §3.7, §3.8).
++//
++// S9 computes; it never writes `terminal_status`, `completed_at`, `reason_code`, ledger,
++// provenance or native rows, and never fences (D-S9-1). Facts arrive pre-collected (S9-B) and are
++// consumed only through the fact types below. Nothing here imports the S8-C writer modules: the
++// persist-outcome and provenance vocabularies are mirrored as literals frozen by the accepted
++// contract (S8-DOC §3.2 outcomes, §3.7 codes, S8-B `target_kind` / `native_kind` CHECKs), so
++// S9-A compiles at the landed S7-L head `df713fd9` and freezes to the S9-0 text once it lands.
++
++// ── Reason codes (D-S9-7, run level) ────────────────────────────────────────────────────
++
++/**
++ * The run-level codes a reconciliation verdict may carry. `unresolved_family` is the existing
++ * D-S7L-5 code, reused unchanged; the other three are appended to `RUN_REASON_CODES` by S9-C
++ * (additive entries only). This object is their single spelling: renaming one — for example if
++ * the landed S9-0 text fixes another name for the F1 code — is a one-line change here.
++ */
++/** The extension's stored `/complete` claim as the arbiter reads it (`success|partial|failed|null`). */
++export type ClaimStatus = ArbiterInput['claim'];
++
++export const S9_REASON_CODE = {
++  /** C-FAM: an unmapped entry, or a mapped family with no native destination (PLAN L307). */
++  unresolved_family: 'unresolved_family',
++  /** C-ID: a staged identity in a mapped family is not natively present and verified, or a child is unresolved. */
++  unresolved_identities: 'unresolved_identities',
++  /** C-REL: a required parent link, soft link or child order failed closure (S8-DOC §3.8). */
++  relationship_unverified: 'relationship_unverified',
++  /** C-COV: a family lacks a recorded completeness basis, or the stored claim is not `success` (F1). */
++  coverage_basis_unknown: 'coverage_basis_unknown',
++} as const;
++export type S9ReasonCode = (typeof S9_REASON_CODE)[keyof typeof S9_REASON_CODE];
++
++/** D-S9-2 condition order: C-FAM, C-ID, C-REL, C-COV. `reason_code` is the first that holds. */
++export const S9_REASON_CODES: readonly S9ReasonCode[] = [
++  S9_REASON_CODE.unresolved_family,
++  S9_REASON_CODE.unresolved_identities,
++  S9_REASON_CODE.relationship_unverified,
++  S9_REASON_CODE.coverage_basis_unknown,
++];
++
++/**
++ * `RunReasonCode` is the S7-L closed list. After S9-C appends the three S9 codes, every
++ * `S9ReasonCode` is a `RunReasonCode` and a v1 verdict is an S7-L `ReconciliationVerdict`
++ * verbatim; until then this union names the widened set.
++ */
++export type ReconciliationReasonCode = RunReasonCode | S9ReasonCode;
++
++// ── Verdict (D-S9-1 outcome set) ────────────────────────────────────────────────────────
++
++/**
++ * S9 emits only `complete` or `partial`. `blocked` comes only from the `revoked` fence (D-S9-6),
++ * `cancelled`/`timed_out` only from fences and `failed` only from arbiter step 2.
++ */
++export type ReconciliationOutcome = Extract<ServerTerminalStatus, 'complete' | 'partial'>;
++
++/** S9's output for arbiter step 3; see `ReconciliationReasonCode` for the S7-L seam. */
++export interface ReconciliationVerdictV1 {
++  outcome: ReconciliationOutcome;
++  reason_code: S9ReasonCode | null;
++}
++
++/** The S7-L seam type, re-exported so S9-C wires `reconciliation:` from one import path. */
++export type { ReconciliationVerdict };
++
++// ── Frozen vocabularies mirrored from the accepted contracts (never imported) ───────────
++
++/** Ledger `status` (`RECONSTRUCT_STATUS`; N/Q1 invariant 6). */
++export type LedgerStatus = 'reconstructed' | 'skipped' | 'failed';
++
++/**
++ * S8-B `ScoutReconstructionLedger.target_kind` closed CHECK; `null` = legacy writer (never
++ * reinterpreted). Only `person`, `workout_program` and `workout_plan` are native kinds;
++ * `scout_entity` is evidence and never counts native (S8-DOC §3.2).
++ */
++export type LedgerTargetKind = 'person' | 'scout_entity' | 'workout_program' | 'workout_plan';
++export type NativeTargetKind = Exclude<LedgerTargetKind, 'scout_entity'>;
++export const NATIVE_TARGET_KINDS: readonly NativeTargetKind[] = [
++  'person',
++  'workout_program',
++  'workout_plan',
++];
++
++/** S8-B `ImportNativeProvenance.outcome` closed CHECK (S8-DOC §3.2). */
++export type ProvenanceOutcome = 'created' | 'already_present' | 'unresolved';
++
++/**
++ * S9-B's verification of the native row a provenance record points at (S8-DOC §3.5 rows 1–3;
++ * D-S9-2 buckets h–j). `present_owned` is the only value that counts native.
++ *  - `removed`             → the coach archived or deleted the row (bucket i)
++ *  - `foreign_owner`       → the row belongs to another coach (bucket h)
++ *  - `kind_mismatch`       → the row is not of the provenance's kind (bucket h)
++ *  - `provenance_mismatch` → provenance `native_kind`/`native_id` differ from the ledger target (bucket h)
++ */
++export type NativeTargetCheck =
++  'present_owned' | 'removed' | 'foreign_owner' | 'kind_mismatch' | 'provenance_mismatch';
++
++// ── Facts (input) ───────────────────────────────────────────────────────────────────────
++
++/** The D-S8-3 provenance record of a reconstructed identity plus its native verification. */
++export interface ProvenanceFacts {
++  readonly outcome: ProvenanceOutcome;
++  readonly native: NativeTargetCheck;
++  /**
++   * The provenance row's §3.7 reason when `outcome` is `unresolved` (S8-C writes a top-level
++   * unresolved provenance row for a client-linked evidence row; review C-4), else `null`.
++   */
++  readonly reason: string | null;
++  /**
++   * `unresolved` child provenance rows under this parent, as a reason → count histogram over
++   * S8-DOC §3.7 child codes (for example `unresolved:exercise_reference`). Children are never
++   * ledger rows (§3.3) and never enter the staged partition.
++   */
++  readonly unresolved_children: Readonly<Record<string, number>>;
++}
++
++/**
++ * The intent's ledger row for one staged identity. `reason` is the writer's string in the
++ * accepted grammar: `unresolved:<code>[:<qualifier>]`, `unresolved_family:<token>`, or a
++ * rejection reason (`unsupported_platform:<token>`, `missing_source_id`). It is echoed into the
++ * histogram only when it parses in the closed catalogue (D-S9-7), never verbatim otherwise.
++ */
++export type LedgerRowFacts =
++  | { readonly status: 'failed' }
++  | { readonly status: 'skipped'; readonly reason: string | null }
++  | {
++      readonly status: 'reconstructed';
++      readonly target_kind: LedgerTargetKind | null;
++      /** `null` when no provenance row exists for the identity (bucket g). */
++      readonly provenance: ProvenanceFacts | null;
++    };
++
++/** One distinct staged identity `(source_platform, source_id)` of a family. */
++export interface IdentityFacts {
++  /** The staged `entity_type` token this identity arrived under (the `families[]` key, S7L-DOC §5). */
++  readonly token: string;
++  /**
++   * Opaque identity built by S9-B (never a name or email). It resolves relationship targets and
++   * is never copied into the report.
++   */
++  readonly identity: string;
++  /** The intent's ledger row, or `null` when staging has the identity and the ledger does not. */
++  readonly ledger: LedgerRowFacts | null;
++  /**
++   * The staged row carries a resolved client link (`client_source_id`, S8-DOC L320-323, read
++   * through the S8-A interpreter). Bucket f keys such a row `no_native_client_principal` (L149).
++   */
++  readonly client_linked: boolean;
++}
++
++/** Family-level qualifiers the report carries verbatim (S8-DOC §4.1 `roster_bridge_pending`). */
++export type FamilyQualifier = 'roster_bridge_pending';
++
++/**
++ * Everything the reconciler knows about one entry: a canonical family (grouped through the
++ * accepted `resolveStagedFamily`) or, when `mapped` is false, an unmapped staged token.
++ * `family` is a string rather than `CanonicalFamily` because the S8-C `programs` family is not
++ * in the landed allow-list at this base and S9 never branches on a family name.
++ */
++export interface FamilyFacts {
++  readonly family: string;
++  readonly mapped: boolean;
++  /** For an unmapped entry, the resolution failure (`unresolved_family:<token>` or `unsupported_platform:<p>`). */
++  readonly resolution_reason: string | null;
++  /** Client-owned under the D-S8-2 interim: evidence rows report `no_native_client_principal`. */
++  readonly client_owned: boolean;
++  /** The pass refused this family at `RECONSTRUCT_MAX_ROWS` (D-S9-6): missing ledger rows are the ceiling remainder. */
++  readonly ceiling_exceeded: boolean;
++  /** Every distinct staged identity. Its length is `staged_unique`. */
++  readonly identities: readonly IdentityFacts[];
++  /**
++   * Ledger rows of this intent attributed to this family with no staged identity (a
++   * contradiction; R05). The run-wide count lives on `ReconciliationFacts`.
++   */
++  readonly ledger_without_staged: number;
++  readonly qualifiers: readonly FamilyQualifier[];
++}
++
++/**
++ * Closure edges S9 validates (D-S9-2 E-R1..E-R3). Parents are always read through provenance on
++ * the D-S8-3 key, never by name, email or label.
++ *  - `program_parent` (E-R1): a program-day plan's `program_id` and `(week_index, day_index)`
++ *  - `child_order`    (E-R2): a created child's `workout_plan_id` and `#ord:` order
++ *  - `client_link`    (E-R3): a `client_source_id` soft link on a counted identity
++ */
++export type RelationshipEdge = 'program_parent' | 'child_order' | 'client_link';
++
++/**
++ * One declared edge. The reconciler resolves `to_identity` inside `to_family` itself;
++ * `consistent` is S9-B's data-level comparison of the native attributes (`null` = not compared,
++ * which is never read as consistent for E-R1/E-R2; E-R3 has no attribute to compare).
++ */
++export interface RelationshipFacts {
++  readonly edge: RelationshipEdge;
++  readonly from_family: string;
++  readonly from_identity: string;
++  readonly to_family: string;
++  readonly to_identity: string;
++  readonly consistent: boolean | null;
++}
++
++/**
++ * D-S9-3: the per-family completeness basis. `known: false` until S10 supplies an observation
++ * contract. S10 extends the `known: true` branch additively; `coverage.ts` is the only reader.
++ */
++export type CoverageFact =
++  | { readonly known: false }
++  | {
++      readonly known: true;
++      /** S10's closed basis kind token (append-only enum owned by S10); reported as `completeness_basis`. */
++      readonly basis_kind: string;
++      readonly observed_unique: number;
++      /** An identity-set statement established by S10, not a count comparison. */
++      readonly covers_staged_identities: boolean;
++    };
++
++/** The complete, pre-collected fact set for one settled server run. */
++export interface ReconciliationFacts {
++  /** The extension's stored `/complete` claim (S7L-DOC D-S7L-2); a non-`success` claim is a signal against coverage. */
++  readonly claim: ClaimStatus;
++  readonly families: readonly FamilyFacts[];
++  readonly relationships: readonly RelationshipFacts[];
++  /**
++   * Every canonical family the mapping spec of each staged, registered `source_platform`
++   * declares (D-S9-2 required families; `mapping-spec.ts` `families` keys). `null` when the set
++   * cannot be determined: no staged row names a registered platform (zero staged rows, or only
++   * `unsupported_platform` rows). A declared family with no staged row gets a report entry with
++   * `staged_unique: 0` and still needs a known basis before `complete`.
++   */
++  readonly spec_families: readonly string[] | null;
++  /**
++   * Run-wide: every ledger row of this intent with no staged identity, whether or not its token
++   * or platform resolves (review C-2). Never below the sum of the per-family attributions.
++   */
++  readonly ledger_without_staged: number;
++  /** Keyed by canonical family; `null` in v1 (S9-B always passes `null` until S10). */
++  readonly coverage: Readonly<Record<string, CoverageFact>> | null;
++}
++
++// ── Report v1 (D-S9-5; also the CQ-13 coverage manifest v1) ──────────────────────────────
++
++export interface ReasonCount {
++  readonly code: string;
++  readonly count: number;
++}
++
++/** Per staged token inside a canonical family (several tokens may share one family, D-S8-1). */
++export interface TokenReportV1 {
++  readonly token: string;
++  readonly staged_unique: number;
++  readonly native_present_verified: number;
++  readonly rejected: number;
++  readonly unresolved: number;
++  readonly failed: number;
++}
++
++export type RelationshipClosure = 'verified' | 'unverified' | 'not_applicable';
++
++/** `completeness_basis` when no basis is recorded (D-S9-3 `COMPLETENESS_BASIS_KINDS = ['none']` in v1). */
++export const COMPLETENESS_BASIS_NONE = 'none';
++
++export interface ReconciliationFamilyV1 {
++  /** Canonical family, or the staged token for an unmapped entry. */
++  readonly family: string;
++  readonly mapped: boolean;
++  readonly tokens: readonly TokenReportV1[];
++  readonly staged_unique: number;
++  /** D-S9-4: the verified union of `created` and `already_present` (bucket j). */
++  readonly native_present_verified: number;
++  /** D-S9-4: the per-run split is "not yet known" — `null`, never 0, never estimated. */
++  readonly created_native: null;
++  readonly already_present_verified: null;
++  readonly rejected: number;
++  readonly unresolved: number;
++  readonly failed: number;
++  readonly ledger_without_staged: number;
++  readonly unresolved_children: number;
++  readonly relationship_closure: RelationshipClosure;
++  /** Bucket-j identities with at least one failing closure edge. */
++  readonly relationship_unverified: number;
++  /** D-S9-7 keys over the staged partition, sorted by code. */
++  readonly reasons: readonly ReasonCount[];
++  /** S8-DOC §3.7 child codes over `unresolved_children`, sorted by code. */
++  readonly child_reasons: readonly ReasonCount[];
++  readonly qualifiers: readonly FamilyQualifier[];
++  // CQ-13 coverage-manifest fields (D-S9-3)
++  /** `'none'` without a basis; otherwise S10's basis kind. */
++  readonly completeness_basis: string;
++  /** From a known basis; `null` = not observed (S7L-DOC §5 null-never-0 rule). */
++  readonly observed_unique: number | null;
++  readonly pagination_terminal_evidence: null;
++  readonly date_window: null;
++  readonly media_policy: null;
++}
++
++export interface ReconciliationReportV1 {
++  readonly report_version: 1;
++  readonly basis: 'recomputed';
++  /** Every D-S9-2 condition that holds, in order; `[]` iff the verdict is `complete`. */
++  readonly conditions: readonly S9ReasonCode[];
++  /**
++   * D-S9-2 `required_families`, sorted; `null` when undeterminable (then C-COV holds). Lets a
++   * reader see which families the `complete` bar was measured against.
++   */
++  readonly required_families: readonly string[] | null;
++  /** Run-wide ledger rows without a staged identity (C-ID input; outside every partition). */
++  readonly ledger_without_staged: number;
++  /**
++   * Sorted by (`mapped` desc, `family`). Includes a zero-row entry for every required family
++   * without a staged entry. The DTO projection (S9-C) exposes these fields as optional
++   * properties, absent when no report applies (R-B1 option i); inside a report they are always
++   * present.
++   */
++  readonly families: readonly ReconciliationFamilyV1[];
++}
++
++export interface ReconciliationResult {
++  readonly verdict: ReconciliationVerdictV1;
++  readonly report: ReconciliationReportV1;
++}
++
++// ── Histogram catalogue (D-S9-7, report level) ──────────────────────────────────────────
++
++/** Keys the reconciler itself mints for conditions no writer records (D-S9-7 additions). */
++export const S9_REPORT_CODE = {
++  /** Bucket b: mapped family, no ledger row for this intent. */
++  not_reconstructed: 'unresolved:not_reconstructed',
++  /** Bucket b when the family is marked over `RECONSTRUCT_MAX_ROWS` (D-S9-6). */
++  pass_ceiling_exceeded: 'unresolved:pass_ceiling_exceeded',
++  /** Bucket g: native kind in the ledger but no provenance row. */
++  provenance_missing: 'unresolved:provenance_missing',
++  /** Bucket f: `target_kind` NULL or `scout_entity` in a coach-owned family. */
++  evidence_only: 'unresolved:evidence_only',
++  /** A ledger reason outside the closed grammar; the text is never echoed. */
++  reason_unrecognised: 'unresolved:reason_unrecognised',
++  /** Bucket c: ledger `failed`; the ledger reason text is never echoed. */
++  failed: 'failed',
++} as const;
++
++/** S8-DOC §3.7 writer codes the reconciler assigns itself (buckets f, h, i). */
++export const WRITER_CODE = {
++  no_native_client_principal: 'unresolved:no_native_client_principal',
++  native_target_removed: 'unresolved:native_target_removed',
++  identity_conflict: 'unresolved:identity_conflict',
++  /** Prefix of the C-FAM trigger for a mapped family without a native destination. */
++  no_native_destination_prefix: 'unresolved:no_native_destination:',
++} as const;
++
++/**
++ * The closed S8-DOC §3.7 `unresolved:<code>[:<qualifier>]` catalogue: code → whether a
++ * qualifier is required (`qualified`) or forbidden (`bare`). A reason that does not parse here
++ * is counted `unresolved:reason_unrecognised` and never echoed (D-S9-7 key rules).
++ */
++export const UNRESOLVED_CATALOGUE: Readonly<Record<string, 'qualified' | 'bare'>> = {
++  no_native_client_principal: 'bare',
++  no_native_destination: 'qualified',
++  missing_required_field: 'qualified',
++  invalid_value: 'qualified',
++  enum_unmapped: 'qualified',
++  unit_unknown: 'qualified',
++  date_zone_unknown: 'qualified',
++  prescription_not_integral: 'qualified',
++  exercise_reference: 'bare',
++  relationship_pending: 'qualified',
++  relationship_missing: 'qualified',
++  native_target_removed: 'bare',
++  identity_conflict: 'bare',
++  native_uniqueness: 'qualified',
++  source_archived: 'bare',
++};
++
++/** Rejection reasons (S8-DOC §3.7, byte-identical to today's writers). */
++export const REJECTION_PREFIX_UNSUPPORTED_PLATFORM = 'unsupported_platform:';
++export const REJECTION_MISSING_SOURCE_ID = 'missing_source_id';
++/** Prefix S8-A grants byte-exact for an unmapped staged label. */
++export const UNRESOLVED_FAMILY_PREFIX = 'unresolved_family:';
++export const UNRESOLVED_PREFIX = 'unresolved:';
+diff --git a/test/scout/reconciliation/reconcile.spec.ts b/test/scout/reconciliation/reconcile.spec.ts
+new file mode 100644
+index 00000000..11f2a524
+--- /dev/null
++++ b/test/scout/reconciliation/reconcile.spec.ts
+@@ -0,0 +1,1726 @@
++import { arbitrate } from '../../../src/scout/lifecycle/arbiter';
++import {
++  isRunReasonCode,
++  RUN_REASON_CODES,
++  type RunReasonCode,
++} from '../../../src/scout/lifecycle/reason-codes';
++import { familyCoverage, requiredFamilies } from '../../../src/scout/reconciliation/coverage';
++import {
++  classifyIdentity,
++  CREATED_NATIVE_SPLIT,
++  edgeVerified,
++  parseLedgerReason,
++  reconcile,
++} from '../../../src/scout/reconciliation/reconcile';
++import {
++  COMPLETENESS_BASIS_NONE,
++  type CoverageFact,
++  type FamilyFacts,
++  type IdentityFacts,
++  type LedgerRowFacts,
++  type NativeTargetKind,
++  type ProvenanceFacts,
++  type ReconciliationFacts,
++  type ReconciliationFamilyV1,
++  type ReconciliationResult,
++  type RelationshipFacts,
++  S9_REASON_CODE,
++  S9_REASON_CODES,
++  S9_REPORT_CODE,
++  UNRESOLVED_CATALOGUE,
++  WRITER_CODE,
++} from '../../../src/scout/reconciliation/types';
++
++// S9-A — table-driven spec of the pure reconciler over the S9 decision doc's A-tier acceptance
++// cases (docs/decisions/2026-09-25-s9-reconciliation.md §3: R01–R08, R10, R12, R14, R17–R19, plus
++// the R09 arbiter composition at the unit level) and the parent S9 decisions: F1 `complete` needs
++// a per-family completeness basis, F2 split is `null`, ceiling → `partial`, `blocked` never from
++// S9. R11 (tenant isolation), R13 (legacy byte identity), R15 (projection) and the PG half of R16
++// belong to S9-B/S9-C and are not asserted here.
++
++// ── Fixture builders ────────────────────────────────────────────────────────────────────
++
++/** Identity tokens carry a sentinel that must never surface in any report (R14). */
++const SENTINEL = 'never-in-report@example.com';
++const ident = (n: string): string => `truecoach:${n}:${SENTINEL}`;
++
++const provenance = (over: Partial<ProvenanceFacts> = {}): ProvenanceFacts => ({
++  outcome: 'created',
++  native: 'present_owned',
++  reason: null,
++  unresolved_children: {},
++  ...over,
++});
++
++const verifiedRow = (
++  kind: NativeTargetKind = 'person',
++  prov: ProvenanceFacts | null = provenance(),
++): LedgerRowFacts => ({ status: 'reconstructed', target_kind: kind, provenance: prov });
++
++const evidenceRow = (kind: 'scout_entity' | null): LedgerRowFacts => ({
++  status: 'reconstructed',
++  target_kind: kind,
++  provenance: null,
++});
++
++const skippedRow = (reason: string | null): LedgerRowFacts => ({ status: 'skipped', reason });
++const failedRow: LedgerRowFacts = { status: 'failed' };
++
++const id = (
++  n: string,
++  ledger: LedgerRowFacts | null,
++  token?: string,
++  client_linked = false,
++): IdentityFacts => ({
++  token: token ?? n.replace(/-.*$/, ''),
++  identity: ident(n),
++  ledger,
++  client_linked,
++});
++
++const fam = (
++  family: string,
++  identities: readonly IdentityFacts[],
++  over: Partial<FamilyFacts> = {},
++): FamilyFacts => ({
++  family,
++  mapped: true,
++  resolution_reason: null,
++  client_owned: false,
++  ceiling_exceeded: false,
++  identities,
++  ledger_without_staged: 0,
++  qualifiers: [],
++  ...over,
++});
++
++const unmapped = (
++  token: string,
++  n: number,
++  reason: string | null = `unresolved_family:${token}`,
++): FamilyFacts =>
++  fam(
++    token,
++    Array.from({ length: n }, (_, i) => id(`${token}-${i}`, null, token)),
++    { mapped: false, resolution_reason: reason },
++  );
++
++/** A mapped family with `n` bucket-j identities under token = family. */
++const cleanFamily = (family: string, n: number, kind: NativeTargetKind = 'person'): FamilyFacts =>
++  fam(
++    family,
++    Array.from({ length: n }, (_, i) => id(`${family}-${i}`, verifiedRow(kind), family)),
++  );
++
++const known = (observed_unique: number, covers = true): CoverageFact => ({
++  known: true,
++  basis_kind: 's10-observation',
++  observed_unique,
++  covers_staged_identities: covers,
++});
++
++/** Coverage that vouches for every given family at its staged size. */
++const coverFor = (families: readonly FamilyFacts[]): Record<string, CoverageFact> =>
++  Object.fromEntries(families.map((f) => [f.family, known(f.identities.length)]));
++
++/** The mapping spec declares exactly the mapped staged families unless a case says otherwise. */
++const specOf = (families: readonly FamilyFacts[]): string[] =>
++  families.filter((f) => f.mapped).map((f) => f.family);
++
++const facts = (
++  families: readonly FamilyFacts[],
++  over: Partial<ReconciliationFacts> = {},
++): ReconciliationFacts => ({
++  claim: 'success',
++  families,
++  relationships: [],
++  spec_families: specOf(families),
++  ledger_without_staged: families.reduce((sum, f) => sum + f.ledger_without_staged, 0),
++  coverage: null,
++  ...over,
++});
++
++/** Clean facts with a basis for every family: the R01(a) baseline. */
++const covered = (
++  families: readonly FamilyFacts[],
++  over: Partial<ReconciliationFacts> = {},
++): ReconciliationFacts => facts(families, { coverage: coverFor(families), ...over });
++
++const edge = (over: Partial<RelationshipFacts> = {}): RelationshipFacts => ({
++  edge: 'client_link',
++  from_family: 'workouts',
++  from_identity: ident('workouts-0'),
++  to_family: 'clients',
++  to_identity: ident('clients-0'),
++  consistent: null,
++  ...over,
++});
++
++const row = (result: ReconciliationResult, family: string): ReconciliationFamilyV1 => {
++  const found = result.report.families.find((f) => f.family === family);
++  if (!found) throw new Error(`no report row for ${family}`);
++  return found;
++};
++
++const counts = (pairs: Record<string, number>) =>
++  Object.keys(pairs)
++    .sort()
++    .map((code) => ({ code, count: pairs[code] }));
++
++const S9_CODES: readonly string[] = Object.values(S9_REASON_CODE);
++
++/** D-S9-7: is this histogram key in the closed catalogue? */
++const inCatalogue = (key: string): boolean => {
++  if ((Object.values(S9_REPORT_CODE) as readonly string[]).includes(key)) return true;
++  if (key === 'missing_source_id') return true;
++  if (/^(unsupported_platform|unresolved_family):[A-Za-z0-9_.-]{1,64}$/.test(key)) return true;
++  const m = /^unresolved:([a-z_]+)(?::([A-Za-z0-9_.-]{1,64}))?$/.exec(key);
++  if (!m) return false;
++  const shape = UNRESOLVED_CATALOGUE[m[1]];
++  return shape === (m[2] === undefined ? 'bare' : 'qualified');
++};
++
++/** Invariants every verdict/report pair must satisfy (D-S9-1 outcome set, R12, R14, R17). */
++function expectWellFormed(result: ReconciliationResult): void {
++  const { verdict, report } = result;
++  expect(['complete', 'partial']).toContain(verdict.outcome);
++  if (verdict.outcome === 'complete') {
++    expect(verdict.reason_code).toBeNull();
++    expect(report.conditions).toEqual([]);
++  } else {
++    expect(S9_CODES).toContain(verdict.reason_code);
++    expect(report.conditions[0]).toBe(verdict.reason_code);
++    // conditions follow the D-S9-2 order and are unique
++    const order = report.conditions.map((c) => S9_REASON_CODES.indexOf(c));
++    expect(order).toEqual([...order].sort((a, b) => a - b));
++    expect(new Set(report.conditions).size).toBe(report.conditions.length);
++  }
++  expect(report.report_version).toBe(1);
++  expect(report.basis).toBe('recomputed');
++  if (report.required_families === null) {
++    expect(report.conditions).toContain(S9_REASON_CODE.coverage_basis_unknown);
++  } else {
++    expect(report.required_families).toEqual([...new Set(report.required_families)].sort());
++    const reported = new Set(report.families.map((f) => f.family));
++    for (const f of report.required_families) expect(reported.has(f)).toBe(true);
++  }
++  const attributed = report.families.reduce((acc, f) => acc + f.ledger_without_staged, 0);
++  expect(report.ledger_without_staged).toBeGreaterThanOrEqual(attributed);
++  const json = JSON.stringify(report);
++  expect(json).not.toContain(SENTINEL);
++  expect(json).not.toContain('truecoach:');
++  // families sorted by (mapped desc, family)
++  const keys = report.families.map((f) => `${f.mapped ? 0 : 1}:${f.family}`);
++  expect(keys).toEqual([...keys].sort());
++  for (const f of report.families) {
++    expect(f.created_native).toBe(CREATED_NATIVE_SPLIT);
++    expect(f.already_present_verified).toBe(CREATED_NATIVE_SPLIT);
++    // partition invariant
++    expect(f.native_present_verified + f.rejected + f.unresolved + f.failed).toBe(f.staged_unique);
++    const tokenSum = f.tokens.reduce((acc, t) => acc + t.staged_unique, 0);
++    expect(tokenSum).toBe(f.staged_unique);
++    for (const t of f.tokens) {
++      expect(t.native_present_verified + t.rejected + t.unresolved + t.failed).toBe(
++        t.staged_unique,
++      );
++    }
++    expect(f.tokens.map((t) => t.token)).toEqual([...f.tokens.map((t) => t.token)].sort());
++    const reasonSum = f.reasons.reduce((acc, r) => acc + r.count, 0);
++    expect(reasonSum).toBe(f.rejected + f.unresolved + f.failed);
++    const childSum = f.child_reasons.reduce((acc, r) => acc + r.count, 0);
++    expect(childSum).toBe(f.unresolved_children);
++    for (const r of [...f.reasons, ...f.child_reasons]) {
++      expect(inCatalogue(r.code)).toBe(true);
++      expect(r.count).toBeGreaterThan(0);
++    }
++    expect(f.reasons.map((r) => r.code)).toEqual([...f.reasons.map((r) => r.code)].sort());
++    if (!f.mapped) expect(f.native_present_verified).toBe(0);
++    // With a known basis the count is a number; with `none` it may still be a counted fact from a
++    // non-vouching observation, but it is never invented.
++    if (f.completeness_basis !== COMPLETENESS_BASIS_NONE)
++      expect(typeof f.observed_unique).toBe('number');
++    expect(f.pagination_terminal_evidence).toBeNull();
++    expect(f.date_window).toBeNull();
++    expect(f.media_policy).toBeNull();
++  }
++}
++
++// ── 1. parseLedgerReason (D-S9-7 key rules) ─────────────────────────────────────────────
++
++describe('S9-A parseLedgerReason — closed grammar, never echo free text', () => {
++  it.each<[string, string | null, string, string]>([
++    ['null reason', null, 'unresolved', S9_REPORT_CODE.reason_unrecognised],
++    ['missing_source_id → rejected verbatim', 'missing_source_id', 'rejected', 'missing_source_id'],
++    [
++      'unsupported_platform:<p> → rejected verbatim',
++      'unsupported_platform:acme',
++      'rejected',
++      'unsupported_platform:acme',
++    ],
++    [
++      'unsupported_platform with a non-token → unrecognised',
++      'unsupported_platform:Bob Smith',
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'unresolved_family:<token> → unresolved verbatim',
++      'unresolved_family:notes',
++      'unresolved',
++      'unresolved_family:notes',
++    ],
++    [
++      'unresolved_family with an email → unrecognised',
++      `unresolved_family:${SENTINEL}`,
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'bare catalogue code',
++      'unresolved:no_native_client_principal',
++      'unresolved',
++      'unresolved:no_native_client_principal',
++    ],
++    [
++      'bare code given a qualifier → unrecognised',
++      'unresolved:identity_conflict:x',
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'qualified catalogue code',
++      'unresolved:missing_required_field:name',
++      'unresolved',
++      'unresolved:missing_required_field:name',
++    ],
++    [
++      'qualified code without a qualifier → unrecognised',
++      'unresolved:relationship_missing',
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'qualified code, dotted qualifier',
++      'unresolved:native_uniqueness:CheckIn.date',
++      'unresolved',
++      'unresolved:native_uniqueness:CheckIn.date',
++    ],
++    [
++      'no_native_destination:<family>',
++      'unresolved:no_native_destination:exercises',
++      'unresolved',
++      'unresolved:no_native_destination:exercises',
++    ],
++    [
++      'code outside the catalogue → unrecognised, not echoed',
++      'unresolved:something_new',
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'writer text with a space → unrecognised',
++      'unresolved:invalid_value:weight lbs',
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'S9 report keys are not writer reasons → unrecognised',
++      S9_REPORT_CODE.not_reconstructed,
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      'arbitrary text → unrecognised',
++      `Error: ${SENTINEL}`,
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++  ])('%s', (_label, reason, bucket, code) => {
++    expect(parseLedgerReason(reason)).toEqual({ bucket, code });
++  });
++
++  it('every catalogue entry round-trips in its own shape and fails in the other', () => {
++    for (const [code, shape] of Object.entries(UNRESOLVED_CATALOGUE)) {
++      const bare = `unresolved:${code}`;
++      const qualified = `unresolved:${code}:field_name`;
++      const ok = shape === 'bare' ? bare : qualified;
++      const bad = shape === 'bare' ? qualified : bare;
++      expect(parseLedgerReason(ok)).toEqual({ bucket: 'unresolved', code: ok });
++      expect(parseLedgerReason(bad)).toEqual({
++        bucket: 'unresolved',
++        code: S9_REPORT_CODE.reason_unrecognised,
++      });
++    }
++  });
++});
++
++// ── 2. classifyIdentity (D-S9-2 buckets a–k) ─────────────────────────────────────────────
++
++describe('S9-A classifyIdentity — every ledger/provenance/native combination', () => {
++  const mapped = fam('clients', []);
++  const clientOwned = fam('client_history', [], { client_owned: true });
++  const ceiling = fam('clients', [], { ceiling_exceeded: true });
++
++  it.each<[string, LedgerRowFacts | null, FamilyFacts, string, string | null]>([
++    ['(b) staged, no ledger row', null, mapped, 'unresolved', S9_REPORT_CODE.not_reconstructed],
++    [
++      '(b) staged, no ledger row, ceiling exceeded (R08)',
++      null,
++      ceiling,
++      'unresolved',
++      S9_REPORT_CODE.pass_ceiling_exceeded,
++    ],
++    ['(c) ledger failed → `failed`, no text', failedRow, mapped, 'failed', S9_REPORT_CODE.failed],
++    [
++      '(d) rejected missing_source_id',
++      skippedRow('missing_source_id'),
++      mapped,
++      'rejected',
++      'missing_source_id',
++    ],
++    [
++      '(d) rejected unsupported_platform',
++      skippedRow('unsupported_platform:x'),
++      mapped,
++      'rejected',
++      'unsupported_platform:x',
++    ],
++    [
++      '(e) §3.7 unresolved reason verbatim',
++      skippedRow('unresolved:relationship_missing:clients'),
++      mapped,
++      'unresolved',
++      'unresolved:relationship_missing:clients',
++    ],
++    [
++      '(e) writer-recorded native_target_removed',
++      skippedRow('unresolved:native_target_removed'),
++      mapped,
++      'unresolved',
++      WRITER_CODE.native_target_removed,
++    ],
++    [
++      '(e) skipped with unparseable reason',
++      skippedRow('oops'),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      '(e) skipped without reason',
++      skippedRow(null),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.reason_unrecognised,
++    ],
++    [
++      '(f) target_kind NULL, coach-owned family → evidence_only',
++      evidenceRow(null),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.evidence_only,
++    ],
++    [
++      '(f) scout_entity, coach-owned family → evidence_only',
++      evidenceRow('scout_entity'),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.evidence_only,
++    ],
++    [
++      '(f) scout_entity, client-owned family → no_native_client_principal (D-S8-2)',
++      evidenceRow('scout_entity'),
++      clientOwned,
++      'unresolved',
++      WRITER_CODE.no_native_client_principal,
++    ],
++    [
++      '(f) NULL kind, client-owned family → no_native_client_principal',
++      evidenceRow(null),
++      clientOwned,
++      'unresolved',
++      WRITER_CODE.no_native_client_principal,
++    ],
++    [
++      '(g) native kind, no provenance row',
++      verifiedRow('person', null),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.provenance_missing,
++    ],
++    [
++      '(g) native kind, provenance outcome unresolved (native_id null)',
++      verifiedRow('workout_plan', provenance({ outcome: 'unresolved' })),
++      mapped,
++      'unresolved',
++      S9_REPORT_CODE.provenance_missing,
++    ],
++    [
++      '(h) native row owned by another coach',
++      verifiedRow('person', provenance({ native: 'foreign_owner' })),
++      mapped,
++      'unresolved',
++      WRITER_CODE.identity_conflict,
++    ],
++    [
++      '(h) native row of another kind',
++      verifiedRow('workout_plan', provenance({ native: 'kind_mismatch' })),
++      mapped,
++      'unresolved',
++      WRITER_CODE.identity_conflict,
++    ],
++    [
++      '(h) provenance differs from ledger target',
++      verifiedRow('workout_program', provenance({ native: 'provenance_mismatch' })),
++      mapped,
++      'unresolved',
++      WRITER_CODE.identity_conflict,
++    ],
++    [
++      '(i) native row archived/deleted (C4; R04)',
++      verifiedRow('workout_program', provenance({ native: 'removed' })),
++      mapped,
++      'unresolved',
++      WRITER_CODE.native_target_removed,
++    ],
++    [
++      '(j) person, created, present+owned',
++      verifiedRow('person'),
++      mapped,
++      'native_present_verified',
++      null,
++    ],
++    [
++      '(j) workout_program, already_present (replay)',
++      verifiedRow('workout_program', provenance({ outcome: 'already_present' })),
++      mapped,
++      'native_present_verified',
++      null,
++    ],
++    [
++      '(j) workout_plan, created',
++      verifiedRow('workout_plan'),
++      mapped,
++      'native_present_verified',
++      null,
++    ],
++    [
++      '(j) plan with unresolved children stays a verified parent (§4.4)',
++      verifiedRow(
++        'workout_plan',
++        provenance({ unresolved_children: { 'unresolved:exercise_reference': 3 } }),
++      ),
++      mapped,
++      'native_present_verified',
++      null,
++    ],
++    [
++      '(j) native kind in a client-owned family still counts when verified',
++      verifiedRow('person'),
++      clientOwned,
++      'native_present_verified',
++      null,
++    ],
++  ])('%s', (_label, ledger, family, bucket, code) => {
++    expect(classifyIdentity(id('x', ledger, 't'), family)).toEqual({ bucket, code });
++  });
++
++  it('(a) unmapped entry: resolution reason decides; ledger is ignored', () => {
++    const notes = unmapped('notes', 0);
++    for (const ledger of [
++      null,
++      verifiedRow('person'),
++      skippedRow('missing_source_id'),
++      failedRow,
++    ]) {
++      expect(classifyIdentity(id('n', ledger, 'notes'), notes)).toEqual({
++        bucket: 'unresolved',
++        code: 'unresolved_family:notes',
++      });
++    }
++    const foreign = unmapped('clients', 0, 'unsupported_platform:acme');
++    expect(classifyIdentity(id('n', null, 'clients'), foreign)).toEqual({
++      bucket: 'rejected',
++      code: 'unsupported_platform:acme',
++    });
++    const odd = unmapped(`Bob ${SENTINEL}`, 0, null);
++    expect(classifyIdentity(id('n', null, 'x'), odd)).toEqual({
++      bucket: 'unresolved',
++      code: S9_REPORT_CODE.reason_unrecognised,
++    });
++  });
++
++  it('(f) is keyed per row (S8-DOC L148-149): a client-linked evidence row in a coach-owned family', () => {
++    const workouts = fam('workouts', []);
++    const linked = id('w', evidenceRow('scout_entity'), 'workouts', true);
++    expect(classifyIdentity(linked, workouts)).toEqual({
++      bucket: 'unresolved',
++      code: WRITER_CODE.no_native_client_principal,
++    });
++    const said: LedgerRowFacts = {
++      status: 'reconstructed',
++      target_kind: 'scout_entity',
++      provenance: provenance({
++        outcome: 'unresolved',
++        native: 'removed',
++        reason: WRITER_CODE.no_native_client_principal,
++      }),
++    };
++    expect(classifyIdentity(id('w', said, 'workouts'), workouts)).toEqual({
++      bucket: 'unresolved',
++      code: WRITER_CODE.no_native_client_principal,
++    });
++    const other: LedgerRowFacts = {
++      status: 'reconstructed',
++      target_kind: 'scout_entity',
++      provenance: provenance({
++        outcome: 'unresolved',
++        native: 'removed',
++        reason: 'unresolved:source_archived',
++      }),
++    };
++    expect(classifyIdentity(id('w', other, 'workouts'), workouts)).toEqual({
++      bucket: 'unresolved',
++      code: S9_REPORT_CODE.evidence_only,
++    });
++  });
++
++  it('(k) catch-all: data outside the type still lands in exactly one bucket, never echoed', () => {
++    // Values a DB CHECK would normally forbid; parsed from JSON so the type is not asserted away.
++    const weirdStatus: LedgerRowFacts = JSON.parse('{"status":"weird","reason":"x"}');
++    expect(classifyIdentity(id('x', weirdStatus, 't'), mapped)).toEqual({
++      bucket: 'unresolved',
++      code: S9_REPORT_CODE.reason_unrecognised,
++    });
++    const weirdNative: ProvenanceFacts = JSON.parse(
++      '{"outcome":"created","native":"weird","reason":null,"unresolved_children":{}}',
++    );
++    expect(classifyIdentity(id('x', verifiedRow('person', weirdNative), 't'), mapped)).toEqual({
++      bucket: 'unresolved',
++      code: S9_REPORT_CODE.reason_unrecognised,
++    });
++  });
++});
++
++// ── 3. Coverage predicate (D-S9-3 / F1) ─────────────────────────────────────────────────
++
++describe('S9-A familyCoverage (F1)', () => {
++  it.each<
++    [
++      string,
++      CoverageFact | undefined,
++      'success' | 'partial' | 'failed' | null,
++      boolean,
++      string,
++      number | null,
++    ]
++  >([
++    ['no record → unknown', undefined, 'success', false, COMPLETENESS_BASIS_NONE, null],
++    ['known:false → unknown', { known: false }, 'success', false, COMPLETENESS_BASIS_NONE, null],
++    ['known, covers, claim success → known', known(5), 'success', true, 's10-observation', 5],
++    [
++      'known, does not cover staged identities → unknown, count shown',
++      known(5, false),
++      'success',
++      false,
++      COMPLETENESS_BASIS_NONE,
++      5,
++    ],
++    [
++      'known, covers, claim partial → unknown (R01c)',
++      known(5),
++      'partial',
++      false,
++      COMPLETENESS_BASIS_NONE,
++      5,
++    ],
++    [
++      'known, covers, claim failed → unknown',
++      known(5),
++      'failed',
++      false,
++      COMPLETENESS_BASIS_NONE,
++      5,
++    ],
++    ['known, covers, no claim → unknown', known(5), null, false, COMPLETENESS_BASIS_NONE, 5],
++  ])('%s', (_label, fact, claim, isKnown, basis, observed) => {
++    expect(familyCoverage(fact, claim)).toEqual({
++      known: isKnown,
++      completeness_basis: basis,
++      observed_unique: observed,
++    });
++  });
++
++  it('required_families = mapped staged ∪ coverage map ∪ mapping spec, sorted (R-A1)', () => {
++    const f = facts([cleanFamily('workouts', 1), cleanFamily('clients', 1), unmapped('notes', 1)], {
++      coverage: { programs: known(0), clients: known(1) },
++      spec_families: ['clients', 'client_history'],
++    });
++    expect(requiredFamilies(f)).toEqual(['client_history', 'clients', 'programs', 'workouts']);
++  });
++
++  it.each<[string, ReconciliationFacts]>([
++    ['zero staged rows, coverage null', facts([])],
++    ['zero staged rows, coverage {} (R18b)', facts([], { coverage: {} })],
++    [
++      'zero staged rows, a spec and a known basis',
++      facts([], { spec_families: ['clients'], coverage: { clients: known(0) } }),
++    ],
++    ['zero staged rows in a mapped entry only', facts([fam('clients', [])])],
++    [
++      'no registered platform (spec_families null)',
++      facts([unmapped('clients', 2, 'unsupported_platform:acme')], { spec_families: null }),
++    ],
++  ])('required_families is undeterminable: %s', (_label, f) => {
++    expect(requiredFamilies(f)).toBeNull();
++  });
++});
++
++// ── 4. Verdict table ────────────────────────────────────────────────────────────────────
++
++interface VerdictCase {
++  label: string;
++  input: ReconciliationFacts;
++  outcome: 'complete' | 'partial';
++  reason: string | null;
++  conditions?: readonly string[];
++  check?: (result: ReconciliationResult) => void;
++}
++
++const cases: readonly VerdictCase[] = [
++  {
++    label: 'R01(a) native-clean, basis known for every family, claim success → complete / null',
++    input: covered([cleanFamily('clients', 3), cleanFamily('workouts', 2, 'workout_plan')]),
++    outcome: 'complete',
++    reason: null,
++    check: (r) => {
++      expect(row(r, 'clients')).toEqual({
++        family: 'clients',
++        mapped: true,
++        tokens: [
++          {
++            token: 'clients',
++            staged_unique: 3,
++            native_present_verified: 3,
++            rejected: 0,
++            unresolved: 0,
++            failed: 0,
++          },
++        ],
++        staged_unique: 3,
++        native_present_verified: 3,
++        created_native: null,
++        already_present_verified: null,
++        rejected: 0,
++        unresolved: 0,
++        failed: 0,
++        ledger_without_staged: 0,
++        unresolved_children: 0,
++        relationship_closure: 'not_applicable',
++        relationship_unverified: 0,
++        reasons: [],
++        child_reasons: [],
++        qualifiers: [],
++        completeness_basis: 's10-observation',
++        observed_unique: 3,
++        pagination_terminal_evidence: null,
++        date_window: null,
++        media_policy: null,
++      });
++      expect(r.report.families.map((f) => f.family)).toEqual(['clients', 'workouts']);
++    },
++  },
++  {
++    label:
++      'R01(b) native-clean, coverage null (today) → partial / coverage_basis_unknown, never complete',
++    input: facts([cleanFamily('clients', 3), cleanFamily('workouts', 2, 'workout_plan')]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        completeness_basis: COMPLETENESS_BASIS_NONE,
++        observed_unique: null,
++        native_present_verified: 3,
++      }),
++  },
++  {
++    label: 'R01(b) basis known for one family only → partial / coverage_basis_unknown',
++    input: facts([cleanFamily('clients', 3), cleanFamily('workouts', 2, 'workout_plan')], {
++      coverage: { clients: known(3) },
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) => {
++      expect(row(r, 'clients').completeness_basis).toBe('s10-observation');
++      expect(row(r, 'workouts').completeness_basis).toBe(COMPLETENESS_BASIS_NONE);
++    },
++  },
++  {
++    label: 'R01(c) as (a) but claim partial → partial / coverage_basis_unknown',
++    input: covered([cleanFamily('clients', 3)], { claim: 'partial' }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        completeness_basis: COMPLETENESS_BASIS_NONE,
++        observed_unique: 3,
++      }),
++  },
++  {
++    label: 'R01(c) as (a) but no claim stored → partial / coverage_basis_unknown',
++    input: covered([cleanFamily('clients', 3)], { claim: null }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++  },
++  {
++    label: 'F1 basis known but covers_staged_identities false → partial / coverage_basis_unknown',
++    input: facts([cleanFamily('clients', 3)], { coverage: { clients: known(3, false) } }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++  },
++  {
++    label: 'F1 a basis recorded for a family with no entry must itself be known',
++    input: facts([cleanFamily('clients', 1)], {
++      coverage: { clients: known(1), programs: { known: false } },
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++  },
++  {
++    label: 'F1 a known basis for a family with no entry does not block complete',
++    input: facts([cleanFamily('clients', 1)], {
++      coverage: { clients: known(1), programs: known(0) },
++    }),
++    outcome: 'complete',
++    reason: null,
++  },
++  {
++    label:
++      'R18 empty run, claim success, coverage null → partial / coverage_basis_unknown, never vacuously complete',
++    input: facts([]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) => expect(r.report.families).toEqual([]),
++  },
++  {
++    label: 'R18b empty run, coverage {} , claim success → partial / coverage_basis_unknown (R-A1)',
++    input: facts([], { coverage: {} }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) => expect(r.report.required_families).toBeNull(),
++  },
++  {
++    label:
++      'R18b zero staged rows with a declared spec and a known basis → still partial / coverage_basis_unknown',
++    input: facts([], { spec_families: ['clients'], coverage: { clients: known(0) } }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++  },
++  {
++    label:
++      'R01d every staged family covered but a spec-declared family missing from the map → partial / coverage_basis_unknown (R-A1)',
++    input: covered([cleanFamily('clients', 1)], { spec_families: ['clients', 'workouts'] }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.coverage_basis_unknown,
++    check: (r) => {
++      expect(r.report.required_families).toEqual(['clients', 'workouts']);
++      expect(row(r, 'workouts')).toMatchObject({
++        mapped: true,
++        staged_unique: 0,
++        tokens: [],
++        completeness_basis: COMPLETENESS_BASIS_NONE,
++        observed_unique: null,
++      });
++    },
++  },
++  {
++    label:
++      'R01d a spec-declared family with no staged row and a known basis does not block complete',
++    input: covered([cleanFamily('clients', 1)], {
++      spec_families: ['clients', 'workouts'],
++      coverage: { clients: known(1), workouts: known(0) },
++    }),
++    outcome: 'complete',
++    reason: null,
++    check: (r) => {
++      expect(r.report.families.map((f) => f.family)).toEqual(['clients', 'workouts']);
++      expect(row(r, 'workouts')).toMatchObject({ staged_unique: 0, observed_unique: 0 });
++    },
++  },
++  {
++    label: 'R-A1 staged rows but no registered platform (spec undeterminable) → C-FAM and C-COV',
++    input: facts([unmapped('clients', 2, 'unsupported_platform:acme')], {
++      spec_families: null,
++      coverage: { clients: known(2) },
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_family,
++    conditions: [S9_REASON_CODE.unresolved_family, S9_REASON_CODE.coverage_basis_unknown],
++    check: (r) => expect(r.report.required_families).toBeNull(),
++  },
++  {
++    label:
++      'C-2 run-wide ledger_without_staged with no family attribution → partial / unresolved_identities',
++    input: covered([cleanFamily('clients', 1)], { ledger_without_staged: 1 }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) => {
++      expect(r.report.ledger_without_staged).toBe(1);
++      expect(row(r, 'clients').ledger_without_staged).toBe(0);
++    },
++  },
++  {
++    label: 'R02 staged identity absent from the ledger → bucket b, partial / unresolved_identities',
++    input: covered([fam('clients', [id('clients-0', verifiedRow()), id('clients-1', null)])]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        native_present_verified: 1,
++        unresolved: 1,
++        reasons: counts({ [S9_REPORT_CODE.not_reconstructed]: 1 }),
++        completeness_basis: 's10-observation',
++      }),
++  },
++  {
++    label: 'R03 staged `notes` (unmapped) beside a clean family → partial / unresolved_family',
++    input: covered([cleanFamily('clients', 2), unmapped('notes', 3)]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_family,
++    // C-ID does not fire: the unmapped entry is outside "any mapped family".
++    conditions: [S9_REASON_CODE.unresolved_family],
++    check: (r) => {
++      expect(row(r, 'notes')).toEqual({
++        family: 'notes',
++        mapped: false,
++        tokens: [
++          {
++            token: 'notes',
++            staged_unique: 3,
++            native_present_verified: 0,
++            rejected: 0,
++            unresolved: 3,
++            failed: 0,
++          },
++        ],
++        staged_unique: 3,
++        native_present_verified: 0,
++        created_native: null,
++        already_present_verified: null,
++        rejected: 0,
++        unresolved: 3,
++        failed: 0,
++        ledger_without_staged: 0,
++        unresolved_children: 0,
++        relationship_closure: 'not_applicable',
++        relationship_unverified: 0,
++        reasons: [{ code: 'unresolved_family:notes', count: 3 }],
++        child_reasons: [],
++        qualifiers: [],
++        completeness_basis: 's10-observation',
++        observed_unique: 3,
++        pagination_terminal_evidence: null,
++        date_window: null,
++        media_policy: null,
++      });
++      expect(r.report.families.map((f) => f.family)).toEqual(['clients', 'notes']);
++    },
++  },
++  {
++    label:
++      'R03b a staged row on an unregistered platform → bucket a rejected, partial / unresolved_family',
++    input: covered([
++      cleanFamily('clients', 1),
++      unmapped('workouts', 2, 'unsupported_platform:acme'),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_family,
++    check: (r) =>
++      expect(row(r, 'workouts')).toMatchObject({
++        mapped: false,
++        rejected: 2,
++        unresolved: 0,
++        reasons: [{ code: 'unsupported_platform:acme', count: 2 }],
++      }),
++  },
++  {
++    label:
++      'C-FAM a mapped family whose rows have no native destination → partial / unresolved_family',
++    input: covered([
++      fam('exercises', [
++        id('exercises-0', skippedRow('unresolved:no_native_destination:exercises')),
++        id('exercises-1', skippedRow('unresolved:no_native_destination:exercises')),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_family,
++    conditions: [S9_REASON_CODE.unresolved_family, S9_REASON_CODE.unresolved_identities],
++  },
++  {
++    label:
++      'R04 ledger reconstructed, native row removed → bucket i, partial / unresolved_identities',
++    input: covered([
++      fam('programs', [
++        id('programs-0', verifiedRow('workout_program', provenance({ native: 'removed' }))),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'programs')).toMatchObject({
++        native_present_verified: 0,
++        unresolved: 1,
++        reasons: [{ code: WRITER_CODE.native_target_removed, count: 1 }],
++      }),
++  },
++  {
++    label: 'R04 another coach owns the row → bucket h, partial / unresolved_identities',
++    input: covered([
++      fam('clients', [
++        id('clients-0', verifiedRow('person', provenance({ native: 'foreign_owner' }))),
++        id('clients-1', verifiedRow('person', provenance({ native: 'kind_mismatch' }))),
++        id('clients-2', verifiedRow('person', provenance({ native: 'provenance_mismatch' }))),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients').reasons).toEqual([
++        { code: WRITER_CODE.identity_conflict, count: 3 },
++      ]),
++  },
++  {
++    label:
++      'R05 equal counts, different identity sets → ledger_without_staged and bucket b; partial / unresolved_identities',
++    // staged {a,b,c}; ledger {a,b,d}: 3 = 3 but c is missing and d has no staged identity.
++    input: covered([
++      fam(
++        'clients',
++        [id('clients-a', verifiedRow()), id('clients-b', verifiedRow()), id('clients-c', null)],
++        {
++          ledger_without_staged: 1,
++        },
++      ),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        staged_unique: 3,
++        native_present_verified: 2,
++        unresolved: 1,
++        ledger_without_staged: 1,
++        reasons: [{ code: S9_REPORT_CODE.not_reconstructed, count: 1 }],
++      }),
++  },
++  {
++    label:
++      'R05 every staged identity verified but a ledger row has no staged identity → partial / unresolved_identities',
++    input: covered([
++      fam('clients', [id('clients-0', verifiedRow())], { ledger_without_staged: 2 }),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) => expect(row(r, 'clients').reasons).toEqual([]),
++  },
++  {
++    label: 'R06 E-R1 program parent mismatch → partial / relationship_unverified',
++    input: covered(
++      [cleanFamily('programs', 1, 'workout_program'), cleanFamily('workouts', 1, 'workout_plan')],
++      {
++        relationships: [
++          edge({
++            edge: 'program_parent',
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: false,
++          }),
++        ],
++      },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++    check: (r) => {
++      expect(row(r, 'workouts')).toMatchObject({
++        relationship_closure: 'unverified',
++        relationship_unverified: 1,
++      });
++      expect(row(r, 'programs')).toMatchObject({
++        relationship_closure: 'not_applicable',
++        relationship_unverified: 0,
++      });
++    },
++  },
++  {
++    label:
++      'R06 E-R1 parent order not compared (null) is never assumed → partial / relationship_unverified',
++    input: covered(
++      [cleanFamily('programs', 1, 'workout_program'), cleanFamily('workouts', 1, 'workout_plan')],
++      {
++        relationships: [
++          edge({
++            edge: 'program_parent',
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: null,
++          }),
++        ],
++      },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++  },
++  {
++    label:
++      'R06 E-R1 parent program itself unresolved → partial / unresolved_identities first, relationship also unverified',
++    input: covered(
++      [
++        fam('programs', [
++          id('programs-0', verifiedRow('workout_program', provenance({ native: 'removed' }))),
++        ]),
++        cleanFamily('workouts', 1, 'workout_plan'),
++      ],
++      {
++        relationships: [
++          edge({
++            edge: 'program_parent',
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: true,
++          }),
++        ],
++      },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    conditions: [S9_REASON_CODE.unresolved_identities, S9_REASON_CODE.relationship_unverified],
++    check: (r) => expect(row(r, 'workouts').relationship_unverified).toBe(1),
++  },
++  {
++    label: 'R06 E-R2 child order mismatch → partial / relationship_unverified',
++    input: covered([cleanFamily('workouts', 1, 'workout_plan')], {
++      relationships: [
++        edge({
++          edge: 'child_order',
++          to_family: 'workouts',
++          to_identity: ident('workouts-0'),
++          consistent: false,
++        }),
++      ],
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++  },
++  {
++    label:
++      'R06 a bucket-f client-linked workout stays unresolved_identities; its edge is not counted twice',
++    input: covered(
++      [
++        cleanFamily('clients', 1),
++        fam('workouts', [id('workouts-0', evidenceRow('scout_entity'), 'workouts', true)]),
++      ],
++      { relationships: [edge({ to_identity: ident('clients-404') })] },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    conditions: [S9_REASON_CODE.unresolved_identities],
++    check: (r) =>
++      expect(row(r, 'workouts')).toMatchObject({
++        relationship_closure: 'not_applicable',
++        relationship_unverified: 0,
++        reasons: [{ code: WRITER_CODE.no_native_client_principal, count: 1 }],
++      }),
++  },
++  {
++    label:
++      'R06 E-R3 client link to an identity that is not bucket j → partial / relationship_unverified',
++    input: covered([cleanFamily('clients', 1), cleanFamily('workouts', 1, 'workout_plan')], {
++      relationships: [edge({ to_identity: ident('clients-404') })],
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++  },
++  {
++    label:
++      'R06 two mapped entries sharing a family name: a failing edge from the first is still counted → partial / relationship_unverified (review B-1)',
++    input: covered(
++      [
++        cleanFamily('programs', 1, 'workout_program'),
++        fam('workouts', [id('workouts-first', verifiedRow('workout_plan'), 'workouts')]),
++        fam('workouts', [id('workouts-second', verifiedRow('workout_plan'), 'workout_templates')]),
++      ],
++      {
++        relationships: [
++          edge({
++            edge: 'program_parent',
++            from_identity: ident('workouts-first'),
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: false,
++          }),
++        ],
++      },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++    conditions: [S9_REASON_CODE.relationship_unverified],
++    check: (r) => {
++      const workouts = r.report.families.filter((f) => f.family === 'workouts');
++      expect(workouts).toHaveLength(2);
++      for (const w of workouts) expect(w.relationship_unverified).toBe(1);
++    },
++  },
++  {
++    label: 'R06 an identity with two failing edges counts once',
++    input: covered(
++      [cleanFamily('programs', 1, 'workout_program'), cleanFamily('workouts', 1, 'workout_plan')],
++      {
++        relationships: [
++          edge({
++            edge: 'program_parent',
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: false,
++          }),
++          edge({
++            edge: 'child_order',
++            to_family: 'workouts',
++            to_identity: ident('workouts-0'),
++            consistent: false,
++          }),
++        ],
++      },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++    check: (r) => expect(row(r, 'workouts').relationship_unverified).toBe(1),
++  },
++  {
++    label: 'R06 closure holds (E-R1 consistent, E-R2 consistent, E-R3 resolved) → complete / null',
++    input: covered(
++      [
++        cleanFamily('clients', 1),
++        cleanFamily('programs', 1, 'workout_program'),
++        cleanFamily('workouts', 1, 'workout_plan'),
++      ],
++      {
++        relationships: [
++          edge(),
++          edge({
++            edge: 'program_parent',
++            to_family: 'programs',
++            to_identity: ident('programs-0'),
++            consistent: true,
++          }),
++          edge({
++            edge: 'child_order',
++            to_family: 'workouts',
++            to_identity: ident('workouts-0'),
++            consistent: true,
++          }),
++        ],
++      },
++    ),
++    outcome: 'complete',
++    reason: null,
++    check: (r) => {
++      expect(row(r, 'workouts')).toMatchObject({
++        relationship_closure: 'verified',
++        relationship_unverified: 0,
++      });
++      expect(row(r, 'clients').relationship_closure).toBe('not_applicable');
++    },
++  },
++  {
++    label:
++      'R07 evidence rows never count native; a client-owned family → at most partial (D-S8-2); keyed per row',
++    input: covered([
++      cleanFamily('clients', 1),
++      fam(
++        'client_history',
++        [
++          id('client_history-0', evidenceRow('scout_entity')),
++          id('client_history-1', evidenceRow(null)),
++          id('client_history-2', skippedRow('unresolved:no_native_client_principal')),
++        ],
++        { client_owned: true },
++      ),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'client_history')).toMatchObject({
++        native_present_verified: 0,
++        unresolved: 3,
++        rejected: 0,
++        reasons: [{ code: WRITER_CODE.no_native_client_principal, count: 3 }],
++      }),
++  },
++  {
++    label:
++      'R07 evidence rows in a coach-owned family → evidence_only per row; a client-linked row → no_native_client_principal (L149)',
++    input: covered([
++      fam('workouts', [
++        id('workouts-0', evidenceRow('scout_entity')),
++        id('workouts-1', evidenceRow(null)),
++        id('workouts-2', evidenceRow('scout_entity'), 'workouts', true),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'workouts').reasons).toEqual(
++        counts({ [S9_REPORT_CODE.evidence_only]: 2, [WRITER_CODE.no_native_client_principal]: 1 }),
++      ),
++  },
++  {
++    label:
++      'R02b ledger skipped missing_source_id / unsupported_platform → bucket d rejected, partial / unresolved_identities',
++    input: covered([
++      fam('clients', [
++        id('clients-0', verifiedRow()),
++        id('clients-1', skippedRow('unsupported_platform:acme')),
++        id('clients-2', skippedRow('missing_source_id')),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        native_present_verified: 1,
++        rejected: 2,
++        unresolved: 0,
++        reasons: counts({ 'unsupported_platform:acme': 1, missing_source_id: 1 }),
++      }),
++  },
++  {
++    label:
++      'ledger failed rows block complete; the reason text is never echoed → partial / unresolved_identities',
++    input: covered([fam('clients', [id('clients-0', verifiedRow()), id('clients-1', failedRow)])]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        failed: 1,
++        unresolved: 0,
++        reasons: [{ code: 'failed', count: 1 }],
++      }),
++  },
++  {
++    label:
++      'R19 already_present plan with a persisted unresolved exercise → unresolved_children, partial / unresolved_identities',
++    input: covered([
++      fam('workouts', [
++        id(
++          'workouts-0',
++          verifiedRow(
++            'workout_plan',
++            provenance({
++              outcome: 'already_present',
++              unresolved_children: { 'unresolved:exercise_reference': 4 },
++            }),
++          ),
++        ),
++        id(
++          'workouts-1',
++          verifiedRow(
++            'workout_plan',
++            provenance({
++              unresolved_children: {
++                'unresolved:exercise_reference': 1,
++                'unresolved:prescription_not_integral:reps_or_duration_seconds': 2,
++              },
++            }),
++          ),
++        ),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'workouts')).toMatchObject({
++        native_present_verified: 2,
++        unresolved: 0,
++        unresolved_children: 7,
++        reasons: [],
++        child_reasons: counts({
++          'unresolved:exercise_reference': 5,
++          'unresolved:prescription_not_integral:reps_or_duration_seconds': 2,
++        }),
++      }),
++  },
++  {
++    label:
++      'R08 ceiling leaves rows staged → pass_ceiling_exceeded, partial / unresolved_identities, never blocked',
++    input: covered([
++      fam(
++        'clients',
++        [
++          ...Array.from({ length: 10_000 }, (_, i) => id(`clients-c${i}`, verifiedRow())),
++          ...Array.from({ length: 250 }, (_, i) => id(`clients-rest${i}`, null)),
++        ],
++        { ceiling_exceeded: true },
++      ),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        staged_unique: 10_250,
++        native_present_verified: 10_000,
++        unresolved: 250,
++        reasons: [{ code: S9_REPORT_CODE.pass_ceiling_exceeded, count: 250 }],
++      }),
++  },
++  {
++    label: 'R10 replayed intent converged already_present → same shape, split null',
++    input: covered([
++      fam('programs', [
++        id(
++          'programs-0',
++          verifiedRow('workout_program', provenance({ outcome: 'already_present' })),
++        ),
++        id(
++          'programs-1',
++          verifiedRow('workout_program', provenance({ outcome: 'already_present' })),
++        ),
++      ]),
++    ]),
++    outcome: 'complete',
++    reason: null,
++    check: (r) =>
++      expect(row(r, 'programs')).toMatchObject({
++        native_present_verified: 2,
++        created_native: null,
++        already_present_verified: null,
++      }),
++  },
++  {
++    label:
++      'R12 a mapped family with zero staged rows and a known basis beside a staged one → complete; 0 is a counted fact, null only for D-S9-3/4 fields',
++    input: covered([cleanFamily('workouts', 1, 'workout_plan'), fam('clients', [])]),
++    outcome: 'complete',
++    reason: null,
++    check: (r) =>
++      expect(row(r, 'clients')).toMatchObject({
++        staged_unique: 0,
++        observed_unique: 0,
++        native_present_verified: 0,
++        rejected: 0,
++        unresolved: 0,
++        failed: 0,
++        tokens: [],
++        created_native: null,
++        already_present_verified: null,
++      }),
++  },
++  {
++    label: 'D-S8-1 two staged tokens in one canonical family report per token and in total',
++    input: covered([
++      fam('workouts', [
++        id('a1', verifiedRow('workout_plan'), 'workouts'),
++        id('a2', null, 'workouts'),
++        id('b1', verifiedRow('workout_plan'), 'workout_templates'),
++      ]),
++    ]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    check: (r) =>
++      expect(row(r, 'workouts')).toMatchObject({
++        staged_unique: 3,
++        native_present_verified: 2,
++        unresolved: 1,
++        tokens: [
++          {
++            token: 'workout_templates',
++            staged_unique: 1,
++            native_present_verified: 1,
++            rejected: 0,
++            unresolved: 0,
++            failed: 0,
++          },
++          {
++            token: 'workouts',
++            staged_unique: 2,
++            native_present_verified: 1,
++            rejected: 0,
++            unresolved: 1,
++            failed: 0,
++          },
++        ],
++      }),
++  },
++  {
++    label: 'qualifiers pass through sorted (S8-DOC §4.1 roster_bridge_pending)',
++    input: covered([
++      fam('clients', [id('clients-0', verifiedRow())], { qualifiers: ['roster_bridge_pending'] }),
++    ]),
++    outcome: 'complete',
++    reason: null,
++    check: (r) => expect(row(r, 'clients').qualifiers).toEqual(['roster_bridge_pending']),
++  },
++  {
++    label:
++      'R17 every condition at once → reason_code is the first; conditions lists all four in order',
++    input: facts(
++      [
++        unmapped('notes', 1),
++        fam('clients', [id('clients-0', verifiedRow()), id('clients-1', null)]),
++        cleanFamily('workouts', 1, 'workout_plan'),
++      ],
++      { relationships: [edge({ to_identity: ident('clients-404') })] },
++    ),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_family,
++    conditions: [...S9_REASON_CODES],
++  },
++  {
++    label: 'R17 C-ID + C-COV → unresolved_identities first',
++    input: facts([fam('clients', [id('clients-0', null)])]),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.unresolved_identities,
++    conditions: [S9_REASON_CODE.unresolved_identities, S9_REASON_CODE.coverage_basis_unknown],
++  },
++  {
++    label: 'R17 C-REL + C-COV → relationship_unverified first',
++    input: facts([cleanFamily('clients', 1), cleanFamily('workouts', 1, 'workout_plan')], {
++      relationships: [edge({ to_identity: ident('clients-404') })],
++    }),
++    outcome: 'partial',
++    reason: S9_REASON_CODE.relationship_unverified,
++    conditions: [S9_REASON_CODE.relationship_unverified, S9_REASON_CODE.coverage_basis_unknown],
++  },
++];
++
++describe('S9-A reconcile — verdict table', () => {
++  it.each(cases.map((c): [string, VerdictCase] => [c.label, c]))('%s', (_label, c) => {
++    const result = reconcile(c.input);
++    expect(result.verdict).toEqual({ outcome: c.outcome, reason_code: c.reason });
++    if (c.conditions) expect(result.report.conditions).toEqual(c.conditions);
++    expectWellFormed(result);
++    c.check?.(result);
++  });
++
++  it('never emits blocked, failed, cancelled or timed_out (D-S9-1, D-S9-6)', () => {
++    for (const c of cases) {
++      const outcome: string = reconcile(c.input).verdict.outcome;
++      expect(['blocked', 'failed', 'cancelled', 'timed_out']).not.toContain(outcome);
++    }
++  });
++
++  it('complete appears only when the report lists no condition, and only with a known basis on every family', () => {
++    for (const c of cases) {
++      const { verdict, report } = reconcile(c.input);
++      if (verdict.outcome !== 'complete') continue;
++      expect(report.conditions).toEqual([]);
++      expect(c.input.coverage).not.toBeNull();
++      expect(c.input.claim).toBe('success');
++      for (const f of report.families)
++        expect(f.completeness_basis).not.toBe(COMPLETENESS_BASIS_NONE);
++    }
++  });
++});
++
++// ── 5. edgeVerified table ───────────────────────────────────────────────────────────────
++
++describe('S9-A edgeVerified', () => {
++  const verified = new Map<string, ReadonlySet<string>>([
++    ['clients', new Set([ident('clients-0')])],
++    ['programs', new Set([ident('programs-0')])],
++    ['workouts', new Set([ident('workouts-0')])],
++  ]);
++  const toProgram = {
++    edge: 'program_parent' as const,
++    to_family: 'programs',
++    to_identity: ident('programs-0'),
++  };
++  const toPlan = {
++    edge: 'child_order' as const,
++    to_family: 'workouts',
++    to_identity: ident('workouts-0'),
++  };
++
++  it.each<[string, RelationshipFacts, boolean]>([
++    ['E-R3 client_link, target j, not compared → verified (no native attribute)', edge(), true],
++    ['E-R3 client_link, target j, consistent true → verified', edge({ consistent: true }), true],
++    [
++      'E-R3 client_link, target j, consistent false → unverified',
++      edge({ consistent: false }),
++      false,
++    ],
++    [
++      'E-R3 client_link, target not j → unverified',
++      edge({ to_identity: ident('clients-1') }),
++      false,
++    ],
++    ['E-R3 client_link, target family unknown → unverified', edge({ to_family: 'people' }), false],
++    [
++      'E-R1 program_parent, target j, consistent true → verified',
++      edge({ ...toProgram, consistent: true }),
++      true,
++    ],
++    [
++      'E-R1 program_parent, target j, not compared → unverified',
++      edge({ ...toProgram, consistent: null }),
++      false,
++    ],
++    [
++      'E-R1 program_parent, target j, consistent false → unverified',
++      edge({ ...toProgram, consistent: false }),
++      false,
++    ],
++    [
++      'E-R1 program_parent, target not j, consistent true → unverified',
++      edge({ ...toProgram, to_identity: ident('programs-9'), consistent: true }),
++      false,
++    ],
++    [
++      'E-R2 child_order, parent j, consistent true → verified',
++      edge({ ...toPlan, consistent: true }),
++      true,
++    ],
++    [
++      'E-R2 child_order, parent j, not compared → unverified',
++      edge({ ...toPlan, consistent: null }),
++      false,
++    ],
++    [
++      'E-R2 child_order, parent j, consistent false → unverified',
++      edge({ ...toPlan, consistent: false }),
++      false,
++    ],
++  ])('%s', (_label, rel, expected) => {
++    expect(edgeVerified(rel, verified)).toBe(expected);
++  });
++});
++
++// ── 6. Determinism (R10) ────────────────────────────────────────────────────────────────
++
++describe('S9-A reconcile — determinism (R10)', () => {
++  const a = fam('clients', [
++    id('clients-0', verifiedRow()),
++    id('clients-1', null),
++    id('clients-2', skippedRow('missing_source_id')),
++  ]);
++  const b = fam('workouts', [
++    id(
++      'workouts-0',
++      verifiedRow(
++        'workout_plan',
++        provenance({ unresolved_children: { 'unresolved:exercise_reference': 1 } }),
++      ),
++    ),
++  ]);
++  const n = unmapped('notes', 2);
++  const rel = edge();
++  const base = covered([a, b, n], { relationships: [rel] });
++
++  it('identical facts → byte-identical verdict and report', () => {
++    expect(JSON.stringify(reconcile(base))).toBe(JSON.stringify(reconcile(base)));
++  });
++
++  it('family and identity input order does not change the report bytes', () => {
++    const permutedA = fam(a.family, [...a.identities].reverse());
++    const permuted = covered([n, b, permutedA], { relationships: [rel] });
++    expect(JSON.stringify(reconcile(permuted))).toBe(JSON.stringify(reconcile(base)));
++    expect(reconcile(permuted).report.families.map((f) => f.family)).toEqual([
++      'clients',
++      'workouts',
++      'notes',
++    ]);
++  });
++
++  it('histogram codes are emitted in code-point order regardless of encounter order', () => {
++    const f = fam('clients', [
++      id('clients-z', skippedRow('unresolved:source_archived')),
++      id('clients-a', skippedRow('unresolved:exercise_reference')),
++      id('clients-m', null),
++    ]);
++    expect(row(reconcile(covered([f])), 'clients').reasons.map((r) => r.code)).toEqual([
++      'unresolved:exercise_reference',
++      S9_REPORT_CODE.not_reconstructed,
++      'unresolved:source_archived',
++    ]);
++  });
++
++  it('does not mutate its input', () => {
++    const before = JSON.stringify(base);
++    reconcile(base);
++    expect(JSON.stringify(base)).toBe(before);
++  });
++});
++
++// ── 7. Arbiter composition (R09 at the unit level) ──────────────────────────────────────
++
++describe('S9-A verdict feeds S7-L arbiter step 3 (R09 precedence preserved)', () => {
++  /** Narrow a v1 verdict to the landed `ReconciliationVerdict`; S9-C appends the S9 codes to the enum. */
++  const asLanded = (v: ReconciliationResult['verdict']) => {
++    const reason: RunReasonCode | null = isRunReasonCode(v.reason_code) ? v.reason_code : null;
++    if (v.reason_code !== null && reason === null)
++      throw new Error('S9 code not yet in RUN_REASON_CODES');
++    return { outcome: v.outcome, reason_code: reason };
++  };
++  const complete = asLanded(reconcile(covered([cleanFamily('clients', 2)])).verdict);
++  const unresolvedFamily = asLanded(reconcile(covered([unmapped('notes', 1)])).verdict);
++  const arbiterBase = {
++    claim: 'success' as const,
++    staged_by_family: { clients: 2 },
++    ledger_by_family: {},
++    unmapped_families: [],
++  };
++
++  it('step 3: the verdict is taken verbatim when no fence and no failing empty claim apply', () => {
++    expect(arbitrate({ ...arbiterBase, fence: null, reconciliation: complete })).toEqual({
++      terminal_status: 'complete',
++      reason_code: null,
++    });
++    expect(
++      arbitrate({
++        ...arbiterBase,
++        fence: null,
++        staged_by_family: { notes: 1 },
++        unmapped_families: ['notes'],
++        reconciliation: unresolvedFamily,
++      }),
++    ).toEqual({ terminal_status: 'partial', reason_code: 'unresolved_family' });
++  });
++
++  it('step 1: a fence ignores the S9 verdict; revoked → blocked comes from the fence, never from S9', () => {
++    expect(arbitrate({ ...arbiterBase, fence: 'cancelled', reconciliation: complete })).toEqual({
++      terminal_status: 'cancelled',
++      reason_code: 'cancelled_by_coach',
++    });
++    expect(arbitrate({ ...arbiterBase, fence: 'timed_out', reconciliation: complete })).toEqual({
++      terminal_status: 'timed_out',
++      reason_code: 'deadline_exceeded',
++    });
++    expect(arbitrate({ ...arbiterBase, fence: 'revoked', reconciliation: complete })).toEqual({
++      terminal_status: 'blocked',
++      reason_code: 'revoked',
++    });
++  });
++
++  it('step 2: claim failed with zero staged rows → failed / transfer_failed regardless of S9', () => {
++    expect(
++      arbitrate({
++        ...arbiterBase,
++        fence: null,
++        claim: 'failed',
++        staged_by_family: {},
++        reconciliation: complete,
++      }),
++    ).toEqual({ terminal_status: 'failed', reason_code: 'transfer_failed' });
++  });
++
++  it('R14: every S9 code is a low-cardinality snake_case identifier; unresolved_family is reused from the landed enum', () => {
++    for (const code of S9_CODES) expect(code).toMatch(/^[a-z][a-z_]*$/);
++    expect(new Set(S9_CODES).size).toBe(S9_CODES.length);
++    expect(S9_REASON_CODES).toEqual([
++      'unresolved_family',
++      'unresolved_identities',
++      'relationship_unverified',
++      'coverage_basis_unknown',
++    ]);
++    expect(RUN_REASON_CODES).toContain('unresolved_family');
++  });
++});

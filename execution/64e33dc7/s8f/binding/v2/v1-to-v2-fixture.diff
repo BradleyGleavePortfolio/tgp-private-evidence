@@ -1,0 +1,42 @@
+--- ../v1/s8f-fixture.sh	2026-09-25 21:01:31.852507275 +0000
++++ s8f-fixture.sh	2026-09-25 21:26:27.720507275 +0000
+@@ -1,17 +1,17 @@
+ #!/usr/bin/env bash
+-# S8-F disposable PostgreSQL 17.6 cluster helper (lane s8-f only, EXEC-DACEDDC8 under 64e33dc7 runtime), derived by substitution from the
++# S8-F disposable PostgreSQL 17.6 cluster helper (lane s8-f only, EXEC-1910A060 under the 1910a060 runtime (binding v2, RT-NEW-1)), derived by substitution from the
+ # accepted S8-C fixture execution/64e33dc7/s8c/binding/v4/s8c-fixture.sh (unchanged there). LOCK-FREE BY DESIGN: it
+ # takes no flock itself and must be invoked only by the S8-F proof binding
+-# execution/64e33dc7/s8f/binding/v1/s8f-pg-proof.sh, the single canonical lock holder. Standalone use is refused
++# execution/64e33dc7/s8f/binding/v2/s8f-pg-proof.sh, the single canonical lock holder. Standalone use is refused
+ # unless S8F_RUNNER_PID names a live s8f-pg-proof.sh process.
+ #   * cluster_name = 's8f-disposable-pg17' (pinned marker required by start, bootstrap and destroy; identical to
+ #     test/utils/g2-s8f-db.ts G2_S8F_CLUSTER_MARKER)
+ #   * FRESH INIT ONLY: init refuses if the data directory exists (no marking/adopting unknown clusters)
+-#   * listen 127.0.0.1 only, port 55643 (daceddc8 SCOPE guard port; refused-port set in test/utils/g2-s8f-db.ts excludes it), superuser s8f_super / s8f_local_synthetic
++#   * listen 127.0.0.1 only, port 55643 (S8-F guard port kept from v1; not occupied in the 1910a060 environment; refused-port set in test/utils/g2-s8f-db.ts excludes it), superuser s8f_super / s8f_local_synthetic
+ #     (synthetic value; scram, S5 shape)
+-#   * FRESH NAMESPACE (RUNTIME_SETUP_RECEIPT §Donor-copy 6-7): binaries from the SHA-pinned
+-#     recovery-reset/pg17/dist; data and socket directories under recovery-reset/proof-s8f-v1/clusters/s8-f and
+-#     recovery-reset/proof-s8f-v1/run/s8-f (fresh S8-F lane; every S8-C and S7-L lane under proof-*/clusters is another lane, retained, never adopted)
++#   * FRESH NAMESPACE (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md): binaries from the SHA-pinned
++#     execution/1910a060/runtime/pg17/dist; data and socket directories under 1910a060/runtime/proof-s8f-v2/clusters/s8-f and
++#     1910a060/runtime/proof-s8f-v2/run/s8-f (fresh S8-F lane; any other lane under clusters/* or proof-*/clusters is another lane, retained, never adopted)
+ #     — never pg17/dist as a data root, never the historical /home/user/pg17 paths.
+ # `destroy` never discards a stop failure (S5-R3-A-03 revision 2 inherited): a running marked cluster is stopped
+ # with a bounded fast stop; a failed stop, a surviving postmaster or any process still referencing the data
+@@ -20,12 +20,12 @@
+ # Usage (via runner): s8f-fixture.sh init|start|stop|status|destroy
+ set -euo pipefail
+ # ---- lane constants
+-RUNTIME_ROOT=/home/user/workspace/execution/64e33dc7/recovery-reset
++RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime
+ # ---- end lane constants
+ PGHOME=$RUNTIME_ROOT/pg17/dist
+ PORT=55643; SUPER=s8f_super; PASS=s8f_local_synthetic; MARKER=s8f-disposable-pg17
+-LANE=$RUNTIME_ROOT/proof-s8f-v1/clusters/s8-f
+-DATA=$LANE/pg-data; LOG=$LANE/pg.log; SOCK=$RUNTIME_ROOT/proof-s8f-v1/run/s8-f
++LANE=$RUNTIME_ROOT/proof-s8f-v2/clusters/s8-f
++DATA=$LANE/pg-data; LOG=$LANE/pg.log; SOCK=$RUNTIME_ROOT/proof-s8f-v2/run/s8-f
+ STOP_TIMEOUT="${S8F_STOP_TIMEOUT:-45}"
+ cmd=${1:?init|start|stop|status|destroy}
+ [ -n "${S8F_RUNNER_PID:-}" ] && [ -d "/proc/$S8F_RUNNER_PID" ] && grep -q s8f-pg-proof.sh "/proc/$S8F_RUNNER_PID/cmdline" \
