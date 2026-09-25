@@ -344,3 +344,14 @@ Rules for these lanes: gates and commits happen only after the landing and a slo
   - Scope: facts service plus module, per the S9-0 doc (`cda68d82`) and READINESS. It carries B-2 (one edge per declared relationship, including unresolvable parents), the re-review's RC-1..3 and C-5/6/7/9/10 as an S9-0 addendum draft, and the S9-A deviations 2, 3 and 5 amendments.
   - Source first; plus a real-PG proof harness and binding drafted under the S7-L/S8-C patterns.
 - **S8-F:** moves to the composition once BC-6 is committed (parent relay).
+
+## Owner instruction: merge if safe (18:00Z)
+
+Bradley at 10:59 PT: "if they're ready to merge safely, lets go ahead and get them merged!" This covers extension PR #27 and PR #30, and backend PR #530.
+
+- **Extension PRs #27 and #30:** these cannot be merged safely by the operator. Extension `main` protection requires 1 approving review, with enforce_admins on and linear history. The only collaborator is `BradleyGleavePortfolio`, which is the PR author, and GitHub forbids self-approval. So any merge needs one of:
+  - a second account with write access that approves, or
+  - Bradley changing the protection himself, which is owner-reserved security governance.
+
+  The operator will not bypass, change protection, or impersonate a reviewer.
+- **Backend PR #530:** this is a production release. `main` is unprotected, and `fly-deploy` runs on push. An independent T4 assessment has been spawned, with its output going to `daceddc8/prod/PR530_MERGE_SAFETY.md`. The merge happens only on a SAFE verdict, pinned to an exact head sha. Bradley confirms the exact payload first.
