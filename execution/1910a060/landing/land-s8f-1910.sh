@@ -41,8 +41,12 @@ CONTRACT=docs/contracts/importer-openapi.json; CONTRACT_BLOB=8ebf936a9f12087a807
 SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
 PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
 MIGRATIONS=172
-HOOK_PRECOMMIT=3b741de3dd006d6265c6ca6698b7b5ce8aa9a2a5ba2743a8615d85e72b4a140d
-HOOK_COMMITMSG=71029ce88d76d5b885e12f978093ad3e046e93f5c5fc629b6fbba635d9f8a61b
+# CORRECTION-1 (pre-run, parent LAND-S8F-1): lefthook 2.1.9 hook bodies embed the owning clone's absolute node_modules
+# path, so raw hashes differ per clone (historical shared-clone 3b741de3/71029ce8). Comparison is path-normalized against
+# the reference clone's hooks (same method as s9a/gate/s9a-gate-1910.sh): substitute each clone's absolute root with
+# @CLONE_ROOT@, require equality, lefthook 2.1.9, and own-clone lefthook binary reference.
+HOOK_REF_ROOT=/home/user/workspace/worktrees/1910a060-s8f
+LEFTHOOK_EXPECT=2.1.9
 LOCK=/home/user/workspace/execution/test-validation.lock; LOCK_INODE=667698
 DONOR_REPO=/home/user/workspace/worktrees/1910a060-s8f       # RT-NEW-1 clone; binding for the S8-F PG proof: READ ONLY
 PFX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9
@@ -238,7 +242,22 @@ compose)
   [ ! -e node_modules/.bin/prettier ] || refuse 71 "prettier inside product tree"
   for b in tsc eslint lefthook; do [ -x node_modules/.bin/$b ] || refuse 71 "node_modules/.bin/$b missing"; done
   npx --no-install lefthook install >"$RUN_DIR/lefthook-install.log" 2>&1 || refuse 71 "lefthook install"
-  [ "$(sha .git/hooks/pre-commit)" = "$HOOK_PRECOMMIT" ] && [ "$(sha .git/hooks/commit-msg)" = "$HOOK_COMMITMSG" ] || refuse 71 "hook bodies differ from recorded lefthook 2.1.9 hooks"
+  for hk in pre-commit commit-msg; do [ -x ".git/hooks/$hk" ] || refuse 71 ".git/hooks/$hk missing or not executable"; [ -f "$HOOK_REF_ROOT/.git/hooks/$hk" ] || refuse 71 "reference hook $HOOK_REF_ROOT/.git/hooks/$hk absent"; done
+  LHV=$(./node_modules/.bin/lefthook version 2>&1 | head -1 | tr -d '[:space:]'); log "LEFTHOOK_VERSION=$LHV expect=$LEFTHOOK_EXPECT"
+  [ "$LHV" = "$LEFTHOOK_EXPECT" ] || refuse 71 "lefthook version != $LEFTHOOK_EXPECT"
+  normhook(){ sed "s|$2|@CLONE_ROOT@|g" "$1" | sha256sum | cut -c1-64; }
+  HP=$(sha .git/hooks/pre-commit); HC=$(sha .git/hooks/commit-msg)
+  RP=$(sha "$HOOK_REF_ROOT/.git/hooks/pre-commit"); RC_=$(sha "$HOOK_REF_ROOT/.git/hooks/commit-msg")
+  NP=$(normhook .git/hooks/pre-commit "$W"); NC=$(normhook .git/hooks/commit-msg "$W")
+  NRP=$(normhook "$HOOK_REF_ROOT/.git/hooks/pre-commit" "$HOOK_REF_ROOT"); NRC=$(normhook "$HOOK_REF_ROOT/.git/hooks/commit-msg" "$HOOK_REF_ROOT")
+  log "HOOK_RAW own pre-commit=$HP commit-msg=$HC | ref($HOOK_REF_ROOT) pre-commit=$RP commit-msg=$RC_"
+  log "HOOK_NORMALIZED own pre-commit=$NP commit-msg=$NC | ref pre-commit=$NRP commit-msg=$NRC"
+  [ "$NP" = "$NRP" ] && [ "$NC" = "$NRC" ] || refuse 71 "path-normalized hook bodies differ from the reference lefthook $LEFTHOOK_EXPECT hooks"
+  for hk in pre-commit commit-msg; do
+    grep -qF "$W/node_modules/lefthook-linux-x64/bin/lefthook" ".git/hooks/$hk" || refuse 71 ".git/hooks/$hk does not reference $W/node_modules/lefthook-linux-x64/bin/lefthook"
+    ! grep -qF "$HOOK_REF_ROOT" ".git/hooks/$hk" || refuse 71 ".git/hooks/$hk references the reference clone root"
+  done
+  log "HOOK_OK own hooks reference $W/node_modules/lefthook-linux-x64/bin/lefthook"
   ( cd "$PFX" && sha256sum -c --quiet "$PFX_MANIFEST" ) >"$RUN_DIR/prefix-verify.log" 2>&1 && [ "$(wc -l <"$PFX_MANIFEST")" = 56 ] || refuse 71 "prettier prefix manifest"
   export NODE_OPTIONS=--max-old-space-size=4096 npm_config_prefix="$PFX" npm_config_offline=true npm_config_update_notifier=false \
          npm_config_fund=false npm_config_audit=false PRISMA_HIDE_UPDATE_MESSAGE=1
@@ -272,7 +291,7 @@ compose)
   git bundle create "$X/land-s8f-${M:0:12}.bundle" "$TIP..refs/heads/$BR" >>"$RUN_DIR/run.log" 2>&1 && git bundle verify "$X/land-s8f-${M:0:12}.bundle" >>"$RUN_DIR/run.log" 2>&1 || refuse 80 "bundle export"
   git diff --name-status "$TIP" "$M" >"$X/name-status-vs-tip.txt"; git diff --name-status "$H" "$M" >"$X/name-status-vs-s8f.txt"
   { echo "tip=$TIP"; echo "s8f=$H tree=$H_TREE"; echo "merge=$M"; echo "tree=$MT"; echo "contract_blob=$CONTRACT_BLOB"; echo "doc_blob=$DOC_BLOB"
-    git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI' "$M"; echo "hooks pre-commit=$HOOK_PRECOMMIT commit-msg=$HOOK_COMMITMSG prettier=$V"; } >"$X/COMPOSE_RECEIPT.txt"
+    git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI' "$M"; echo "hooks raw pre-commit=$HP commit-msg=$HC normalized pre-commit=$NP commit-msg=$NC (== ref $HOOK_REF_ROOT normalized) lefthook=$LHV prettier=$V"; } >"$X/COMPOSE_RECEIPT.txt"
   ( cd "$X" && sha256sum ./* >SHA256SUMS )
   printf 'TIP=%s\nS8F=%s\nMERGE=%s\nTREE=%s\nWT=%s\nRECEIPT=%s\n' "$TIP" "$H" "$M" "$MT" "$W" "$X/COMPOSE_RECEIPT.txt" >"$LANDING/state/compose-s8f.env"
   log "DONE compose merge=$M tree=$MT (not pushed)"; exit 0 ;;

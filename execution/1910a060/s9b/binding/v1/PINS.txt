@@ -1,0 +1,66 @@
+# S9-B PG proof binding pins — DRAFT v1 (execution/1910a060/s9b/binding/v1). NOTHING HERE HAS BEEN EXECUTED.
+# Every value marked __FILL_*__ is unfilled; s9b-pg-proof.sh refuses to run while any pin is unfilled.
+# Fill ORDER (same doctrine as 64e33dc7/s8c/binding/PINS.txt): runtime setup for 1c5fbb04 (its receipt fills
+# RUNTIME_ROOT + tool pins) -> parent chooses the lane port -> S9-A composition + S9-B gates -> hooked Bradley commit
+# -> fill the head pins from that head (authorized preparation, not a PG run) -> record template->filled diff + sha256
+# in BINDING.sha256 -> dual independent review attests final head + FILLED binding -> separate execution grant.
+# Never fill from an uncommitted tree. Never adjust a tool pin to pass: a mismatch is reported.
+# Fill commands (read-only against the attested head H in W=/home/user/workspace/worktrees/1910a060-s9b):
+#   EXPECT_HEAD           = git -C $W rev-parse HEAD                              (must equal attested H, must not be 1c5fbb04)
+#   EXPECT_TREE           = git -C $W rev-parse 'HEAD^{tree}'
+#   EXPECT_SPEC_BLOB      = git -C $W rev-parse HEAD:test/rls-g2-s9.spec.ts
+#   EXPECT_BOOTSTRAP_BLOB = git -C $W rev-parse HEAD:test/utils/g2-s9-bootstrap.sh
+#   EXPECT_DB_BLOB        = git -C $W rev-parse HEAD:test/utils/g2-s9-db.ts
+#   EXPECT_PGH_BLOB       = git -C $W rev-parse HEAD:test/utils/g2-s9-pg-harness.ts
+#   EXPECT_HARNESS_BLOB   = git -C $W rev-parse HEAD:test/utils/g2-s9-harness.ts
+#   EXPECT_WORKER_BLOB    = git -C $W rev-parse HEAD:test/utils/g2-s9-worker.cjs
+#   EXPECT_FIXTURE_SHA    = sha256sum binding/v1/s9b-fixture.sh                  (frozen together with the filled runner)
+#   PORT                  = lane port chosen by the parent (55645 suggested; 55642 S8-C and 55643 S8-G are refused by g2-s9-db.ts)
+BASE_HEAD=1c5fbb0441178e0cfe6e9f8d72e955c645c265e9
+BASE_TREE=82b56ad373c9cb4888b7c9b79544fbbb6f55c0d6
+EXPECT_HEAD=__FILL_AFTER_ATTESTATION__
+EXPECT_TREE=__FILL_AFTER_ATTESTATION__
+EXPECT_SPEC_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_BOOTSTRAP_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_DB_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_PGH_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_HARNESS_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_WORKER_BLOB=__FILL_AFTER_ATTESTATION__
+EXPECT_FIXTURE_SHA=__FILL_AFTER_ATTESTATION__   # current draft s9b-fixture.sh sha256 = 6fb78034d87ebf429bb041cfe537f8d7db04445ab96ad97954f9f28ad2062b4c (changes when PORT is filled)
+PORT=__FILL_BY_PARENT__
+RUNTIME_ROOT=__FILL_FROM_RUNTIME_RECEIPT__
+# Tool pins: filled from the 1c5fbb04 runtime setup receipt. Prior 64e33dc7 records (compare only; copy a value ONLY
+# when the new receipt re-verifies the same binary/file):
+#   postgres 23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a  initdb b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
+#   pg_ctl   af53d826845af4679a0aaba2bda319f5e527f3b94f3794c67fa174049c9b9401  psql   a200e38c89b111d3abdf26927b186fdd423bef3d84f157af0f4b65db6f8e6c94
+#   node     a03953a7b16bff002b94d6fb58ada900b68241cbcaee6efc400b20dadd36dddc  nm-lock 05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
+#   generated client for schema 0eb41f9a (S7-L lane record, lane-provision.sh S7L_CLIENT): 9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
+EXPECT_POSTGRES_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_INITDB_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_PGCTL_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_PSQL_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_NODE_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_NM_LOCK_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+EXPECT_NM_CLIENT_SHA=__FILL_FROM_RUNTIME_RECEIPT__
+# Filled now from the standalone clone at 1c5fbb04 (sha256sum; read-only):
+EXPECT_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
+EXPECT_PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
+# Accepted-path git blobs/trees at 1c5fbb04 the runner requires unchanged (git rev-parse HEAD:<path> in the clone):
+ACCEPTED_prisma_schema=2e328bbcab0c902c6adb55dfb5ee172defc5f698
+ACCEPTED_prisma_migrations_tree=654550cb99b55473429a9c60ee08319e1b649106
+ACCEPTED_jest_rls_config=44c9691533be2ea27f9a416271d9ff400f7faa3f
+ACCEPTED_src_scout_reconstruct_tree=c4ae4b8ea3e9e2ce8e3ed3cea9d2a69acdc58c02
+ACCEPTED_src_scout_lifecycle_tree=c345dd54a0fafaf4de99f4bb4841a8a51eda82f0
+ACCEPTED_scout_reconstruct_service=711bfb09f7bc831d76daff4ce2f69f7ee39daf94
+ACCEPTED_g2_s8c_db=a7d67217fe959f65daae9615e5f00806cc3764d3
+ACCEPTED_g2_s8c_pg_harness=4059883d70c26aed46398af707645aaacb306868
+ACCEPTED_g2_s8c_harness=1a8f17970a1095f9b802badacf093e773caabd76
+ACCEPTED_g2_s8c_bootstrap=7c3fba471f991e3750eb56fd29e271101652196e
+ACCEPTED_g2_s8c_worker=484030636dee841bcd5aff1af42536128858ac77
+ACCEPTED_g2_s8c_db_guard_spec=c3fc6bded0906fb27fd5cab49dc51fb17825db04
+ACCEPTED_rls_g2_s8c_spec=9d701783eeb7701126d158b45bfee3d5f0f686b3
+# Frozen S9-A files (READ-ONLY dependency; git hash-object of the hash-verified copies; sha256 in S9_A_SOURCE_READY):
+FROZEN_S9A_types=bb28f151a88435abc69d337a92dd3bc2ab7203bd
+FROZEN_S9A_coverage=e13c336ad35a43a26a5e8856a8e810eb96c5dd99
+FROZEN_S9A_reconcile=3932cd3caed21d705c5718e547e225c1a326d5ad
+FROZEN_S9A_reconcile_spec=df887df51a25f48b77564931eac75af5ed71a153

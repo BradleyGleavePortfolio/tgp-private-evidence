@@ -1,0 +1,3741 @@
+diff --git a/src/scout/lifecycle/lifecycle.service.ts b/src/scout/lifecycle/lifecycle.service.ts
+index 5949a293..1a6db74e 100644
+--- a/src/scout/lifecycle/lifecycle.service.ts
++++ b/src/scout/lifecycle/lifecycle.service.ts
+@@ -1,4 +1,4 @@
+-import { Injectable, NotFoundException } from '@nestjs/common';
++import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+ import { Prisma } from '@prisma/client';
+ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+ import { AnalyticsService } from '../../analytics/analytics.service';
+@@ -6,6 +6,7 @@ import { Events } from '../../analytics/events';
+ import { PrismaService } from '../../prisma.service';
+ import { buildFamilyRegistry } from '../reconstruct/families';
+ import { RECONSTRUCT_STATUS } from '../scout-reconstruct.dto';
++import { ScoutReconstructService } from '../scout-reconstruct.service';
+ import { SCOUT_TERMINAL_STATUSES, type ScoutTerminalStatus } from '../scout.dto';
+ import { arbitrate, type ArbiterVerdict, type LedgerTally } from './arbiter';
+ import type { ScoutRunCancelResult, ScoutRunStartResult } from './lifecycle.dto';
+@@ -110,12 +111,16 @@ export class RunGateClosed extends Error {
+ export class ScoutLifecycleService {
+   readonly deadlineMs: number;
+   private readonly registry = buildFamilyRegistry();
++  /** S8-G: the engine the settle hook drives one pass through (same seam pattern as ScoutService → this). */
++  private readonly reconstruct: ScoutReconstructService;
+ 
+   constructor(
+     private readonly prisma: PrismaService,
+     private readonly analytics: AnalyticsService,
++    @Optional() reconstruct?: ScoutReconstructService,
+   ) {
+     this.deadlineMs = ScoutLifecycleService.readDeadlineMs(process.env[SCOUT_RUN_DEADLINE_MS_ENV]);
++    this.reconstruct = reconstruct ?? new ScoutReconstructService(prisma, analytics);
+   }
+ 
+   /** A positive integer number of milliseconds, else the parent-frozen default. */
+@@ -306,11 +311,26 @@ export class ScoutLifecycleService {
+   }
+ 
+   /**
+-   * §3 `onTransferSettled`: the accepted `/complete` hands the run to the arbiter. S7-L arbitrates
+-   * immediately under a CAS on the epoch the settle observed; S8-G replaces this body with
+-   * reconstruct-then-arbitrate and keeps the CAS. A miss (a fence won) is not an error.
++   * §3 `onTransferSettled`: the accepted `/complete` hands the run to the arbiter. S8-G body:
++   * reconstruct-then-arbitrate. One reconstruction pass runs first over the open run in phase
++   * `reconciling`, with this run's `assertRunOpen` as the §3.1 gate inside every per-row
++   * transaction and `epoch` (the value the settle observed at claim commit) as the per-row CAS.
++   * The pass writes only target rows and ledger outcomes — never a terminal field. If the gate
++   * closed mid-pass (a fence or the deadline won), the lazy classifier runs once so a past-deadline
++   * run is fenced `timed_out` truthfully; then the S7-L tail runs unchanged: lock the run, CAS on
++   * `epoch`, collect the durable facts, arbitrate, write the terminal. A miss (a fence won) is not
++   * an error. An unexpected pass failure propagates and leaves the run open for the lazy deadline
++   * — nothing terminal is ever written from a failed pass.
+    */
+   async onTransferSettled(coachId: string, intentId: string, epoch: number): Promise<void> {
++    const pass = await this.reconstruct.reconstructRun(coachId, intentId, {
++      mode: 'server',
++      epoch,
++      gate: (tx) => this.assertRunOpen(tx, coachId, intentId),
++    });
++    if (pass.stopped === 'gate_closed') {
++      await this.classifyClosed(coachId, intentId);
++    }
+     const outcome = await this.prisma.$transaction(async (tx) => {
+       const locked = await this.lockRun(tx, coachId, intentId);
+       if (!locked || locked.terminal_status !== null || locked.execution_epoch !== epoch) {
+diff --git a/src/scout/scout-reconstruct.service.ts b/src/scout/scout-reconstruct.service.ts
+index 711bfb09..fb728502 100644
+--- a/src/scout/scout-reconstruct.service.ts
++++ b/src/scout/scout-reconstruct.service.ts
+@@ -10,6 +10,20 @@ import {
+   type FamilyReconstructor,
+   type StagedRow,
+ } from './reconstruct/families';
++import {
++  planRun,
++  type PlannedSource,
++  type UnmappedGroup,
++} from './reconstruct/orchestration/family-plan';
++import {
++  LEGACY_RUN,
++  RunPassStopped,
++  type FamilyPassResult,
++  type RunContext,
++  type RunPassResult,
++  type ServerRunContext,
++} from './reconstruct/orchestration/run-context';
++import { buildSourceMapperRegistry } from './reconstruct/source-mapper-registry';
+ import {
+   RECONSTRUCT_ENTITY_TYPE,
+   RECONSTRUCT_MAX_ROWS,
+@@ -53,6 +67,8 @@ import {
+ export class ScoutReconstructService {
+   private readonly logger = new Logger(ScoutReconstructService.name);
+   private readonly families = buildFamilyRegistry();
++  /** The planner's `(platform, token) → family` seam (S8-G); same repository specs the families read. */
++  private readonly sourceMappers = buildSourceMapperRegistry();
+ 
+   constructor(
+     private readonly prisma: PrismaService,
+@@ -96,7 +112,7 @@ export class ScoutReconstructService {
+         skip,
+       });
+       for (const row of page) {
+-        await this.reconstructRow(family, coachId, intentId, row);
++        await this.reconstructRow(family, coachId, intentId, row, LEGACY_RUN);
+       }
+     }
+ 
+@@ -131,6 +147,238 @@ export class ScoutReconstructService {
+     return result;
+   }
+ 
++  /**
++   * S8-G — one reconstruction pass over an OPEN server run (phase `reconciling`,
++   * terminal null), driven by `ScoutLifecycleService.onTransferSettled`. Not the
++   * settled gate: the §3.1 gate inside every per-row transaction is the only
++   * admission check, so a fence (cancel, deadline, revoke) that lands between
++   * two rows stops the pass at the next row with nothing further written.
++   *
++   * The distinct staged `(source_platform, entity_type)` groups of the run are
++   * planned once (`planRun`: token → canonical family through the source spec,
++   * contract §3.8 order). Each planned source runs as the legacy engine would
++   * (count-bound, paged, one transaction per row) with the run context threaded
++   * into `reconstructRow`; the staged token is forwarded on each row so the
++   * native families dispatch on it and the ledger groups by it. An unmapped token
++   * is ledgered `skipped` per row with the exact S8-A reason (gate-first too).
++   *
++   * Family-level isolation: an over-ceiling source or a structural provenance
++   * conflict stops THAT source only (recorded on its result, no new reason code)
++   * and the next family still runs. A closed gate (`RunPassStopped`) ends the
++   * whole pass. The pass never writes `terminal_status`, `completed_at`,
++   * `reason_code`, `fenced_at` or `execution_epoch`: the caller's arbiter tail
++   * reads the durable rows under the run lock and writes the terminal under its
++   * CAS. Counts here are informational and read back from the ledger.
++   */
++  async reconstructRun(
++    coachId: string,
++    intentId: string,
++    ctx: ServerRunContext,
++  ): Promise<RunPassResult> {
++    const groups = await this.prisma.scoutIngestEntity.groupBy({
++      by: ['source_platform', 'entity_type'],
++      where: { coach_id: coachId, intent_id: intentId },
++      _count: { _all: true },
++    });
++    const plan = planRun(groups, this.sourceMappers, this.families);
++    const unmappedFamilies = [...new Set(plan.unmapped.map((group) => group.token))];
++    const families: FamilyPassResult[] = [];
++    let stopped: RunPassResult['stopped'] = null;
++    try {
++      for (const planned of plan.ordered) {
++        const family = this.families.get(planned.family);
++        // planRun only plans registered families; fail closed if that ever changes.
++        if (!family) throw new Error(`unregistered planned family: ${planned.family}`);
++        for (const source of planned.sources) {
++          families.push(await this.runFamilySource(family, coachId, intentId, source, ctx));
++        }
++      }
++      for (const group of plan.unmapped) {
++        families.push(await this.runUnmappedSource(coachId, intentId, group, ctx));
++      }
++    } catch (err) {
++      if (!(err instanceof RunPassStopped)) throw err;
++      stopped = 'gate_closed';
++    }
++    const summary = {
++      intent_id: intentId,
++      coach_id: coachId,
++      epoch: ctx.epoch,
++      stopped,
++      families: families.map((f) => ({
++        token: f.token,
++        family: f.family,
++        staged: f.staged,
++        reconstructed: f.reconstructed,
++        skipped: f.skipped,
++        failed: f.failed,
++        stopped: f.stopped,
++      })),
++      unmapped_families: unmappedFamilies,
++    };
++    if (stopped !== null || families.some((f) => f.failed > 0 || f.stopped !== null)) {
++      this.logger.warn(`scout.reconstruct run pass stopped or degraded ${JSON.stringify(summary)}`);
++    } else {
++      this.logger.log(`scout.reconstruct run pass completed ${JSON.stringify(summary)}`);
++    }
++    return { families, unmapped_families: unmappedFamilies, stopped };
++  }
++
++  /**
++   * One planned (platform, token) source of a canonical family: the legacy
++   * engine's count-bound paged loop with the token forwarded on every row.
++   * Over-ceiling (409 before any write) and a structural provenance conflict are
++   * isolated to this source; a closed gate propagates and ends the pass.
++   */
++  private async runFamilySource(
++    family: FamilyReconstructor,
++    coachId: string,
++    intentId: string,
++    source: PlannedSource,
++    ctx: ServerRunContext,
++  ): Promise<FamilyPassResult> {
++    let stopped: FamilyPassResult['stopped'] = null;
++    try {
++      this.assertWithinBound(coachId, intentId, source.staged);
++    } catch (err) {
++      if (!(err instanceof ConflictException)) throw err;
++      stopped = 'over_ceiling';
++    }
++    if (stopped === null) {
++      const where = {
++        coach_id: coachId,
++        intent_id: intentId,
++        entity_type: source.token,
++        source_platform: source.source_platform,
++      };
++      try {
++        for (let skip = 0; skip < source.staged; skip += RECONSTRUCT_PAGE_SIZE) {
++          const page = await this.prisma.scoutIngestEntity.findMany({
++            where,
++            select: { source_id: true, source_platform: true, payload: true, entity_type: true },
++            orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
++            take: RECONSTRUCT_PAGE_SIZE,
++            skip,
++          });
++          for (const row of page) {
++            await this.reconstructRow(family, coachId, intentId, row, ctx);
++          }
++        }
++      } catch (err) {
++        if (err instanceof RunPassStopped) throw err;
++        if (!(err instanceof ProvenanceConflict)) throw err;
++        stopped = 'provenance_conflict';
++      }
++    }
++    const result = await this.tallyPass(coachId, intentId, source);
++    this.analytics.capture(coachId, Events.SCOUT_RECONSTRUCT_COMPLETED, {
++      intent_id: intentId,
++      entity_type: source.token,
++      staged: source.staged,
++      reconstructed: result.reconstructed,
++      skipped: result.skipped,
++      failed: result.failed,
++    });
++    return {
++      token: source.token,
++      source_platform: source.source_platform,
++      family: family.entityType,
++      staged: source.staged,
++      ...result,
++      stopped,
++    };
++  }
++
++  /**
++   * A staged token no spec maps to a registered family: every row is ledgered
++   * `skipped` with the exact S8-A reason (`unresolved_family:<token>` or
++   * `unsupported_platform:<platform>`), gate-first, so the run's accounting
++   * (`staged = reconstructed + skipped + failed` per token) holds and the arbiter
++   * sees the token in `unmapped_families`. A noncanonical platform token is a
++   * structural conflict (the ledger CHECK would refuse it): nothing is written.
++   */
++  private async runUnmappedSource(
++    coachId: string,
++    intentId: string,
++    group: UnmappedGroup,
++    ctx: ServerRunContext,
++  ): Promise<FamilyPassResult> {
++    const base = {
++      token: group.token,
++      source_platform: group.source_platform,
++      family: null,
++      staged: group.staged,
++    };
++    if (!isCanonicalPlatform(group.source_platform)) {
++      return { ...base, reconstructed: 0, skipped: 0, failed: 0, stopped: 'provenance_conflict' };
++    }
++    const where = {
++      coach_id: coachId,
++      intent_id: intentId,
++      entity_type: group.token,
++      source_platform: group.source_platform,
++    };
++    for (let skip = 0; skip < group.staged; skip += RECONSTRUCT_PAGE_SIZE) {
++      const page = await this.prisma.scoutIngestEntity.findMany({
++        where,
++        select: { source_id: true, source_platform: true, payload: true, entity_type: true },
++        orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
++        take: RECONSTRUCT_PAGE_SIZE,
++        skip,
++      });
++      for (const row of page) {
++        await this.writeOutcome(
++          group.token,
++          coachId,
++          intentId,
++          row,
++          RECONSTRUCT_STATUS.skipped,
++          group.reason,
++          ctx,
++        );
++      }
++    }
++    const result = await this.tallyPass(coachId, intentId, group);
++    return { ...base, ...result, stopped: null };
++  }
++
++  /** Ledger read-back for one (platform, token) source of a run pass. */
++  private async tallyPass(
++    coachId: string,
++    intentId: string,
++    source: PlannedSource,
++  ): Promise<Pick<FamilyPassResult, 'reconstructed' | 'skipped' | 'failed'>> {
++    const grouped = await this.prisma.scoutReconstructionLedger.groupBy({
++      by: ['status'],
++      where: {
++        coach_id: coachId,
++        intent_id: intentId,
++        entity_type: source.token,
++        source_platform: source.source_platform,
++      },
++      _count: { _all: true },
++    });
++    const count = (status: string): number =>
++      grouped.find((g) => g.status === status)?._count._all ?? 0;
++    return {
++      reconstructed: count(RECONSTRUCT_STATUS.reconstructed),
++      skipped: count(RECONSTRUCT_STATUS.skipped),
++      failed: count(RECONSTRUCT_STATUS.failed),
++    };
++  }
++
++  /**
++   * §3.1 gate-first (S8-G): for a server run the caller-supplied `assertRunOpen`
++   * UPDATE is the first statement of the transaction and its row lock; the epoch
++   * it returns must equal the one the pass was started under (per-row CAS). A
++   * legacy context performs no statement at all.
++   */
++  private async gateRun(tx: Prisma.TransactionClient, ctx: RunContext): Promise<void> {
++    if (ctx.mode !== 'server') return;
++    const seen = await ctx.gate(tx);
++    if (seen === null || seen !== ctx.epoch) throw new RunPassStopped();
++  }
++
+   /**
+    * Reject reconstruction of an intent that has not settled to a terminal
+    * status. Post-settle only: reconstructing a live crawl would race the
+@@ -174,46 +422,59 @@ export class ScoutReconstructService {
+    * write a ledger outcome unless success was already committed. Ordinary map
+    * and target errors are isolated; structural provenance conflicts and terminal
+    * ledger failures stop the operation rather than inventing durable accounting.
++   *
++   * S8-G: `ctx` is threaded into every transaction this row opens; for a server
++   * run the §3.1 gate is the first statement of each (`gateRun`) and a closed
++   * gate (`RunPassStopped`) propagates unchanged — never a fabricated `failed`.
++   * The ledger row carries the staged token when the caller forwarded one
++   * (`row.entity_type`, run passes) and the family's own token otherwise (the
++   * coach-JWT route, which selects no token — unchanged).
+    */
+   private async reconstructRow(
+     family: FamilyReconstructor,
+     coachId: string,
+     intentId: string,
+     row: StagedRow,
++    ctx: RunContext,
+   ): Promise<void> {
+     // Old ingestion may have admitted noncanonical tokens. Never normalize or
+     // invent provenance; a structural failure stops this operation truthfully.
+     if (!isCanonicalPlatform(row.source_platform)) {
+       throw new ProvenanceConflict();
+     }
++    const ledgerType = row.entity_type ?? family.entityType;
+     let mapped: ReturnType<FamilyReconstructor['map']>;
+     try {
+       mapped = family.map(row);
+     } catch (err) {
+       await this.writeOutcome(
+-        family.entityType,
++        ledgerType,
+         coachId,
+         intentId,
+         row,
+         RECONSTRUCT_STATUS.failed,
+         summarizeError(err),
++        ctx,
+       );
+       return;
+     }
+     if (!mapped.ok) {
+       await this.writeOutcome(
+-        family.entityType,
++        ledgerType,
+         coachId,
+         intentId,
+         row,
+         RECONSTRUCT_STATUS.skipped,
+         mapped.reason,
++        ctx,
+       );
+       return;
+     }
+     try {
+       await retryContention(() =>
+         this.prisma.$transaction(async (tx) => {
++          // §3.1 gate first (server runs only); a legacy context issues nothing here.
++          await this.gateRun(tx, ctx);
+           // Keep target-before-ledger lock order compatible with old writers.
+           const result = await family.persist(tx, coachId, row.source_id, mapped.mapped);
+           if (isPersistOutcome(result)) {
+@@ -223,7 +484,7 @@ export class ScoutReconstructService {
+             if (!result.ok) {
+               await this.writeLedger(
+                 tx,
+-                family.entityType,
++                ledgerType,
+                 coachId,
+                 intentId,
+                 row,
+@@ -235,7 +496,7 @@ export class ScoutReconstructService {
+             }
+             await this.writeLedger(
+               tx,
+-              family.entityType,
++              ledgerType,
+               coachId,
+               intentId,
+               row,
+@@ -249,7 +510,7 @@ export class ScoutReconstructService {
+           // Legacy `string | null` result: ledger target_kind stays NULL (never reinterpreted).
+           await this.writeLedger(
+             tx,
+-            family.entityType,
++            ledgerType,
+             coachId,
+             intentId,
+             row,
+@@ -261,13 +522,15 @@ export class ScoutReconstructService {
+       );
+     } catch (err) {
+       if (err instanceof ProvenanceConflict) throw err;
++      if (err instanceof RunPassStopped) throw err;
+       await this.writeOutcome(
+-        family.entityType,
++        ledgerType,
+         coachId,
+         intentId,
+         row,
+         RECONSTRUCT_STATUS.failed,
+         summarizeError(err),
++        ctx,
+       );
+     }
+   }
+@@ -279,13 +542,15 @@ export class ScoutReconstructService {
+     row: StagedRow,
+     status: string,
+     reason: string,
++    ctx: RunContext,
+   ): Promise<void> {
+     // A terminal ledger-write failure propagates: do not report a fabricated
+     // durable outcome. Success/skip/failure transactions each retry at most once.
+     await retryContention(() =>
+-      this.prisma.$transaction((tx) =>
+-        this.writeLedger(tx, entityType, coachId, intentId, row, status, null, reason),
+-      ),
++      this.prisma.$transaction(async (tx) => {
++        await this.gateRun(tx, ctx);
++        await this.writeLedger(tx, entityType, coachId, intentId, row, status, null, reason);
++      }),
+     );
+   }
+ 
+diff --git a/src/scout/reconstruct/orchestration/family-plan.ts b/src/scout/reconstruct/orchestration/family-plan.ts
+new file mode 100644
+index 00000000..0a75e656
+--- /dev/null
++++ b/src/scout/reconstruct/orchestration/family-plan.ts
+@@ -0,0 +1,113 @@
++import { RECONSTRUCT_FAMILY } from '../../scout-reconstruct.dto';
++import type { FamilyReconstructor } from '../families';
++import { resolveStagedFamily, type SourceMapper } from '../source-mapper-registry';
++
++/**
++ * S8-G — the pure plan of one reconstruction pass over a run's staged rows
++ * (docs/decisions/2026-09-24-s8-native-contract.md §3.8).
++ *
++ * Input is the distinct staged `(source_platform, entity_type)` groups of one
++ * (coach, intent) with their row counts, exactly as Prisma's `groupBy` returns
++ * them. Each group's step token is resolved ONCE here through the source's
++ * data-only mapping spec (`resolveStep`, S8-A carry-forward C2), so the engine
++ * never iterates the family registry's insertion order and never maps a token
++ * twice at the engine level (the native families' own `dispatch` re-evaluates
++ * the same pure function with the same inputs — idempotent, not a conflict).
++ */
++
++/** One distinct staged group, as `scoutIngestEntity.groupBy({ by: ['source_platform','entity_type'] })` returns it. */
++export interface StagedGroup {
++  readonly source_platform: string;
++  readonly entity_type: string;
++  readonly _count: { readonly _all: number };
++}
++
++/** One planned (platform, token) source inside a canonical family. */
++export interface PlannedSource {
++  readonly source_platform: string;
++  readonly token: string;
++  readonly staged: number;
++}
++
++export interface PlannedFamily {
++  readonly family: string;
++  readonly sources: readonly PlannedSource[];
++}
++
++/** A staged group no registered spec maps to a registered family; `reason` is the exact S8-A skip reason. */
++export interface UnmappedGroup extends PlannedSource {
++  readonly reason: string;
++}
++
++export interface RunPlan {
++  /** Canonical families with at least one staged source, in {@link RUN_FAMILY_ORDER}. */
++  readonly ordered: readonly PlannedFamily[];
++  /** Groups the pass ledgers `skipped` with their reason, in (platform, token) order. */
++  readonly unmapped: readonly UnmappedGroup[];
++}
++
++/**
++ * Contract §3.8 order: `clients → programs → workouts (coach templates) → client-owned
++ * families`. `programs` before `workouts` is load-bearing: program-day plans resolve their
++ * parent through provenance and stay `relationship_pending` when the program has not landed.
++ * This is deliberately NOT the `RECONSTRUCT_FAMILY` declaration order nor the registry's
++ * insertion order.
++ */
++export const RUN_FAMILY_ORDER = [
++  RECONSTRUCT_FAMILY.clients,
++  RECONSTRUCT_FAMILY.programs,
++  RECONSTRUCT_FAMILY.workouts,
++  RECONSTRUCT_FAMILY.client_history,
++] as const;
++
++const bySource = (a: PlannedSource, b: PlannedSource): number =>
++  a.source_platform < b.source_platform
++    ? -1
++    : a.source_platform > b.source_platform
++      ? 1
++      : a.token < b.token
++        ? -1
++        : a.token > b.token
++          ? 1
++          : 0;
++
++/**
++ * Pure: no I/O. A group whose token resolves (`ok`) to a family the registry holds is planned
++ * into that family; every other group is unmapped with the reason `resolveStagedFamily`
++ * returned (`unsupported_platform:<platform>` or `unresolved_family:<token>`), or
++ * `unresolved_family:<token>` when the spec names a family the registry does not register.
++ * Families with no staged rows are omitted — a family is never invented.
++ */
++export function planRun(
++  staged: readonly StagedGroup[],
++  mappers: ReadonlyMap<string, SourceMapper>,
++  registry: ReadonlyMap<string, FamilyReconstructor>,
++): RunPlan {
++  const planned = new Map<string, PlannedSource[]>();
++  const unmapped: UnmappedGroup[] = [];
++  for (const group of staged) {
++    const source: PlannedSource = {
++      source_platform: group.source_platform,
++      token: group.entity_type,
++      staged: group._count._all,
++    };
++    const step = resolveStagedFamily(mappers, group.source_platform, group.entity_type);
++    if (!step.ok) {
++      unmapped.push({ ...source, reason: step.reason });
++      continue;
++    }
++    if (!registry.has(step.family)) {
++      unmapped.push({ ...source, reason: `unresolved_family:${group.entity_type}` });
++      continue;
++    }
++    const sources = planned.get(step.family) ?? [];
++    sources.push(source);
++    planned.set(step.family, sources);
++  }
++  const ordered: PlannedFamily[] = [];
++  for (const family of RUN_FAMILY_ORDER) {
++    const sources = planned.get(family);
++    if (sources !== undefined) ordered.push({ family, sources: [...sources].sort(bySource) });
++  }
++  return { ordered, unmapped: unmapped.sort(bySource) };
++}
+diff --git a/src/scout/reconstruct/orchestration/run-context.ts b/src/scout/reconstruct/orchestration/run-context.ts
+new file mode 100644
+index 00000000..b07ebb85
+--- /dev/null
++++ b/src/scout/reconstruct/orchestration/run-context.ts
+@@ -0,0 +1,73 @@
++import { Prisma } from '@prisma/client';
++
++/**
++ * S8-G — the run context a reconstruction pass carries into every per-row
++ * transaction (docs/decisions/2026-09-24-s7l-run-lifecycle.md §3.1, §8).
++ *
++ * `legacy`: the coach-JWT `POST /api/scout/reconstruct` route on a settled
++ * intent. No gate, no epoch — the statement sequence of every row transaction
++ * is byte-identical to the pre-S8-G engine.
++ *
++ * `server`: the pass `onTransferSettled` runs over an open server run in phase
++ * `reconciling`. `gate` is S7-L's `assertRunOpen` bound to this run: an UPDATE
++ * that is itself the row lock and returns the run's `execution_epoch` (or null
++ * when the run is fenced, terminal, past its deadline or absent). The engine
++ * calls it as the FIRST statement of every per-row transaction and compares the
++ * returned epoch with `epoch`, the value the settle observed at claim commit —
++ * the per-row CAS. Any mismatch closes the pass at that row.
++ */
++export type GateFn = (tx: Prisma.TransactionClient) => Promise<number | null>;
++
++export interface ServerRunContext {
++  readonly mode: 'server';
++  readonly epoch: number;
++  readonly gate: GateFn;
++}
++
++export interface LegacyRunContext {
++  readonly mode: 'legacy';
++}
++
++export type RunContext = LegacyRunContext | ServerRunContext;
++
++/** The coach-JWT route's context: no gate, no epoch (pre-S8-G statement sequence). */
++export const LEGACY_RUN: LegacyRunContext = { mode: 'legacy' };
++
++/**
++ * Thrown out of a per-row transaction when the §3.1 gate returned zero rows or an
++ * epoch other than the one the pass was started under. The transaction rolls
++ * back with nothing written; the pass stops at that row and hands over to the
++ * arbiter path. It is never converted into a fabricated `failed` ledger outcome
++ * and never retried (it is not a contention error).
++ */
++export class RunPassStopped extends Error {
++  constructor() {
++    super('scout run pass stopped: gate closed');
++    this.name = 'RunPassStopped';
++  }
++}
++
++/** Why one planned (platform, token) source stopped early, or null when it ran to the end. */
++export type FamilyStop = 'gate_closed' | 'over_ceiling' | 'provenance_conflict';
++
++/** The pass's account of one staged (platform, token) source; counts are read back from the ledger. */
++export interface FamilyPassResult {
++  /** The staged step token (`entity_type` of the staged rows). */
++  readonly token: string;
++  readonly source_platform: string;
++  /** The canonical family the token resolved to, or null for an unmapped token. */
++  readonly family: string | null;
++  readonly staged: number;
++  readonly reconstructed: number;
++  readonly skipped: number;
++  readonly failed: number;
++  readonly stopped: FamilyStop | null;
++}
++
++/** The whole pass. `stopped: 'gate_closed'` means the run was fenced/expired mid-pass. */
++export interface RunPassResult {
++  readonly families: readonly FamilyPassResult[];
++  /** Distinct staged tokens no registered source spec maps to a registered family. */
++  readonly unmapped_families: readonly string[];
++  readonly stopped: 'gate_closed' | null;
++}
+diff --git a/test/rls-g2-s8g.spec.ts b/test/rls-g2-s8g.spec.ts
+new file mode 100644
+index 00000000..7e3e4273
+--- /dev/null
++++ b/test/rls-g2-s8g.spec.ts
+@@ -0,0 +1,657 @@
++/**
++ * G2-S8-G live PostgreSQL 17 proof (explicitly guarded; run only through jest.rls.config.js on the
++ * S8-G disposable lane bootstrapped by test/utils/g2-s8g-bootstrap.sh, never in the default suite).
++ *
++ * Exercises the REAL settle path — ScoutService.complete → ScoutLifecycleService.onTransferSettled
++ * → ScoutReconstructService.reconstructRun → S7-L arbitration — in independent OS processes
++ * (test/utils/g2-s8g-worker.cjs) with the owned family registry AND planner mappers injected from
++ * the fixture spec + rule set, against the accepted S7-L run objects and S8-B provenance objects
++ * on the base 1c5fbb04 schema (S8-G ships no migration). Every assertion reads the database
++ * through psql as the fixture owner. The fixture platform's staged tokens (`people`, `blocks`,
++ * `routines`, `log`) deliberately differ from the family names so token forwarding is observable.
++ *
++ * Fixture facts that shape expectations (accepted S8-A/S8-C behaviour, not S8-G's to change):
++ * the `clients` and `client_history` families resolve their mapper through the ACCEPTED registry,
++ * so fixture-platform rows of those tokens ledger `skipped` `unsupported_platform:s8g-proof`; the
++ * native `programs`/`workouts` families use the injected mappers and land real targets.
++ */
++import { execFileSync } from 'child_process';
++import { RECONSTRUCT_MAX_ROWS } from '../src/scout/scout-reconstruct.dto';
++import {
++  catalog,
++  completionRows,
++  count,
++  evidenceRows,
++  expire,
++  intent,
++  ledgerByToken,
++  ledgerRows,
++  legacyRun,
++  PLATFORM,
++  plans,
++  programs,
++  provenanceRows,
++  REGISTRY,
++  resetData,
++  runRow,
++  stage,
++  stagedCount,
++  targetSnapshot,
++  TOKEN,
++  TOKEN_ORDER,
++} from './utils/g2-s8g-harness';
++import {
++  appliedMigrations,
++  BASE_HEAD,
++  blocked,
++  candidateHead,
++  directory,
++  EXPECTED_MIGRATIONS,
++  expectedVersion,
++  jsonAdmin,
++  quote,
++  refused,
++  root,
++  run,
++  S7L_MIGRATION,
++  sql,
++  sqlAdmin,
++  sqlAs,
++  target,
++  worker,
++} from './utils/g2-s8g-pg-harness';
++
++jest.setTimeout(300000);
++
++const COACH = 'coach';
++const OTHER = 'other-coach';
++const LEGACY_INTENT = 'intent_legacy_s8g';
++const CAT_ID = '11111111-1111-4111-8111-111111111111';
++const CAT_SLUG = 'synthetic-bench-press';
++const PROGRAM = { title: 'Base Block', weeks: 4, days: 3, notes: 'synthetic' };
++const WORKOUT = {
++  title: 'Push Day',
++  kind: 'lift',
++  minutes: 45,
++  exercises: [{ id: 'e1', exercise: CAT_ID, sets: 3, reps: 8, kg: 100 }],
++};
++const ack = (intent_id: string) => ({ acknowledged: true, intent_id });
++const conflict = (code: string, extra: Record<string, unknown> = {}) =>
++  expect.objectContaining({ status: 409, response: expect.objectContaining({ code, ...extra }) });
++
++/* ---- query-log helpers (statement shapes only; the worker never logs parameters) ---- */
++const isGate = (q: string) => q.includes('last_observed_at');
++const isLock = (q: string) => q.includes('FOR NO KEY UPDATE');
++const isTerminal = (q: string) => q.includes('SET terminal_status = ');
++const isFence = (q: string) => q.includes('SET fenced_at = ');
++const isNoise = (q: string) => /^\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|SET |DEALLOCATE|SELECT 1\b)/i.test(q);
++/** Statements of each fixture-marked transaction, in order (noise such as BEGIN/COMMIT removed). */
++function segments(queries: string[]): string[][] {
++  const out: string[][] = [];
++  let cur: string[] | null = null;
++  for (const q of queries) {
++    if (q === '-- tx:begin') cur = [];
++    else if (q === '-- tx:commit' || q === '-- tx:rollback') {
++      if (cur) out.push(cur);
++      cur = null;
++    } else if (cur && !isNoise(q)) cur.push(q);
++  }
++  return out;
++}
++const firstIndex = (queries: string[], re: RegExp) => queries.findIndex((q) => re.test(q));
++const stagePlanned = (intentId: string, coach = COACH) => {
++  stage(coach, intentId, TOKEN.clients, 'p-1');
++  stage(coach, intentId, TOKEN.clients, 'p-2');
++  stage(coach, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++  stage(coach, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++  stage(coach, intentId, TOKEN.workouts, 'rt-c', { ...WORKOUT, title: 'Client Push', client_id: 'c-1' });
++  stage(coach, intentId, TOKEN.client_history, 'h-1', { title: 'note' });
++};
++const started = async (coach = COACH) => {
++  const intentId = intent(coach);
++  const start = await run({ action: 'start', coach, intent: intentId });
++  expect(start.failure).toBeUndefined();
++  return intentId;
++};
++
++beforeEach(() => {
++  resetData();
++  catalog([{ id: CAT_ID, slug: CAT_SLUG }]);
++});
++afterAll(() => resetData());
++
++describe('lane identity (bootstrap state, never repaired here)', () => {
++  it('is the S8-G disposable PG17 lane at the accepted history through S7-L; S7-L and S8-B objects present', () => {
++    const facts =
++      jsonAdmin(`SELECT json_build_object('version',current_setting('server_version_num')::int,
++      'cluster',current_setting('cluster_name'),'directory',current_setting('data_directory'),
++      'port',inet_server_port(),'db',current_database())`);
++    expect(facts).toEqual({
++      version: expectedVersion,
++      cluster: 's8g-disposable-pg17',
++      directory,
++      port: target.port,
++      db: 'g2_s8g_disposable',
++    });
++    expect(Number(appliedMigrations())).toBe(EXPECTED_MIGRATIONS);
++    expect(
++      sql(`SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC, migration_name DESC LIMIT 1`),
++    ).toBe(S7L_MIGRATION);
++    expect(sql(`SELECT to_regclass('public."ImportNativeProvenance"') IS NOT NULL`)).toBe('t');
++    for (const column of ['mode', 'phase', 'execution_epoch', 'fenced_at', 'fence_reason', 'deadline_at']) {
++      expect(
++        sql(`SELECT count(*) FROM information_schema.columns WHERE table_name='ScoutImport' AND column_name='${column}'`),
++      ).toBe('1');
++    }
++    expect(sqlAdmin(`SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','authenticator')`)).toBe('0');
++  });
++
++  it('is bound to one attested candidate head that descends from the base and adds no migration', () => {
++    expect(candidateHead).toMatch(/^[0-9a-f]{40}$/);
++    expect(candidateHead).not.toBe(BASE_HEAD);
++    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()).toBe(candidateHead);
++    expect(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()).toBe('');
++    expect(() =>
++      execFileSync('git', ['merge-base', '--is-ancestor', BASE_HEAD, candidateHead], { cwd: root, stdio: 'ignore' }),
++    ).not.toThrow();
++    expect(
++      execFileSync('git', ['diff', '--stat', BASE_HEAD, candidateHead, '--', 'prisma/migrations', 'prisma/schema.prisma'], {
++        cwd: root,
++        encoding: 'utf8',
++      }).trim(),
++    ).toBe('');
++  });
++
++  it('the worker exposes the accepted family list and resolves fixture tokens through the injected planner', async () => {
++    const result = await run({ ...REGISTRY, action: 'status', coach: COACH, intent: intent(COACH) });
++    expect(result.families).toEqual(['clients', 'workouts', 'client_history', 'programs']);
++  });
++});
++
++describe('P01 — open run, /complete → one ordered pass → truthful terminal (G01)', () => {
++  it('reconstructs every staged token in §3.8 order, forwards tokens into the ledger, settles partial/reconciliation_not_performed', async () => {
++    const intentId = await started();
++    for (const [token, entities] of [
++      [TOKEN.clients, [{ sourceId: 'p-1', payload: { name: 'A' } }, { sourceId: 'p-2', payload: { name: 'B' } }]],
++      [TOKEN.programs, [{ sourceId: 'blk-1', payload: PROGRAM }]],
++      [TOKEN.workouts, [{ sourceId: 'rt-1', payload: WORKOUT }, { sourceId: 'rt-c', payload: { ...WORKOUT, client_id: 'c-1' } }]],
++      [TOKEN.client_history, [{ sourceId: 'h-1', payload: { title: 'note' } }]],
++    ] as const) {
++      const ingest = await run({ action: 'ingest', coach: COACH, intent: intentId, body: { entity_type: token, entities } });
++      expect(ingest.failure).toBeUndefined();
++    }
++    expect(stagedCount(COACH, intentId)).toBe(6);
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, body: { terminal_status: 'success' } });
++    expect(done.failure).toBeUndefined();
++    expect(done.result).toEqual(ack(intentId));
++    const row = runRow(COACH, intentId);
++    expect(row).toMatchObject({
++      mode: 'server',
++      phase: 'reconciling',
++      terminal_status: 'partial',
++      state: 'partial',
++      reason_code: 'reconciliation_not_performed',
++      execution_epoch: 1,
++      fenced_at: null,
++    });
++    expect(row.completed_at).not.toBeNull();
++    expect(completionRows()).toEqual([[COACH, intentId, 'success']]);
++    // Ledger carries the staged TOKEN (not the family) and covers every staged row.
++    expect(ledgerByToken(COACH, intentId)).toEqual({
++      [TOKEN.clients]: { reconstructed: 0, skipped: 2, failed: 0 },
++      [TOKEN.programs]: { reconstructed: 1, skipped: 0, failed: 0 },
++      [TOKEN.workouts]: { reconstructed: 2, skipped: 0, failed: 0 },
++      [TOKEN.client_history]: { reconstructed: 0, skipped: 1, failed: 0 },
++    });
++    const ledger = ledgerRows(COACH, intentId);
++    expect(ledger.find((r) => r.source_id === 'p-1')).toMatchObject({
++      entity_type: TOKEN.clients,
++      status: 'skipped',
++      reason: `unsupported_platform:${PLATFORM}`,
++    });
++    expect(ledger.find((r) => r.source_id === 'rt-1')).toMatchObject({ entity_type: TOKEN.workouts, status: 'reconstructed', target_kind: 'workout_plan' });
++    expect(ledger.find((r) => r.source_id === 'rt-c')).toMatchObject({ entity_type: TOKEN.workouts, status: 'reconstructed', target_kind: 'scout_entity' });
++    expect(ledger.find((r) => r.source_id === 'blk-1')).toMatchObject({ entity_type: TOKEN.programs, status: 'reconstructed', target_kind: 'workout_program' });
++    // Native targets + provenance (provenance is keyed by the canonical family).
++    expect(programs(COACH)).toHaveLength(1);
++    expect(plans(COACH)).toHaveLength(1);
++    expect(evidenceRows(COACH)).toEqual([{ entity_type: 'workouts', source_id: 'rt-c', label: 'Client Push', client_source_id: 'c-1' }]);
++    const provenance = provenanceRows(COACH);
++    expect(provenance.find((p) => p.source_id === 'blk-1')).toMatchObject({ entity_type: 'programs', native_kind: 'workout_program', outcome: 'created', source_namespace: PLATFORM });
++    expect(provenance.find((p) => p.source_id === 'rt-c')).toMatchObject({ outcome: 'unresolved', reason: 'unresolved:no_native_client_principal' });
++    expect(count('Person')).toBe(0);
++    expect(count('ClientWorkoutAssignment')).toBe(0);
++    expect(count('Notification')).toBe(0);
++    // §3.8 order in the writer's own log: first clients ledger write < first program insert <
++    // first plan insert < the client_history ledger write (its rows skip, so the ledger is the trace).
++    const q = done.queries;
++    const clientsLedgerAt = firstIndex(q, /"ScoutReconstructionLedger"/);
++    const programAt = firstIndex(q, /INSERT INTO "public"\."WorkoutProgram"/);
++    const planAt = firstIndex(q, /INSERT INTO "public"\."WorkoutPlan" /);
++    expect(clientsLedgerAt).toBeGreaterThanOrEqual(0);
++    expect(programAt).toBeGreaterThan(clientsLedgerAt);
++    expect(planAt).toBeGreaterThan(programAt);
++    // Events: the accepted complete event, one reconstruct completion per planned token, one settle.
++    const names = done.events.map((e) => e[1]);
++    expect(names).toEqual(expect.arrayContaining(['scout.ingest.completed', 'scout.reconstruct.completed', 'scout.run.settled']));
++    expect(done.events.filter((e) => e[1] === 'scout.reconstruct.completed').map((e) => e[2].entity_type)).toEqual(TOKEN_ORDER);
++    const settled = done.events.find((e) => e[1] === 'scout.run.settled');
++    expect(settled[2]).toMatchObject({ terminal_status: 'partial', reason_code: 'reconciliation_not_performed' });
++    expect(JSON.stringify(done.events)).not.toContain('"complete"');
++    // G12: exactly one push for the whole /complete (S7-L's accepted notifyComplete), no side-effect loads.
++    expect(done.pushes).toBe(1);
++    expect(Object.values(done.sideEffectLoads).every((n) => n === 0)).toBe(true);
++    // Status read after settle.
++    const status = await run({ action: 'status', coach: COACH, intent: intentId });
++    expect(status.result).toMatchObject({ status: 'partial', mode: 'server', claimed_status: 'success', reason_code: 'reconciliation_not_performed' });
++  });
++});
++
++describe('P02 — the gate is the first statement of every per-row transaction; the legacy route never gates (G02/G08)', () => {
++  it('server pass: gate-first for success, skip, failure and unmapped outcomes; one gate per staged row; no lock inside the pass', async () => {
++    const intentId = await started();
++    stagePlanned(intentId);
++    stage(COACH, intentId, 'notes', 'n-1');
++    stage(COACH, intentId, 'notes', 'n-2');
++    const pass = await run({ ...REGISTRY, action: 'run-pass', coach: COACH, intent: intentId, mapper: 'throw', family: 'programs' });
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result).toMatchObject({ stopped: null, unmapped_families: ['notes'] });
++    const segs = segments(pass.queries);
++    expect(segs).toHaveLength(8);
++    for (const seg of segs) expect(isGate(seg[0])).toBe(true);
++    expect(pass.queries.filter(isGate)).toHaveLength(8);
++    expect(pass.queries.filter(isLock)).toHaveLength(0);
++    expect(pass.queries.filter(isTerminal)).toHaveLength(0);
++    expect(ledgerByToken(COACH, intentId)).toEqual({
++      [TOKEN.clients]: { reconstructed: 0, skipped: 2, failed: 0 },
++      [TOKEN.programs]: { reconstructed: 0, skipped: 0, failed: 1 },
++      [TOKEN.workouts]: { reconstructed: 2, skipped: 0, failed: 0 },
++      [TOKEN.client_history]: { reconstructed: 0, skipped: 1, failed: 0 },
++      notes: { reconstructed: 0, skipped: 2, failed: 0 },
++    });
++    const failedRow = ledgerRows(COACH, intentId).find((r) => r.source_id === 'blk-1');
++    expect(failedRow).toMatchObject({ status: 'failed', reason: 'error:Error' });
++    expect(ledgerRows(COACH, intentId).filter((r) => r.entity_type === 'notes').map((r) => r.reason)).toEqual([
++      'unresolved_family:notes',
++      'unresolved_family:notes',
++    ]);
++    expect(count('WorkoutProgram')).toBe(0);
++    // The pass never touches the run's terminal fields.
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: null, fenced_at: null, execution_epoch: 1 });
++  });
++
++  it('legacy coach-JWT reconstruct on a settled legacy run: no gate, no lock, family-named ledger, replay byte-identical', async () => {
++    legacyRun(COACH, LEGACY_INTENT, 'success');
++    stage(COACH, LEGACY_INTENT, 'workouts', 'rt-1', WORKOUT);
++    stage(COACH, LEGACY_INTENT, 'workouts', 'rt-2', { ...WORKOUT, title: 'Pull Day' });
++    const first = await run({ ...REGISTRY, action: 'reconstruct', family: 'workouts', coach: COACH, intent: LEGACY_INTENT });
++    expect(first.failure).toBeUndefined();
++    expect(first.result).toEqual({ intent_id: LEGACY_INTENT, staged: 2, reconstructed: 2, skipped: 0, failed: 0 });
++    expect(first.queries.filter(isGate)).toHaveLength(0);
++    expect(first.queries.filter(isLock)).toHaveLength(0);
++    expect(ledgerRows(COACH, LEGACY_INTENT).map((r) => r.entity_type)).toEqual(['workouts', 'workouts']);
++    const snapshot = targetSnapshot(COACH, LEGACY_INTENT);
++    const replay = await run({ ...REGISTRY, action: 'reconstruct', family: 'workouts', coach: COACH, intent: LEGACY_INTENT });
++    expect(replay.result).toEqual(first.result);
++    expect(targetSnapshot(COACH, LEGACY_INTENT)).toEqual(snapshot);
++    expect(replay.queries.join('\n')).not.toMatch(/INSERT INTO "public"\."WorkoutPlan" /);
++    expect(runRow(COACH, LEGACY_INTENT)).toMatchObject({ mode: 'legacy', terminal_status: 'success', state: 'success' });
++  });
++});
++
++describe('P03/P04 — cancel during the pass (G03/G04)', () => {
++  it('P03: cancel between rows — rows before the fence are kept, nothing further is written, no fabricated failed', async () => {
++    const intentId = await started();
++    stagePlanned(intentId);
++    const pass = worker({ ...REGISTRY, action: 'settled', coach: COACH, intent: intentId, pause: 'after-row', pauseRow: 2, body: { epoch: 1 } });
++    await pass.ready;
++    const afterTwo = targetSnapshot(COACH, intentId);
++    expect(afterTwo.ledger).toHaveLength(2);
++    const cancelled = await run({ action: 'cancel', coach: COACH, intent: intentId });
++    expect(cancelled.failure).toBeUndefined();
++    expect(cancelled.result).toEqual({ intent_id: intentId, status: 'cancelled', execution_epoch: 2 });
++    pass.resume();
++    const done = await pass.done;
++    expect(done.failure).toBeUndefined();
++    // The pass stopped at row 3: its gate saw zero rows and the transaction rolled back.
++    const q = done.queries;
++    const gates = q.filter(isGate);
++    expect(gates).toHaveLength(3);
++    const lastGateAt = q.lastIndexOf(gates[2]);
++    expect(q.slice(lastGateAt + 1).find((s) => s.startsWith('-- tx:'))).toBe('-- tx:rollback');
++    expect(q.filter(isTerminal)).toHaveLength(0);
++    expect(cancelled.queries.filter(isTerminal)).toHaveLength(1);
++    expect(done.events.map((e) => e[1])).not.toContain('scout.run.settled');
++    // Nothing further landed; the row snapshot after row 2 is the final snapshot.
++    expect(targetSnapshot(COACH, intentId)).toEqual(afterTwo);
++    expect(ledgerRows(COACH, intentId).filter((r) => r.status === 'failed')).toEqual([]);
++    expect(runRow(COACH, intentId)).toMatchObject({
++      terminal_status: 'cancelled',
++      state: 'cancelled',
++      fence_reason: 'cancelled',
++      reason_code: 'cancelled_by_coach',
++      execution_epoch: 2,
++    });
++  });
++
++  it('P04: cancel racing an in-flight gated row waits on the row lock (no 40P01); row k commits and counts; the next gate stops the pass', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    const pass = worker({ ...REGISTRY, action: 'run-pass', coach: COACH, intent: intentId, pause: 'gated', txTimeout: 30000 });
++    await pass.ready;
++    const cancel = worker({ action: 'cancel', coach: COACH, intent: intentId });
++    await blocked(cancel.name);
++    expect(ledgerRows(COACH, intentId)).toEqual([]);
++    // The gated row's phase move is uncommitted: the owner still reads the pre-gate phase.
++    expect(runRow(COACH, intentId)).toMatchObject({ fenced_at: null, phase: 'discovering' });
++    pass.resume();
++    const done = await pass.done;
++    const cancelled = await cancel.done;
++    expect(done.failure).toBeUndefined();
++    expect(cancelled.failure).toBeUndefined();
++    expect(done.result).toMatchObject({ stopped: 'gate_closed' });
++    expect(cancelled.result).toEqual({ intent_id: intentId, status: 'cancelled', execution_epoch: 2 });
++    expect(programs(COACH)).toHaveLength(1);
++    expect(plans(COACH)).toHaveLength(0);
++    expect(ledgerByToken(COACH, intentId)).toEqual({ [TOKEN.programs]: { reconstructed: 1, skipped: 0, failed: 0 } });
++    expect(done.queries.filter(isGate)).toHaveLength(2);
++    expect(done.failure?.code).not.toBe('40P01');
++    expect(cancelled.failure?.code).not.toBe('40P01');
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'cancelled', execution_epoch: 2 });
++  });
++});
++
++describe('P05 — deadline passes mid-pass (G05)', () => {
++  it('the next gate sees zero rows, the pass rolls back, classifyClosed fences timed_out in a new transaction, the tail CAS misses', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    const settle = worker({ ...REGISTRY, action: 'settled', coach: COACH, intent: intentId, pause: 'after-row', pauseRow: 1, body: { epoch: 1 } });
++    await settle.ready;
++    expire(COACH, intentId);
++    settle.resume();
++    const done = await settle.done;
++    expect(done.failure).toBeUndefined();
++    const q = done.queries;
++    const gates = q.filter(isGate);
++    expect(gates).toHaveLength(2);
++    const gateAt = q.lastIndexOf(gates[1]);
++    const rollbackAt = q.findIndex((s, i) => i > gateAt && s === '-- tx:rollback');
++    const beginAt = q.findIndex((s, i) => i > rollbackAt && s === '-- tx:begin');
++    const lockAt = q.findIndex((s, i) => i > beginAt && isLock(s));
++    expect(rollbackAt).toBeGreaterThan(gateAt);
++    expect(beginAt).toBeGreaterThan(rollbackAt);
++    expect(lockAt).toBeGreaterThan(beginAt);
++    expect(q.filter(isFence)).toHaveLength(1);
++    expect(q.filter(isTerminal)).toHaveLength(1); // the fence's; the tail's CAS on epoch 1 misses
++    expect(runRow(COACH, intentId)).toMatchObject({
++      terminal_status: 'timed_out',
++      state: 'timed_out',
++      fence_reason: 'timed_out',
++      reason_code: 'deadline_exceeded',
++      execution_epoch: 2,
++    });
++    expect(programs(COACH)).toHaveLength(1);
++    expect(plans(COACH)).toHaveLength(0);
++    expect(done.events.map((e) => e[1])).toContain('scout.run.fenced');
++    expect(done.events.map((e) => e[1])).not.toContain('scout.run.settled');
++  });
++});
++
++describe('P06 — claim vs truth (G06)', () => {
++  it('claim failed with zero staged → failed/transfer_failed and no pass; claim failed with staged rows → the pass runs, partial', async () => {
++    const empty = await started();
++    const b = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: empty, body: { terminal_status: 'failed' } });
++    expect(b.failure).toBeUndefined();
++    expect(b.queries.filter(isGate)).toHaveLength(1); // the complete's own gate only
++    expect(runRow(COACH, empty)).toMatchObject({ terminal_status: 'failed', reason_code: 'transfer_failed', execution_epoch: 1 });
++    expect(ledgerRows(COACH, empty)).toEqual([]);
++
++    const withRows = await started();
++    stage(COACH, withRows, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, withRows, TOKEN.workouts, 'rt-1', WORKOUT);
++    const c = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: withRows, body: { terminal_status: 'failed' } });
++    expect(c.failure).toBeUndefined();
++    expect(c.queries.filter(isGate)).toHaveLength(3);
++    expect(runRow(COACH, withRows)).toMatchObject({ terminal_status: 'partial', reason_code: 'reconciliation_not_performed' });
++    const status = await run({ action: 'status', coach: COACH, intent: withRows });
++    expect(status.result).toMatchObject({ status: 'partial', claimed_status: 'failed' });
++  });
++});
++
++describe('P07 — duplicate and late /complete (G07)', () => {
++  it('a concurrent second claim is a no-op ack with no pass of its own; exactly one completion row and one terminal write', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    // pauseRow 2: the complete's own gated transaction is the first committed gated transaction.
++    const first = worker({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, pause: 'after-row', pauseRow: 2, body: { terminal_status: 'success' } });
++    await first.ready;
++    const second = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, body: { terminal_status: 'failed' } });
++    expect(second.result).toEqual(ack(intentId));
++    expect(second.queries.filter(isGate)).toHaveLength(1);
++    expect(second.queries.filter(isLock)).toHaveLength(0);
++    expect(second.queries.filter(isTerminal)).toHaveLength(0);
++    expect(second.queries).toContain('-- tx:rollback');
++    expect(second.pushes).toBe(0);
++    first.resume();
++    const done = await first.done;
++    expect(done.result).toEqual(ack(intentId));
++    expect(completionRows()).toEqual([[COACH, intentId, 'success']]);
++    expect(done.queries.filter(isTerminal)).toHaveLength(1);
++    expect(done.queries.filter(isGate)).toHaveLength(3);
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'partial', execution_epoch: 1 });
++    // Late claim after terminal: ack, row byte-equal, no pass.
++    const rowAfter = runRow(COACH, intentId);
++    const late = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, body: { terminal_status: 'failed' } });
++    expect(late.result).toEqual(ack(intentId));
++    expect(late.queries.filter(isGate)).toHaveLength(1);
++    expect(late.queries.filter(isTerminal)).toHaveLength(0);
++    expect(runRow(COACH, intentId)).toEqual(rowAfter);
++    expect(completionRows()).toEqual([[COACH, intentId, 'success']]);
++  });
++
++  it('/complete without a Start is 409 run_not_started: no completion row, no pass', async () => {
++    const intentId = intent(COACH);
++    const none = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId });
++    expect(none).toMatchObject({ failure: conflict('run_not_started') });
++    expect(completionRows()).toEqual([]);
++    expect(none.queries.filter(isLock)).toHaveLength(0);
++  });
++});
++
++describe('P09 — the post-settle gate and readers during reconciling (G09)', () => {
++  it('coach-JWT reconstruct is 409 during the pass; after the terminal it runs and replays idempotently; status reads running then partial', async () => {
++    const intentId = await started();
++    // A family-named token: the fixture spec declares no `workouts` step, so the PASS ledgers it
++    // `unresolved_family:workouts`, while the legacy route (which selects by family name) can
++    // address it afterwards — the two routes stay observably distinct on one run.
++    stage(COACH, intentId, 'workouts', 'rt-1', WORKOUT);
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    const settle = worker({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, pause: 'after-row', pauseRow: 2, body: { terminal_status: 'success' } });
++    await settle.ready;
++    const during = await run({ ...REGISTRY, action: 'reconstruct', family: 'workouts', coach: COACH, intent: intentId });
++    expect(during.failure).toMatchObject({ status: 409, message: 'scout import intent has not settled; reconstruction is post-settle only' });
++    expect(during.queries.filter(isGate)).toHaveLength(0);
++    const running = await run({ action: 'status', coach: COACH, intent: intentId });
++    expect(running.result).toMatchObject({ status: 'running', mode: 'server', phase: 'reconciling' });
++    settle.resume();
++    const done = await settle.done;
++    expect(done.failure).toBeUndefined();
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'partial' });
++    expect(ledgerRows(COACH, intentId).find((r) => r.source_id === 'rt-1')).toMatchObject({ entity_type: 'workouts', status: 'skipped', reason: 'unresolved_family:workouts' });
++    const first = await run({ ...REGISTRY, action: 'reconstruct', family: 'workouts', coach: COACH, intent: intentId });
++    expect(first.failure).toBeUndefined();
++    expect(first.result).toEqual({ intent_id: intentId, staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
++    expect(first.queries.filter(isGate)).toHaveLength(0);
++    const snapshot = targetSnapshot(COACH, intentId);
++    const second = await run({ ...REGISTRY, action: 'reconstruct', family: 'workouts', coach: COACH, intent: intentId });
++    expect(second.result).toEqual(first.result);
++    expect(targetSnapshot(COACH, intentId)).toEqual(snapshot);
++    expect(plans(COACH)).toHaveLength(1);
++  });
++});
++
++describe('P10 — unmapped token and over-ceiling source (G10)', () => {
++  it('unmapped notes rows ledger skipped with the S8-A reason; status lists the token; terminal partial', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, 'notes', 'n-1');
++    stage(COACH, intentId, 'notes', 'n-2');
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId });
++    expect(done.failure).toBeUndefined();
++    expect(ledgerByToken(COACH, intentId)).toEqual({
++      [TOKEN.programs]: { reconstructed: 1, skipped: 0, failed: 0 },
++      notes: { reconstructed: 0, skipped: 2, failed: 0 },
++    });
++    expect(ledgerRows(COACH, intentId).filter((r) => r.entity_type === 'notes').every((r) => r.reason === 'unresolved_family:notes')).toBe(true);
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'partial' });
++    const status = await run({ action: 'status', coach: COACH, intent: intentId });
++    expect(status.result.families).toEqual(
++      expect.arrayContaining([expect.objectContaining({ family: 'notes', staged_unique: 2 })]),
++    );
++  });
++
++  it('an over-ceiling source is isolated: no target, no ledger for it; the other family runs; one terminal write', async () => {
++    const intentId = await started();
++    const max = RECONSTRUCT_MAX_ROWS + 1; // fixture rows inserted directly as the owner, never through ingest
++    sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++      SELECT ${quote(`${COACH}-${intentId}-bulk-`)}||g, ${quote(COACH)}, ${quote(intentId)}, ${quote(TOKEN.programs)}, 'bulk-'||g, ${quote(PLATFORM)}, '{"title":"x"}'::jsonb
++      FROM generate_series(1,${max}) g`);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    const pass = await run({ ...REGISTRY, action: 'run-pass', coach: COACH, intent: intentId });
++    expect(pass.failure).toBeUndefined();
++    expect(pass.result.stopped).toBeNull();
++    expect(pass.result.families.find((f: any) => f.token === TOKEN.programs)).toMatchObject({ stopped: 'over_ceiling', staged: max, reconstructed: 0 });
++    expect(pass.result.families.find((f: any) => f.token === TOKEN.workouts)).toMatchObject({ stopped: null, reconstructed: 1 });
++    expect(count('WorkoutProgram')).toBe(0);
++    expect(ledgerByToken(COACH, intentId)).toEqual({ [TOKEN.workouts]: { reconstructed: 1, skipped: 0, failed: 0 } });
++    expect(pass.queries.filter(isGate)).toHaveLength(1);
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId });
++    expect(done.failure).toBeUndefined();
++    expect(done.queries.filter(isTerminal)).toHaveLength(1);
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'partial' });
++  });
++});
++
++describe('P11 — tenant isolation, RLS, rollback (G11)', () => {
++  it("A's pass never reads B's rows; anon/authenticated are refused by policy; a rolled-back service_role write persists nothing", async () => {
++    const a = await started(COACH);
++    const b = await started(OTHER);
++    stage(COACH, a, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(OTHER, b, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(OTHER, b, TOKEN.workouts, 'rt-1', WORKOUT);
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: a });
++    expect(done.failure).toBeUndefined();
++    expect(ledgerRows(OTHER, b)).toEqual([]);
++    expect(provenanceRows(OTHER)).toEqual([]);
++    expect(programs(OTHER)).toEqual([]);
++    expect(programs(COACH)).toHaveLength(1);
++    expect(runRow(OTHER, b)).toMatchObject({ terminal_status: null, execution_epoch: 1 });
++    const ledgerCount = count('ScoutReconstructionLedger');
++    const provenanceCount = count('ImportNativeProvenance');
++    for (const role of ['anon', 'authenticated']) {
++      expect(sql(`SET ROLE ${role}; SELECT count(*) FROM "ScoutReconstructionLedger"`)).toBe('0');
++      expect(sql(`SET ROLE ${role}; SELECT count(*) FROM "ImportNativeProvenance"`)).toBe('0');
++      refused(
++        `SET ROLE ${role}; INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_platform,source_id,status)
++         VALUES ('rls-${role}',${quote(COACH)},${quote(a)},'blocks',${quote(PLATFORM)},'rls','skipped')`,
++        'row-level security',
++      );
++    }
++    sqlAs(
++      'service_role',
++      `BEGIN; INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_platform,source_id,status)
++       VALUES ('rb-1',${quote(COACH)},${quote(a)},'blocks',${quote(PLATFORM)},'rb','skipped'); ROLLBACK;`,
++    );
++    expect(count('ScoutReconstructionLedger')).toBe(ledgerCount);
++    expect(count('ImportNativeProvenance')).toBe(provenanceCount);
++  });
++});
++
++describe('P12 — zero side effects (G12)', () => {
++  it('a replayed run-pass over a settled run loads no side-effect module and pushes nothing; targets unchanged', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId });
++    expect(done.pushes).toBe(1);
++    const snapshot = targetSnapshot(COACH, intentId);
++    // The run is terminal: every gate of a replayed pass closes immediately; nothing is written.
++    const replay = await run({ ...REGISTRY, action: 'run-pass', coach: COACH, intent: intentId });
++    expect(replay.failure).toBeUndefined();
++    expect(replay.result).toMatchObject({ stopped: 'gate_closed' });
++    expect(replay.pushes).toBe(0);
++    expect(Object.values(replay.sideEffectLoads).every((n) => n === 0)).toBe(true);
++    expect(Object.values(done.sideEffectLoads).every((n) => n === 0)).toBe(true);
++    expect(targetSnapshot(COACH, intentId)).toEqual(snapshot);
++    expect(count('ClientWorkoutAssignment')).toBe(0);
++    expect(count('Notification')).toBe(0);
++  });
++});
++
++describe('P13 — interrupted pass (G13)', () => {
++  it('a killed pass leaves the run reconciling until the deadline poll fences timed_out; a new run replays without duplicates', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, intentId, TOKEN.workouts, 'rt-1', WORKOUT);
++    const settle = worker({ ...REGISTRY, action: 'complete', coach: COACH, intent: intentId, pause: 'after-row', pauseRow: 2, body: { terminal_status: 'success' } });
++    await settle.ready;
++    settle.stop();
++    // The interrupted worker's exit is the expected outcome here; its rejection is recorded, not swallowed silently.
++    const interrupted = await settle.done.then(
++      () => 'exited',
++      (err: unknown) => `rejected:${String(err)}`,
++    );
++    expect(interrupted).toBeDefined();
++    expect(runRow(COACH, intentId)).toMatchObject({ phase: 'reconciling', terminal_status: null, execution_epoch: 1 });
++    expect(programs(COACH)).toHaveLength(1);
++    expect(plans(COACH)).toHaveLength(0);
++    expire(COACH, intentId);
++    const poll = await run({ action: 'status', coach: COACH, intent: intentId });
++    expect(poll.result).toMatchObject({ status: 'timed_out', reason_code: 'deadline_exceeded', execution_epoch: 2 });
++    expect(runRow(COACH, intentId)).toMatchObject({ terminal_status: 'timed_out', execution_epoch: 2 });
++    const [program] = programs(COACH);
++    // Run 2 over the same source identifiers: the native writer verifies the existing targets.
++    const second = await started();
++    stage(COACH, second, TOKEN.programs, 'blk-1', PROGRAM);
++    stage(COACH, second, TOKEN.workouts, 'rt-1', WORKOUT);
++    const done = await run({ ...REGISTRY, action: 'complete', coach: COACH, intent: second });
++    expect(done.failure).toBeUndefined();
++    expect(runRow(COACH, second)).toMatchObject({ terminal_status: 'partial' });
++    expect(programs(COACH)).toHaveLength(1);
++    expect(plans(COACH)).toHaveLength(1);
++    expect(provenanceRows(COACH).filter((p) => p.source_id === 'blk-1').every((p) => p.native_id === program.id)).toBe(true);
++    expect(ledgerByToken(COACH, second)).toEqual({
++      [TOKEN.programs]: { reconstructed: 1, skipped: 0, failed: 0 },
++      [TOKEN.workouts]: { reconstructed: 1, skipped: 0, failed: 0 },
++    });
++  });
++});
++
++describe('P14 — CAS/epoch on the settle tail (G14)', () => {
++  it('a cancel between the pass and the tail lock raises the epoch; the tail writes no terminal; completed_at is set once', async () => {
++    const intentId = await started();
++    stage(COACH, intentId, TOKEN.programs, 'blk-1', PROGRAM);
++    const settle = worker({ ...REGISTRY, action: 'settled', coach: COACH, intent: intentId, pause: 'before-lock', body: { epoch: 1 } });
++    await settle.ready;
++    expect(ledgerByToken(COACH, intentId)).toEqual({ [TOKEN.programs]: { reconstructed: 1, skipped: 0, failed: 0 } });
++    const cancelled = await run({ action: 'cancel', coach: COACH, intent: intentId });
++    expect(cancelled.result).toEqual({ intent_id: intentId, status: 'cancelled', execution_epoch: 2 });
++    const fenced = runRow(COACH, intentId);
++    settle.resume();
++    const done = await settle.done;
++    expect(done.failure).toBeUndefined();
++    expect(done.queries.filter(isLock)).toHaveLength(1);
++    expect(done.queries.filter(isTerminal)).toHaveLength(0);
++    expect(done.events.map((e) => e[1])).not.toContain('scout.run.settled');
++    expect(runRow(COACH, intentId)).toEqual(fenced);
++    expect(fenced).toMatchObject({ terminal_status: 'cancelled', execution_epoch: 2 });
++    expect(fenced.completed_at).not.toBeNull();
++    // A stale settle with the old epoch is also a no-op.
++    const stale = await run({ ...REGISTRY, action: 'settled', coach: COACH, intent: intentId, body: { epoch: 1 } });
++    expect(stale.failure).toBeUndefined();
++    expect(runRow(COACH, intentId)).toEqual(fenced);
++  });
++});
+diff --git a/test/scout/g2-s8g-db-guard.spec.ts b/test/scout/g2-s8g-db-guard.spec.ts
+new file mode 100644
+index 00000000..f702cc1b
+--- /dev/null
++++ b/test/scout/g2-s8g-db-guard.spec.ts
+@@ -0,0 +1,214 @@
++import { readdirSync, readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S8G_BASE_HEAD,
++  G2_S8G_CANDIDATE_HEAD_ENV,
++  g2S8gCandidateHead,
++  G2_S8G_CLUSTER_MARKER,
++  G2_S8G_DATABASE_MARKER,
++  g2S8gTestTarget,
++  withFixturePassword,
++} from '../utils/g2-s8g-db';
++
++const base = 'postgresql://s8g_super@127.0.0.1:55643/g2_s8g_disposable';
++const ack = 'g2_s8g_disposable:55643';
++
++describe('S8-G PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2S8gTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://s8g_super@127.0.0.1:55643/postgres?connect_timeout=5`,
++      port: 55643,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55643', '5432'),
++    base.replace('55643', '6543'),
++    base.replace('55643', '55439'),
++    base.replace('55643', '70000'),
++    base.replace('55643', '55461'),
++    base.replace('55643', '55471'),
++    base.replace('55643', '55481'),
++    base.replace('55643', '55491'),
++    base.replace('55643', '55501'),
++    base.replace('55643', '55511'),
++    base.replace('55643', '55641'),
++    base.replace('55643', '55642'),
++    base.replace('g2_s8g_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_r_ready_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_nq1_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_c_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_s7l_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_s8b_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_s8c_disposable'),
++    base.replace('s8g_super@', 'b_super@'),
++    base.replace('s8g_super@', 'r_super@'),
++    base.replace('s8g_super@', 'nq1_super@'),
++    base.replace('s8g_super@', 'c_super@'),
++    base.replace('s8g_super@', 's7l_super@'),
++    base.replace('s8g_super@', 's8b_super@'),
++    base.replace('s8g_super@', 's8c_super@'),
++    base.replace('g2_s8g_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_s8g_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55643', '54325'),
++    base.replace('g2_s8g_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_s8g_disposable', 'postgres'),
++    base.replace('s8g_super@', 'service_role@'),
++    base.replace('s8g_super@', 's8c_super:secret@'),
++    base.replace('s8g_super@', 'postgres@'),
++    base.replace('55643', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2S8gTestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2S8gTestTarget(base)).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8g_disposable')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8g_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8c_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_tq0_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_b_drain_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_r_ready_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_nq1_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_c_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s7l_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8b_disposable:55643')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    expect(G2_S8G_CLUSTER_MARKER).toBe('s8g-disposable-pg17');
++    expect(G2_S8G_DATABASE_MARKER).toBe(
++      's8g-g2-run-orchestration-synthetic-disposable-fixture-safe-to-drop',
++    );
++    for (const marker of [G2_S8G_CLUSTER_MARKER, G2_S8G_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^s8g-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s8g-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_S8G_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_S8G_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://s8g_super:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++    );
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      'nq1_super',
++      'c_super',
++      's7l_super',
++      's8b_super',
++      's8c_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++  it('pins the base head and migration count identically across bootstrap, harness and repository', () => {
++    const BASE_HEAD = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++    const EXPECTED_MIGRATIONS = 172;
++    const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++    const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s8g-bootstrap.sh'), 'utf8');
++    const harness = readFileSync(resolve(__dirname, '../utils/g2-s8g-pg-harness.ts'), 'utf8');
++    expect(bootstrap).toContain(`BASE_HEAD=${BASE_HEAD}\n`);
++    expect(bootstrap).toContain(`EXPECTED_MIGRATIONS=${EXPECTED_MIGRATIONS}\n`);
++    expect(bootstrap).toContain(`S8B_MIGRATION=${S8B_MIGRATION}\n`);
++    expect(bootstrap).toContain(`S7L_MIGRATION=${S7L_MIGRATION}\n`);
++    expect(G2_S8G_BASE_HEAD).toBe(BASE_HEAD);
++    expect(harness).toContain(`export const BASE_HEAD: string = G2_S8G_BASE_HEAD;`);
++    expect(bootstrap).toContain(`G2_S8G_CANDIDATE_HEAD`);
++    expect(G2_S8G_CANDIDATE_HEAD_ENV).toBe('G2_S8G_CANDIDATE_HEAD');
++    expect(harness).toContain(`export const EXPECTED_MIGRATIONS = ${EXPECTED_MIGRATIONS};`);
++    expect(harness).toContain(`export const S8B_MIGRATION = '${S8B_MIGRATION}';`);
++    expect(harness).toContain(`export const S7L_MIGRATION = '${S7L_MIGRATION}';`);
++    // S8-G ships no migration: the proof base's 172 directories are present, in order, and end at
++    // the S7-L migration. Lanes landed after the proof base may add later, well-formed migrations.
++    const migrationsDir = resolve(__dirname, '../../prisma/migrations');
++    const migrations = readdirSync(migrationsDir, { withFileTypes: true })
++      .filter((entry) => entry.isDirectory())
++      .map((entry) => entry.name)
++      .sort();
++    const baseMigrations = migrations.slice(0, EXPECTED_MIGRATIONS);
++    expect(baseMigrations).toHaveLength(EXPECTED_MIGRATIONS);
++    expect(baseMigrations[EXPECTED_MIGRATIONS - 1]).toBe(S7L_MIGRATION);
++    expect(baseMigrations[EXPECTED_MIGRATIONS - 2]).toBe(S8B_MIGRATION);
++    expect(baseMigrations.filter((name) => name > S7L_MIGRATION)).toEqual([]);
++    for (const later of migrations.slice(EXPECTED_MIGRATIONS)) {
++      expect(later > S7L_MIGRATION).toBe(true);
++      expect(later).toMatch(/^\d{14}_[a-z0-9_]+$/);
++      expect(readdirSync(resolve(migrationsDir, later))).toContain('migration.sql');
++    }
++  });
++  it('binds the proof to one attested, clean, non-base candidate head; the worker attests before any client', () => {
++    const base = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++    const candidate = 'a'.repeat(40);
++    expect(g2S8gCandidateHead(candidate, `${candidate}\n`, '')).toBe(candidate);
++    expect(() => g2S8gCandidateHead(undefined, candidate, '')).toThrow(/G2_S8G_CANDIDATE_HEAD/);
++    expect(() => g2S8gCandidateHead('abc', candidate, '')).toThrow(/G2_S8G_CANDIDATE_HEAD/);
++    expect(() => g2S8gCandidateHead(candidate.toUpperCase(), candidate, '')).toThrow();
++    expect(() => g2S8gCandidateHead(base, base, '')).toThrow(/not the accepted base/);
++    expect(() => g2S8gCandidateHead(candidate, 'b'.repeat(40), '')).toThrow(
++      /not the attested candidate/,
++    );
++    expect(() => g2S8gCandidateHead(candidate, candidate, ' M src/x.ts\n')).toThrow(/uncommitted/);
++    const worker = readFileSync(resolve(__dirname, '../utils/g2-s8g-worker.cjs'), 'utf8');
++    expect(worker.indexOf("['rev-parse', 'HEAD']")).toBeGreaterThan(-1);
++    expect(worker.indexOf("['rev-parse', 'HEAD']")).toBeLessThan(worker.indexOf('new PrismaClient'));
++    // The worker hands the injected mappers to BOTH engine seams (families and planner).
++    expect(worker).toContain('reconstruct.sourceMappers = sourceMappers');
++  });
++  it('G12: the orchestration seam imports no side-effecting module (static import scan)', () => {
++    const src = resolve(__dirname, '../../src/scout');
++    const files = [
++      resolve(src, 'reconstruct/orchestration/run-context.ts'),
++      resolve(src, 'reconstruct/orchestration/family-plan.ts'),
++      resolve(src, 'scout-reconstruct.service.ts'),
++    ];
++    const forbidden = /(notifications|drip|assignment|email|billing|mailer|stripe)/i;
++    for (const file of files) {
++      const text = readFileSync(file, 'utf8');
++      const imports = [...text.matchAll(/^import[^;]*?from\s+'([^']+)';/gms)].map((m) => m[1]);
++      expect(imports.length).toBeGreaterThan(0);
++      for (const spec of imports) expect(spec).not.toMatch(forbidden);
++      expect(text).not.toMatch(/require\(/);
++    }
++    // The engine does not import the lifecycle (no cycle): the gate arrives as a closure.
++    const engine = readFileSync(files[2], 'utf8');
++    expect(engine).not.toMatch(/from '\.\/lifecycle\//);
++    // The hook seam: lifecycle gates the pass with assertRunOpen and classifies a closed gate once.
++    const lifecycle = readFileSync(resolve(src, 'lifecycle/lifecycle.service.ts'), 'utf8');
++    expect(lifecycle).toContain("gate: (tx) => this.assertRunOpen(tx, coachId, intentId)");
++    expect(lifecycle).toMatch(
++      /if \(pass\.stopped === 'gate_closed'\) \{\s+await this\.classifyClosed\(coachId, intentId\);/,
++    );
++  });
++});
+diff --git a/test/scout/orchestration/family-plan.spec.ts b/test/scout/orchestration/family-plan.spec.ts
+new file mode 100644
+index 00000000..46a36eac
+--- /dev/null
++++ b/test/scout/orchestration/family-plan.spec.ts
+@@ -0,0 +1,145 @@
++import { buildFamilyRegistry } from '../../../src/scout/reconstruct/families';
++import { parseSourceMappingSpec } from '../../../src/scout/reconstruct/mapping-spec';
++import {
++  planRun,
++  RUN_FAMILY_ORDER,
++} from '../../../src/scout/reconstruct/orchestration/family-plan';
++import { buildSourceMapperRegistry } from '../../../src/scout/reconstruct/source-mapper-registry';
++
++// S8-G pure planner: distinct staged (source_platform, entity_type) groups → contract §3.8-ordered
++// canonical families plus explicit unmapped tokens with the exact S8-A reason. No I/O, no doubles.
++
++const PLATFORM = 's8g-proof';
++const spec = parseSourceMappingSpec(
++  {
++    specVersion: 1,
++    sourcePlatform: PLATFORM,
++    steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
++    families: {
++      clients: { displayName: { paths: [['name']], coerce: 'string' } },
++      programs: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
++      workouts: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
++      client_history: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
++    },
++  },
++  'family-plan.spec:fixture',
++);
++const mappers = buildSourceMapperRegistry([spec]);
++const registry = buildFamilyRegistry({ sourceMappers: mappers });
++
++const staged = (rows: [string, string, number][]) =>
++  rows.map(([source_platform, entity_type, n]) => ({
++    source_platform,
++    entity_type,
++    _count: { _all: n },
++  }));
++
++describe('RUN_FAMILY_ORDER (contract §3.8)', () => {
++  it('is clients → programs → workouts → client_history, not the dto declaration order', () => {
++    expect(RUN_FAMILY_ORDER).toEqual(['clients', 'programs', 'workouts', 'client_history']);
++  });
++});
++
++describe('planRun', () => {
++  it('orders planned families by §3.8 regardless of staged input order and resolves tokens', () => {
++    const plan = planRun(
++      staged([
++        [PLATFORM, 'log', 1],
++        [PLATFORM, 'routines', 2],
++        [PLATFORM, 'people', 3],
++        [PLATFORM, 'blocks', 1],
++      ]),
++      mappers,
++      registry,
++    );
++    expect(plan.ordered).toEqual([
++      { family: 'clients', sources: [{ source_platform: PLATFORM, token: 'people', staged: 3 }] },
++      { family: 'programs', sources: [{ source_platform: PLATFORM, token: 'blocks', staged: 1 }] },
++      { family: 'workouts', sources: [{ source_platform: PLATFORM, token: 'routines', staged: 2 }] },
++      { family: 'client_history', sources: [{ source_platform: PLATFORM, token: 'log', staged: 1 }] },
++    ]);
++    expect(plan.unmapped).toEqual([]);
++  });
++
++  it('routes an unmapped step token (notes) to unmapped with the exact S8-A reason', () => {
++    const plan = planRun(
++      staged([
++        [PLATFORM, 'notes', 2],
++        [PLATFORM, 'people', 1],
++      ]),
++      mappers,
++      registry,
++    );
++    expect(plan.ordered.map((f) => f.family)).toEqual(['clients']);
++    expect(plan.unmapped).toEqual([
++      { source_platform: PLATFORM, token: 'notes', staged: 2, reason: 'unresolved_family:notes' },
++    ]);
++  });
++
++  it('routes an unregistered platform to unmapped with unsupported_platform:<platform>', () => {
++    const plan = planRun(staged([['ghost', 'clients', 1]]), mappers, registry);
++    expect(plan.ordered).toEqual([]);
++    expect(plan.unmapped).toEqual([
++      { source_platform: 'ghost', token: 'clients', staged: 1, reason: 'unsupported_platform:ghost' },
++    ]);
++  });
++
++  it('a canonical family name staged as a token is NOT a family unless the spec maps it', () => {
++    // The fixture spec maps `people`, not `clients`: the engine never guesses from the token text.
++    const plan = planRun(staged([[PLATFORM, 'clients', 1]]), mappers, registry);
++    expect(plan.ordered).toEqual([]);
++    expect(plan.unmapped[0]).toMatchObject({ token: 'clients', reason: 'unresolved_family:clients' });
++  });
++
++  it('routes a spec-resolved family the registry does not hold to unmapped (fail closed)', () => {
++    const partial = new Map([...registry].filter(([family]) => family !== 'programs'));
++    const plan = planRun(staged([[PLATFORM, 'blocks', 4]]), mappers, partial);
++    expect(plan.ordered).toEqual([]);
++    expect(plan.unmapped).toEqual([
++      { source_platform: PLATFORM, token: 'blocks', staged: 4, reason: 'unresolved_family:blocks' },
++    ]);
++  });
++
++  it('omits families with no staged rows and never invents a family', () => {
++    const plan = planRun(staged([[PLATFORM, 'blocks', 4]]), mappers, registry);
++    expect(plan.ordered).toEqual([
++      { family: 'programs', sources: [{ source_platform: PLATFORM, token: 'blocks', staged: 4 }] },
++    ]);
++  });
++
++  it('keeps one family entry per canonical family across several platforms, sources ordered', () => {
++    const plan = planRun(
++      staged([
++        ['truecoach', 'workouts', 2],
++        [PLATFORM, 'routines', 1],
++      ]),
++      new Map([...mappers, ...buildSourceMapperRegistry()]),
++      registry,
++    );
++    const workouts = plan.ordered.find((f) => f.family === 'workouts');
++    expect(plan.ordered).toHaveLength(1);
++    expect(workouts?.sources).toEqual([
++      { source_platform: PLATFORM, token: 'routines', staged: 1 },
++      { source_platform: 'truecoach', token: 'workouts', staged: 2 },
++    ]);
++  });
++
++  it('is pure: the same input yields an equal plan and the input is not mutated', () => {
++    const input = staged([
++      [PLATFORM, 'notes', 1],
++      [PLATFORM, 'people', 1],
++    ]);
++    const copy = JSON.parse(JSON.stringify(input));
++    expect(planRun(input, mappers, registry)).toEqual(planRun(input, mappers, registry));
++    expect(input).toEqual(copy);
++  });
++});
+diff --git a/test/scout/orchestration/reconstruct-run.spec.ts b/test/scout/orchestration/reconstruct-run.spec.ts
+new file mode 100644
+index 00000000..bdb01c0a
+--- /dev/null
++++ b/test/scout/orchestration/reconstruct-run.spec.ts
+@@ -0,0 +1,493 @@
++import { Prisma } from '@prisma/client';
++import { AnalyticsService } from '../../../src/analytics/analytics.service';
++import { Events } from '../../../src/analytics/events';
++import { PrismaService } from '../../../src/prisma.service';
++import type { FamilyReconstructor, PersistResult } from '../../../src/scout/reconstruct/families';
++import { parseSourceMappingSpec } from '../../../src/scout/reconstruct/mapping-spec';
++import type { ServerRunContext } from '../../../src/scout/reconstruct/orchestration/run-context';
++import {
++  buildSourceMapperRegistry,
++  type SourceMapper,
++} from '../../../src/scout/reconstruct/source-mapper-registry';
++import { RECONSTRUCT_MAX_ROWS } from '../../../src/scout/scout-reconstruct.dto';
++import { ScoutReconstructService } from '../../../src/scout/scout-reconstruct.service';
++
++/**
++ * S8-G engine seam under test with stubbed families (pattern: S8-C
++ * test/scout/reconstruct/native/engine-handoff.spec.ts FakePrisma):
++ *  - the §3.1 gate is the FIRST statement of EVERY per-row transaction of a server pass, for
++ *    success, skip, failure and unmapped outcomes (G02);
++ *  - the coach-JWT legacy route keeps the pre-S8-G statement sequence and never gates (G08);
++ *  - a closed gate (zero rows or another epoch) stops the pass at that row, writes nothing
++ *    further and never records a fabricated `failed` (G03);
++ *  - §3.8 order, token forwarding into the ledger, unmapped tokens ledgered `skipped` with the
++ *    exact S8-A reason, over-ceiling / provenance-conflict isolation (G01, G10);
++ *  - enumeration is tenant/intent scoped (G11).
++ * The real PG behaviour of the gate (row lock, fence race) is proven in test/rls-g2-s8g.spec.ts.
++ */
++
++const COACH = 'coach-A';
++const INTENT = '3f2b9c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
++const PLATFORM = 's8g-proof';
++const TOKEN = { clients: 'people', programs: 'blocks', workouts: 'routines', client_history: 'log' };
++
++interface Staged {
++  coach_id: string;
++  intent_id: string;
++  entity_type: string;
++  source_platform: string;
++  source_id: string;
++  payload: Prisma.JsonValue;
++}
++interface LedgerRow {
++  entity_type: string;
++  source_platform: string;
++  source_id: string;
++  status: string;
++  target_id: string | null;
++  target_kind?: string;
++  reason: string | null;
++}
++
++/** Ordered log of what happened INSIDE each $transaction callback; 'gate' is the §3.1 UPDATE. */
++class FakePrisma {
++  staged: Staged[] = [];
++  ledger = new Map<string, LedgerRow>();
++  txLog: string[][] = [];
++  /** Epochs the gate returns per call (default 1); `null` → zero rows. */
++  gateScript: (number | null)[] = [];
++  gateCalls = 0;
++  groupByArgs: unknown[] = [];
++  /** Override the staged count the planner sees for one token (over-ceiling fixture). */
++  countOverride = new Map<string, number>();
++  private current: string[] | null = null;
++  note(n: string) {
++    if (this.current) this.current.push(n);
++  }
++  private key(r: Pick<LedgerRow, 'entity_type' | 'source_platform' | 'source_id'>) {
++    return `${r.entity_type}|${r.source_platform}|${r.source_id}`;
++  }
++  private select(where: Record<string, unknown>) {
++    return this.staged.filter((s) =>
++      Object.entries(where).every(([k, v]) => (s as Record<string, unknown>)[k] === v),
++    );
++  }
++  scoutImport = { findUnique: async () => ({ terminal_status: 'success' }) };
++  scoutIngestEntity = {
++    groupBy: async (args: { where: Record<string, unknown> }) => {
++      this.groupByArgs.push(args);
++      const out = new Map<string, { source_platform: string; entity_type: string; n: number }>();
++      for (const r of this.select(args.where)) {
++        const k = `${r.source_platform}|${r.entity_type}`;
++        const prev = out.get(k)?.n ?? 0;
++        out.set(k, { source_platform: r.source_platform, entity_type: r.entity_type, n: prev + 1 });
++      }
++      return [...out.values()].map((g) => ({
++        source_platform: g.source_platform,
++        entity_type: g.entity_type,
++        _count: { _all: this.countOverride.get(g.entity_type) ?? g.n },
++      }));
++    },
++    count: async (args: { where: Record<string, unknown> }) => this.select(args.where).length,
++    findMany: async (args: { where: Record<string, unknown>; take?: number; skip?: number }) =>
++      this.select(args.where)
++        .sort((a, b) => a.source_id.localeCompare(b.source_id))
++        .slice(args.skip ?? 0, (args.skip ?? 0) + (args.take ?? 500))
++        .map(({ source_id, source_platform, payload, entity_type }) => ({
++          source_id,
++          source_platform,
++          payload,
++          entity_type,
++        })),
++  };
++  scoutReconstructionLedger = {
++    upsert: async (args: { where: any; create: LedgerRow; update: Partial<LedgerRow> }) => {
++      this.note('ledger.upsert');
++      const k = this.key(args.where.coach_id_intent_id_entity_type_source_platform_source_id);
++      const row = this.ledger.get(k) ?? { ...args.create };
++      this.ledger.set(k, row);
++      return row;
++    },
++    updateMany: async (args: { where: any; data: Partial<LedgerRow> }) => {
++      this.note('ledger.updateMany');
++      const k = this.key(args.where);
++      const row = this.ledger.get(k);
++      if (row && (args.where.status === undefined || row.status !== 'reconstructed')) {
++        Object.assign(row, args.data);
++      }
++      return { count: row ? 1 : 0 };
++    },
++    groupBy: async (args: { where: { entity_type: string; source_platform?: string } }) => {
++      const rows = [...this.ledger.values()].filter(
++        (r) =>
++          r.entity_type === args.where.entity_type &&
++          (args.where.source_platform === undefined ||
++            r.source_platform === args.where.source_platform),
++      );
++      const by = new Map<string, number>();
++      for (const r of rows) by.set(r.status, (by.get(r.status) ?? 0) + 1);
++      return [...by].map(([status, n]) => ({ status, _count: { _all: n } }));
++    },
++  };
++  /** The §3.1 gate stand-in: the server context's `gate` calls this on the tx handle. */
++  gate = async (): Promise<number | null> => {
++    this.note('gate');
++    const epoch = this.gateScript[this.gateCalls++];
++    return epoch === undefined ? 1 : epoch;
++  };
++  $transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
++    const log: string[] = [];
++    this.txLog.push(log);
++    this.current = log;
++    try {
++      return await fn(this);
++    } finally {
++      this.current = null;
++    }
++  };
++}
++
++function stubFamily(
++  entityType: string,
++  persist: (id: string) => PersistResult,
++  db: FakePrisma,
++): FamilyReconstructor {
++  return {
++    entityType,
++    map: (row) => {
++      if (String(row.source_id).startsWith('skip')) return { ok: false, reason: 'fixture_skip' };
++      if (String(row.source_id).startsWith('boom')) throw new Error('fixture private payload');
++      return { ok: true, mapped: row };
++    },
++    async persist(_tx, _coach, sourceId) {
++      db.note('persist:' + entityType);
++      return persist(sourceId);
++    },
++  };
++}
++
++const spec = parseSourceMappingSpec(
++  {
++    specVersion: 1,
++    sourcePlatform: PLATFORM,
++    steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
++    families: {
++      clients: { displayName: { paths: [['name']], coerce: 'string' } },
++      programs: { label: { paths: [['title']], coerce: 'string' } },
++      workouts: { label: { paths: [['title']], coerce: 'string' } },
++      client_history: { label: { paths: [['title']], coerce: 'string' } },
++    },
++  },
++  'reconstruct-run.spec:fixture',
++);
++
++function makeService(db: FakePrisma, extraMappers: [string, SourceMapper][] = []) {
++  const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, db);
++  const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, {
++    capture: jest.fn(),
++  });
++  const service = new ScoutReconstructService(prisma, analytics);
++  const families = new Map<string, FamilyReconstructor>();
++  for (const f of ['clients', 'programs', 'workouts', 'client_history']) {
++    families.set(
++      f,
++      stubFamily(
++        f,
++        (id) => ({
++          ok: true,
++          targetId: `${f}:${id}`,
++          targetKind: 'scout_entity',
++          unresolvedChildren: 0,
++        }),
++        db,
++      ),
++    );
++  }
++  // Injected the same way the S8-G worker does: the family registry and the planner's mappers.
++  Object.assign(service, {
++    families,
++    sourceMappers: new Map([...buildSourceMapperRegistry([spec]), ...extraMappers]),
++  });
++  return { service, analytics, families };
++}
++
++const row = (entity_type: string, source_id: string, source_platform = PLATFORM): Staged => ({
++  coach_id: COACH,
++  intent_id: INTENT,
++  entity_type,
++  source_platform,
++  source_id,
++  payload: {},
++});
++
++const serverCtx = (epoch = 1): ServerRunContext => ({
++  mode: 'server',
++  epoch,
++  gate: (tx) => (tx as Prisma.TransactionClient & FakePrisma).gate(),
++});
++
++describe('reconstructRun — gate-first in every per-row transaction (G02)', () => {
++  it('gates success, skip, failure and unmapped outcomes; the ledger carries the staged token', async () => {
++    const db = new FakePrisma();
++    db.staged = [
++      row(TOKEN.clients, 'a'),
++      row(TOKEN.clients, 'skip-b'),
++      row(TOKEN.clients, 'boom-c'),
++      row('notes', 'n1'),
++    ];
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(db.txLog).toEqual([
++      ['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany'],
++      ['gate', 'ledger.upsert', 'ledger.updateMany'],
++      ['gate', 'ledger.upsert', 'ledger.updateMany'],
++      ['gate', 'ledger.upsert', 'ledger.updateMany'],
++    ]);
++    // Token forwarding (C4): the ledger groups by the staged token, not the family name.
++    expect(db.ledger.get(`people|${PLATFORM}|a`)).toMatchObject({
++      status: 'reconstructed',
++      target_id: 'clients:a',
++      target_kind: 'scout_entity',
++    });
++    expect(db.ledger.get(`people|${PLATFORM}|skip-b`)).toMatchObject({
++      status: 'skipped',
++      reason: 'fixture_skip',
++    });
++    expect(db.ledger.get(`people|${PLATFORM}|boom-c`)).toMatchObject({ status: 'failed' });
++    expect(db.ledger.get(`people|${PLATFORM}|boom-c`)?.reason).not.toContain('private payload');
++    expect(db.ledger.get(`notes|${PLATFORM}|n1`)).toMatchObject({
++      status: 'skipped',
++      reason: 'unresolved_family:notes',
++    });
++    expect(db.ledger.has(`clients|${PLATFORM}|a`)).toBe(false);
++    expect(result.stopped).toBeNull();
++    expect(result.unmapped_families).toEqual(['notes']);
++    expect(result.families).toEqual([
++      {
++        token: 'people',
++        source_platform: PLATFORM,
++        family: 'clients',
++        staged: 3,
++        reconstructed: 1,
++        skipped: 1,
++        failed: 1,
++        stopped: null,
++      },
++      {
++        token: 'notes',
++        source_platform: PLATFORM,
++        family: null,
++        staged: 1,
++        reconstructed: 0,
++        skipped: 1,
++        failed: 0,
++        stopped: null,
++      },
++    ]);
++  });
++
++  it('a gate epoch that differs from the pass epoch closes the row (per-row CAS), nothing written', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.clients, 'a')];
++    db.gateScript = [2];
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx(1));
++    expect(result.stopped).toBe('gate_closed');
++    expect(db.txLog).toEqual([['gate']]);
++    expect(db.ledger.size).toBe(0);
++  });
++
++  it('captures one SCOUT_RECONSTRUCT_COMPLETED per planned token with ledger read-back counts', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.clients, 'a'), row(TOKEN.programs, 'skip-p'), row('notes', 'n')];
++    const { service, analytics } = makeService(db);
++    await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(analytics.capture).toHaveBeenCalledTimes(2);
++    expect(analytics.capture).toHaveBeenCalledWith(COACH, Events.SCOUT_RECONSTRUCT_COMPLETED, {
++      intent_id: INTENT,
++      entity_type: 'people',
++      staged: 1,
++      reconstructed: 1,
++      skipped: 0,
++      failed: 0,
++    });
++    expect(analytics.capture).toHaveBeenCalledWith(COACH, Events.SCOUT_RECONSTRUCT_COMPLETED, {
++      intent_id: INTENT,
++      entity_type: 'blocks',
++      staged: 1,
++      reconstructed: 0,
++      skipped: 1,
++      failed: 0,
++    });
++  });
++});
++
++describe('reconstruct (coach-JWT legacy route) — statement-sequence identity (G08)', () => {
++  it('never gates and keeps the S8-C per-row sequence and result shape', async () => {
++    const db = new FakePrisma();
++    db.staged = [row('clients', 'a'), row('clients', 'skip-b'), row('clients', 'boom-c')];
++    const { service } = makeService(db);
++    const result = await service.reconstruct(COACH, INTENT, 'clients');
++    expect(db.gateCalls).toBe(0);
++    expect(db.txLog).toEqual([
++      ['persist:clients', 'ledger.upsert', 'ledger.updateMany'],
++      ['ledger.upsert', 'ledger.updateMany'],
++      ['ledger.upsert', 'ledger.updateMany'],
++    ]);
++    expect(result).toEqual({ intent_id: INTENT, staged: 3, reconstructed: 1, skipped: 1, failed: 1 });
++    // Legacy rows select no token: the ledger carries the family name as before.
++    expect(db.ledger.get(`clients|${PLATFORM}|a`)).toMatchObject({ status: 'reconstructed' });
++  });
++});
++
++describe('reconstructRun — a closed gate stops the pass (G03/G05)', () => {
++  it('stops at the first zero-row gate, writes nothing further, never records a fabricated failed', async () => {
++    const db = new FakePrisma();
++    db.staged = [
++      row(TOKEN.clients, 'a'),
++      row(TOKEN.clients, 'b'),
++      row(TOKEN.clients, 'c'),
++      row(TOKEN.programs, 'p'),
++      row('notes', 'n'),
++    ];
++    db.gateScript = [1, 1, null];
++    const { service, analytics } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(result.stopped).toBe('gate_closed');
++    expect(db.txLog).toEqual([
++      ['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany'],
++      ['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany'],
++      ['gate'],
++    ]);
++    expect([...db.ledger.keys()].sort()).toEqual([`people|${PLATFORM}|a`, `people|${PLATFORM}|b`]);
++    expect(db.gateCalls).toBe(3); // programs and the unmapped token never started
++    // Families that never completed have no completion event; the tokens are still reported.
++    expect(analytics.capture).not.toHaveBeenCalled();
++    expect(result.families).toEqual([]);
++    expect(result.unmapped_families).toEqual(['notes']);
++  });
++
++  it('a closed gate on a skip/failed outcome transaction also stops the pass without a ledger row', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.clients, 'skip-a'), row(TOKEN.clients, 'b')];
++    db.gateScript = [null];
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(result.stopped).toBe('gate_closed');
++    expect(db.txLog).toEqual([['gate']]);
++    expect(db.ledger.size).toBe(0);
++  });
++});
++
++describe('reconstructRun — family orchestration (G01/G10)', () => {
++  it('runs families in §3.8 order independent of staged order, unmapped tokens last', async () => {
++    const db = new FakePrisma();
++    db.staged = [
++      row('notes', 'n'),
++      row(TOKEN.client_history, 'h'),
++      row(TOKEN.workouts, 'w'),
++      row(TOKEN.programs, 'p'),
++      row(TOKEN.clients, 'c'),
++    ];
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(db.txLog.map((t) => t[1])).toEqual([
++      'persist:clients',
++      'persist:programs',
++      'persist:workouts',
++      'persist:client_history',
++      'ledger.upsert',
++    ]);
++    expect(result.families.map((f) => [f.token, f.family])).toEqual([
++      ['people', 'clients'],
++      ['blocks', 'programs'],
++      ['routines', 'workouts'],
++      ['log', 'client_history'],
++      ['notes', null],
++    ]);
++  });
++
++  it('isolates an over-ceiling source: no read or write for it, later families proceed, pass not stopped', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.programs, 'p'), row(TOKEN.workouts, 'w')];
++    db.countOverride.set(TOKEN.programs, RECONSTRUCT_MAX_ROWS + 1);
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(result.stopped).toBeNull();
++    expect(result.families.find((f) => f.token === TOKEN.programs)).toMatchObject({
++      stopped: 'over_ceiling',
++      staged: RECONSTRUCT_MAX_ROWS + 1,
++      reconstructed: 0,
++    });
++    expect([...db.ledger.keys()]).toEqual([`routines|${PLATFORM}|w`]);
++    expect(db.txLog).toHaveLength(1);
++  });
++
++  it('a noncanonical staged platform is a structural conflict: nothing written, pass continues', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.programs, 'p', 'Not_Canonical'), row(TOKEN.workouts, 'w')];
++    const { service } = makeService(db);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(result.stopped).toBeNull();
++    expect(result.families.find((f) => f.source_platform === 'Not_Canonical')).toMatchObject({
++      token: TOKEN.programs,
++      family: null,
++      stopped: 'provenance_conflict',
++      reconstructed: 0,
++      skipped: 0,
++      failed: 0,
++    });
++    expect([...db.ledger.keys()]).toEqual([`routines|${PLATFORM}|w`]);
++  });
++
++  it('a provenance conflict inside a planned family stops that family only', async () => {
++    // A mapper registered for a noncanonical platform cannot exist through the parser; a hand-built
++    // one exercises the engine's own structural refusal on the row.
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.programs, 'p', 'Not_Canonical'), row(TOKEN.workouts, 'w')];
++    const real = buildSourceMapperRegistry([spec]).get(PLATFORM);
++    if (!real) throw new Error('fixture mapper missing');
++    const rogue: SourceMapper = {
++      sourcePlatform: 'Not_Canonical',
++      spec: real.spec,
++      mapClient: (r) => real.mapClient(r),
++      mapEntity: (family, r) => real.mapEntity(family, r),
++      resolveStep: () => ({ ok: true, family: 'programs' }),
++    };
++    const { service } = makeService(db, [['Not_Canonical', rogue]]);
++    const result = await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(result.stopped).toBeNull();
++    expect(result.families.find((f) => f.token === TOKEN.programs)).toMatchObject({
++      family: 'programs',
++      stopped: 'provenance_conflict',
++    });
++    expect([...db.ledger.keys()]).toEqual([`routines|${PLATFORM}|w`]);
++  });
++
++  it('does not write terminal fields: only ledger and target calls appear in any transaction', async () => {
++    const db = new FakePrisma();
++    db.staged = [row(TOKEN.clients, 'a'), row('notes', 'n')];
++    const { service } = makeService(db);
++    await service.reconstructRun(COACH, INTENT, serverCtx());
++    const seen = new Set(db.txLog.flat());
++    expect([...seen].sort()).toEqual(['gate', 'ledger.updateMany', 'ledger.upsert', 'persist:clients']);
++  });
++});
++
++describe('reconstructRun — tenancy (G11)', () => {
++  it('enumerates only the calling coach and intent', async () => {
++    const db = new FakePrisma();
++    db.staged = [
++      row(TOKEN.clients, 'a'),
++      { ...row(TOKEN.clients, 'a'), coach_id: 'coach-B' },
++      { ...row(TOKEN.clients, 'z'), intent_id: 'other' },
++    ];
++    const { service } = makeService(db);
++    await service.reconstructRun(COACH, INTENT, serverCtx());
++    expect(db.groupByArgs[0]).toMatchObject({
++      by: ['source_platform', 'entity_type'],
++      where: { coach_id: COACH, intent_id: INTENT },
++    });
++    expect(db.ledger.size).toBe(1);
++  });
++});
+diff --git a/test/scout/orchestration/settle-hook.spec.ts b/test/scout/orchestration/settle-hook.spec.ts
+new file mode 100644
+index 00000000..d0334d6c
+--- /dev/null
++++ b/test/scout/orchestration/settle-hook.spec.ts
+@@ -0,0 +1,308 @@
++import { AnalyticsService } from '../../../src/analytics/analytics.service';
++import { Events } from '../../../src/analytics/events';
++import { PrismaService } from '../../../src/prisma.service';
++import { ScoutLifecycleService } from '../../../src/scout/lifecycle/lifecycle.service';
++import type { RunPassResult } from '../../../src/scout/reconstruct/orchestration/run-context';
++import { ScoutReconstructService } from '../../../src/scout/scout-reconstruct.service';
++
++/**
++ * The S8-G body of ScoutLifecycleService.onTransferSettled against the S7-L doubles pattern
++ * (test/scout/lifecycle/lifecycle.service.spec.ts) plus a `reconstructRun` double. Proves order
++ * (the pass BEFORE the FOR NO KEY UPDATE tail), the gate closure handed to the pass is this run's
++ * assertRunOpen, a CAS miss on a raised epoch writes nothing (G14), classifyClosed after a closed
++ * gate (G03/G05), verdicts from durable facts not from the pass result (G01/G06), and that the hook
++ * never writes a terminal field except through S7-L's single writeTerminal statement.
++ */
++
++const COACH = 'coach-1';
++const INTENT = '3f2b9c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
++
++interface Doubles {
++  order: string[];
++  queryRaw: jest.Mock;
++  executeRaw: jest.Mock;
++  completionFindUnique: jest.Mock;
++  stagedGroupBy: jest.Mock;
++  ledgerGroupBy: jest.Mock;
++  runFindUnique: jest.Mock;
++  capture: jest.Mock;
++  reconstructRun: jest.Mock;
++}
++
++const passResult = (over: Partial<RunPassResult> = {}): RunPassResult => ({
++  families: [],
++  unmapped_families: [],
++  stopped: null,
++  ...over,
++});
++
++interface LockedRow {
++  execution_epoch: number;
++  terminal_status: string | null;
++  fenced_at: Date | null;
++  fence_reason: string | null;
++  deadline_at: Date | null;
++}
++
++function make(lockedRow: LockedRow | null) {
++  const d: Doubles = {
++    order: [],
++    queryRaw: jest.fn(),
++    executeRaw: jest.fn(),
++    completionFindUnique: jest.fn().mockResolvedValue({ terminal_status: 'success' }),
++    stagedGroupBy: jest.fn().mockResolvedValue([{ entity_type: 'clients', _count: { _all: 2 } }]),
++    ledgerGroupBy: jest
++      .fn()
++      .mockResolvedValue([{ entity_type: 'clients', status: 'reconstructed', _count: { _all: 2 } }]),
++    runFindUnique: jest.fn().mockResolvedValue(null),
++    capture: jest.fn(),
++    reconstructRun: jest.fn(async () => {
++      d.order.push('pass');
++      return passResult();
++    }),
++  };
++  d.queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
++    const text = strings.join('?');
++    if (text.includes('FOR NO KEY UPDATE')) {
++      d.order.push('lock');
++      return lockedRow ? [lockedRow] : [];
++    }
++    if (text.includes('last_observed_at')) {
++      d.order.push('gate');
++      return [{ execution_epoch: 1 }];
++    }
++    return [];
++  });
++  d.executeRaw.mockImplementation(async (strings: TemplateStringsArray) => {
++    const text = strings.join('?');
++    d.order.push(
++      text.includes('terminal_status = ') ? 'terminal' : text.includes('fenced_at = ') ? 'fence' : 'exec',
++    );
++    return 1;
++  });
++  const tx = {
++    $queryRaw: d.queryRaw,
++    $executeRaw: d.executeRaw,
++    scoutImportCompletion: { findUnique: d.completionFindUnique },
++    scoutIngestEntity: { groupBy: d.stagedGroupBy },
++    scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++  };
++  const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, {
++    scoutImport: { findUnique: d.runFindUnique },
++    scoutImportCompletion: { findUnique: d.completionFindUnique },
++    scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++    $transaction: jest.fn(async (fn: (t: unknown) => Promise<unknown>) => fn(tx)),
++  });
++  const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, {
++    capture: d.capture,
++  });
++  const reconstruct = Object.assign(
++    Object.create(ScoutReconstructService.prototype) as ScoutReconstructService,
++    { reconstructRun: d.reconstructRun },
++  );
++  const service = new ScoutLifecycleService(prisma, analytics, reconstruct);
++  return { d, service };
++}
++
++const open: LockedRow = {
++  execution_epoch: 1,
++  terminal_status: null,
++  fenced_at: null,
++  fence_reason: null,
++  deadline_at: new Date(Date.now() + 60_000),
++};
++const terminalCall = (d: Doubles) =>
++  d.executeRaw.mock.calls.find((c: any[]) => c[0].join('?').includes('terminal_status = '));
++
++describe('onTransferSettled — S8-G body', () => {
++  it('G01: runs the pass once with this run and epoch, then locks, arbitrates and settles', async () => {
++    const { d, service } = make(open);
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(d.reconstructRun).toHaveBeenCalledTimes(1);
++    const [coach, intent, ctx] = d.reconstructRun.mock.calls[0];
++    expect(coach).toBe(COACH);
++    expect(intent).toBe(INTENT);
++    expect(ctx).toMatchObject({ mode: 'server', epoch: 1 });
++    expect(typeof ctx.gate).toBe('function');
++    expect(d.order).toEqual(['pass', 'lock', 'terminal']);
++    // Until S9 supplies a reconciliation verdict the arbiter's step 4 is the truthful terminal.
++    expect(terminalCall(d)?.slice(1)).toEqual(
++      expect.arrayContaining(['partial', 'partial', 'reconciliation_not_performed', COACH, INTENT, 1]),
++    );
++    expect(d.capture).toHaveBeenCalledWith(
++      COACH,
++      Events.SCOUT_RUN_SETTLED,
++      expect.objectContaining({
++        intent_id: INTENT,
++        terminal_status: 'partial',
++        reason_code: 'reconciliation_not_performed',
++      }),
++    );
++    // `complete` never appears in any write argument (S7-L invariant kept).
++    for (const call of d.executeRaw.mock.calls) expect(call.slice(1)).not.toContain('complete');
++  });
++
++  it('the gate closure handed to the pass is assertRunOpen bound to this run', async () => {
++    const { d, service } = make(open);
++    await service.onTransferSettled(COACH, INTENT, 1);
++    const ctx = d.reconstructRun.mock.calls[0][2];
++    const tx = { $queryRaw: d.queryRaw };
++    await expect(ctx.gate(tx)).resolves.toBe(1);
++    expect(d.order).toContain('gate');
++    // Bound to (coach, intent): the UPDATE carries both as parameters.
++    const gateCall = d.queryRaw.mock.calls.find((c: any[]) => c[0].join('?').includes('last_observed_at'));
++    expect(gateCall?.slice(1)).toEqual(expect.arrayContaining([COACH, INTENT]));
++  });
++
++  it('the pass result is informational: the verdict comes from the durable facts under the lock', async () => {
++    const { d, service } = make(open);
++    d.reconstructRun.mockImplementationOnce(async () => {
++      d.order.push('pass');
++      return passResult({
++        families: [
++          {
++            token: 'clients',
++            source_platform: 'truecoach',
++            family: 'clients',
++            staged: 2,
++            reconstructed: 2,
++            skipped: 0,
++            failed: 0,
++            stopped: null,
++          },
++        ],
++      });
++    });
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(d.stagedGroupBy).toHaveBeenCalledTimes(1);
++    expect(d.ledgerGroupBy).toHaveBeenCalledTimes(1);
++    expect(terminalCall(d)?.slice(1)).toEqual(
++      expect.arrayContaining(['partial', 'reconciliation_not_performed']),
++    );
++  });
++
++  it('G14: a raised epoch at the lock is a CAS miss — no facts read, no terminal write, no event', async () => {
++    const { d, service } = make({
++      ...open,
++      execution_epoch: 2,
++      fenced_at: new Date(),
++      fence_reason: 'cancelled',
++      terminal_status: 'cancelled',
++    });
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(d.order).toEqual(['pass', 'lock']);
++    expect(d.stagedGroupBy).not.toHaveBeenCalled();
++    expect(d.executeRaw).not.toHaveBeenCalled();
++    expect(d.capture).not.toHaveBeenCalled();
++  });
++
++  it('a run already terminal at the lock (same epoch) is also a miss', async () => {
++    const { d, service } = make({ ...open, terminal_status: 'partial' });
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(d.order).toEqual(['pass', 'lock']);
++    expect(d.executeRaw).not.toHaveBeenCalled();
++  });
++
++  it('G03/G05: a pass stopped by a closed gate → classifyClosed once, then the tail', async () => {
++    const { d, service } = make(open);
++    d.reconstructRun.mockImplementationOnce(async () => {
++      d.order.push('pass');
++      return passResult({ stopped: 'gate_closed' });
++    });
++    // classifyClosed re-reads unlocked: an open row PAST its deadline → fence timed_out in its own
++    // transaction (lock, fence UPDATE, terminal write), then the hook's tail runs its own lock.
++    d.runFindUnique.mockResolvedValueOnce({
++      mode: 'server',
++      import_intent_id: INTENT,
++      phase: 'reconciling',
++      accepted_start_at: new Date(0),
++      deadline_at: new Date(Date.now() - 1000),
++      last_observed_at: null,
++      execution_epoch: 1,
++      fenced_at: null,
++      fence_reason: null,
++      reason_code: null,
++      terminal_status: null,
++      completed_at: null,
++      started_at: new Date(0),
++    });
++    const spy = jest.spyOn(service, 'classifyClosed');
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(spy).toHaveBeenCalledTimes(1);
++    expect(spy).toHaveBeenCalledWith(COACH, INTENT);
++    expect(d.order.slice(0, 4)).toEqual(['pass', 'lock', 'fence', 'terminal']);
++    // The fence's terminal is timed_out under epoch 2; on real PG the tail's CAS on epoch 1 then
++    // misses (the double keeps returning epoch 1 at the lock, which is why only the prefix is pinned).
++    expect(terminalCall(d)?.slice(1)).toEqual(expect.arrayContaining(['timed_out', 'timed_out', 2]));
++    expect(d.capture).toHaveBeenCalledWith(
++      COACH,
++      Events.SCOUT_RUN_FENCED,
++      expect.objectContaining({ fence_reason: 'timed_out' }),
++    );
++  });
++
++  it('a closed gate on a run that is not past its deadline (fenced elsewhere) writes nothing itself', async () => {
++    const { d, service } = make({
++      ...open,
++      execution_epoch: 2,
++      fenced_at: new Date(),
++      fence_reason: 'cancelled',
++      terminal_status: 'cancelled',
++    });
++    d.reconstructRun.mockImplementationOnce(async () => {
++      d.order.push('pass');
++      return passResult({ stopped: 'gate_closed' });
++    });
++    d.runFindUnique.mockResolvedValueOnce({
++      mode: 'server',
++      import_intent_id: INTENT,
++      phase: 'reconciling',
++      accepted_start_at: new Date(0),
++      deadline_at: new Date(Date.now() + 60_000),
++      last_observed_at: null,
++      execution_epoch: 2,
++      fenced_at: new Date(),
++      fence_reason: 'cancelled',
++      reason_code: 'cancelled_by_coach',
++      terminal_status: 'cancelled',
++      completed_at: new Date(),
++      started_at: new Date(0),
++    });
++    await service.onTransferSettled(COACH, INTENT, 1);
++    expect(d.order).toEqual(['pass', 'lock']);
++    expect(d.executeRaw).not.toHaveBeenCalled();
++    expect(d.capture).not.toHaveBeenCalled();
++  });
++
++  it('G06: claim failed with zero staged → failed/transfer_failed; with staged rows → partial', async () => {
++    const a = make(open);
++    a.d.completionFindUnique.mockResolvedValue({ terminal_status: 'failed' });
++    a.d.stagedGroupBy.mockResolvedValue([]);
++    a.d.ledgerGroupBy.mockResolvedValue([]);
++    await a.service.onTransferSettled(COACH, INTENT, 1);
++    expect(terminalCall(a.d)?.slice(1)).toEqual(expect.arrayContaining(['failed', 'transfer_failed']));
++
++    const b = make(open);
++    b.d.completionFindUnique.mockResolvedValue({ terminal_status: 'failed' });
++    await b.service.onTransferSettled(COACH, INTENT, 1);
++    expect(terminalCall(b.d)?.slice(1)).toEqual(
++      expect.arrayContaining(['partial', 'reconciliation_not_performed']),
++    );
++  });
++
++  it('an unexpected pass failure propagates; nothing is locked or written (run left open)', async () => {
++    const { d, service } = make(open);
++    d.reconstructRun.mockRejectedValueOnce(new Error('connection lost'));
++    await expect(service.onTransferSettled(COACH, INTENT, 1)).rejects.toThrow('connection lost');
++    expect(d.executeRaw).not.toHaveBeenCalled();
++    expect(d.order).toEqual([]);
++    expect(d.capture).not.toHaveBeenCalled();
++  });
++
++  it('without an injected engine the hook constructs the real one (never skips the pass)', () => {
++    const prisma = Object.create(PrismaService.prototype) as PrismaService;
++    const analytics = Object.create(AnalyticsService.prototype) as AnalyticsService;
++    const service = new ScoutLifecycleService(prisma, analytics);
++    expect(service).toHaveProperty('reconstruct', expect.any(ScoutReconstructService));
++  });
++});
+diff --git a/test/utils/g2-s8g-bootstrap.sh b/test/utils/g2-s8g-bootstrap.sh
+new file mode 100755
+index 00000000..02e9986f
+--- /dev/null
++++ b/test/utils/g2-s8g-bootstrap.sh
+@@ -0,0 +1,232 @@
++#!/usr/bin/env bash
++# S8-G G2 proof bootstrap, derived by substitution from the accepted S8-C bootstrap
++# test/utils/g2-s8c-bootstrap.sh (at 1c5fbb04, unchanged) for the S8-G-only disposable
++# cluster/database. S8-G ships NO migration: the candidate's prisma tree must be byte-identical to
++# the base 1c5fbb04, so there is no OLD side here. The full accepted history (172 migrations,
++# S8-B and S7-L included) is installed from the CANDIDATE root through the real release mechanism
++# (`prisma migrate deploy`), and the spec then drives the candidate settle path (real ScoutService →
++# ScoutLifecycleService → ScoutReconstructService) against it.
++# Validation harness only: it never touches a hosted or application database, never edits
++# schema/migration/generator sources, and stops on the first unexpected state instead of
++# repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_S8G_DATABASE_URL  postgresql://s8g_super@127.0.0.1:<port>/g2_s8g_disposable?schema=public&connection_limit=2
++#   G2_S8G_CONFIRM       g2_s8g_disposable:<port>
++#   G2_S8G_PASSWORD      disposable local fixture password shared by s8g_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_S8G_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_S8G_CANDIDATE_HEAD  the attested final candidate head (40 hex); the runtime root must be
++#                        checked out exactly there and clean, and it must not be the base itself
++# Optional:
++#   G2_S8G_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# Base pin (kept identical in test/utils/g2-s8g-pg-harness.ts and test/scout/g2-s8g-db-guard.spec.ts).
++BASE_HEAD=1c5fbb0441178e0cfe6e9f8d72e955c645c265e9
++S8B_MIGRATION=20270122000000_scout_native_provenance_expand
++S7L_MIGRATION=20270123000000_scout_run_lifecycle_expand
++# 171 accepted migrations through S8-B plus S7-L = 172 tracked by the base; S8-G adds none.
++EXPECTED_MIGRATIONS=172
++EXPECTED_VERSION="${G2_S8G_SERVER_VERSION:-170006}"
++# Distinctive S8-G fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-s8g-db.ts G2_S8G_CLUSTER_MARKER / G2_S8G_DATABASE_MARKER, kept identical by
++# test/scout/g2-s8g-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's8g-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s8g-disposable-pg17
++DB_MARKER=s8g-g2-run-orchestration-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_S8G_DATABASE_URL G2_S8G_CONFIRM G2_S8G_PASSWORD G2_S8G_PSQL G2_S8G_CANDIDATE_HEAD; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++# Candidate binding (mirrors g2S8gCandidateHead in test/utils/g2-s8g-db.ts): one attested head, clean.
++[[ "$G2_S8G_CANDIDATE_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "G2_S8G_CANDIDATE_HEAD is not a 40-hex commit id" >&2; exit 2; }
++[[ "$G2_S8G_CANDIDATE_HEAD" != "$BASE_HEAD" ]] || { echo "G2_S8G_CANDIDATE_HEAD is the accepted base, not a candidate" >&2; exit 2; }
++ACTUAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
++[[ "$ACTUAL_HEAD" == "$G2_S8G_CANDIDATE_HEAD" ]] || { echo "runtime root $ROOT is at $ACTUAL_HEAD, not the attested candidate $G2_S8G_CANDIDATE_HEAD" >&2; exit 2; }
++[[ -z "$(git -C "$ROOT" status --porcelain)" ]] || { echo "runtime root $ROOT has uncommitted changes; the attested head must be checked out clean" >&2; exit 2; }
++git -C "$ROOT" merge-base --is-ancestor "$BASE_HEAD" "$ACTUAL_HEAD" || { echo "candidate $ACTUAL_HEAD does not descend from base $BASE_HEAD" >&2; exit 2; }
++echo "CANDIDATE_HEAD=$ACTUAL_HEAD"
++[[ -x "$G2_S8G_PSQL" ]] || { echo "psql binary not executable: $G2_S8G_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: nothing in this harness may auto-install.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2S8gTestTarget, withFixturePassword } = require("./test/utils/g2-s8g-db");
++  const t = g2S8gTestTarget(process.env.G2_S8G_DATABASE_URL, process.env.G2_S8G_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_S8G_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_S8G_PASSWORD"
++
++psql_maint() { "$G2_S8G_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_S8G_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|verify-only) ;; *) echo "usage: g2-s8g-bootstrap.sh [bootstrap|verify-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S8-G lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S8-G fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_S8G_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_s8g_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s8g_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_s8g_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s8g_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s8g_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s8g_disposable exists without the S8-G disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_s8g_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_s8g_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. Candidate source: S8-G ships no migration. The prisma tree (schema + migrations) must be
++#    byte-identical to the base and track exactly the accepted 172 directories, S8-B and S7-L included.
++git -C "$ROOT" cat-file -e "$BASE_HEAD^{commit}" || { echo "base $BASE_HEAD unknown in $ROOT" >&2; exit 4; }
++[[ -z "$(git -C "$ROOT" diff --name-only "$BASE_HEAD" HEAD -- prisma)" ]] \
++  || { echo "candidate prisma tree differs from base $BASE_HEAD; S8-G must ship no schema/migration change" >&2; exit 4; }
++git -C "$ROOT" diff --quiet HEAD -- prisma || { echo "candidate has uncommitted prisma changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$BASE_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ from base; the isolated dependency tree is unsafe" >&2; exit 4; }
++COUNT="$(find "$ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "candidate has $COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S8B_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S8-B migration" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S7L_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S7-L migration" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history (S8-B and S7-L included) through the real release mechanism from the candidate root.
++#    Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the cluster superuser.
++(cd "$ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S8B_MIGRATION' AND finished_at IS NOT NULL")" == "1" ]] \
++  || { echo "S8-B not recorded as applied" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S7L_MIGRATION' AND finished_at IS NOT NULL")" == "1" ]] \
++  || { echo "S7-L not recorded as applied" >&2; exit 5; }
++# S7-L run objects the S8-G settle path depends on must be PRESENT (the accepted target of this slice).
++for col in mode import_intent_id phase accepted_start_at deadline_at last_observed_at execution_epoch fenced_at fence_reason reason_code; do
++  [[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutImport\"'::regclass AND attname='$col' AND NOT attisdropped")" == "1" ]] \
++    || { echo "ScoutImport lacks S7-L's $col" >&2; exit 5; }
++done
++# S8-B objects the S8-G writer depends on must be PRESENT (the accepted target of this slice).
++[[ "$(psql_db -c "SELECT to_regclass('public.\"ImportNativeProvenance\"') IS NOT NULL")" == "t" ]] \
++  || { echo "ImportNativeProvenance absent after the accepted history" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='target_kind' AND NOT attisdropped")" == "1" ]] \
++  || { echo "ScoutReconstructionLedger lacks S8-B's target_kind" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_constraint WHERE conrelid='public.\"ImportNativeProvenance\"'::regclass AND contype='c'")" -ge "3" ]] \
++  || { echo "ImportNativeProvenance CHECK constraints absent" >&2; exit 5; }
++for rel in WorkoutProgram WorkoutPlan WorkoutPlanExercise WorkoutPlanRevision ExerciseCatalogItem ScoutReconstructedEntity; do
++  [[ "$(psql_db -c "SELECT to_regclass('public.\"$rel\"') IS NOT NULL")" == "t" ]] || { echo "$rel absent after the accepted history" >&2; exit 5; }
++done
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative: a missing file is a refusal (exit 6).
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Candidate client in the candidate root: generated once by the runtime setup (the schema is
++#    the base schema, so it is the accepted S7-L client) and only VERIFIED here; no `prisma generate`.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++# The generated client copy is normalized by Prisma (never byte-equal to prisma/schema.prisma), so it
++# is verified STRUCTURALLY: it must carry the accepted S7-L run fields and relation, S8-B's provenance
++# model and target_kind, and N's ledger source_platform. A stale pre-S7-L client is refused (exit 7).
++[[ -f "$ROOT/node_modules/.prisma/client/schema.prisma" ]] \
++  || { echo "candidate client schema copy missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++for field in mode import_intent_id phase accepted_start_at deadline_at last_observed_at execution_epoch fenced_at fence_reason reason_code; do
++  awk '/model ScoutImport \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq "^ +$field +" \
++    || { echo "candidate client ScoutImport lacks $field; a pre-S7-L client (stale generated client)" >&2; exit 7; }
++done
++awk '/model ScoutImport \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +intent +ImportIntent\?' \
++  || { echo "candidate client ScoutImport lacks the ImportIntent relation (stale generated client)" >&2; exit 7; }
++grep -q 'model ImportNativeProvenance ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client lacks ImportNativeProvenance (pre-S8-B client)" >&2; exit 7; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +target_kind +String\?' \
++  || { echo "candidate client ledger lacks target_kind String? (pre-S8-B client)" >&2; exit 7; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "candidate client does not carry N's required ledger source_platform" >&2; exit 7; }
++awk '/model ScoutIngestEntity \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +entity_type +String( |$)' \
++  || { echo "candidate client staged rows lack entity_type" >&2; exit 7; }
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++
++if [[ "$MODE" == verify-only ]]; then echo "G2_S8G_VERIFY_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_S8G_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-s8g-db.ts b/test/utils/g2-s8g-db.ts
+new file mode 100644
+index 00000000..2fdbedd2
+--- /dev/null
++++ b/test/utils/g2-s8g-db.ts
+@@ -0,0 +1,154 @@
++/**
++ * S8-G G2 proof target guard: derived by literal substitution from the accepted S8-C guard
++ * test/utils/g2-s8c-db.ts (at 1c5fbb04), which stays byte-identical and keeps governing the
++ * S8-C proof. One dedicated disposable database on an S8-G-only disposable PostgreSQL 17
++ * cluster; a further identity, separate from the E, T/Q0, S5, B, R, N/Q1, C, S7-L, S8-B and
++ * S8-C targets, so no earlier proof state is reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_S8G_DATABASE = 'g2_s8g_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      s8g_super    cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy` and all harness DDL/data (S8-G ships no migration)
++ *  - runtime    service_role  BYPASSRLS runtime role used by the candidate lifecycle/reconstruct worker processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_S8G_ROLE = 's8g_super';
++export const G2_S8G_ADMIN_ROLE = G2_S8G_ROLE;
++export const G2_S8G_MIGRATION_ROLE = 'postgres';
++export const G2_S8G_RUNTIME_ROLE = 'service_role';
++export const G2_S8G_LOGIN_ROLES = new Set([
++  G2_S8G_ADMIN_ROLE,
++  G2_S8G_MIGRATION_ROLE,
++  G2_S8G_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_S8G_PASSWORD_ENV = 'G2_S8G_PASSWORD';
++/**
++ * Distinctive S8-G fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's8g-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s8g_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-s8g-bootstrap.sh and the S8-G binding under execution/1910a060/s8g/ must carry the same literals.
++ */
++export const G2_S8G_CLUSTER_MARKER = 's8g-disposable-pg17';
++export const G2_S8G_DATABASE_MARKER =
++  's8g-g2-run-orchestration-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
++// S7-L lane; 55511 is the accepted S8-B lane; 55641 is the accepted S7-L (64e33dc7) lane; 55642 is
++// the accepted S8-C lane. The S8-G lane port is chosen by the operator (55643 suggested,
++// execution/1910a060 SCOPE), double-entered in the confirmation, never hard-coded.
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++  '55491',
++  '55501',
++  '55511',
++  '55641',
++  '55642',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2S8gTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_S8G_DATABASE}` ||
++    url.username !== G2_S8G_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_S8G_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'S8-G G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('S8-G G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_S8G_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('S8-G G2 proof requires a plain fixture password in the environment');
++  if (!G2_S8G_LOGIN_ROLES.has(username))
++    throw new Error('S8-G G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
++
++/**
++ * Candidate binding. The one-run S8-G proof is granted against ONE attested final head, so the
++ * driver refuses to run against anything else: the operator double-enters the attested head in
++ * G2_S8G_CANDIDATE_HEAD, and it must equal the checked-out HEAD of the runtime root exactly,
++ * that head must not be the base itself (a candidate, not the accepted tree), and the tree must
++ * be clean (an uncommitted edit would make the proof about bytes no attestation covers). Pure:
++ * the callers supply `git rev-parse HEAD` and `git status --porcelain` output.
++ */
++export const G2_S8G_CANDIDATE_HEAD_ENV = 'G2_S8G_CANDIDATE_HEAD';
++export const G2_S8G_BASE_HEAD = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++export function g2S8gCandidateHead(
++  declared: string | undefined,
++  checkedOut: string,
++  porcelain: string,
++): string {
++  if (!declared || !/^[0-9a-f]{40}$/.test(declared))
++    throw new Error(
++      `S8-G G2 proof requires the attested candidate head in ${G2_S8G_CANDIDATE_HEAD_ENV}`,
++    );
++  if (declared === G2_S8G_BASE_HEAD)
++    throw new Error('S8-G G2 proof target is a candidate head, not the accepted base');
++  if (checkedOut.trim() !== declared)
++    throw new Error(
++      `S8-G G2 proof runtime root is at ${checkedOut.trim()}, not the attested candidate ${declared}`,
++    );
++  if (porcelain.trim() !== '')
++    throw new Error(
++      'S8-G G2 proof runtime root has uncommitted changes; the attested head must be checked out clean',
++    );
++  return declared;
++}
+diff --git a/test/utils/g2-s8g-harness.ts b/test/utils/g2-s8g-harness.ts
+new file mode 100644
+index 00000000..ee2a41a2
+--- /dev/null
++++ b/test/utils/g2-s8g-harness.ts
+@@ -0,0 +1,271 @@
++/**
++ * G2-S8-G live-proof observations layered on the S8-G-only derivative
++ * (test/utils/g2-s8g-pg-harness.ts) of the accepted S8-C harness. Union of the S7-L run-lifecycle
++ * fixture helpers (test/utils/g2-s7l-harness.ts at 1c5fbb04: User → ImportIntent, server run rows,
++ * staged rows, deadline clock, run/completion snapshots, the exact §3.1 gate text) and the S8-C
++ * native fixture helpers (test/utils/g2-s8c-harness.ts: fixture source spec + native rule set the
++ * worker injects, catalog rows, target/provenance/ledger snapshots). Adds only what S8-G needs:
++ * staged tokens that are NOT the canonical family names (`people`/`blocks`/`routines`/`log`), so
++ * the proof observes the planner's token → family resolution and the ledger's token grouping.
++ * No production writer is emulated here: the settle path runs as the real ScoutService →
++ * ScoutLifecycleService → ScoutReconstructService in test/utils/g2-s8g-worker.cjs. Imported only
++ * by the explicitly guarded test/rls-g2-s8g.spec.ts.
++ */
++import { json, quote, sql } from './g2-s8g-pg-harness';
++
++export const RUN = 'ScoutImport';
++export const INTENT = 'ImportIntent';
++export const COMPLETION = 'ScoutImportCompletion';
++export const STAGED = 'ScoutIngestEntity';
++export const PROVENANCE = 'ImportNativeProvenance';
++export const LEDGER = 'ScoutReconstructionLedger';
++/** Fixture platform: canonical, synthetic, registered only through the injected spec. */
++export const PLATFORM = 's8g-proof';
++/** Staged step tokens of the fixture platform (deliberately not the canonical family names). */
++export const TOKEN = {
++  clients: 'people',
++  programs: 'blocks',
++  workouts: 'routines',
++  client_history: 'log',
++} as const;
++/** Contract §3.8 order the pass must follow, as fixture tokens. */
++export const TOKEN_ORDER = [TOKEN.clients, TOKEN.programs, TOKEN.workouts, TOKEN.client_history];
++
++/** Fixture S8-A spec: `people` → clients, `blocks` → programs, `routines` → workouts, `log` → client_history. */
++export const SPEC = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
++  families: {
++    clients: { displayName: { paths: [['name']], coerce: 'string' } },
++    programs: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    workouts: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    client_history: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++  },
++};
++/** Fixture S8-C native rules for the same platform (the accepted S8-C fixture shape). */
++export const RULES = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  families: {
++    programs: {
++      description: { kind: 'text', paths: [['notes']] },
++      weeks: { kind: 'integer', paths: [['weeks']] },
++      daysPerWeek: { kind: 'integer', paths: [['days']] },
++    },
++    workouts: {
++      type: {
++        kind: 'enum',
++        paths: [['kind']],
++        map: { lift: 'strength', run: 'cardio' },
++        default: 'strength',
++      },
++      durationEstimateMinutes: { kind: 'duration', paths: [['minutes']], unit: 'minutes' },
++      programSourceId: { kind: 'identifier', paths: [['block_id']] },
++      weekIndex: { kind: 'integer', paths: [['week']], base: 1 },
++      dayIndex: { kind: 'integer', paths: [['day']], base: 1 },
++      exercises: {
++        paths: [['exercises']],
++        item: {
++          id: { kind: 'identifier', paths: [['id']] },
++          exerciseRef: { kind: 'identifier', paths: [['exercise']] },
++          sets: { kind: 'integer', paths: [['sets']] },
++          reps: { kind: 'integer', paths: [['reps']] },
++          weight: { kind: 'weight', paths: [['kg']], unit: 'kg' },
++          restSeconds: { kind: 'duration', paths: [['rest']], unit: 'seconds' },
++          groupKey: { kind: 'identifier', paths: [['superset']] },
++          notes: { kind: 'text', paths: [['cue']] },
++        },
++      },
++    },
++  },
++};
++/** Worker options that inject the fixture registry (spread into every `run`). */
++export const REGISTRY = { spec: SPEC, rules: RULES };
++
++export const MODES = ['legacy', 'server'] as const;
++export const PHASES = ['discovering', 'transferring', 'reconciling'] as const;
++export const FENCE_REASONS = ['cancelled', 'timed_out', 'revoked'] as const;
++
++/** Synthetic owner row (User is the FK target of ImportIntent/WorkoutPlan/WorkoutProgram coach_id). */
++export function ensureUser(coach: string) {
++  sql(`INSERT INTO "User" (id,supabase_id,email,name,role)
++    VALUES (${quote(coach)},${quote(`sb-${coach}`)},${quote(`${coach}@synthetic.invalid`)},${quote(`Synthetic ${coach}`)},'coach')
++    ON CONFLICT (id) DO NOTHING`);
++}
++/** Synthetic setup intent for `coach`; returns its UUID. C1 keeps ONE current setup per coach
++ *  (`ImportIntent_one_current_key`), so any earlier current intent of the coach is superseded
++ *  first (fixture shaping). `paired=false` → S7-L Start must refuse `intent_not_paired`. */
++export function intent(coach: string, paired = true): string {
++  ensureUser(coach);
++  return sql(`UPDATE "${INTENT}" SET superseded_at=now() WHERE coach_id=${quote(coach)} AND superseded_at IS NULL;
++    INSERT INTO "${INTENT}" (id,coach_id,chosen_platform,paired_at)
++    VALUES (gen_random_uuid(),${quote(coach)},'truecoach',${paired ? 'now()' : 'NULL'})
++    RETURNING id`);
++}
++/** Settled LEGACY run row (the pre-S7-L writer's shape): the post-settle gate of the coach-JWT route. */
++export function legacyRun(coach: string, intent: string, terminal: string | null = 'success') {
++  ensureUser(coach);
++  sql(`INSERT INTO "${RUN}" (id,coach_id,intent_id,state,terminal_status,completed_at)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},
++      ${terminal === null ? "'in_progress'" : quote(terminal)},${terminal === null ? 'NULL' : quote(terminal)},
++      ${terminal === null ? 'NULL' : 'now()'})
++    ON CONFLICT DO NOTHING`);
++}
++/** One SERVER run row written directly (SQL-level fixtures only). Behavioural runs come from the
++ *  real Start through the worker. */
++export function serverRunInsert(
++  coach: string,
++  intentId: string,
++  overrides: Partial<Record<string, string>> = {},
++) {
++  const v: Record<string, string> = {
++    id: quote(`${coach}-${intentId}`),
++    coach_id: quote(coach),
++    intent_id: quote(intentId),
++    state: "'in_progress'",
++    terminal_status: 'NULL',
++    mode: "'server'",
++    import_intent_id: `${quote(intentId)}::uuid`,
++    phase: "'discovering'",
++    accepted_start_at: "(now() AT TIME ZONE 'UTC')",
++    deadline_at: "(now() AT TIME ZONE 'UTC') + interval '5 minutes'",
++    ...overrides,
++  };
++  const names = Object.keys(v);
++  return `INSERT INTO "${RUN}" (${names.join(',')}) VALUES (${names.map((n) => v[n]).join(',')})`;
++}
++/** One staged row (the accepted ingest shape) written directly; `token` is the staged step token
++ *  (fixture platform tokens, or an unmapped one such as `notes`). */
++export function stage(
++  coach: string,
++  intent: string,
++  token: string,
++  source: string,
++  payload: Record<string, unknown> = { name: `Synthetic ${source}` },
++  platform: string = PLATFORM,
++) {
++  sql(`INSERT INTO "${STAGED}" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${token}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(token)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify(payload))})
++    ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`);
++}
++/**
++ * Synthetic catalog rows the exact-identifier link may resolve against (id and slug).
++ * `updated_at` is `@updatedAt` in the schema: Prisma fills it client-side and the column has no
++ * database default, so this raw INSERT must supply it.
++ */
++export function catalog(items: readonly { id: string; slug: string }[]) {
++  for (const item of items)
++    sql(`INSERT INTO "ExerciseCatalogItem" (id,slug,name,category,primary_muscle,updated_at)
++      VALUES (${quote(item.id)},${quote(item.slug)},${quote(`Synthetic ${item.slug}`)},'strength','full_body',now())
++      ON CONFLICT (id) DO NOTHING`);
++}
++/** Move a server run's deadline into the past (fixture clock; the service never updates it). */
++export function expire(coach: string, intent: string) {
++  sql(`UPDATE "${RUN}" SET deadline_at=accepted_start_at + interval '1 millisecond'
++    WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`);
++}
++
++/** One run row (all columns) or null. */
++export const runRow = (coach: string, intent: string) =>
++  json(
++    `SELECT COALESCE((SELECT to_jsonb(r) FROM "${RUN}" r WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}),'null')`,
++  );
++export const runCount = () => Number(sql(`SELECT count(*) FROM "${RUN}"`));
++export const completionRows = () =>
++  json(
++    `SELECT COALESCE(jsonb_agg(jsonb_build_array(coach_id,intent_id,terminal_status) ORDER BY coach_id,intent_id),'[]') FROM "${COMPLETION}"`,
++  );
++export const stagedCount = (coach: string, intent: string) =>
++  Number(
++    sql(
++      `SELECT count(*) FROM "${STAGED}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`,
++    ),
++  );
++export const stagedGroups = (coach: string, intent: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('source_platform',source_platform,'entity_type',entity_type,'n',n)
++    ORDER BY source_platform,entity_type),'[]')
++    FROM (SELECT source_platform,entity_type,count(*) AS n FROM "${STAGED}"
++      WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)} GROUP BY 1,2) g`) as Array<
++    Record<string, any>
++  >;
++export const provenanceRows = (coach: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_id',source_id,
++    'source_namespace',source_namespace,'native_kind',native_kind,'native_id',native_id,'outcome',outcome,
++    'reason',reason,'import_intent_id',import_intent_id) ORDER BY entity_type, source_id),'[]')
++    FROM "${PROVENANCE}" WHERE coach_id=${quote(coach)}`) as Array<Record<string, string | null>>;
++export const ledgerRows = (coach: string, intent: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_platform',source_platform,
++    'source_id',source_id,'status',status,'target_id',target_id,'target_kind',target_kind,'reason',reason)
++    ORDER BY entity_type, source_platform, source_id),'[]')
++    FROM "${LEDGER}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`) as Array<
++    Record<string, string | null>
++  >;
++/** Ledger tally per staged token: the arbiter's `ledger_by_family` grouping key. */
++export const ledgerByToken = (coach: string, intent: string) =>
++  json(`SELECT COALESCE(jsonb_object_agg(entity_type, tally),'{}') FROM (
++    SELECT entity_type, jsonb_build_object(
++      'reconstructed', count(*) FILTER (WHERE status='reconstructed'),
++      'skipped', count(*) FILTER (WHERE status='skipped'),
++      'failed', count(*) FILTER (WHERE status='failed')) AS tally
++    FROM "${LEDGER}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)} GROUP BY entity_type) t`) as Record<
++    string,
++    { reconstructed: number; skipped: number; failed: number }
++  >;
++export const plans = (coach: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'name',name,'type',type,'program_id',program_id,
++    'week_index',week_index,'day_index',day_index,'is_template',is_template,'version',version,
++    'head_revision_id',head_revision_id,'duration_estimate_minutes',duration_estimate_minutes) ORDER BY name),'[]')
++    FROM "WorkoutPlan" WHERE coach_id=${quote(coach)}`) as Array<Record<string, any>>;
++export const programs = (coach: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'name',name,'weeks',weeks,'days_per_week',days_per_week,
++    'is_template',is_template,'is_regime',is_regime,'owner_user_id',owner_user_id,'visibility',visibility,'version',version) ORDER BY name),'[]')
++    FROM "WorkoutProgram" WHERE coach_id=${quote(coach)}`) as Array<Record<string, any>>;
++export const persons = (coach: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'display_name',display_name) ORDER BY id),'[]')
++    FROM "Person" WHERE coach_id=${quote(coach)}`) as Array<Record<string, any>>;
++export const evidenceRows = (coach: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_id',source_id,'label',label,
++    'client_source_id',client_source_id) ORDER BY entity_type, source_id),'[]')
++    FROM "ScoutReconstructedEntity" WHERE coach_id=${quote(coach)}`) as Array<
++    Record<string, string | null>
++  >;
++export const count = (table: string, where = 'true') =>
++  Number(sql(`SELECT count(*) FROM "${table}" WHERE ${where}`));
++/** Every row of every native/evidence target and the ledger for one coach: the "nothing further
++ *  written" snapshot (P03/P05) and the legacy byte-identity snapshot (P08). */
++export const targetSnapshot = (coach: string, intent: string) => ({
++  persons: persons(coach),
++  programs: programs(coach),
++  plans: plans(coach),
++  evidence: evidenceRows(coach),
++  provenance: provenanceRows(coach),
++  ledger: ledgerRows(coach, intent),
++});
++
++/** Whole-fixture reset: every table the proof writes, children first. Never touches the catalog schema. */
++export function resetData() {
++  sql(`DELETE FROM "${PROVENANCE}"; DELETE FROM "${LEDGER}"; DELETE FROM "${STAGED}";
++    DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "ScoutProgressSnapshot";
++    DELETE FROM "${COMPLETION}"; DELETE FROM "${RUN}";
++    DELETE FROM "WorkoutPlanRevision"; DELETE FROM "WorkoutPlanExercise"; DELETE FROM "WorkoutPlan";
++    DELETE FROM "WorkoutProgram"; DELETE FROM "ExerciseCatalogItem"; DELETE FROM "Person";
++    DELETE FROM "ExtensionPairCode"; DELETE FROM "${INTENT}";`);
++}
++/** The exact §3.1 gate statement as SQL text for the two-session serialization check. */
++export const gateSql = (coach: string, intent: string) =>
++  `UPDATE "${RUN}" SET last_observed_at=(now() AT TIME ZONE 'UTC'),
++     phase=CASE WHEN phase='discovering' THEN 'transferring' ELSE phase END
++   WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)} AND mode='server'
++     AND terminal_status IS NULL AND fenced_at IS NULL AND deadline_at>(now() AT TIME ZONE 'UTC')
++   RETURNING execution_epoch`;
+diff --git a/test/utils/g2-s8g-pg-harness.ts b/test/utils/g2-s8g-pg-harness.ts
+new file mode 100644
+index 00000000..ffd7c476
+--- /dev/null
++++ b/test/utils/g2-s8g-pg-harness.ts
+@@ -0,0 +1,254 @@
++/**
++ * S8-G G2 live-proof helpers: derived by substitution from the accepted S8-C harness
++ * test/utils/g2-s8c-pg-harness.ts (at 1c5fbb04), which stays byte-identical. Same real psql, same
++ * real generated Prisma client in separate OS processes (test/utils/g2-s8g-worker.cjs drives the
++ * real ScoutService → ScoutLifecycleService → ScoutReconstructService settle path with the owned
++ * family registry injected from an explicit fixture source spec + native rule set), no transaction
++ * or query mocks; bound to the S8-G-only identity guard test/utils/g2-s8g-db.ts and the G2_S8G_*
++ * environment. Only test/rls-g2-s8g.spec.ts (via test/utils/g2-s8g-harness.ts) imports this.
++ *
++ * There is no OLD side: S8-G ships no migration, so the base 1c5fbb04 prisma tree (through the
++ * accepted S7-L migration) is the only schema and the accepted S7-L run objects plus the S8-B
++ * native provenance objects are the proof target. No up/down file helpers are carried.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { resolve } from 'path';
++import {
++  G2_S8G_ADMIN_ROLE,
++  G2_S8G_MIGRATION_ROLE,
++  G2_S8G_RUNTIME_ROLE,
++  G2_S8G_BASE_HEAD,
++  G2_S8G_CANDIDATE_HEAD_ENV,
++  g2S8gCandidateHead,
++  g2S8gTestTarget,
++  withFixturePassword,
++} from './g2-s8g-db';
++
++export const root = resolve(__dirname, '..', '..');
++/** Base pin (kept identical in test/utils/g2-s8g-bootstrap.sh and test/scout/g2-s8g-db-guard.spec.ts). */
++export const BASE_HEAD: string = G2_S8G_BASE_HEAD;
++export const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++export const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
++/** 171 accepted migrations through S8-B plus S7-L; S8-G adds none. */
++export const EXPECTED_MIGRATIONS = 172;
++
++const raw = process.env.G2_S8G_DATABASE_URL;
++const password = process.env.G2_S8G_PASSWORD;
++export const psql = process.env.G2_S8G_PSQL;
++export const directory = process.env.G2_S8G_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_S8G_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !directory) {
++  throw new Error('S8-G G2 proof requires explicit database, password, psql and data directory');
++}
++export const target = g2S8gTestTarget(raw, process.env.G2_S8G_CONFIRM);
++/** The attested candidate head this run is bound to: the runtime root must be exactly there, clean. */
++export const candidateHead = g2S8gCandidateHead(
++  process.env[G2_S8G_CANDIDATE_HEAD_ENV],
++  execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }),
++  execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
++);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_S8G_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_S8G_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** The same statement text as another fixture-matrix role (runtime `service_role`, or an API
++ *  role reached through SET ROLE from the owner session in the statement itself). */
++export const sqlAs = (role: string, text: string): string => psqlRun(asRole(role), [], text);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string, role?: string): void {
++  let error: unknown;
++  try {
++    if (role) sqlAs(role, statement);
++    else sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++export type Result = {
++  result?: any;
++  failure?: any;
++  queries: string[];
++  events: any[];
++  pushes: number;
++  sideEffectLoads: Record<string, number>;
++  pid: number;
++  families?: string[];
++};
++let sequence = 0;
++/** One real `ScoutReconstructService.reconstruct(coach, intent, family)` call in an independent OS
++ *  process with the candidate generated client. `options.spec` / `options.rules` are the raw
++ *  fixture source-mapping spec and native rule set the worker parses through the real S8-A /
++ *  S8-G parsers and injects as the owned family registry; see test/utils/g2-s8g-worker.cjs. */
++export function worker(options: Record<string, unknown> = {}) {
++  const name = `g2g_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_S8G_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root,
++    client: resolve(root, 'node_modules/.prisma/client'),
++    head: candidateHead,
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    action: 'status',
++    family: 'workouts',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-s8g-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_S8G_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  // Fixture barrier (carried from the N/Q1 harness): `options.pause` names the phase the worker
++  // pauses at; `ready` settles when it has, `resume()` releases it.
++  let readyResolve: (phase: string) => void = () => undefined;
++  const ready = new Promise<string>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.done) result = message;
++      if (message.ready) readyResolve(message.ready);
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          options: { ...options, spec: undefined, rules: undefined },
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return { done, ready, resume: () => child.send({}), stop: () => child.kill(), name };
++}
++export const run = (options: Record<string, unknown> = {}) => worker(options).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_S8G_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_S8G_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
+diff --git a/test/utils/g2-s8g-worker.cjs b/test/utils/g2-s8g-worker.cjs
+new file mode 100644
+index 00000000..65ee972d
+--- /dev/null
++++ b/test/utils/g2-s8g-worker.cjs
+@@ -0,0 +1,283 @@
++// S8-G: real ScoutService + ScoutLifecycleService + ScoutReconstructService + real generated
++// Prisma client in an independent OS process. Union of the accepted test/utils/g2-s7l-worker.cjs
++// (query log, transaction markers, IPC barriers, lifecycle actions) and test/utils/g2-s8c-worker.cjs
++// (candidate head attestation, fixture spec/rules injection into the engine's `families` seam),
++// both unchanged at 1c5fbb04. The S8-G deltas: the injected mapper registry is ALSO handed to the
++// engine's planner seam (`sourceMappers`), the lifecycle service receives the engine through its
++// S8-G constructor seam, and barriers exist for the per-row pass (`after-row`, `before-ledger`).
++// Hooks only PAUSE real operations at named barriers; they never replace query results or
++// transaction semantics. Used only by the explicitly guarded live proof test/rls-g2-s8g.spec.ts.
++//
++// input (G2_S8G_WORKER JSON): { root, head, client, url, coach, intent, action, pause?, pauseRow?,
++//   txTimeout?, deadlineMs?, body?, spec?, rules?, mapper?, family? }
++// action ∈ start | ingest | complete | cancel | fence | settled | status | reconstruct | run-pass
++// pause  ∈ before-gate (inside a transaction, before the §3.1 gate UPDATE)
++//        | gated (gate UPDATE returned; row lock held; before the transaction's own rows)
++//        | before-ledger (before the first ledger upsert of a per-row transaction)
++//        | after-row (after the `pauseRow`-th COMMITTED gated per-row transaction of the pass)
++//        | before-lock | locked (around the lifecycle FOR NO KEY UPDATE)
++const { join } = require('path');
++const { execFileSync } = require('child_process');
++const input = JSON.parse(process.env.G2_S8G_WORKER);
++// Candidate binding: the worker loads source from input.root, so that root must be at the attested
++// head the harness was bound to; a mismatch is a hard failure before any client is constructed.
++const workerHead = execFileSync('git', ['rev-parse', 'HEAD'], {
++  cwd: input.root,
++  encoding: 'utf8',
++}).trim();
++if (workerHead !== input.head) {
++  throw new Error(
++    `worker root ${input.root} is at ${workerHead}, not the attested candidate ${input.head}`,
++  );
++}
++const Module = require('module');
++const resolveFilename = Module._resolveFilename;
++Module._resolveFilename = function (request, ...args) {
++  return request === '@prisma/client'
++    ? join(input.client, 'index.js')
++    : resolveFilename.call(this, request, ...args);
++};
++if (Number.isInteger(input.deadlineMs) && input.deadlineMs > 0) {
++  process.env.SCOUT_RUN_DEADLINE_MS = String(input.deadlineMs);
++}
++// G12 spies: count any load of a side-effect module from this process (never replaces a module).
++const sideEffectLoads = { notifications: 0, drip: 0, assignment: 0, email: 0, billing: 0 };
++const origLoad = Module._load;
++Module._load = function (request, ...args) {
++  const text = String(request);
++  for (const k of Object.keys(sideEffectLoads)) {
++    if (text.includes(`/${k}/`) || text.endsWith(`.${k}.service`)) sideEffectLoads[k] += 1;
++  }
++  return origLoad.call(this, request, ...args);
++};
++
++const { PrismaClient } = require(input.client);
++const { ScoutService } = require(join(input.root, 'src/scout/scout.service'));
++const { ScoutIngestService } = require(join(input.root, 'src/scout/scout-ingest.service'));
++const { ScoutLifecycleService } = require(
++  join(input.root, 'src/scout/lifecycle/lifecycle.service'),
++);
++const { ScoutReconstructService } = require(
++  join(input.root, 'src/scout/scout-reconstruct.service'),
++);
++const { buildFamilyRegistry } = require(join(input.root, 'src/scout/reconstruct/families'));
++const { parseSourceMappingSpec } = require(join(input.root, 'src/scout/reconstruct/mapping-spec'));
++const { buildSourceMapperRegistry } = require(
++  join(input.root, 'src/scout/reconstruct/source-mapper-registry'),
++);
++const { parseNativeRuleSet } = require(
++  join(input.root, 'src/scout/reconstruct/native/native-rules'),
++);
++const { buildNativeRuleRegistry } = require(
++  join(input.root, 'src/scout/reconstruct/native/native-rule-registry'),
++);
++// Startup loads are the accepted import graph (ScoutService already depends on notifications);
++// the proof counts only what the ACTION loads lazily from here on.
++for (const k of Object.keys(sideEffectLoads)) sideEffectLoads[k] = 0;
++
++const db = new PrismaClient({
++  datasources: { db: { url: input.url } },
++  log: [{ emit: 'event', level: 'query' }],
++});
++const queries = [];
++const events = [];
++db.$on('query', (e) => queries.push(e.query)); // Never log query parameters.
++const analytics = { capture: (...args) => events.push(args) };
++let pushes = 0;
++const notifications = {
++  pushToUser: async () => {
++    pushes += 1;
++  },
++};
++
++let paused = false;
++let committedRows = 0;
++async function barrier(phase) {
++  if (input.pause !== phase || paused) return;
++  paused = true;
++  process.send({ ready: phase });
++  await new Promise((resolve) => process.once('message', resolve));
++}
++const isGate = (strings) =>
++  Array.isArray(strings) && strings.join('?').includes('last_observed_at');
++const isLock = (strings) =>
++  Array.isArray(strings) && strings.join('?').includes('FOR NO KEY UPDATE');
++
++// `onGate` is the enclosing transaction's "this transaction issued the §3.1 gate" flag setter
++// (null at the top level). Interactive transactions leave fixture markers
++// (`-- tx:begin|commit|rollback`) in the query log so a proof can assert statement ORDER across
++// transaction boundaries; the FIXTURE-ONLY `txTimeout` widens this process's interactive
++// transaction ceiling so a paused writer can hold its row lock deterministically.
++function instrument(target, onGate = null) {
++  return new Proxy(target, {
++    get(object, key) {
++      if (key === '$transaction')
++        return async (fn, ...options) => {
++          if (typeof fn !== 'function') return object.$transaction(fn, ...options);
++          queries.push('-- tx:begin');
++          let sawGate = false;
++          try {
++            const out = await object.$transaction(
++              (tx) =>
++                fn(
++                  instrument(tx, () => {
++                    sawGate = true;
++                  }),
++                ),
++              ...(options.length === 0 && Number.isInteger(input.txTimeout) && input.txTimeout > 0
++                ? [{ timeout: input.txTimeout }]
++                : options),
++            );
++            queries.push('-- tx:commit');
++            if (sawGate) {
++              committedRows += 1;
++              if (input.pause === 'after-row' && committedRows === (input.pauseRow ?? 1)) {
++                await barrier('after-row');
++              }
++            }
++            return out;
++          } catch (e) {
++            queries.push('-- tx:rollback');
++            throw e;
++          }
++        };
++      if (key === '$queryRaw')
++        return async (strings, ...values) => {
++          if (isGate(strings)) await barrier('before-gate');
++          if (isLock(strings)) await barrier('before-lock');
++          const result = await object.$queryRaw(strings, ...values);
++          if (isGate(strings)) {
++            if (onGate) onGate();
++            await barrier('gated');
++          }
++          if (isLock(strings)) await barrier('locked');
++          return result;
++        };
++      if (key === 'scoutReconstructionLedger') {
++        const delegate = object[key];
++        return new Proxy(delegate, {
++          get(model, method) {
++            if (method === 'upsert')
++              return async (...args) => {
++                await barrier('before-ledger');
++                return model.upsert(...args);
++              };
++            return typeof model[method] === 'function' ? model[method].bind(model) : model[method];
++          },
++        });
++      }
++      return typeof object[key] === 'function' ? object[key].bind(object) : object[key];
++    },
++  });
++}
++
++(async () => {
++  let result;
++  let failure;
++  let families;
++  try {
++    const prisma = instrument(db);
++    const reconstruct = new ScoutReconstructService(prisma, analytics);
++    if (input.spec !== undefined || input.rules !== undefined) {
++      const specs =
++        input.spec === undefined ? [] : [parseSourceMappingSpec(input.spec, 'g2-s8g-worker:spec')];
++      const rules =
++        input.rules === undefined ? [] : [parseNativeRuleSet(input.rules, 'g2-s8g-worker:rules')];
++      const sourceMappers = buildSourceMapperRegistry(specs);
++      reconstruct.families = buildFamilyRegistry({
++        sourceMappers,
++        nativeRules: buildNativeRuleRegistry(rules),
++      });
++      // The planner resolves staged tokens through the SAME mapper registry the families use.
++      reconstruct.sourceMappers = sourceMappers;
++    }
++    families = [...reconstruct.families.keys()];
++    if (input.mapper === 'throw')
++      reconstruct.families.get(input.family).map = () => {
++        throw new Error('fixture private payload');
++      };
++    const lifecycle = new ScoutLifecycleService(prisma, analytics, reconstruct);
++    const scout = new ScoutService(prisma, notifications, analytics, lifecycle);
++    const body = input.body ?? {};
++    switch (input.action) {
++      case 'start':
++        result = await lifecycle.start(input.coach, input.intent);
++        break;
++      case 'cancel':
++        result = await lifecycle.cancel(input.coach, input.intent);
++        break;
++      case 'fence':
++        result = await lifecycle.fence(input.coach, input.intent, body.reason ?? 'revoked');
++        break;
++      case 'settled':
++        result = await lifecycle.onTransferSettled(input.coach, input.intent, body.epoch ?? 1);
++        break;
++      case 'ingest':
++        result = await new ScoutIngestService(prisma, analytics, lifecycle).ingest(input.coach, {
++          intent_id: input.intent,
++          entity_type: body.entity_type ?? 'people',
++          entities: (body.entities ?? [{ sourceId: 'a', payload: { name: 'Synthetic a' } }]).map(
++            (e) => ({
++              sourceId: e.sourceId,
++              sourcePlatform: body.sourcePlatform ?? 's8g-proof',
++              capturedAt: '2026-09-25T00:00:00.000Z',
++              payload: e.payload,
++            }),
++          ),
++        });
++        break;
++      case 'complete':
++        result = await scout.complete(input.coach, {
++          intent_id: input.intent,
++          terminal_status: body.terminal_status ?? 'success',
++          final_counts: body.final_counts,
++          error_summary: body.error_summary,
++        });
++        break;
++      case 'status':
++        result = await scout.getImportStatus(input.coach, input.intent);
++        break;
++      case 'reconstruct':
++        result = await reconstruct.reconstruct(input.coach, input.intent, input.family);
++        break;
++      case 'run-pass':
++        result = await reconstruct.reconstructRun(input.coach, input.intent, {
++          mode: 'server',
++          epoch: body.epoch ?? 1,
++          gate: (tx) => lifecycle.assertRunOpen(tx, input.coach, input.intent),
++        });
++        break;
++      default:
++        throw new Error(`unknown action ${input.action}`);
++    }
++  } catch (e) {
++    failure = {
++      status: typeof e.getStatus === 'function' ? e.getStatus() : 500,
++      // Emulate Nest's public boundary for unexpected DB failures.
++      message: typeof e.getStatus === 'function' ? e.message : 'Internal server error',
++      response: typeof e.getResponse === 'function' ? e.getResponse() : undefined,
++      code: e.code,
++    };
++  } finally {
++    await db.$disconnect();
++  }
++  // process.send is asynchronous: disconnect only from the send callback so the final message
++  // is never lost on the parent side.
++  process.send(
++    {
++      done: true,
++      result,
++      failure,
++      queries,
++      events,
++      pushes,
++      sideEffectLoads,
++      families,
++      pid: process.pid,
++    },
++    () => process.disconnect(),
++  );
++})().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

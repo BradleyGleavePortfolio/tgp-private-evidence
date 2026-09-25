@@ -106,7 +106,7 @@ FF_GRANT=1 ACCEPT_RECORD=<S8-F acceptance naming e1ec2fec> LAND_RECORD=<parent G
 4. Fetches S8-F from the bundle only, verified by sha256 and `bundle verify`. It must equal `e1ec2fec`, with tree `2fe0201f` and parent `1c10e2a1`, and pass the hygiene check.
 5. Checks the schema and lockfile pins.
 6. Copies `node_modules` from the RT-NEW-1 donor with `cp -a`. The donor HEAD must be `e1ec2fec` and its pins must equal the relayed values. The donor is never modified.
-7. Runs `lefthook install` into the new clone and checks the hook sha256 values `3b741de3…` and `71029ce8…`.
+7. Runs `lefthook install` into the new clone and checks the hooks by path-normalized comparison against `worktrees/1910a060-s8f/.git/hooks` (lefthook 2.1.9, own-clone lefthook reference). This superseded the fixed raw pins `3b741de3…`/`71029ce8…`; see `CORRECTION-1.md` (script sha256 `2adc7e10…`).
 8. Checks prettier 3.9.9 through the verified prefix.
 9. Runs `git merge --no-ff --no-commit refs/heads/s8f-accepted`, then checks:
    - MERGE_HEAD is `e1ec2fec`.
