@@ -160,3 +160,31 @@ See `64e33dc7/S7L_ACCEPTANCE.md`. `landing_composition_prep` may, once the draft
 Owner-reserved limits are unchanged: never touch `main`.
 
 The canonical slot passes to S8-C BC-3 diagnostics.
+
+## S7-L landed (17:05Z): unblocked lanes and grants (17:10Z)
+
+`integration/importer` is now `df713fd9` (PR #539, CI green; see `landing/ci/s7-l/LANDED.md`). The S7-L lane is retired, and its worktree `worktrees/64e33dc7-s7l` (node_modules for `df713fd9`) is re-assigned to S9-0.
+
+### Parent S9 decisions (from S9 READINESS F1/F2; derivable, truthful-by-default, not owner-reserved)
+
+- **F1 disposition:** `complete` requires a recorded per-family completeness basis. Until S10 supplies an observation contract, no run may reach `complete` on native reconciliation alone. Such runs end `partial` with a new additive low-cardinality reason, for example `coverage_basis_unknown`. The predicate is written so that S10 later adds the basis without a core change.
+- **F2 disposition:** until a post-landing N3-FILL slice gives provenance intent attribution, the report carries only the verified union (`native_present_verified`). The `created_native` / `already_present_verified` split is `null`, meaning "not yet known", never 0 and never guessed.
+- **Report:** recomputed in v1. There is no new table unless an acceptance case proves persistence necessary; the S9-0 author must justify any table.
+- **Ceiling case:** ends `partial`. `blocked` stays reserved for `revoked`.
+
+### Grants
+
+- **S9-0-1:** `s9_0_decision_doc` (T3, `claude_opus_5_5`).
+  - Branch `exec-dace/s9-0` from `df713fd9` in `worktrees/64e33dc7-s7l`.
+  - Single new file `docs/decisions/2026-09-25-s9-reconciliation.md`, recording the above plus the verdict predicate, report/manifest v1 shape and reason-code additions.
+  - The commit (genuine hooks) waits for the slot. It lands only after one independent T3 review.
+- **S9-A-1:** `s9_a_reconciler` (T4, `claude_fable_5_1`).
+  - New worktree `worktrees/daceddc8-s9a` from `df713fd9`.
+  - Paths: `src/scout/reconciliation/{types.ts,reconcile.ts,coverage.ts}` and `test/scout/reconciliation/reconcile.spec.ts`.
+  - Source first, against the S7-L `ReconciliationVerdict` and the parent decisions. Its node_modules copy and gates happen later under the slot. It freezes to the landed S9-0 text.
+- **E2-1:** `e2_status_reads_server` (T3, `claude_opus_5_5`).
+  - Owns the extension WS1 logic for this slice.
+  - Step 1: consumer-freeze `GET /api/scout/import/status` at the landed contract (`df713fd9`, `docs/contracts/importer-openapi.json`), with fixture-derived tests.
+  - Step 2: build E2 in a fresh extension clone or worktree based on `land/s4-r6` (`8901d5f5`, which carries E1). It may push branch `land/e2-status-server` and open a DRAFT PR for CI.
+  - Merging to extension `main` still needs the owner-reserved non-author approval, as for PR #27.
+- **Heavy queue:** S8-C BC-3 diagnostics and commit, then S9-0 commit, then the E2 gates, then the S9-A gates, then the S8-C v5 proof after dual GO.
