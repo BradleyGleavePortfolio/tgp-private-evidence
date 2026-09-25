@@ -1,0 +1,19 @@
+test(scout): S7-L PG proof worker — resolve @prisma/client/runtime/library to the custom-output client runtime
+
+test/utils/g2-s7l-worker.cjs only:
+
+- The worker's Module._resolveFilename hook additionally redirects
+  '@prisma/client/runtime/library' (and the '.js' form) to
+  join(input.client, 'runtime/library.js') when that file exists, i.e. when
+  the worker is bound to a custom-output client that carries its own runtime
+  copy (the OLD image). The services import PrismaClientKnownRequestError
+  from '@prisma/client/runtime/library'; without the redirect that class and
+  the error thrown by the custom-output client come from two module
+  instances, so `instanceof` is false and the P2002 replay-as-ack path
+  rethrows (v3 proof L05/L12 failure).
+- A default-output client has no runtime copy, so the request falls through
+  to the original resolver unchanged. '@prisma/client' -> index.js is
+  unchanged.
+
+Proof-only correction; no src/, prisma/, spec, bootstrap, contract or
+dependency change. No assertion changed.

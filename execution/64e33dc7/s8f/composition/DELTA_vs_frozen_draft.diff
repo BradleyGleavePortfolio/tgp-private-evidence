@@ -1,0 +1,45 @@
+diff -ru /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/build/checkpoint/test/scout/entities/scout-entities.service.spec.ts /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/composition/checkpoint/test/scout/entities/scout-entities.service.spec.ts
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/build/checkpoint/test/scout/entities/scout-entities.service.spec.ts	2026-09-25 16:09:33.873603848 +0000
++++ /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8f/composition/checkpoint/test/scout/entities/scout-entities.service.spec.ts	2026-09-25 16:39:40.149603848 +0000
+@@ -845,7 +845,11 @@
+   it('every reviewable family is a non-person family (clients excluded)', () => {
+     expect(ENTITY_REVIEW_FAMILIES).not.toContain(RECONSTRUCT_FAMILY.clients);
+     expect(ENTITY_REVIEW_FAMILIES).toEqual(
+-      expect.arrayContaining([RECONSTRUCT_FAMILY.workouts, RECONSTRUCT_FAMILY.client_history]),
++      expect.arrayContaining([
++        RECONSTRUCT_FAMILY.workouts,
++        RECONSTRUCT_FAMILY.client_history,
++        RECONSTRUCT_FAMILY.programs,
++      ]),
+     );
+   });
+ 
+@@ -971,13 +975,11 @@
+ describe('ScoutEntitiesService S8-F native targets', () => {
+   const T0 = new Date('2026-09-01T00:00:00.000Z');
+   const T1 = new Date('2026-09-02T00:00:00.000Z');
+-  const PROGRAMS_FAMILY = 'programs';
+-  // The `programs` family joins RECONSTRUCT_FAMILY in S8-C (N3) and is therefore
+-  // reviewable only once S8-F is composed onto S8-C. Until then this case is
+-  // marked skipped (visible in the run summary), never a silent pass.
+-  const itPrograms = (ENTITY_REVIEW_FAMILIES as readonly string[]).includes(PROGRAMS_FAMILY)
+-    ? it
+-    : it.skip;
++  // The `programs` family joined RECONSTRUCT_FAMILY in S8-C (N3), so it is a
++  // reviewable non-person family here and F03 runs unconditionally (composed
++  // onto S8-C; the former `it.skip` fallback is gone — a missing family now FAILS
++  // the allow-list assertion below rather than skipping).
++  const PROGRAMS_FAMILY = RECONSTRUCT_FAMILY.programs;
+ 
+   function ledger(
+     fake: FakePrisma,
+@@ -1120,7 +1122,8 @@
+     expect(res.entities.map((e) => e.native_id)).toEqual(['plan-1']);
+   });
+ 
+-  itPrograms('F03: a workout_program row resolves to the owned native program', async () => {
++  it('F03: a workout_program row resolves to the owned native program', async () => {
++    expect(ENTITY_REVIEW_FAMILIES).toContain(PROGRAMS_FAMILY);
+     const fake = new FakePrisma();
+     seed(fake, { family: PROGRAMS_FAMILY });
+     ledger(fake, {
