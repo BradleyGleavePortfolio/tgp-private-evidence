@@ -9,6 +9,7 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 | `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, lifecycle/schema/generator | ACTIVE source/test/binding drafting; heavy gates await relay |
 | `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, native writers/families | ACTIVE source/test/binding drafting; heavy gates await relay |
 | `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | `64e33dc7/RUNTIME_SETUP_GRANT.md`; fresh tooling/donor namespace only | ACTIVE; sole initial heavy-slot grantee |
+| `s8_f_reader_readiness_muge8avl` | T3 / `claude_opus_5_5`, high | Read-only accepted native-reader contracts; `64e33dc7/s8f/READINESS.md` only, no product writes/runtime | DONE; A1 minimum typed-target handoff granted to S8-C; A2 qualified dark sequencing; no S8-F build yet |
 | Parent | Executive | Scope, grants, evidence publication, acceptance/landing | ACTIVE |
 
 Heavy slot: canonical `execution/test-validation.lock`, no live lock/process observed before grant. Setup first; builder gate queue relayed when each is ready, no simultaneous heavy execution. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
