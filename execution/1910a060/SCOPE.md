@@ -87,6 +87,18 @@ Shared base clone growth-project-backend is --no-checkout; apparent index
 deletions there are clone state, not a product candidate. Never commit them.
 Builders use standalone clones with their own hooks/index/config, not shared worktrees.
 
+## Runtime recovery clarification (Bradley, 14:14 PT)
+
+RT-NEW-1 must not stall on the predecessor PG17.6 binary. Prefer the exact
+predecessor artifact only if cheaply recoverable. Otherwise RT-NEW-1 may establish
+a NEW PostgreSQL 17.6 proof environment from an authorized no-new-spend source,
+recording version/source origin and artifact hash, any compiler/configure/build
+inputs, and a hash manifest of all resulting binaries/libraries. Binding v1 stays
+immutable; binding v2 pins the NEW runtime explicitly; no old-runtime identity
+claim. Dual independent v2 binding review precedes any PG proof; no server/initdb/
+proof before a separate proof grant. Return to Bradley only if source/toolchain
+would need new spending, an external commitment or another reserved boundary.
+
 ## Heavy sequence
 
 1. RT-NEW-1: environment preparation only; bounded commands, log exit/terminal.
