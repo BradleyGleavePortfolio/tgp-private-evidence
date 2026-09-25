@@ -1,0 +1,14 @@
+holder pid 17284 (bash hold-slot.sh), fd 9 on /home/user/workspace/execution/test-validation.lock
+ACQUIRED pid=17284 2026-09-25T04:02:28Z
+second nonblocking probe exit=0 (1 = held, as expected)
+
+CORRECTION (recorded honestly): the first holder (pid 17284, ACQUIRED 2026-09-25T04:02:28Z) was started with
+nohup inside a tool call and was killed by the tool supervisor when that call ended. The probe
+`flock -n <lock> true` returned exit=0 right after (the log line above says "exit=0 (1 = held, as expected)"
+— i.e. the lock was NOT held). Consequently the donor `cp -a` (04:02:30–04:05:00Z) ran WITHOUT the slot held.
+Nothing else used the slot in that window as far as observable (probe would have failed otherwise), but the
+window is reported as unprotected. Second holder: `setsid -f bash hold-slot.sh` → pid 17436,
+ACQUIRED 2026-09-25T04:05:40Z; probe exit=1 (held). Every later gate step re-probes and records the holder pid.
+ACQUIRED pid=17436 2026-09-25T04:05:40Z
+RELEASED pid=17436 2026-09-25T04:17:21Z
+post-release probe exit=0 (0 = free)

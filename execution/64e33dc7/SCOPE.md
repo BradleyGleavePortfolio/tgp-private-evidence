@@ -1,5 +1,11 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live source/proof cursor, 2026-09-25 04:33Z
+
+S7-L new lineage is committed at `839b54c53ccb252f95b4ec63df0b08595bbe7698`, tree `f02205c60ad0bfeb24ce82d74b0025ee9a185df6`, on accepted `93389265`. Its source gates/genuine hooks passed; raw failures are preserved. Two independent nonbuilder reviewers examine the frozen new source while the builder finishes its filled PG binding. A final GO requires both exact source and binding. No real-PG execution is granted yet.
+
+S8-C source gates and narrowly derived contract generation are active under `S8C_SOURCE_GATES_GRANT.md`, following S7-L's actual 04:30:19Z release and the parent's 04:31:04Z no-holder/no-heavy observation. S8-F source preparation is authorized under `S8F_SOURCE_PREPARATION_GRANT.md`, without runtime gates/commit until accepted S8-C composition. No accepted work is reopened; no replacement candidate is yet accepted or landed. Current assignments are in DISPATCHES.
+
 ## Current owner-directed reset, 2026-09-25 03:16Z
 
 `OWNER_RECOVERY_RESET.md` is the latest owner authority. Predecessor S7-L/S8-C writers and runtime are revoked. Exact old candidates remain unrecovered, unaccepted history; their records are preserved and cannot prove replacement bytes. The prior RECOVERY-S7L, RECOVERY-S8C and RUNTIME-OWNERSHIP prerequisites below are superseded by this explicit reset, not by a claim of recovery.

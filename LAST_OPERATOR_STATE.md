@@ -1,5 +1,15 @@
 # LAST OPERATOR STATE
 
+## Live cursor: 2026-09-25 04:33Z
+
+S7-L replacement source is committed at `839b54c53ccb252f95b4ec63df0b08595bbe7698`, tree `f02205c60ad0bfeb24ce82d74b0025ee9a185df6`, based on accepted landed backend `93389265a846095b846fa8f1fb0dad782fb6ee9f`. Genuine hooks passed with the pinned isolated formatter; applicable source gates and targeted contract 56/56 are recorded in `execution/64e33dc7/s7l/HEAD_READY.md`. Earlier failures remain unchanged. This is source readiness, not PG proof or acceptance.
+
+Two independent T4 nonbuilder reviews are active under `S7L_INDEPENDENT_REVIEW_GRANT.md`, initially reading the frozen source while its builder completes the filled private PG binding. Neither can issue final GO until that exact binding is supplied and reviewed. No PG run has been granted.
+
+S7-L's actual driver released the canonical slot at 04:30:19Z, rc0. Parent verified no holder or relevant heavy process at 04:31:04Z. S8-C is now the sole source-gate grantee under `execution/64e33dc7/S8C_SOURCE_GATES_GRANT.md`, including only execution of the unchanged generator and its derived artifact in its own worktree. S8-F performs disjoint source preparation against the pinned typed-target interface; no S8-F gates or commit before accepted S8-C composition.
+
+Remote product heads remain the accepted ones recorded below; neither replacement backend candidate has been pushed or landed. Continue new-source reviews and separately granted proofs, then automatically land dependency-valid accepted work to `integration/importer`. Production main, S8-D/E principal/roster direction, G3-AUTH, branch protection and real-account/activation boundaries remain reserved. The leading DISPATCHES table is live ownership; all earlier recovery blockers below are superseded history.
+
 ## Owner-directed recovery reset: 2026-09-25 03:16Z
 
 Latest authority: `execution/64e33dc7/OWNER_RECOVERY_RESET.md`. Predecessor S7-L/S8-C ownership is revoked. Do not wait for exact exports; old unaccepted candidates and receipts remain historical, not replacement acceptance evidence. Backend integration was reverified at accepted `93389265a846095b846fa8f1fb0dad782fb6ee9f`; new S7-L and coach-owned S8-C lineages start there under the two replacement build grants.

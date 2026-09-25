@@ -1,0 +1,14 @@
+scout: S7-L server-owned run lifecycle (Start/Cancel, writer gate, fences, arbiter)
+
+Adds migration 20270123000000_scout_run_lifecycle_expand (ten ScoutImport
+lifecycle columns, four CHECKs, partial unique on import_intent_id, owner-scoped
+FK to ImportIntent; refusing entry gates on up and down), the
+src/scout/lifecycle module (Start/Cancel routes, UPDATE-first writer gate,
+FOR NO KEY UPDATE fences with epoch CAS, lazy deadline, single terminal write,
+arbiter that never settles complete without an S9 verdict), wiring in the
+scout module/service/ingest, additive analytics keys, the regenerated importer
+contract 2.0.0-c1-s2.0, unit specs, and the new real-PG proof harness
+(test/rls-g2-s7l.spec.ts, port 55641, disposable identities only).
+
+Documents the ingest receiver 409 (run_not_started | run_fenced) in the generated
+contract and pins it in the contract spec.

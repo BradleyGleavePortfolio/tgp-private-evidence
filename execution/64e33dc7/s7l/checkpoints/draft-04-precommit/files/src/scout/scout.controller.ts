@@ -1,0 +1,155 @@
+import { Body, Controller, Get, HttpCode, Post, Query, Request } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import type { AuthedRequest } from '../auth/auth-request';
+import { Roles } from '../common/decorators/roles.decorator';
+import {
+  ScoutCompleteDto,
+  ScoutCompleteResult,
+  ScoutImportStatusQueryDto,
+  ScoutImportStatusResult,
+  ScoutProgressDto,
+} from './scout.dto';
+import { ScoutService } from './scout.service';
+import {
+  envelopeWithCode,
+  errorEnvelopeSchema,
+  rateLimitSchema,
+} from '../common/errors/importer-error-responses';
+
+/**
+ * IMPORTER-E — cross-device progress + completion for the tgp-importer Chrome
+ * extension (DESIGN.md v0.3 §10 + §2 steps 10-11).
+ *
+ * Auth: the global JwtAuthGuard (APP_GUARD) verifies the extension bearer token
+ * — the same Supabase access token minted by /auth/extension/* (IMPORTER-A
+ * #496). The coach identity is `req.user.id`; the payload is routed by TOKEN
+ * IDENTITY, never a body field (DESIGN §3, R80).
+ *
+ * Feature gate (R-DARK-1): FEATURE_SCOUT_INGEST is enforced by the global
+ * featureFlagNotFoundMiddleware — while the flag is off (the default) EVERY
+ * /api/scout request returns a uniform 404 BEFORE any guard runs, so the
+ * surface is indistinguishable from an unmounted route. There is no
+ * controller-level feature guard: see
+ * src/common/feature-flag/feature-flag-not-found.middleware.ts.
+ */
+@ApiTags('scout')
+@ApiBearerAuth('bearer')
+@ApiResponse({
+  status: 400,
+  description:
+    'Malformed body (global ValidationPipe: whitelist + forbidNonWhitelisted). ' +
+    'Standard HttpExceptionFilter envelope; `message` is a string ARRAY of ' +
+    'per-field constraint violations when present.',
+  schema: errorEnvelopeSchema(),
+})
+@ApiResponse({
+  status: 401,
+  description: 'Missing or invalid bearer token.',
+  schema: errorEnvelopeSchema(),
+})
+@ApiResponse({
+  status: 403,
+  description: 'Caller is not a coach or owner.',
+  schema: errorEnvelopeSchema(),
+})
+@ApiResponse({
+  status: 404,
+  description: 'Feature disabled (FEATURE_SCOUT_INGEST off — uniform R-DARK-1 404).',
+  schema: errorEnvelopeSchema(),
+})
+@ApiResponse({ status: 429, description: 'Rate limit exceeded.', schema: rateLimitSchema() })
+@Controller('scout')
+export class ScoutController {
+  constructor(private readonly scout: ScoutService) {}
+
+  @ApiOperation({
+    summary: 'Mirror an extension crawl progress snapshot to the mobile app',
+    description:
+      'Accepts the status_snapshot the extension broadcasts on every batch ' +
+      'commit and records the latest per (coach, intent). Cheap by design: ' +
+      'the snapshot is coalesced in-process and flushed to storage on a timer. ' +
+      'On a server-owned run (intent_id = a paired setup intent) the snapshot first ' +
+      'passes the run gate; a fenced or unstarted run is ignored with no write — ' +
+      'still 204, never 409.',
+  })
+  @ApiResponse({ status: 204, description: 'Snapshot accepted (or ignored on a fenced run).' })
+  @Post('progress')
+  @HttpCode(204)
+  @Roles('coach', 'owner')
+  @Throttle({ default: { ttl: 60_000, limit: 240 } })
+  postProgress(
+    @Request() req: AuthedRequest,
+    @Body() body: ScoutProgressDto,
+  ): void | Promise<void> {
+    return this.scout.recordProgress(req.user.id, body);
+  }
+
+  @ApiOperation({
+    summary: 'Settle an extension import to its terminal state',
+    description:
+      'Idempotent per (coach, intent): the first call atomically flips the ' +
+      'parent ScoutImport row to its terminal state AND appends the completion ' +
+      'ledger row in a single transaction (R-STATE-1), then pushes an ' +
+      'import.complete notification to the mobile app. Retries after a network ' +
+      'flake are acknowledged no-ops — the ledger unique constraint rolls the ' +
+      'transaction back, so the state is never re-flipped and the coach is ' +
+      'never double-notified. On a server-owned run (intent_id = a paired setup ' +
+      'intent) the terminal_status is stored as the extension CLAIM and the run is ' +
+      'handed to the server arbiter, which decides the terminal; a late or duplicate ' +
+      'settle of a fenced or settled run is a 200 ack no-op.',
+  })
+  @ApiResponse({ status: 200, description: 'Completion acknowledged.', type: ScoutCompleteResult })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Server-owned run only: `run_not_started` — the intent is a paired setup intent but ' +
+      'POST /scout/runs/start was never called for it. Legacy intents never 409 here.',
+    schema: envelopeWithCode(['run_not_started']),
+  })
+  @Post('ingest/complete')
+  @HttpCode(200)
+  @Roles('coach', 'owner')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async postComplete(
+    @Request() req: AuthedRequest,
+    @Body() body: ScoutCompleteDto,
+  ): Promise<{ acknowledged: true; intent_id: string }> {
+    return this.scout.complete(req.user.id, body);
+  }
+
+  @ApiOperation({
+    summary: "Read one import run's server-authoritative status (committed counts, not estimates)",
+  })
+  @ApiQuery({ name: 'intent_id', required: true, description: 'Crawl session id to read.' })
+  @ApiResponse({ status: 200, description: 'Import status.', type: ScoutImportStatusResult })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid query string (global ValidationPipe: whitelist + forbidNonWhitelisted). ' +
+      'Raised when `intent_id` is missing, empty, over 128 chars, or an unknown ' +
+      'query param is supplied. Standard HttpExceptionFilter envelope; `message` is ' +
+      'a string ARRAY of per-field constraint violations when present.',
+    schema: errorEnvelopeSchema(),
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Uniform not-found. Returned identically whether FEATURE_SCOUT_INGEST is off ' +
+      '(R-DARK-1 dark route, decided before any guard runs) OR the run has no ' +
+      'server-side evidence for the calling coach (unknown intent, cross-tenant ' +
+      'intent, or a run with no committed entity, persisted progress snapshot, or ' +
+      'settle row yet). The two cases are deliberately indistinguishable — no ' +
+      'existence oracle.',
+    schema: errorEnvelopeSchema(),
+  })
+  @Get('import/status')
+  @Roles('coach', 'owner')
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  getImportStatus(
+    @Request() req: AuthedRequest,
+    @Query() query: ScoutImportStatusQueryDto,
+  ): Promise<ScoutImportStatusResult> {
+    return this.scout.getImportStatus(req.user.id, query.intent_id);
+  }
+}

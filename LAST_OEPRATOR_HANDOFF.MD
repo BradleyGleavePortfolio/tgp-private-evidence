@@ -1,5 +1,13 @@
 # LAST OPERATOR HANDOFF
 
+## Live continuation: 2026-09-25 04:33Z
+
+Continue from S7-L replacement `839b54c53ccb252f95b4ec63df0b08595bbe7698`, tree `f02205c60ad0bfeb24ce82d74b0025ee9a185df6`, not the lost predecessor. Its genuine hooked commit and source gates are complete; exact exports and all failed gates are retained under `execution/64e33dc7/s7l/`. Independent reviewers A/B are active on the frozen new delta, with final one-PG readiness pending the builder's filled binding. No PG has run or been granted.
+
+S8-C owns the canonical source-gate slot by the 04:31Z relay in `S8C_SOURCE_GATES_GRANT.md`, after verified S7-L release at 04:30:19Z. It may generate only its own derived artifact with the unchanged generator, then perform gates, genuine commit and filled binding preparation. S8-F source preparation remains disjoint and contract-pinned, with execution gated on accepted S8-C. Current worker IDs and surfaces are in the leading DISPATCHES table.
+
+The accepted backend integration remains `93389265`; mobile `affc2818` remains landed and closed. Preserve accepted history and failed new gates. Do not run a database proof before dual final-head/binding attestations plus the separate one-run grant. Do not wait for the revoked predecessor or seek routine permission already granted.
+
 ## Current continuation: owner reset, 2026-09-25 03:16Z
 
 Read `execution/64e33dc7/OWNER_RECOVERY_RESET.md` and current DISPATCHES first. Bradley revoked all predecessor S7-L/S8-C workers/runtime and authorized new candidate lineages from accepted integration `93389265`; old exact bytes remain unrecovered and must not be approximated or treated as accepted. Earlier requests for exports/release below no longer block execution.

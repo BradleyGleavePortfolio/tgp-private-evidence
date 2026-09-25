@@ -6,15 +6,17 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 
 | New lane | Tier / requested route | Sole writable surface | State |
 |---|---|---|---|
-| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; lifecycle/schema/generator plus narrow ingest 409 documentation | Source gates passed after narrow fixes, exact staged tree exported; no commit because genuine hook lacks pinned Prettier; released slot04:17:21Z; source-only completion until relay |
-| `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, native writers/families/typed ledger handoff and two mapping lines | DRAFT_READY, exact 22-file checkpoint; two-line mapping completion granted; source gates queued after S7-L; no PG |
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; lifecycle/schema/generator plus narrow ingest 409 documentation | Committed `839b54c5`, tree `f02205c6`; source gates/hooks rc0, slot released04:30:19Z; complete filled binding and export, no PG |
+| `s7_l_independent_review_a_muggs3qw` | T4 / `claude_fable_5_1`, high | Read-only new S7-L candidate; `64e33dc7/s7l/reviews/REVIEW_A.md` only | ACTIVE under `S7L_INDEPENDENT_REVIEW_GRANT.md`; final GO awaits filled binding |
+| `s7_l_independent_review_b_muggs3ql` | T4 / `claude_fable_5_1`, high | Read-only new S7-L candidate; `64e33dc7/s7l/reviews/REVIEW_B.md` only | ACTIVE under `S7L_INDEPENDENT_REVIEW_GRANT.md`; independent of A; final GO awaits filled binding |
+| `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md` plus `S8C_SOURCE_GATES_GRANT.md`; native writers/typed handoff and own-worktree derived artifact only | Source gates ACTIVE under04:31Z relay; no generator script/version/spec edits and no PG |
 | `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | Initial setup DONE; `64e33dc7/FORMATTER_TOOLING_GRANT.md`, isolated formatter tool only | DONE rc0 at04:23:36Z, Prettier3.9.9 verified; lock released; no project dependency changes |
 | `s8_f_reader_readiness_muge8avl` | T3 / `claude_opus_5_5`, high | Read-only accepted native-reader contracts; `64e33dc7/s8f/READINESS.md` only, no product writes/runtime | DONE; A1 minimum typed-target handoff granted to S8-C; A2 qualified dark sequencing; no S8-F build yet |
 | `s8_g_orchestration_readiness_mugf57lu` | T4 / `claude_fable_5_1`, high | Read-only accepted lifecycle/native orchestration requirements; `64e33dc7/s8g/READINESS.md` only | DONE; prerequisites are final S7-L/S8-C interfaces and acceptance; no product/Git/runtime writes or slot grant |
 | `s8_f_native_reader_draft_mugg2i9f` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8F_SOURCE_PREPARATION_GRANT.md`; isolated entities/roster readers and tests | ACTIVE source preparation on frozen typed-target requirements; no gates/commit/runtime until accepted S8-C composition |
 | Parent | Executive | Scope, grants, evidence publication, acceptance/landing | ACTIVE |
 
-Heavy slot: canonical `execution/test-validation.lock`, formatter setup released04:23:36Z; parent observed no holder04:25:02Z. File remains in place. Current grantee: S7-L source completion/hooked commit under the04:25Z relay in `S7L_SOURCE_GATES_GRANT.md`. Queue: S8-C source gates and derived contract generation, then separately granted new proofs. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
+Heavy slot: canonical `execution/test-validation.lock`, S7-L source completion released04:30:19Z; parent observed no holder or relevant heavy process04:31:04Z. File remains in place. Current grantee: S8-C source gates and own-worktree derived contract generation under `S8C_SOURCE_GATES_GRANT.md`. Queue: separately granted new proofs after dual exact-head/binding attestations. No real-PG run yet granted. Source work and read-only reviews proceed in parallel. Requested routes are not actual telemetry.
 
 ## Earlier checkpoint, preserved
 
