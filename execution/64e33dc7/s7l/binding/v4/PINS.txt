@@ -1,0 +1,47 @@
+# S7-L PG proof binding v4 pins (execution/64e33dc7/s7l/binding/v4). FILLED from the committed clean follow-up head; frozen by freeze-v4.sh.
+# Lineage: base 93389265 -> v1 candidate 839b54c5 (preserved) -> v2 candidate 54970cd9 (preserved; FAILED first proof 05:14:22Z)
+#          -> v3 follow-up a68cdac7 (preserved; FAILED second proof 23 pass / 1 fail L05/L12, class-B proof-tool defect; exact parent pin)
+#          -> v4 follow-up df713fd9 (worker runtime-identity correction, one file test/utils/g2-s7l-worker.cjs; grant S7L-WC-1).
+# Source-only preparation: NOT a PG run; no PG is granted until the parent separately binds one run after two new independent
+# attestations (WORKER_CORRECTION_REVIEW_A/B) of head df713fd9 + this frozen v4 binding. Derivation (read-only, W=/home/user/workspace/worktrees/64e33dc7-s7l):
+#   EXPECT_HEAD            = git -C $W rev-parse HEAD                          -> df713fd9217df524915348ef8a42c797f288dde1
+#   EXPECT_TREE            = git -C $W rev-parse 'HEAD^{tree}'                 -> 796f437fea80550a379b5f54dc485bc5dbba67e1
+#   EXPECT_PARENT          = git -C $W rev-parse HEAD^                         -> a68cdac70d81aea384fdc99c01c9c983a08e80eb (tree 6c00e248, checked)
+#   HEAD^^ / HEAD^^^ / HEAD^^^^ = 54970cd937afc8dea689b33243961abfef8b9dd6 (tree 513c71d7, checked) / 839b54c53ccb252f95b4ec63df0b08595bbe7698 (tree f02205c6, checked) / 93389265a846095b846fa8f1fb0dad782fb6ee9f (BASE_HEAD)
+#   BASE_TREE              = a315dd651b8c54c2e82f2260fcc6058f0d13b64a
+#   follow-up delta        = git diff --name-only EXPECT_PARENT HEAD == exactly test/utils/g2-s7l-worker.cjs
+#   EXPECT_*_BLOB          = git -C $W rev-parse HEAD:<path>  (spec, bootstrap, old-root, db, pg-harness, harness, worker, guard spec,
+#                            S7-L migration directory tree, prisma/schema.prisma) — only EXPECT_WORKER_BLOB differs from v3 (a8fed545 -> 155ffdcc); EXPECT_SPEC_BLOB stays 94e7fac4
+#   EXPECT_FIXTURE_SHA     = sha256sum binding/v4/s7l-fixture.sh  (filled by freeze-v4.sh; fixture differs from v3 ONLY in the fresh lane/socket paths)
+#   tool pins              = unchanged from v1/v2 (pg17/dist postgres/initdb/pg_ctl, /usr/bin/psql target, node, package-lock.json,
+#                            node_modules/.package-lock.json, node_modules/.prisma/client/index.d.ts, prisma/schema.prisma, jest.rls.config.js);
+#                            re-verified by sha256 at freeze time. Reported, never edited to pass.
+# Lane identity the runner exports (exactly the G2_S7L_* names the committed guard/harness/bootstrap read) — FRESH v4 paths:
+#   port 55641; database g2_s7l_disposable; cluster superuser s7l_super; fixture password s7l_local_synthetic (synthetic, local only);
+#   cluster_name s7l-disposable-pg17; db comment s7l-g2-run-lifecycle-synthetic-disposable-fixture-safe-to-drop;
+#   data dir /home/user/workspace/execution/64e33dc7/recovery-reset/proof-v4/clusters/s7l/pg-data (matches the committed guard regex
+#     /execution/64e33dc7/recovery-reset/.*/s7l/pg-data$ without any helper change);
+#   socket dir recovery-reset/proof-v4/run/s7l; OLD root recovery-reset/proof-v4/s7l/old-root (detached 93389265 via test/utils/g2-s7l-old-root.sh);
+#   OLD client <old-root>/.g2-s7l-old-client; G2_S7L_SERVER_VERSION 170006; psql /usr/bin/psql (18.6 client).
+#   The failed v2 lane recovery-reset/clusters/s7l and the failed v3 lane recovery-reset/proof-v3/clusters/s7l (+ run/, old-root) are untouched evidence
+#   (absent in this fresh sandbox; [ -d ] skips them). Both other-lane loops enumerate clusters/*/, proof-v3/clusters/*/ and proof-v4/clusters/*/
+#   and exclude only this lane by path, so the sibling S8-C v4 lane proof-v4/clusters/s8-c is checked as another stopped lane and never started.
+# Expected observations: OLD history applied = 171 before the spec; the spec applies S7-L in L01 (172), exercises L02..L12,
+#   then L03/L04 down/up; final applied count is recorded as observed. jest bound 1800 s; jest.setTimeout 240 s in the spec.
+# Stage exit codes: 70 precondition, 71 preflight, 72 marker missing, 73 identity, 74 stop/post state, 75 lock, 76 sentinel/frozen.
+BASE_HEAD=93389265a846095b846fa8f1fb0dad782fb6ee9f
+BASE_TREE=a315dd651b8c54c2e82f2260fcc6058f0d13b64a
+EXPECT_PARENT=a68cdac70d81aea384fdc99c01c9c983a08e80eb
+EXPECT_HEAD=df713fd9217df524915348ef8a42c797f288dde1
+EXPECT_TREE=796f437fea80550a379b5f54dc485bc5dbba67e1
+EXPECT_SPEC_BLOB=94e7fac4b8cbb8a8e2146700cbdc7ce9129b9f92
+EXPECT_BOOTSTRAP_BLOB=ebef51fcd355282a222b8f7f789fdfedcb86370c
+EXPECT_OLDROOT_BLOB=cb1137fe7327d456ebd1afa33333f58cba602ea0
+EXPECT_DB_BLOB=384e1b746bdcace15b7ed51db23b365557ee72de
+EXPECT_PGH_BLOB=d8b71d68da9a1e823ebd9c334d99798da5d12de8
+EXPECT_HARNESS_BLOB=f0860a8da9fd709dfa8178d9c61415ee6dcb05ff
+EXPECT_WORKER_BLOB=155ffdccd3d4e472cede84e7b11523d18201b450
+EXPECT_GUARD_BLOB=27fcba5fcb088f8e16a5316ed5be2a427e7c70fe
+EXPECT_MIGRATION_TREE=4ce576460c7ae325f3ec778d9d616ab766290f29
+EXPECT_SCHEMA_BLOB=2e328bbcab0c902c6adb55dfb5ee172defc5f698
+# informational (not driver pins; covered by EXPECT_TREE): src/scout/lifecycle/lifecycle.service.ts 5949a29357f46d545456e178a70069d26c4cc5ad (unchanged from v2/v3), test/scout/lifecycle/lifecycle.service.spec.ts 52d4f14457f44f005fad836923a305d239538bc7 (unchanged from v2/v3)

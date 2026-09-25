@@ -1,0 +1,169 @@
+// DRAFT (S8G-DRAFT-1, evidence only). Target: test/utils/g2-s8g-worker.cjs
+// S8-G: real ScoutService + ScoutLifecycleService + ScoutReconstructService + real generated
+// Prisma client in an independent OS process. Union of test/utils/g2-s7l-worker.cjs (query log,
+// tx markers, IPC barriers, lifecycle actions) and test/utils/g2-s8c-worker.cjs (head attestation,
+// fixture spec/rules injection into `service.families`). Hooks only PAUSE real operations at named
+// barriers; they never replace query results or transaction semantics.
+//
+// input (G2_S8G_WORKER JSON): { root, head, client, url, coach, intent, action, pause?, pauseRow?,
+//   txTimeout?, deadlineMs?, body?, spec?, rules?, mapper? }
+// action ∈ start | ingest | complete | cancel | status | reconstruct | run-pass
+// pause  ∈ before-gate | gated | before-ledger | after-row | before-lock | locked
+//   after-row pauses after the `pauseRow`-th COMMITTED row transaction of the pass.
+const { join } = require('path');
+const { execFileSync } = require('child_process');
+const input = JSON.parse(process.env.G2_S8G_WORKER);
+const workerHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: input.root, encoding: 'utf8' }).trim();
+if (workerHead !== input.head) {
+  throw new Error(`worker root ${input.root} is at ${workerHead}, not the attested candidate ${input.head}`);
+}
+const Module = require('module');
+const resolveFilename = Module._resolveFilename;
+Module._resolveFilename = function (request, ...args) {
+  return request === '@prisma/client' ? join(input.client, 'index.js') : resolveFilename.call(this, request, ...args);
+};
+if (Number.isInteger(input.deadlineMs) && input.deadlineMs > 0) {
+  process.env.SCOUT_RUN_DEADLINE_MS = String(input.deadlineMs);
+}
+// G12 spies: count any load of a side-effect module from this process.
+const sideEffectLoads = { notifications: 0, drip: 0, assignment: 0, email: 0, billing: 0 };
+const origLoad = Module._load;
+Module._load = function (request, ...args) {
+  for (const k of Object.keys(sideEffectLoads)) if (String(request).includes(`/${k}/`) || String(request).endsWith(`.${k}.service`)) sideEffectLoads[k] += 1;
+  return origLoad.call(this, request, ...args);
+};
+
+const { PrismaClient } = require(input.client);
+const { ScoutService } = require(join(input.root, 'src/scout/scout.service'));
+const { ScoutIngestService } = require(join(input.root, 'src/scout/scout-ingest.service'));
+const { ScoutLifecycleService } = require(join(input.root, 'src/scout/lifecycle/lifecycle.service'));
+const { ScoutReconstructService } = require(join(input.root, 'src/scout/scout-reconstruct.service'));
+const { buildFamilyRegistry } = require(join(input.root, 'src/scout/reconstruct/families'));
+const { parseSourceMappingSpec } = require(join(input.root, 'src/scout/reconstruct/mapping-spec'));
+const { buildSourceMapperRegistry } = require(join(input.root, 'src/scout/reconstruct/source-mapper-registry'));
+const { parseNativeRuleSet } = require(join(input.root, 'src/scout/reconstruct/native/native-rules'));
+const { buildNativeRuleRegistry } = require(join(input.root, 'src/scout/reconstruct/native/native-rule-registry'));
+
+const db = new PrismaClient({ datasources: { db: { url: input.url } }, log: [{ emit: 'event', level: 'query' }] });
+const queries = [];
+const events = [];
+db.$on('query', (e) => queries.push(e.query)); // Never log query parameters.
+const analytics = { capture: (...args) => events.push(args) };
+const pushes = [];
+const notifications = { pushToUser: async (...args) => { pushes.push(args.length); } };
+
+let paused = false;
+let committedRows = 0;
+async function barrier(phase) {
+  if (input.pause !== phase || paused) return;
+  paused = true;
+  process.send({ ready: phase });
+  await new Promise((resolve) => process.once('message', resolve));
+}
+const isGate = (strings) => Array.isArray(strings) && strings.join('?').includes('last_observed_at');
+const isLock = (strings) => Array.isArray(strings) && strings.join('?').includes('FOR NO KEY UPDATE');
+
+function instrument(target, depth = 0) {
+  return new Proxy(target, {
+    get(object, key) {
+      if (key === '$transaction')
+        return async (fn, ...options) => {
+          if (typeof fn !== 'function') return object.$transaction(fn, ...options);
+          queries.push('-- tx:begin');
+          let sawGate = false;
+          try {
+            const out = await object.$transaction(
+              (tx) => fn(instrument(Object.assign(tx, { __markGate: () => { sawGate = true; } }), depth + 1)),
+              ...(options.length === 0 && Number.isInteger(input.txTimeout) && input.txTimeout > 0 ? [{ timeout: input.txTimeout }] : options),
+            );
+            queries.push('-- tx:commit');
+            if (sawGate) {
+              committedRows += 1;
+              if (input.pause === 'after-row' && committedRows === (input.pauseRow ?? 1)) await barrier('after-row');
+            }
+            return out;
+          } catch (e) {
+            queries.push('-- tx:rollback');
+            throw e;
+          }
+        };
+      if (key === '$queryRaw')
+        return async (strings, ...values) => {
+          if (isGate(strings)) await barrier('before-gate');
+          if (isLock(strings)) await barrier('before-lock');
+          const result = await object.$queryRaw(strings, ...values);
+          if (isGate(strings)) { object.__markGate?.(); await barrier('gated'); }
+          if (isLock(strings)) await barrier('locked');
+          return result;
+        };
+      if (key === 'scoutReconstructionLedger')
+        return new Proxy(object[key], {
+          get(delegate, method) {
+            if (method === 'upsert') return async (...args) => { await barrier('before-ledger'); return delegate.upsert(...args); };
+            return typeof delegate[method] === 'function' ? delegate[method].bind(delegate) : delegate[method];
+          },
+        });
+      return typeof object[key] === 'function' ? object[key].bind(object) : object[key];
+    },
+  });
+}
+
+(async () => {
+  let result;
+  let failure;
+  let families;
+  try {
+    const prisma = instrument(db);
+    const reconstruct = new ScoutReconstructService(prisma, analytics);
+    if (input.spec !== undefined || input.rules !== undefined) {
+      const specs = input.spec === undefined ? [] : [parseSourceMappingSpec(input.spec, 'g2-s8g-worker:spec')];
+      const rules = input.rules === undefined ? [] : [parseNativeRuleSet(input.rules, 'g2-s8g-worker:rules')];
+      reconstruct.families = buildFamilyRegistry({ sourceMappers: buildSourceMapperRegistry(specs), nativeRules: buildNativeRuleRegistry(rules) });
+      // The planner uses the same mapper registry (S8-G exposes it on the service like `families`).
+      reconstruct.sourceMappers = buildSourceMapperRegistry(specs);
+    }
+    families = [...reconstruct.families.keys()];
+    if (input.mapper === 'throw') reconstruct.families.get(input.family).map = () => { throw new Error('fixture private payload'); };
+    const lifecycle = new ScoutLifecycleService(prisma, analytics, reconstruct);
+    const scout = new ScoutService(prisma, notifications, analytics, lifecycle);
+    const body = input.body ?? {};
+    switch (input.action) {
+      case 'start': result = await lifecycle.start(input.coach, input.intent); break;
+      case 'cancel': result = await lifecycle.cancel(input.coach, input.intent); break;
+      case 'ingest':
+        result = await new ScoutIngestService(prisma, analytics, lifecycle).ingest(input.coach, {
+          intent_id: input.intent,
+          entity_type: body.entity_type ?? 'clients',
+          entities: (body.entities ?? [{ sourceId: 'a', payload: { name: 'Synthetic a' } }]).map((e) => ({
+            sourceId: e.sourceId,
+            sourcePlatform: body.sourcePlatform ?? 'conformance_s8g',
+            capturedAt: '2026-09-25T00:00:00.000Z',
+            payload: e.payload,
+          })),
+        });
+        break;
+      case 'complete':
+        result = await scout.complete(input.coach, { intent_id: input.intent, terminal_status: body.terminal_status ?? 'success', final_counts: body.final_counts, error_summary: body.error_summary });
+        break;
+      case 'status': result = await scout.getImportStatus(input.coach, input.intent); break;
+      case 'reconstruct': result = await reconstruct.reconstruct(input.coach, input.intent, input.family); break;
+      case 'run-pass':
+        result = await reconstruct.reconstructRun(input.coach, input.intent, {
+          mode: 'server', epoch: body.epoch ?? 1,
+          gate: (tx) => lifecycle.assertRunOpen(tx, input.coach, input.intent),
+        });
+        break;
+      default: throw new Error(`unknown action ${input.action}`);
+    }
+  } catch (e) {
+    failure = {
+      status: typeof e.getStatus === 'function' ? e.getStatus() : 500,
+      message: typeof e.getStatus === 'function' ? e.message : 'Internal server error',
+      response: typeof e.getResponse === 'function' ? e.getResponse() : undefined,
+      code: e.code,
+    };
+  } finally {
+    await db.$disconnect();
+  }
+  process.send({ done: true, result, failure, queries, events, pushes: pushes.length, sideEffectLoads, families, pid: process.pid }, () => process.disconnect());
+})().catch((e) => { console.error(e); process.exit(1); });

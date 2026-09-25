@@ -1,0 +1,255 @@
+// DRAFT (S8G-DRAFT-1, evidence only). Target: test/scout/orchestration/reconstruct-run.spec.ts
+// Engine seam under test with stubbed families (pattern: S8-C engine-handoff.spec.ts FakePrisma):
+//  - gate-first in EVERY per-row transaction for a server context (G02);
+//  - the legacy context produces the pre-S8-G statement sequence (G08);
+//  - a closed gate stops the pass at that row, writes nothing further, never a fabricated `failed` (G03);
+//  - §3.8 order, unmapped tokens ledgered skipped, over-ceiling family isolated (G01, G10);
+//  - enumeration is tenant/intent scoped (G11).
+import { Prisma } from '@prisma/client';
+import { AnalyticsService } from '../../../src/analytics/analytics.service';
+import { PrismaService } from '../../../src/prisma.service';
+import type { FamilyReconstructor, PersistResult } from '../../../src/scout/reconstruct/families';
+import { LEGACY_RUN } from '../../../src/scout/reconstruct/orchestration/run-context';
+import { RECONSTRUCT_MAX_ROWS } from '../../../src/scout/scout-reconstruct.dto';
+import { ScoutReconstructService } from '../../../src/scout/scout-reconstruct.service';
+
+const COACH = 'coach-A';
+const INTENT = '3f2b9c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
+const PLATFORM = 'conformance_s8g';
+
+interface Staged {
+  coach_id: string;
+  intent_id: string;
+  entity_type: string;
+  source_platform: string;
+  source_id: string;
+  payload: Prisma.JsonValue;
+}
+interface LedgerRow {
+  entity_type: string;
+  source_platform: string;
+  source_id: string;
+  status: string;
+  target_id: string | null;
+  target_kind?: string;
+  reason: string | null;
+}
+
+/** Ordered log of what happened INSIDE each $transaction callback; 'gate' is the §3.1 UPDATE. */
+class FakePrisma {
+  staged: Staged[] = [];
+  ledger = new Map<string, LedgerRow>();
+  txLog: string[][] = [];
+  /** Epochs the gate returns per call; `null` → zero rows. */
+  gateScript: (number | null)[] = [];
+  gateCalls = 0;
+  groupByArgs: unknown[] = [];
+  countOverride: number | null = null;
+  private current: string[] | null = null;
+  private note(n: string) {
+    if (this.current) this.current.push(n);
+  }
+  private key(r: Pick<LedgerRow, 'entity_type' | 'source_platform' | 'source_id'>) {
+    return `${r.entity_type}|${r.source_platform}|${r.source_id}`;
+  }
+  scoutImport = { findUnique: async () => ({ terminal_status: 'success' }) };
+  scoutIngestEntity = {
+    groupBy: async (args: unknown) => {
+      this.groupByArgs.push(args);
+      const out = new Map<string, { source_platform: string; entity_type: string; n: number }>();
+      for (const r of this.staged.filter((s) => s.coach_id === COACH && s.intent_id === INTENT)) {
+        const k = `${r.source_platform}|${r.entity_type}`;
+        out.set(k, { source_platform: r.source_platform, entity_type: r.entity_type, n: (out.get(k)?.n ?? 0) + 1 });
+      }
+      return [...out.values()].map((g) => ({ source_platform: g.source_platform, entity_type: g.entity_type, _count: { _all: g.n } }));
+    },
+    count: async (args: { where: Partial<Staged> }) =>
+      this.countOverride ?? this.staged.filter((s) => Object.entries(args.where).every(([k, v]) => (s as any)[k] === v)).length,
+    findMany: async (args: { where: Partial<Staged>; take?: number; skip?: number }) =>
+      this.staged
+        .filter((s) => Object.entries(args.where).every(([k, v]) => (s as any)[k] === v))
+        .sort((a, b) => a.source_id.localeCompare(b.source_id))
+        .slice(args.skip ?? 0, (args.skip ?? 0) + (args.take ?? 500))
+        .map(({ source_id, source_platform, payload, entity_type }) => ({ source_id, source_platform, payload, entity_type })),
+  };
+  scoutReconstructionLedger = {
+    upsert: async (args: { where: any; create: LedgerRow; update: Partial<LedgerRow> }) => {
+      this.note('ledger.upsert');
+      const k = this.key(args.where.coach_id_intent_id_entity_type_source_platform_source_id);
+      const row = this.ledger.get(k) ?? { ...args.create };
+      this.ledger.set(k, row);
+      return row;
+    },
+    updateMany: async (args: { where: any; data: Partial<LedgerRow> }) => {
+      this.note('ledger.updateMany');
+      const k = this.key(args.where);
+      const row = this.ledger.get(k);
+      if (row && (args.where.status === undefined || row.status !== 'reconstructed')) Object.assign(row, args.data);
+      return { count: row ? 1 : 0 };
+    },
+    groupBy: async (args: { where: { entity_type: string } }) => {
+      const rows = [...this.ledger.values()].filter((r) => r.entity_type === args.where.entity_type);
+      const by = new Map<string, number>();
+      for (const r of rows) by.set(r.status, (by.get(r.status) ?? 0) + 1);
+      return [...by].map(([status, n]) => ({ status, _count: { _all: n } }));
+    },
+  };
+  $queryRaw = async () => {
+    this.note('gate');
+    const epoch = this.gateScript[this.gateCalls++] ?? 1;
+    return epoch === null ? [] : [{ execution_epoch: epoch }];
+  };
+  $transaction = async <T>(fn: (tx: FakePrisma) => Promise<T>): Promise<T> => {
+    const log: string[] = [];
+    this.txLog.push(log);
+    this.current = log;
+    try {
+      return await fn(this);
+    } finally {
+      this.current = null;
+    }
+  };
+}
+
+function stubFamily(entityType: string, persist: (id: string) => PersistResult, log: FakePrisma): FamilyReconstructor {
+  return {
+    entityType,
+    map: (row) => (String(row.source_id).startsWith('skip') ? { ok: false, reason: 'fixture_skip' } : { ok: true, mapped: row }),
+    async persist(_tx, _coach, sourceId) {
+      (log as any).note?.('persist:' + entityType);
+      return persist(sourceId);
+    },
+  };
+}
+
+function makeService(db: FakePrisma) {
+  const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, db);
+  const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, { capture: jest.fn() });
+  const service = new ScoutReconstructService(prisma, analytics);
+  const families = new Map<string, FamilyReconstructor>();
+  for (const f of ['clients', 'programs', 'workouts', 'client_history']) {
+    families.set(f, stubFamily(f, (id) => ({ ok: true, targetId: `${f}:${id}`, targetKind: 'scout_entity' as const, unresolvedChildren: 0 }), db));
+  }
+  (service as any).families = families;
+  // Planner mappers: identity spec for PLATFORM (see family-plan.spec fixture); injected the same way the S8-C worker does.
+  return { service, analytics, families };
+}
+
+const row = (entity_type: string, source_id: string, source_platform = PLATFORM): Staged => ({
+  coach_id: COACH,
+  intent_id: INTENT,
+  entity_type,
+  source_platform,
+  source_id,
+  payload: {},
+});
+
+const serverCtx = (db: FakePrisma, epoch = 1) => ({
+  mode: 'server' as const,
+  epoch,
+  gate: (tx: unknown) => (tx as FakePrisma).$queryRaw(),
+});
+
+describe('reconstructRun — gate-first (G02)', () => {
+  it('every per-row transaction starts with the gate, for success, skip and unmapped outcomes', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('clients', 'a'), row('clients', 'skip-b'), row('notes', 'n1')];
+    const { service } = makeService(db);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(db.txLog.length).toBe(3);
+    for (const tx of db.txLog) expect(tx[0]).toBe('gate');
+    expect(db.txLog[0]).toEqual(['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany']);
+    expect(db.txLog[1]).toEqual(['gate', 'ledger.upsert', 'ledger.updateMany']);
+    expect(db.ledger.get(`notes|${PLATFORM}|n1`)).toMatchObject({ status: 'skipped', reason: 'unresolved_family:notes' });
+    expect(result.unmapped_families).toEqual(['notes']);
+    expect(result.stopped).toBeNull();
+  });
+
+  it('a gate epoch that differs from the hook-entry epoch closes the row (per-row CAS)', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('clients', 'a')];
+    db.gateScript = [2];
+    const { service } = makeService(db);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db, 1));
+    expect(result.stopped).toBe('gate_closed');
+    expect(db.txLog).toEqual([['gate']]);
+    expect(db.ledger.size).toBe(0);
+  });
+});
+
+describe('reconstruct (coach-JWT legacy route) — byte-identity (G08)', () => {
+  it('never gates and keeps the S8-C statement sequence', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('clients', 'a'), row('clients', 'skip-b')];
+    const { service } = makeService(db);
+    const result = await service.reconstruct(COACH, INTENT, 'clients');
+    expect(db.gateCalls).toBe(0);
+    expect(db.txLog).toEqual([
+      ['persist:clients', 'ledger.upsert', 'ledger.updateMany'],
+      ['ledger.upsert', 'ledger.updateMany'],
+    ]);
+    expect(result).toEqual({ intent_id: INTENT, staged: 2, reconstructed: 1, skipped: 1, failed: 0 });
+  });
+});
+
+describe('reconstructRun — closed gate stops the pass (G03/G05)', () => {
+  it('stops at the first zero-row gate, writes nothing further and never records a fabricated failed', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('clients', 'a'), row('clients', 'b'), row('clients', 'c'), row('programs', 'p')];
+    db.gateScript = [1, 1, null];
+    const { service } = makeService(db);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(result.stopped).toBe('gate_closed');
+    expect(db.txLog).toEqual([
+      ['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany'],
+      ['gate', 'persist:clients', 'ledger.upsert', 'ledger.updateMany'],
+      ['gate'],
+    ]);
+    expect([...db.ledger.keys()].sort()).toEqual([`clients|${PLATFORM}|a`, `clients|${PLATFORM}|b`]);
+    expect(db.gateCalls).toBe(3); // no 4th transaction: programs never started
+  });
+});
+
+describe('reconstructRun — family orchestration (G01/G10)', () => {
+  it('runs families in §3.8 order independent of staged order and forwards the token on each row', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('client_history', 'h'), row('workouts', 'w'), row('programs', 'p'), row('clients', 'c')];
+    const { service } = makeService(db);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(db.txLog.map((t) => t[1])).toEqual(['persist:clients', 'persist:programs', 'persist:workouts', 'persist:client_history']);
+    expect(result.families.map((f) => f.token)).toEqual(['clients', 'programs', 'workouts', 'client_history']);
+  });
+
+  it('isolates an over-ceiling family: no writes for it, later families proceed, pass not stopped', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('programs', 'p'), row('workouts', 'w')];
+    const { service } = makeService(db);
+    const realCount = db.scoutIngestEntity.count;
+    db.scoutIngestEntity.count = async (args) =>
+      args.where.entity_type === 'programs' ? RECONSTRUCT_MAX_ROWS + 1 : realCount(args);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(result.stopped).toBeNull();
+    expect(result.families.find((f) => f.token === 'programs')?.stopped).toBe('over_ceiling');
+    expect([...db.ledger.keys()]).toEqual([`workouts|${PLATFORM}|w`]);
+  });
+
+  it('a ProvenanceConflict (409) in one family stops that family only', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('programs', 'p', 'NotCanonical'), row('workouts', 'w')];
+    const { service } = makeService(db);
+    const result = await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(result.families.find((f) => f.token === 'programs')?.stopped).toBe('provenance_conflict');
+    expect(db.ledger.has(`workouts|${PLATFORM}|w`)).toBe(true);
+  });
+});
+
+describe('reconstructRun — tenancy (G11)', () => {
+  it('enumerates only the calling coach and intent', async () => {
+    const db = new FakePrisma();
+    db.staged = [row('clients', 'a'), { ...row('clients', 'a'), coach_id: 'coach-B' }, { ...row('clients', 'z'), intent_id: 'other' }];
+    const { service } = makeService(db);
+    await service.reconstructRun(COACH, INTENT, serverCtx(db));
+    expect(db.groupByArgs[0]).toMatchObject({ where: { coach_id: COACH, intent_id: INTENT } });
+    expect(db.ledger.size).toBe(1);
+  });
+});

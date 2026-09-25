@@ -1,0 +1,46 @@
+// DRAFT (S8G-DRAFT-1, evidence only). Target: test/scout/g2-s8g-db-guard.spec.ts
+// Guard: the S8-G live proof (test/rls-g2-s8g.spec.ts) must be unreachable from the ordinary Jest
+// run and must refuse without its explicit lane env + confirmation token, exactly like the S7-L and
+// S8-C guards (test/scout/g2-s7l-db-guard.spec.ts, test/scout/g2-s8c-db-guard.spec.ts).
+import { execFileSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+const root = resolve(__dirname, '..', '..');
+
+describe('S8-G live-proof guard', () => {
+  it('the proof spec is excluded from the default Jest projects (only the guarded lane runs it)', () => {
+    const jestConfig = readFileSync(resolve(root, 'jest.config.js'), 'utf8');
+    expect(jestConfig).toMatch(/rls-g2-\*|rls-g2-s8g/);
+  });
+
+  it('refuses without G2_S8G_DATABASE_URL and the confirmation token, touching nothing', () => {
+    const env = { ...process.env };
+    for (const k of Object.keys(env)) if (k.startsWith('G2_S8G_')) delete env[k];
+    let out = '';
+    try {
+      execFileSync(process.execPath, ['node_modules/.bin/jest', '--runInBand', 'test/rls-g2-s8g.spec.ts'], { cwd: root, env, encoding: 'utf8', stdio: 'pipe' });
+    } catch (e: any) {
+      out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+    }
+    expect(out).toMatch(/G2_S8G_DATABASE_URL|g2_s8g_disposable|refus/i);
+  });
+
+  it('the worker attests the candidate head before constructing a client', () => {
+    const worker = readFileSync(resolve(root, 'test/utils/g2-s8g-worker.cjs'), 'utf8');
+    expect(worker.indexOf('rev-parse')).toBeGreaterThan(-1);
+    expect(worker.indexOf('rev-parse')).toBeLessThan(worker.indexOf('new PrismaClient'));
+  });
+
+  it('S8-G product paths import no side-effect module (G12 static guard)', () => {
+    const files = [
+      'src/scout/reconstruct/orchestration/family-plan.ts',
+      'src/scout/reconstruct/orchestration/run-context.ts',
+      'src/scout/scout-reconstruct.service.ts',
+    ];
+    for (const f of files) {
+      const text = readFileSync(resolve(root, f), 'utf8');
+      expect(text).not.toMatch(/notifications|drip|assignment|email|billing|workout-builder\.service/);
+    }
+  });
+});

@@ -1,0 +1,311 @@
+// DRAFT (S8G-DRAFT-1, evidence only). Target: test/rls-g2-s8g.spec.ts
+// S8-G real-PG proof: G01-G14 of s8g/READINESS.md on the disposable PG17 lane with S7-L's
+// migration applied. Guarded exactly like rls-g2-s7l.spec.ts (explicit G2_S8G_* env, confirmation
+// token, cluster/database markers). Harness helpers are the S7-L ones renamed (test/utils/g2-s8g-*).
+// Assertions are on durable rows (psql as owner/admin), the workers' query logs and IPC barriers.
+import {
+  blocked, COACH, holdTransaction, intent, json, quote, refused, run, sql, worker,
+} from './utils/g2-s8g-pg-harness';
+
+const RUN = 'ScoutImport';
+const PLATFORM = 'conformance_s8g';
+const COACH_B = 'coach-B';
+
+const SPEC = {
+  specVersion: 1,
+  sourcePlatform: PLATFORM,
+  steps: { clients: 'clients', programs: 'programs', workouts: 'workouts', client_history: 'client_history' },
+  families: {
+    clients: { displayName: { path: ['name'] }, sourcePersonId: { path: ['id'] } },
+    programs: { label: { path: ['name'] } },
+    workouts: { label: { path: ['title'] }, clientSourceId: { path: ['client_id'] } },
+    client_history: { label: { path: ['title'] }, clientSourceId: { path: ['client_id'] } },
+  },
+};
+// Native rules: the S8-C proof's fixture rule set for programs and workouts (copied verbatim at build time).
+const RULES = require('./scout/reconstruct/native/fixtures/s8c-rules.json');
+
+const fixture = { spec: SPEC, rules: RULES, txTimeout: 60_000 };
+const go = (options: Record<string, unknown>) => run({ ...fixture, ...options });
+
+const runRow = (coach: string, id: string) =>
+  json(`SELECT row_to_json(r) FROM (SELECT phase, terminal_status, state, reason_code, execution_epoch, fenced_at, fence_reason, completed_at, mode FROM "${RUN}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(id)}) r`);
+const ledger = (coach: string, id: string) =>
+  json(`SELECT coalesce(json_agg(row_to_json(l) ORDER BY entity_type, source_id), '[]') FROM (SELECT entity_type, source_id, status, target_kind, reason FROM "ScoutReconstructionLedger" WHERE coach_id=${quote(coach)} AND intent_id=${quote(id)}) l`);
+const provenance = (coach: string) =>
+  json(`SELECT coalesce(json_agg(row_to_json(p) ORDER BY entity_type, source_id), '[]') FROM (SELECT entity_type, source_id, native_kind, outcome, reason, import_intent_id FROM "ImportNativeProvenance" WHERE coach_id=${quote(coach)}) p`);
+const count = (table: string, coach: string) => Number(sql(`SELECT count(*) FROM "${table}" WHERE coach_id=${quote(coach)}`));
+
+const isGate = (q: string) => q.includes('UPDATE "ScoutImport"') && q.includes('last_observed_at');
+const isLock = (q: string) => q.includes('FOR NO KEY UPDATE');
+const isTerminal = (q: string) => q.includes('terminal_status = ');
+/** First SQL statement of each fixture-marked transaction segment. */
+function firstStatements(queries: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < queries.length; i += 1) {
+    if (queries[i] !== '-- tx:begin') continue;
+    let j = i + 1;
+    while (j < queries.length && /^(BEGIN|SET TRANSACTION|DEALLOCATE)/i.test(queries[j])) j += 1;
+    out.push(queries[j]);
+  }
+  return out;
+}
+
+async function stagedRun(coach = COACH, opts: { clientLinked?: boolean; notes?: number } = {}) {
+  const id = intent(coach);
+  await go({ action: 'start', coach, intent: id });
+  await go({ action: 'ingest', coach, intent: id, body: { entity_type: 'clients', entities: [{ sourceId: 'c1', payload: { id: 'c1', name: 'Synthetic c1' } }, { sourceId: 'c2', payload: { id: 'c2', name: 'Synthetic c2' } }] } });
+  await go({ action: 'ingest', coach, intent: id, body: { entity_type: 'programs', entities: [{ sourceId: 'p1', payload: RULES.fixtures.program }] } });
+  await go({ action: 'ingest', coach, intent: id, body: { entity_type: 'workouts', entities: [
+    { sourceId: 'w1', payload: RULES.fixtures.workout },
+    ...(opts.clientLinked ? [{ sourceId: 'w2', payload: { ...RULES.fixtures.workout, client_id: 'c1' } }] : []),
+  ] } });
+  await go({ action: 'ingest', coach, intent: id, body: { entity_type: 'client_history', entities: [{ sourceId: 'h1', payload: { title: 'History', client_id: 'c1' } }] } });
+  for (let n = 0; n < (opts.notes ?? 0); n += 1) {
+    await go({ action: 'ingest', coach, intent: id, body: { entity_type: 'notes', entities: [{ sourceId: `n${n}`, payload: { text: 'x' } }] } });
+  }
+  return id;
+}
+
+describe('S8-G G01/G02/G06a/G12: one ordered, gate-first pass then partial', () => {
+  it('P01: /complete(success) on an open run → pass over all families in §3.8 order → partial/reconciliation_not_performed', async () => {
+    const id = await stagedRun(COACH, { clientLinked: true });
+    const done = await go({ action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' } });
+    expect(done.failure).toBeUndefined();
+    expect(runRow(COACH, id)).toMatchObject({ phase: 'reconciling', terminal_status: 'partial', state: 'partial', reason_code: 'reconciliation_not_performed', execution_epoch: 1, fenced_at: null });
+    expect(runRow(COACH, id).completed_at).not.toBeNull();
+    expect(sql(`SELECT count(*) FROM "${RUN}" WHERE terminal_status='complete' OR state='complete'`)).toBe('0');
+    expect(JSON.stringify(done.events)).not.toContain('"complete"');
+    const rows = ledger(COACH, id);
+    expect(rows).toHaveLength(6);
+    expect(rows.every((r: any) => r.status === 'reconstructed')).toBe(true);
+    expect(rows.find((r: any) => r.source_id === 'w2')).toMatchObject({ entity_type: 'workouts', target_kind: 'scout_entity' }); // N4
+    expect(rows.find((r: any) => r.source_id === 'w1')).toMatchObject({ target_kind: 'workout_plan' });
+    expect(rows.find((r: any) => r.source_id === 'p1')).toMatchObject({ target_kind: 'workout_program' });
+    expect(provenance(COACH).find((p: any) => p.source_id === 'w2')).toMatchObject({ outcome: 'unresolved', reason: expect.stringContaining('no_native_client_principal'), import_intent_id: null }); // N3 null
+    // §3.8 order in the pass log: clients ledger → WorkoutProgram insert → WorkoutPlan insert → client_history evidence.
+    const q = done.queries;
+    const at = (re: RegExp) => q.findIndex((s) => re.test(s));
+    expect(at(/INSERT INTO "Person"|INSERT INTO "public"."Person"/) < at(/INSERT INTO .*"WorkoutProgram"/)).toBe(true);
+    expect(at(/INSERT INTO .*"WorkoutProgram"/) < at(/INSERT INTO .*"WorkoutPlan"/)).toBe(true);
+    expect(at(/INSERT INTO .*"WorkoutPlan"/) < q.findIndex((s, i) => i > at(/INSERT INTO .*"WorkoutPlan"/) && /"ScoutReconstructedEntity"/.test(s) && !/w2/.test(s))).toBe(true);
+    // G02 gate-first: every pass transaction (after the claim transaction) starts with the gate; count == staged rows.
+    const claimTxEnd = q.indexOf('-- tx:commit');
+    const passSegment = q.slice(claimTxEnd + 1, q.findIndex(isLock));
+    const firsts = firstStatements(passSegment);
+    expect(firsts).toHaveLength(6);
+    expect(firsts.every(isGate)).toBe(true);
+    expect(passSegment.filter(isLock)).toHaveLength(0);
+    expect(q.filter(isTerminal)).toHaveLength(1);
+    // G12: the only push is S7-L's notifyComplete; no side-effect module reached from the pass.
+    expect(done.pushes).toBe(1);
+    expect(done.sideEffectLoads).toMatchObject({ drip: 0, assignment: 0, email: 0, billing: 0 });
+    // Status read: claim projected separately, families by token, native buckets null.
+    const status = await go({ action: 'status', coach: COACH, intent: id });
+    expect(status.result).toMatchObject({ status: 'partial', claimed_status: 'success', phase: 'reconciling', reason_code: 'reconciliation_not_performed' });
+    expect(status.result.families.find((f: any) => f.family === 'workouts')).toMatchObject({ staged_unique: 2, ledger: { reconstructed: 2, skipped: 0, failed: 0 }, created_native: null });
+  });
+
+  it('P02b: the legacy coach-JWT route on a legacy intent gates nothing (G08)', async () => {
+    const legacy = `legacy_${Date.now()}`;
+    // OLD-shape legacy settle through the accepted legacy /complete (non-UUID → legacy branch).
+    await go({ action: 'complete', coach: COACH, intent: legacy, body: { terminal_status: 'success' } });
+    sql(`INSERT INTO "ScoutIngestEntity"(coach_id,intent_id,entity_type,source_platform,source_id,payload,captured_at) VALUES (${quote(COACH)},${quote(legacy)},'clients',${quote(PLATFORM)},'L1','{"id":"L1","name":"Synthetic"}'::jsonb, now())`);
+    const legacyPass = await go({ action: 'reconstruct', coach: COACH, intent: legacy, family: 'clients' });
+    expect(legacyPass.failure).toBeUndefined();
+    expect(legacyPass.result).toEqual({ intent_id: legacy, staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+    expect(legacyPass.queries.some(isGate)).toBe(false);
+    expect(legacyPass.queries.some(isLock)).toBe(false);
+    expect(runRow(COACH, legacy)).toMatchObject({ mode: 'legacy', terminal_status: 'success', state: 'success' });
+  });
+});
+
+describe('S8-G G03/G04/G14: cancel around the pass', () => {
+  it('P03: cancel between rows — rows before keep native+provenance+ledger, none after; one terminal write; CAS miss in the tail', async () => {
+    const id = await stagedRun();
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'after-row', pauseRow: 2 });
+    await w.ready; // two row transactions committed
+    const cancel = await go({ action: 'cancel', coach: COACH, intent: id });
+    expect(cancel.result).toMatchObject({ status: 'cancelled', execution_epoch: 2 });
+    w.resume();
+    const done = await w.done;
+    expect(done.failure).toBeUndefined();
+    expect(runRow(COACH, id)).toMatchObject({ terminal_status: 'cancelled', reason_code: 'cancelled_by_coach', execution_epoch: 2, fence_reason: 'cancelled' });
+    expect(ledger(COACH, id)).toHaveLength(2);
+    expect(count('WorkoutProgram', COACH)).toBe(0); // programs is 3rd in order; never reached
+    const gateIdx = done.queries.map((q, i) => (isGate(q) ? i : -1)).filter((i) => i >= 0);
+    expect(gateIdx).toHaveLength(3); // rows 1,2 committed; row 3's gate returned zero rows
+    expect(done.queries[done.queries.findIndex((q, i) => i > gateIdx[2] && q.startsWith('-- tx:'))]).toBe('-- tx:rollback');
+    expect(done.queries.filter(isTerminal)).toHaveLength(0);
+    expect(cancel.queries.filter(isTerminal)).toHaveLength(1);
+    expect(done.events.some((e: any[]) => e[1] === 'scout.run.settled')).toBe(false);
+  });
+
+  it('P04: cancel racing an in-flight row waits on the gate lock (no 40P01); the row commits and counts; terminal cancelled', async () => {
+    const id = await stagedRun();
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'gated' });
+    await w.ready; // gate UPDATE returned inside row 1; row lock held
+    const cancelling = worker({ ...fixture, action: 'cancel', coach: COACH, intent: id });
+    expect(await blocked('g2-s8g-cancel')).toBe(true);
+    w.resume();
+    const [done, cancel] = await Promise.all([w.done, cancelling.done]);
+    expect(cancel.failure).toBeUndefined();
+    expect(done.failure).toBeUndefined();
+    expect(JSON.stringify([done, cancel])).not.toContain('40P01');
+    expect(ledger(COACH, id)).toHaveLength(1);
+    expect(runRow(COACH, id)).toMatchObject({ terminal_status: 'cancelled', execution_epoch: 2 });
+  });
+
+  it('P14: a fence between the pass and the tail lock makes the settle a no-op; epoch strictly +1 once; completed_at set once', async () => {
+    const id = await stagedRun();
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'before-lock' });
+    await w.ready; // pass finished; before FOR NO KEY UPDATE
+    const cancel = await go({ action: 'cancel', coach: COACH, intent: id });
+    const afterCancel = runRow(COACH, id);
+    w.resume();
+    const done = await w.done;
+    expect(done.queries.filter(isTerminal)).toHaveLength(0);
+    expect(runRow(COACH, id)).toEqual(afterCancel);
+    expect(afterCancel).toMatchObject({ terminal_status: 'cancelled', execution_epoch: 2 });
+    expect(ledger(COACH, id)).toHaveLength(5); // whole pass committed before the fence
+    expect(cancel.result.execution_epoch).toBe(2);
+  });
+});
+
+describe('S8-G G05/G13: deadline and interruption', () => {
+  it('P05: deadline passes mid-pass → next gate zero rows → timed_out fenced in a NEW transaction after the rollback; pass stops', async () => {
+    const id = intent(COACH);
+    await go({ action: 'start', coach: COACH, intent: id, deadlineMs: 4000 });
+    await go({ action: 'ingest', coach: COACH, intent: id, body: { entity_type: 'clients', entities: [{ sourceId: 'c1', payload: { id: 'c1', name: 'a' } }, { sourceId: 'c2', payload: { id: 'c2', name: 'b' } }] } });
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'after-row', pauseRow: 1, deadlineMs: 4000 });
+    await w.ready;
+    await new Promise((r) => setTimeout(r, 4500));
+    w.resume();
+    const done = await w.done;
+    const q = done.queries;
+    const gates = q.map((s, i) => (isGate(s) ? i : -1)).filter((i) => i >= 0);
+    const failedGate = gates[gates.length - 1];
+    const rollbackAt = q.findIndex((s, i) => i > failedGate && s === '-- tx:rollback');
+    const beginAt = q.findIndex((s, i) => i > rollbackAt && s === '-- tx:begin');
+    const lockAt = q.findIndex((s, i) => i > beginAt && isLock(s));
+    expect(failedGate).toBeGreaterThan(0);
+    expect(rollbackAt).toBeGreaterThan(failedGate);
+    expect(lockAt).toBeGreaterThan(beginAt);
+    expect(runRow(COACH, id)).toMatchObject({ terminal_status: 'timed_out', reason_code: 'deadline_exceeded', fence_reason: 'timed_out', execution_epoch: 2 });
+    expect(ledger(COACH, id)).toHaveLength(1);
+    expect(q.filter(isTerminal)).toHaveLength(1); // the lazy fence's; the tail is a CAS miss
+  });
+
+  it('P13: an aborted pass leaves the run reconciling; poll past deadline → timed_out; a new intent converges already_present with zero duplicates', async () => {
+    const id = intent(COACH);
+    await go({ action: 'start', coach: COACH, intent: id, deadlineMs: 3000 });
+    await go({ action: 'ingest', coach: COACH, intent: id, body: { entity_type: 'programs', entities: [{ sourceId: 'p1', payload: RULES.fixtures.program }, { sourceId: 'p2', payload: RULES.fixtures.program }] } });
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'after-row', pauseRow: 1, deadlineMs: 3000 });
+    await w.ready;
+    w.kill('SIGKILL');
+    expect(runRow(COACH, id)).toMatchObject({ phase: 'reconciling', terminal_status: null });
+    expect(count('WorkoutProgram', COACH)).toBe(1);
+    await new Promise((r) => setTimeout(r, 3500));
+    const poll = await go({ action: 'status', coach: COACH, intent: id, deadlineMs: 3000 });
+    expect(poll.result).toMatchObject({ status: 'timed_out', reason_code: 'deadline_exceeded' });
+    const id2 = intent(COACH);
+    await go({ action: 'start', coach: COACH, intent: id2 });
+    await go({ action: 'ingest', coach: COACH, intent: id2, body: { entity_type: 'programs', entities: [{ sourceId: 'p1', payload: RULES.fixtures.program }, { sourceId: 'p2', payload: RULES.fixtures.program }] } });
+    const before = provenance(COACH);
+    await go({ action: 'complete', coach: COACH, intent: id2, body: { terminal_status: 'success' } });
+    expect(count('WorkoutProgram', COACH)).toBe(2); // p1 already_present, p2 created once
+    expect(provenance(COACH).filter((p: any) => p.source_id === 'p1')).toEqual(before.filter((p: any) => p.source_id === 'p1'));
+    expect(ledger(COACH, id2)).toHaveLength(2);
+    expect(runRow(COACH, id2)).toMatchObject({ terminal_status: 'partial' });
+  });
+});
+
+describe('S8-G G06/G07/G09: claim vs truth, duplicate and late settle, reader gates', () => {
+  it('P06b/P06c: claim failed with zero staged → failed/transfer_failed with no pass; claim failed with staged rows → pass then partial', async () => {
+    const empty = intent(COACH);
+    await go({ action: 'start', coach: COACH, intent: empty });
+    const b = await go({ action: 'complete', coach: COACH, intent: empty, body: { terminal_status: 'failed' } });
+    expect(runRow(COACH, empty)).toMatchObject({ terminal_status: 'failed', reason_code: 'transfer_failed' });
+    expect(b.queries.filter(isGate)).toHaveLength(1); // only the claim transaction's gate
+    const some = await stagedRun();
+    const c = await go({ action: 'complete', coach: COACH, intent: some, body: { terminal_status: 'failed' } });
+    expect(c.queries.filter(isGate)).toHaveLength(6); // claim + 5 rows
+    expect(runRow(COACH, some)).toMatchObject({ terminal_status: 'partial', reason_code: 'reconciliation_not_performed' });
+    expect((await go({ action: 'status', coach: COACH, intent: some })).result.claimed_status).toBe('failed');
+  });
+
+  it('P07/P09: a duplicate /complete during the pass is an ack without a second pass; readers 404/409 while reconciling and work after', async () => {
+    const id = await stagedRun();
+    const w = worker({ ...fixture, action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' }, pause: 'after-row', pauseRow: 1 });
+    await w.ready;
+    const dup = await go({ action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'failed' } });
+    expect(dup.result).toEqual({ acknowledged: true, intent_id: id });
+    expect(dup.queries.filter(isGate)).toHaveLength(1);
+    expect(dup.queries.filter((q) => q === '-- tx:rollback')).toHaveLength(1);
+    expect(dup.queries.some(isLock)).toBe(false);
+    const during = await go({ action: 'reconstruct', coach: COACH, intent: id, family: 'clients' });
+    expect(during.failure).toMatchObject({ status: 409, message: 'scout import intent has not settled; reconstruction is post-settle only' });
+    expect((await go({ action: 'status', coach: COACH, intent: id })).result.status).toBe('running');
+    w.resume();
+    await w.done;
+    expect(sql(`SELECT count(*) FROM "ScoutImportCompletion" WHERE coach_id=${quote(COACH)} AND intent_id=${quote(id)}`)).toBe('1');
+    expect(sql(`SELECT terminal_status FROM "ScoutImportCompletion" WHERE coach_id=${quote(COACH)} AND intent_id=${quote(id)}`)).toBe('success');
+    const rowAfter = runRow(COACH, id);
+    const late = await go({ action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'failed' } });
+    expect(late.result).toEqual({ acknowledged: true, intent_id: id });
+    expect(runRow(COACH, id)).toEqual(rowAfter);
+    const after = await go({ action: 'reconstruct', coach: COACH, intent: id, family: 'clients' });
+    expect(after.result).toEqual({ intent_id: id, staged: 2, reconstructed: 2, skipped: 0, failed: 0 });
+    expect(count('Person', COACH)).toBe(2);
+    const noStart = await go({ action: 'complete', coach: COACH, intent: intent(COACH), body: { terminal_status: 'success' } });
+    expect(noStart.failure).toMatchObject({ status: 409, response: expect.objectContaining({ code: 'run_not_started' }) });
+  });
+});
+
+describe('S8-G G10/G11: unmapped tokens, ceiling, tenancy and RLS', () => {
+  it('P10a: notes rows are ledgered skipped unresolved_family:notes, gate-first, and the terminal is partial', async () => {
+    const id = await stagedRun(COACH, { notes: 2 });
+    const done = await go({ action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' } });
+    const notes = ledger(COACH, id).filter((r: any) => r.entity_type === 'notes');
+    expect(notes).toEqual([
+      { entity_type: 'notes', source_id: 'n0', status: 'skipped', target_kind: null, reason: 'unresolved_family:notes' },
+      { entity_type: 'notes', source_id: 'n1', status: 'skipped', target_kind: null, reason: 'unresolved_family:notes' },
+    ]);
+    expect(firstStatements(done.queries).filter(isGate)).toHaveLength(8); // claim + 5 rows + 2 notes
+    const status = await go({ action: 'status', coach: COACH, intent: id });
+    expect(status.result.families.find((f: any) => f.family === 'notes')).toMatchObject({ staged_unique: 2, ledger: { skipped: 2 } });
+    expect(runRow(COACH, id)).toMatchObject({ terminal_status: 'partial' });
+  });
+
+  it('P10b: an over-ceiling family writes nothing; other families proceed; terminal still written once', async () => {
+    const id = intent(COACH);
+    await go({ action: 'start', coach: COACH, intent: id });
+    await go({ action: 'ingest', coach: COACH, intent: id, body: { entity_type: 'clients', entities: [{ sourceId: 'c1', payload: { id: 'c1', name: 'a' } }] } });
+    sql(`INSERT INTO "ScoutIngestEntity"(coach_id,intent_id,entity_type,source_platform,source_id,payload,captured_at)
+         SELECT ${quote(COACH)},${quote(id)},'programs',${quote(PLATFORM)},'p'||g,'{}'::jsonb,now() FROM generate_series(1,10001) g`);
+    const done = await go({ action: 'complete', coach: COACH, intent: id, body: { terminal_status: 'success' } });
+    expect(done.failure).toBeUndefined();
+    expect(count('WorkoutProgram', COACH)).toBe(0);
+    expect(ledger(COACH, id)).toEqual([{ entity_type: 'clients', source_id: 'c1', status: 'reconstructed', target_kind: null, reason: null }]);
+    expect(done.queries.filter(isTerminal)).toHaveLength(1);
+    expect(runRow(COACH, id)).toMatchObject({ terminal_status: 'partial' });
+  });
+
+  it('P11: coach B is never enumerated; anon/authenticated refused; a service_role rollback persists nothing', async () => {
+    const a = await stagedRun(COACH);
+    const b = await stagedRun(COACH_B);
+    await go({ action: 'complete', coach: COACH, intent: a, body: { terminal_status: 'success' } });
+    expect(ledger(COACH_B, b)).toEqual([]);
+    expect(count('WorkoutProgram', COACH_B)).toBe(0);
+    expect(sql(`SELECT count(*) FROM "WorkoutProgram" WHERE coach_id<>${quote(COACH)} AND coach_id<>${quote(COACH_B)}`)).toBe('0');
+    for (const role of ['anon', 'authenticated']) {
+      refused(`SELECT 1 FROM "ScoutReconstructionLedger" LIMIT 1`, 'permission denied', role);
+      refused(`SELECT 1 FROM "ImportNativeProvenance" LIMIT 1`, 'permission denied', role);
+      refused(`INSERT INTO "ScoutReconstructionLedger"(coach_id,intent_id,entity_type,source_platform,source_id,status) VALUES ('x','y','clients','${PLATFORM}','z','skipped')`, 'permission denied', role);
+    }
+    const before = ledger(COACH, a).length;
+    const held = holdTransaction(`INSERT INTO "ScoutReconstructionLedger"(coach_id,intent_id,entity_type,source_platform,source_id,status) VALUES (${quote(COACH)},${quote(a)},'clients',${quote(PLATFORM)},'ghost','skipped')`);
+    await held.rollback();
+    expect(ledger(COACH, a).length).toBe(before);
+  });
+});

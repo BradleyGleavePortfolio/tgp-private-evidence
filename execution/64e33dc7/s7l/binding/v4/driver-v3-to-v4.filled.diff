@@ -1,0 +1,90 @@
+2,9c2,11
+< # S7-L real-PG proof — binding v3 (S7L_RUNTIME_MINIMUM_CORRECTION_GRANT: P1 observed lock-timeout message, P2 try/finally
+< # release in the stage-1 held-transaction test of test/rls-g2-s7l.spec.ts). Bound to the ORDINARY FOLLOW-UP commit whose
+< # exact parent is the failed-but-preserved v2 candidate 54970cd937afc8dea689b33243961abfef8b9dd6 (HEAD^^ = preserved v1
+< # 839b54c5, HEAD^^^ = accepted base 93389265). Identical to binding/v2/s7l-pg-proof.sh except: versioned paths (binding/v3,
+< # run receipts under binding/v3/run), FRESH runtime lane/socket/old-root under recovery-reset/proof-v3 (the failed v2 lane
+< # clusters/s7l and its old-root are retained evidence, never reused, and are now included in the other-lane checks),
+< # EXPECT_PARENT pin + lineage/one-path delta checks, and the candidate head/tree/spec-blob/fixture pins filled by
+< # freeze-v3.sh. NOT RUN; NOT GRANTED. Derived as a code pattern from the
+---
+> # S7-L real-PG proof — binding v4 (grant S7L-WC-1, daceddc8/SCOPE.md: worker runtime-identity correction — the OLD-image
+> # worker resolves @prisma/client/runtime/library to the custom-output client's own runtime copy so P2002 instanceof holds;
+> # one file test/utils/g2-s7l-worker.cjs). Bound to the ORDINARY FOLLOW-UP commit whose exact parent is the
+> # failed-but-preserved v3 candidate a68cdac70d81aea384fdc99c01c9c983a08e80eb (HEAD^^ = preserved v2 54970cd9, HEAD^^^ =
+> # preserved v1 839b54c5, HEAD^^^^ = accepted base 93389265). Identical to binding/v3/s7l-pg-proof.sh except: versioned
+> # paths (binding/v4, run receipts under binding/v4/run), FRESH runtime lane/socket/old-root under recovery-reset/proof-v4
+> # (the failed v2 lane clusters/s7l and the failed v3 lane proof-v3/clusters/s7l are retained evidence, never reused; the
+> # other-lane loops enumerate clusters/, proof-v3/clusters/ and proof-v4/clusters/ excluding only this lane by path so a
+> # sibling S8-C v4 lane is protected), EXPECT_PARENT pin + lineage/one-path delta checks shifted one level, and the
+> # candidate head/tree/worker-blob/fixture pins (fixture filled by freeze-v4.sh). NOT RUN; NOT GRANTED. Derived as a code pattern from the
+25c27
+< #   timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v3/s7l-pg-proof.sh
+---
+> #   timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v4/s7l-pg-proof.sh
+27c29
+< D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v3
+---
+> D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v4
+35,37c37,39
+< EXPECT_PARENT=54970cd937afc8dea689b33243961abfef8b9dd6                       # v2 candidate (failed proof, preserved): the exact parent of the ordinary follow-up commit
+< EXPECT_HEAD=a68cdac70d81aea384fdc99c01c9c983a08e80eb                                  # v3 candidate head (P1/P2 runtime minimum correction), filled by freeze-v3.sh
+< EXPECT_TREE=6c00e2483d0407e1ba8b8e97d03ff0e1ea2b88eb
+---
+> EXPECT_PARENT=a68cdac70d81aea384fdc99c01c9c983a08e80eb                       # v3 candidate (failed proof 23/1 L05/L12, preserved): the exact parent of the ordinary follow-up commit
+> EXPECT_HEAD=df713fd9217df524915348ef8a42c797f288dde1                                  # v4 candidate head (worker runtime-identity correction), committed df713fd9; verified by freeze-v4.sh
+> EXPECT_TREE=796f437fea80550a379b5f54dc485bc5dbba67e1
+44c46
+< EXPECT_WORKER_BLOB=a8fed545d68d1536171de0892f33ef8a9abf2f3e                 # test/utils/g2-s7l-worker.cjs
+---
+> EXPECT_WORKER_BLOB=155ffdccd3d4e472cede84e7b11523d18201b450                 # test/utils/g2-s7l-worker.cjs (v4: runtime/library redirect)
+48c50
+< EXPECT_FIXTURE_SHA=721468ac49eae624697feafa78ddfbddab9fee41303be03c36c66c923e6f7945                                     # sha256 of binding/v3/s7l-fixture.sh (frozen with this file by freeze-v3.sh)
+---
+> EXPECT_FIXTURE_SHA=74aed2611c9abb507b65697fa1b88834d5e8afe876e12c7d19f1068873e8e751                                     # sha256 of binding/v4/s7l-fixture.sh (frozen with this file by freeze-v4.sh)
+60,61c62,63
+< DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$RUNTIME_ROOT/proof-v3/clusters/s7l; SOCK=$RUNTIME_ROOT/proof-v3/run/s7l  # fresh v3 lane; CLUSTERS kept for other-lane checks
+< OLDROOT=$RUNTIME_ROOT/proof-v3/s7l/old-root; OLDCLIENT=$OLDROOT/.g2-s7l-old-client
+---
+> DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$RUNTIME_ROOT/proof-v4/clusters/s7l; SOCK=$RUNTIME_ROOT/proof-v4/run/s7l  # fresh v4 lane; CLUSTERS kept for other-lane checks
+> OLDROOT=$RUNTIME_ROOT/proof-v4/s7l/old-root; OLDCLIENT=$OLDROOT/.g2-s7l-old-client
+94,95c96,97
+< case "$EXPECT_FIXTURE_SHA$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB" in *__*) log "PRECONDITION_FAIL v3 pins not frozen (run freeze-v3.sh after the follow-up commit)"; fail 70;; esac
+< [ "$EXPECT_HEAD" != "$BASE_HEAD" ] && [ "$EXPECT_HEAD" != "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base or the v2 parent, not the v3 candidate"; fail 70; }
+---
+> case "$EXPECT_FIXTURE_SHA$EXPECT_HEAD$EXPECT_TREE$EXPECT_WORKER_BLOB" in *__*) log "PRECONDITION_FAIL v4 pins not frozen (run freeze-v4.sh after the follow-up commit)"; fail 70;; esac
+> [ "$EXPECT_HEAD" != "$BASE_HEAD" ] && [ "$EXPECT_HEAD" != "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base or the v3 parent, not the v4 candidate"; fail 70; }
+100,106c102,110
+< # ordinary follow-up lineage: HEAD^ is exactly the preserved v2 candidate (never amended/replaced), HEAD^^ the preserved v1
+< # candidate 839b54c5, HEAD^^^ the accepted base; both preserved trees are checked byte-for-byte
+< [ "$(git -C "$W" rev-parse HEAD^)" = "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL HEAD parent != $EXPECT_PARENT (ordinary follow-up on the preserved v2 candidate expected)"; fail 70; }
+< [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^{tree}")" = 513c71d7c1390787e1521ccbfa46b30bb52b5462 ] || { log "PRECONDITION_FAIL v2 parent tree changed (54970cd9 must be preserved byte-for-byte)"; fail 70; }
+< [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^")" = 839b54c53ccb252f95b4ec63df0b08595bbe7698 ] || { log "PRECONDITION_FAIL v2 parent $EXPECT_PARENT does not sit directly on the preserved v1 candidate 839b54c5"; fail 70; }
+< [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^")" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL v1 candidate 839b54c5 does not sit directly on the accepted base"; fail 70; }
+< [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^{tree}")" = f02205c60ad0bfeb24ce82d74b0025ee9a185df6 ] || { log "PRECONDITION_FAIL v1 tree changed (839b54c5 must be preserved byte-for-byte)"; fail 70; }
+---
+> # ordinary follow-up lineage: HEAD^ is exactly the preserved v3 candidate (never amended/replaced), HEAD^^ the preserved v2
+> # candidate 54970cd9, HEAD^^^ the preserved v1 candidate 839b54c5, HEAD^^^^ the accepted base; all three preserved trees are checked byte-for-byte
+> [ "$(git -C "$W" rev-parse HEAD^)" = "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL HEAD parent != $EXPECT_PARENT (ordinary follow-up on the preserved v3 candidate expected)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^{tree}")" = 6c00e2483d0407e1ba8b8e97d03ff0e1ea2b88eb ] || { log "PRECONDITION_FAIL v3 parent tree changed (a68cdac7 must be preserved byte-for-byte)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^")" = 54970cd937afc8dea689b33243961abfef8b9dd6 ] || { log "PRECONDITION_FAIL v3 parent $EXPECT_PARENT does not sit directly on the preserved v2 candidate 54970cd9"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^{tree}")" = 513c71d7c1390787e1521ccbfa46b30bb52b5462 ] || { log "PRECONDITION_FAIL v2 tree changed (54970cd9 must be preserved byte-for-byte)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^")" = 839b54c53ccb252f95b4ec63df0b08595bbe7698 ] || { log "PRECONDITION_FAIL v2 candidate 54970cd9 does not sit directly on the preserved v1 candidate 839b54c5"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^^{tree}")" = f02205c60ad0bfeb24ce82d74b0025ee9a185df6 ] || { log "PRECONDITION_FAIL v1 tree changed (839b54c5 must be preserved byte-for-byte)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^^^")" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL v1 candidate 839b54c5 does not sit directly on the accepted base"; fail 70; }
+108,110c112,114
+< # the follow-up delta from v2 is exactly the one granted proof-spec path
+< [ "$(git -C "$W" diff --name-only "$EXPECT_PARENT" HEAD | sort | tr '\n' ' ')" = "test/rls-g2-s7l.spec.ts " ] \
+<   || { log "PRECONDITION_FAIL follow-up delta from v2 is not exactly the one granted P1/P2 path test/rls-g2-s7l.spec.ts"; fail 70; }
+---
+> # the follow-up delta from v3 is exactly the one granted proof-worker path
+> [ "$(git -C "$W" diff --name-only "$EXPECT_PARENT" HEAD | sort | tr '\n' ' ')" = "test/utils/g2-s7l-worker.cjs " ] \
+>   || { log "PRECONDITION_FAIL follow-up delta from v3 is not exactly the one granted path test/utils/g2-s7l-worker.cjs"; fail 70; }
+161c165
+< for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "${d%/}" != "$LANE" ] || continue  # own lane by actual path; retained v2 clusters/s7l is another stopped lane
+---
+> for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}  # own lane by actual path; every other lane (retained v2 clusters/s7l, failed v3 proof-v3/clusters/s7l, sibling proof-v4/clusters/*) is another stopped lane
+211c215
+< for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "${d%/}" != "$LANE" ] || continue  # own lane by actual path; retained v2 clusters/s7l is another stopped lane
+---
+> for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}  # own lane by actual path; every other lane (retained v2 clusters/s7l, failed v3 proof-v3/clusters/s7l, sibling proof-v4/clusters/*) is another stopped lane
