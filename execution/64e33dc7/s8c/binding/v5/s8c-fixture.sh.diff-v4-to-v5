@@ -1,0 +1,24 @@
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v5/s8c-fixture.sh.v4	2026-09-25 16:39:17.409603848 +0000
++++ /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v5/s8c-fixture.sh	2026-09-25 17:23:55.533603848 +0000
+@@ -10,8 +10,8 @@
+ #   * listen 127.0.0.1 only, port 55642 (execution/64e33dc7 SCOPE), superuser s8c_super / s8c_local_synthetic
+ #     (synthetic value; scram, S5 shape)
+ #   * FRESH NAMESPACE (RUNTIME_SETUP_RECEIPT §Donor-copy 6-7): binaries from the SHA-pinned
+-#     recovery-reset/pg17/dist; data and socket directories under recovery-reset/proof-v4/clusters/s8-c and
+-#     recovery-reset/proof-v4/run/s8-c (fresh v4 lane; the failed v3 lane clusters/s8-c is retained, never adopted)
++#     recovery-reset/pg17/dist; data and socket directories under recovery-reset/proof-v5/clusters/s8-c and
++#     recovery-reset/proof-v5/run/s8-c (fresh v5 lane; the failed v3 lane clusters/s8-c and the failed v4 lane proof-v4/clusters/s8-c are retained, never adopted)
+ #     — never pg17/dist as a data root, never the historical /home/user/pg17 paths.
+ # `destroy` never discards a stop failure (S5-R3-A-03 revision 2 inherited): a running marked cluster is stopped
+ # with a bounded fast stop; a failed stop, a surviving postmaster or any process still referencing the data
+@@ -24,8 +24,8 @@
+ # ---- end lane constants
+ PGHOME=$RUNTIME_ROOT/pg17/dist
+ PORT=55642; SUPER=s8c_super; PASS=s8c_local_synthetic; MARKER=s8c-disposable-pg17
+-LANE=$RUNTIME_ROOT/proof-v4/clusters/s8-c
+-DATA=$LANE/pg-data; LOG=$LANE/pg.log; SOCK=$RUNTIME_ROOT/proof-v4/run/s8-c
++LANE=$RUNTIME_ROOT/proof-v5/clusters/s8-c
++DATA=$LANE/pg-data; LOG=$LANE/pg.log; SOCK=$RUNTIME_ROOT/proof-v5/run/s8-c
+ STOP_TIMEOUT="${S8C_STOP_TIMEOUT:-45}"
+ cmd=${1:?init|start|stop|status|destroy}
+ [ -n "${S8C_RUNNER_PID:-}" ] && [ -d "/proc/$S8C_RUNNER_PID" ] && grep -q s8c-pg-proof.sh "/proc/$S8C_RUNNER_PID/cmdline" \

@@ -1,0 +1,181 @@
+From 9cc764013fd1d726dad082eebfa7def50800a6b2 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Fri, 25 Sep 2026 17:03:30 +0000
+Subject: [PATCH 1/3] S8-C: supply updated_at in the G2 proof harness catalog
+ fixture rows
+
+ExerciseCatalogItem.updated_at is @updatedAt, which Prisma fills client-side
+and which has no database default, so the raw fixture INSERT in
+test/utils/g2-s8c-harness.ts violated its NOT NULL constraint and every
+live-PG spec failed in beforeEach before any writer behaviour ran. Supply
+now() for that column. A sweep of every other raw INSERT/UPDATE in the S8-C
+test support (User, ScoutImport, ScoutIngestEntity, ScoutReconstructionLedger)
+against the columns as they exist after the 171 accepted migrations found no
+other NOT NULL column without a default that is omitted. Test support only:
+no product source, schema, migration or spec assertion changes.
+---
+ test/utils/g2-s8c-harness.ts | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/test/utils/g2-s8c-harness.ts b/test/utils/g2-s8c-harness.ts
+index d5cbf877..1a8f1797 100644
+--- a/test/utils/g2-s8c-harness.ts
++++ b/test/utils/g2-s8c-harness.ts
+@@ -107,11 +107,16 @@ export function stage(
+     ${quote(source)},${quote(platform)},${quote(JSON.stringify(payload))})
+     ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`);
+ }
+-/** Synthetic catalog rows the exact-identifier link may resolve against (id and slug). */
++/**
++ * Synthetic catalog rows the exact-identifier link may resolve against (id and slug).
++ * `updated_at` is `@updatedAt` in the schema: Prisma fills it client-side and the column has no
++ * database default, so this raw INSERT must supply it (every other NOT NULL column of the table
++ * either is listed here or carries a default in migration 20260601000000_add_exercise_catalog_video).
++ */
+ export function catalog(items: readonly { id: string; slug: string }[]) {
+   for (const item of items)
+-    sql(`INSERT INTO "ExerciseCatalogItem" (id,slug,name,category,primary_muscle)
+-      VALUES (${quote(item.id)},${quote(item.slug)},${quote(`Synthetic ${item.slug}`)},'strength','full_body')
++    sql(`INSERT INTO "ExerciseCatalogItem" (id,slug,name,category,primary_muscle,updated_at)
++      VALUES (${quote(item.id)},${quote(item.slug)},${quote(`Synthetic ${item.slug}`)},'strength','full_body',now())
+       ON CONFLICT (id) DO NOTHING`);
+ }
+ 
+-- 
+2.53.0
+
+
+From 4d7d4b4ebdb7df2af593bbd809f7df23775fdf29 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Fri, 25 Sep 2026 17:12:40 +0000
+Subject: [PATCH 2/3] S8-C: align three live-proof spec observations with the
+ accepted fixture
+
+Read the lane identity (data_directory is restricted to superusers) over
+the existing admin connection instead of the unprivileged migration role,
+with the asserted values unchanged. Compare the converted weight_lbs with a
+tolerance because the double round-trips through the Prisma Float path,
+which is not bit-exact by one ulp. Count User rows excluding the accepted
+seed system coach from migration 20261215000100 so the assertion still
+proves the native writer minted no User. Test assertions only: no product
+source, schema, migration or harness change.
+---
+ test/rls-g2-s8c.spec.ts | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/test/rls-g2-s8c.spec.ts b/test/rls-g2-s8c.spec.ts
+index dc804fde..84410b5c 100644
+--- a/test/rls-g2-s8c.spec.ts
++++ b/test/rls-g2-s8c.spec.ts
+@@ -39,7 +39,7 @@ import {
+   EXPECTED_MIGRATIONS,
+   expectedVersion,
+   holdTransaction,
+-  json,
++  jsonAdmin,
+   quote,
+   root,
+   run,
+@@ -90,8 +90,10 @@ beforeEach(() => {
+ 
+ describe('lane identity (bootstrap state, never repaired here)', () => {
+   it('is the S8-C disposable PG17 lane with the full accepted history and S8-B objects present', () => {
++    // `data_directory` is readable only by superusers / pg_read_all_settings: observe the lane
++    // identity over the existing admin connection (the migration role stays unprivileged).
+     const facts =
+-      json(`SELECT json_build_object('version',current_setting('server_version_num')::int,
++      jsonAdmin(`SELECT json_build_object('version',current_setting('server_version_num')::int,
+       'cluster',current_setting('cluster_name'),'directory',current_setting('data_directory'),
+       'port',inet_server_port(),'db',current_database())`);
+     expect(facts).toEqual({
+@@ -218,11 +220,12 @@ describe('native persistence: target + provenance + typed ledger in one transact
+     expect(rows[0]).toMatchObject({
+       sets: 3,
+       reps_or_duration_seconds: 8,
+-      weight_lbs: toPounds(100, 'kg'),
+       rest_seconds: 90,
+       superset_group_id: null,
+       notes: 'brace',
+     });
++    // The double round-trips through the Prisma Float path, which is not bit-exact (1 ulp).
++    expect(rows[0].weight_lbs).toBeCloseTo(toPounds(100, 'kg'), 9);
+     expect(rows[1]).toMatchObject({
+       sets: 3,
+       reps_or_duration_seconds: 10,
+@@ -421,7 +424,9 @@ describe('client principal: explicit unresolved, never a User (N2)', () => {
+     ]);
+     expect(count('WorkoutPlan')).toBe(0);
+     expect(count('WorkoutProgram')).toBe(0);
+-    expect(count('User')).toBe(1);
++    // Only the fixture coach besides the accepted seed system coach
++    // (migration 20261215000100_seed_b5_contract_templates): the writer minted no User.
++    expect(count('User', `id <> 'b5-system-coach-tgp'`)).toBe(1);
+     expect(count('ClientWorkoutAssignment')).toBe(0);
+   });
+ });
+-- 
+2.53.0
+
+
+From f428db9ab65f638da1651b8cd792c6f93b4983c1 Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Fri, 25 Sep 2026 17:18:13 +0000
+Subject: [PATCH 3/3] S8-C: assert no minted User against the pre-writer
+ baseline in the live proof
+
+The User table carries the accepted seed system coach from migration
+20261215000100 and is never reset between proof cases, so an absolute
+count cannot prove that the native writer minted no User. Capture the
+count before the writer runs at both sites and require it unchanged
+afterwards, which is the property the cases were written to prove. Test
+assertions only: no product source, schema, migration or harness change.
+---
+ test/rls-g2-s8c.spec.ts | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/test/rls-g2-s8c.spec.ts b/test/rls-g2-s8c.spec.ts
+index 84410b5c..9d701783 100644
+--- a/test/rls-g2-s8c.spec.ts
++++ b/test/rls-g2-s8c.spec.ts
+@@ -195,6 +195,9 @@ describe('native persistence: target + provenance + typed ledger in one transact
+ 
+   it('creates a standalone WorkoutPlan with ordered exercises, exact catalog links and unresolved children', async () => {
+     stage('rt-1', 'workouts', STANDALONE);
++    // `User` carries the accepted seed system coach and is never reset: prove "no User minted"
++    // against the pre-writer baseline rather than an absolute count.
++    const usersBefore = count('User');
+     const result = await run({ ...REGISTRY, family: 'workouts' });
+     expect(result.result).toMatchObject({ staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+     const [plan] = plans();
+@@ -287,7 +290,7 @@ describe('native persistence: target + provenance + typed ledger in one transact
+     expect(count('ScoutReconstructionLedger', `status='reconstructed'`)).toBe(1);
+     expect(count('ClientWorkoutAssignment')).toBe(0);
+     expect(count('Notification')).toBe(0);
+-    expect(count('User')).toBe(1);
++    expect(count('User')).toBe(usersBefore);
+     expect(count('Person')).toBe(0);
+     // The writer's rows satisfy S8-B's CHECKs by construction (a violation would have aborted the tx).
+     expect(count('ImportNativeProvenance', `(native_id IS NULL) <> (outcome='unresolved')`)).toBe(
+@@ -379,6 +382,7 @@ describe('client principal: explicit unresolved, never a User (N2)', () => {
+   it('client-linked workout stays generic evidence with an unresolved provenance marker; no plan, no User', async () => {
+     stage('rt-c', 'workouts', { ...STANDALONE, title: 'Client Push', client_id: 'c-1' });
+     stage('blk-c', 'programs', { ...PROGRAM, client_id: 'c-1' });
++    const usersBefore = count('User');
+     const workouts = await run({ ...REGISTRY, family: 'workouts' });
+     const programsRun = await run({ ...REGISTRY, family: 'programs' });
+     expect(workouts.result).toMatchObject({ staged: 1, reconstructed: 1, skipped: 0, failed: 0 });
+@@ -424,9 +428,8 @@ describe('client principal: explicit unresolved, never a User (N2)', () => {
+     ]);
+     expect(count('WorkoutPlan')).toBe(0);
+     expect(count('WorkoutProgram')).toBe(0);
+-    // Only the fixture coach besides the accepted seed system coach
+-    // (migration 20261215000100_seed_b5_contract_templates): the writer minted no User.
+-    expect(count('User', `id <> 'b5-system-coach-tgp'`)).toBe(1);
++    // The writer minted no User (baseline form: the table carries the accepted seed system coach).
++    expect(count('User')).toBe(usersBefore);
+     expect(count('ClientWorkoutAssignment')).toBe(0);
+   });
+ });
+-- 
+2.53.0
+

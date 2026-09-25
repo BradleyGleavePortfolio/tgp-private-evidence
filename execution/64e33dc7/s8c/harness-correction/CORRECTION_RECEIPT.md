@@ -1,49 +1,49 @@
-# S8C-BC-3 harness correction — receipt (INTERIM: steps 1–3 done, step 4 withheld for disposition)
+# S8-C harness + spec correction — final receipt (S8C-BC-3 → BC-4 → BC-5, EXEC-DACEDDC8)
 
-Builder `s8c_bootstrap_completion` (T4) under S8C-BC-3 (class B harness-only closure, SCOPE.md 16:56Z). Evidence repo NOT
-committed by the builder (parent publishes). Nothing rerun, amended, bypassed or force-pushed.
+Builder `s8c_bootstrap_completion` (T4). Evidence repo NOT committed by the builder (parent publishes). No amend, no
+`--no-verify`, no force push, no rerun of any consumed run. The v5 driver was never executed. Supersedes the interim receipt.
 
-## 1. Harness fix (one file, one function)
-- Static sweep of all raw SQL in S8-C test support: `STATIC_SWEEP.md` (`15c0cc03…`). Authoritative confirmation: diagnostic (a).
-- Only omission: `ExerciseCatalogItem.updated_at` in `catalog()` (`test/utils/g2-s8c-harness.ts:113`). Fix: add `updated_at`
-  to the column list and `now()` to VALUES, with a doc-comment. `harness.patch` `1a23604a…` (+8/−3). No product/schema/
-  migration/spec-assertion change.
+## Final pins
+| item | value |
+|---|---|
+| **HEAD** | `f428db9ab65f638da1651b8cd792c6f93b4983c1` on `exec64/s8c-replacement` |
+| **TREE** | `f2623be642ddfbba025ffe8360256a683ac57997` |
+| lineage | `87018a42` (v5 ckpt) → `e0cee7e0` (bootstrap fix, v6) → `9cc76401` (harness) → `4d7d4b4e` (spec, 3 sites) → `f428db9a` (spec, User baseline) |
+| changed blobs vs 87018a42 | `test/utils/g2-s8c-bootstrap.sh` `7c3fba471f991e3750eb56fd29e271101652196e` (unchanged since e0cee7e0); `test/utils/g2-s8c-harness.ts` `d5cbf877…` → **`1a8f17970a1095f9b802badacf093e773caabd76`**; `test/rls-g2-s8c.spec.ts` `dc804fde…` → **`9d701783eeb7701126d158b45bfee3d5f0f686b3`** |
+| unchanged | prisma/, src/, docs/contracts trees identical to 87018a42 (v7 HEAD.txt); DB/PGH/WORKER blobs and all tool pins identical to v4 |
+| checkpoint v7 | `s8c/checkpoints/v7/` bundle `s8c-f428db9a.bundle` `65aa9245…`, `MANIFEST.sha256` `1554ef88…` (6/6 OK), `e0cee7e0..HEAD.patch` `fb1e8774…` |
+| binding v5 driver | `s8c/binding/v5/s8c-pg-proof.sh` **`b641db2d5fae07d9220e573a04cb512c5ec35814b08ae7c506c02499c314fd1d`** |
+| binding v5 fixture | `s8c-fixture.sh` **`34a42ab8b2ffa75256f5fa600ca7a51bcdb3ae1f224ad989ff1ca7a4dd716f10`** |
+| binding v5 manifest | `BINDING.sha256` **`2995ed837fd352e3ea663949cc74e66ca5eec4566444739e8b7f53aab87c9eba`** (10/10 OK); PINS.txt `0c18477f…` |
+| run-prep v5 supervisor | `s8c/binding/v5/run-prep/supervisor.sh` **`5407d27458ea705c471dda2c328067ea0219233769826383e5f8770b099eabec`** (flag `S8C_PG5_GRANT=1`); PREFLIGHT.md `b752503a…`; RUN_PREP.sha256 |
+| lane | `recovery-reset/proof-v5/clusters/s8-c`, socket `proof-v5/run/s8-c`, port 55642 (both ABSENT now) |
 
-## 2. Diagnostics (non-accepting) — `diagnostic/FINDINGS.md`
-- (a) rc=0: information_schema after 171 migrations confirms the single omission (27 required columns across the 5 tables).
-- (b) jest rc=1 at the corrected clean head: **10 passed / 3 failed**; the `beforeEach` defect is closed; three further defects
-  F1–F3 are outside the harness file and outside this grant (spec observation role; spec float-exactness assertion vs Prisma
-  Float round-trip; spec `count('User')` vs the accepted seed migration's system coach). Details and closure candidates there.
+## Commits (each: one file, genuine lefthook hooks — prod-readiness, banned-casts, prettier, eslint, tsc, no-ai-tokens — all ✔; Bradley Gleave author+committer; no trailers)
+1. **BC-3** `9cc76401` (slot 17:03:27–17:04:17Z): `catalog()` INSERT supplies `updated_at` (`now()`), +8/−3. Gate `harness-correction/s8c-harness-gate.sh`, logs `harness-correction/run/`.
+2. **BC-4** `4d7d4b4e` (slot 17:12:37–17:13:28Z): F1 identity observation via `jsonAdmin`; F2 `toBeCloseTo(toPounds(100,'kg'), 9)` on `weight_lbs` only; F3 `count('User', id <> seed)`; unused `json` import removed (required by eslint hook). +9/−4. Gate `spec-correction/s8c-spec-gate.sh`; first launch stopped at its own eslint step (unused import; no commit attempted) — preserved `spec-correction/run-attempt1-lint-stop/`; second launch `spec-correction/run/`.
+3. **BC-5** `f428db9a` (slot 17:18:09–17:19:01Z): both User-count sites → pre-writer baseline (`usersBefore`), +7/−4. Standing-permission sweep: `User` is the only migration-seeded table among those the spec counts (seed INSERTs exist only for BuildWeekDay, CoachBriefPushLedger, ContractTemplate, User, WearableMetricDef). Gate `spec-correction-bc5/s8c-spec-bc5-gate.sh`, logs `spec-correction-bc5/run/`.
 
-## 3. Commit (gate `s8c-harness-gate.sh` `5202d87d…`, log `run/s8c-harness-gate.log` `60b30f42…`)
-- Slot: ACQUIRED 17:03:27Z (flock -n, inode 674373, lslocks=1, postgres 0) → RELEASED 17:04:17Z.
-- Pre: HEAD = `e0cee7e0…`, delta exactly `test/utils/g2-s8c-harness.ts`, +8/−3 (`run/delta-from-e0cee7e0.1file.patch` `8f604d31…`).
-- Scoped prettier 3.9.9 (`recovery-reset/s8c/tools/prettier-3.9.9`, offline) `--check` rc=0; scoped eslint `--max-warnings 0` rc=0.
-- `git commit -F commit-message.txt` (`5a3b4a3d…`) rc=0 with genuine lefthook hooks (`run/commit.raw.log` `f99c72e9…`):
-  pre-commit prod-readiness-quick ✔, banned-cast-tokens ✔, prettier ✔, eslint ✔, tsc ✔ (46.17 s); commit-msg no-ai-tokens ✔.
-  No trailers; author/committer `Bradley Gleave <bradley@bradleytgpcoaching.com>`.
-- **HEAD `9cc764013fd1d726dad082eebfa7def50800a6b2`**, parent `e0cee7e04bef88811310f6dde1fd921f45d103ad`,
-  **TREE `820836142812caa98f035f6e0856ce2b71f0692f`**, changed blob `test/utils/g2-s8c-harness.ts`
-  `d5cbf877…` → **`1a8f17970a1095f9b802badacf093e773caabd76`**; `git diff --numstat e0cee7e0 HEAD` = one file +8/−3; porcelain 0.
+## Diagnostics (non-accepting; `harness-correction/diagnostic/`; own scratch-lane scripts, never a frozen driver; all `flock -n`)
+| run | slot | lane | head | result |
+|---|---|---|---|---|
+| (a) catalog | 17:02:44–17:02:53Z | `scratch/s8c-diag` fresh, bootstrap rc=0 | e0cee7e0 | 27 NOT NULL/no-default columns across the 5 raw-SQL tables; exactly one omitted (`ExerciseCatalogItem.updated_at`) |
+| (b) suite | 17:04:52–17:05:44Z | `scratch/s8c-diag` | 9cc76401 | 10/13 → F1 F2 F3 (`FINDINGS.md`) |
+| (b2) suite | 17:14:02–17:14:52Z | `scratch/s8c-diag` (reused) | 4d7d4b4e | 11/13 → F4 (masked 4th `count('User')`) + lane contamination (`spec-correction/STOP_FOR_DISPOSITION.md`) |
+| **(b3) suite** | **17:19:51–17:20:57Z** | **`scratch/s8c-diag2` FRESH: initdb + unchanged bootstrap rc=0 (171, seed_users=1)** | **f428db9a** | **13 passed / 13 total, 51.3 s** — `b3/jest.log` sha256 `1bbd3d28403a83960d6688e8bbf2318eb5584f02eea1dbc94c48a31a1d5bee46` |
+Every run exited with 0 lock holders, 0 postgres, 55644 free, scratch pg-data retained without `postmaster.pid`. The retained
+v4 lane `proof-v4/clusters/s8-c` and the S7-L lanes were never touched. Slot order respected (S7-L v4 END 17:00:22Z observed first).
 
-## 4. Checkpoint v7 / binding v5 / run-prep v5 — WITHHELD
-Not produced: binding `9cc76401…` would fail PG-4c 3/13 (F1–F3). Producing v7/v5 now would consume the binding number on a
-head that must change if the parent grants a spec-side closure. Awaiting parent disposition; the mechanical v4→v5 derivation
-(proof-v5 paths, head/tree/blob/fixture pins, PINS.txt L57 fix, `S8C_PG5_GRANT` supervisor) is ready to run against whichever
-head is final.
+## Binding v5 derivation (`harness-correction/v5-prep/prepare-binding-v5-daceddc8.sh`, source-only)
+From frozen v4 bytes (`BINDING.sha256` re-verified): binding dir, head/tree pins, SPEC + HARNESS blob pins, fixture pin,
+`proof-v4`→`proof-v5` lane/socket in driver + fixture, both other-lane loops also enumerate `proof-v5/clusters/*/`, README §v5,
+and **PINS.txt L57 fixed** (`DATA=$RUNTIME_ROOT/proof-v5/clusters/s8-c/pg-data SOCK=$RUNTIME_ROOT/proof-v5/run/s8-c`; v4 had
+left it at the v3 paths). Asserted-count literal replacements; unchanged-pin diff against v4 empty; all six head-derived pins
+re-read from git. Diffs: `s8c-pg-proof.sh.diff-v4-to-v5` `72b1f849…`, `s8c-fixture.sh.diff-v4-to-v5` `e5c8dd58…`,
+`PINS.txt.diff-v4-to-v5` `93e8622f…`. First prep invocation stopped on its own over-strict self-check (my README-style comment
+in the fixture mentions the retained v4 lane path); the unfrozen partial output (no manifest yet) was removed, the check
+narrowed to non-comment lines, and the prep ran once more — recorded here; the frozen v5 is the single manifested output.
 
-## Slot times (all `flock -n`, yielded to none because none held; S7-L END observed 17:00:22Z before the first acquire)
-| hold | acquired | released | purpose |
-|---|---|---|---|
-| 1 | 17:02:44Z | 17:02:53Z | diagnostic (a): initdb + bootstrap + catalog query + stop |
-| 2 | 17:03:27Z | 17:04:17Z | gate: prettier/eslint/hooked commit |
-| 3 | 17:04:52Z | 17:05:44Z | diagnostic (b): RLS suite on scratch lane + stop |
-
-Post-state after each: 0 holders, 0 postgres, 55641/55642/55644 free, scratch pg-data retained without `postmaster.pid`,
-retained v4 pg-data untouched (no `postmaster.pid`), worktree porcelain 0.
-
-## Recorded operational notes (no evidence altered)
-- First gate launch attempt failed at the shell redirect (`run/` did not exist yet); no gate process started, no log written,
-  no lock touched; `run/` was created and the gate launched once (this is the recorded run).
-- `diagnostic/a|b/RECEIPTS.sha256` hash their own log before its final END line (driver pattern); complete-file hashes are in
-  `diagnostic/FINDINGS.md`.
+## Recorded operational notes
+- BC-4 gate attempt 1 (eslint stop) and diag b2 attempt 0 (script's own env-name refusal before lock/PG) are preserved as-is.
+- `checkpoints/v7/HEAD.txt` is labelled `T4 builder s8c_bootstrap_completion` (v6's "parent operator" label was class C).
+- Scratch lanes `scratch/s8c-diag` (76 MB) and `scratch/s8c-diag2` remain on disk for the parent's disposition (destroy grant).

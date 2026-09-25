@@ -1,0 +1,52 @@
+2,4c2,4
+< # S8-C v4 proof supervisor (EXEC-DACEDDC8 PG-4; prepared under S8C-BC-2 follow-up, 2026-09-25 ~16:45Z).
+< # Runs the ONE authorized invocation of the frozen v4 driver, detached, exactly once; records identity; never retries.
+< #   outer command:  timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v4/s8c-pg-proof.sh
+---
+> # S8-C v5 proof supervisor (EXEC-DACEDDC8 PG-5; prepared under S8C-BC-5, 2026-09-25 ~17:25Z).
+> # Runs the ONE authorized invocation of the frozen v5 driver, detached, exactly once; records identity; never retries.
+> #   outer command:  timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v5/s8c-pg-proof.sh
+11,12c11,12
+< # Requires S8C_PG4_GRANT=1 in the environment (set only by the executor under the explicit PG-4 grant after dual GO).
+< # Once-only: refuses if run-prep/LAUNCH.txt or LAUNCHER.txt exists, or if binding/v4/run/ or its sentinel exists.
+---
+> # Requires S8C_PG5_GRANT=1 in the environment (set only by the executor under the explicit PG-5 grant after dual GO).
+> # Once-only: refuses if run-prep/LAUNCH.txt or LAUNCHER.txt exists, or if binding/v5/run/ or its sentinel exists.
+14,15c14,15
+< V4=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v4
+< P=$V4/run-prep; R=$V4/run; DRIVER=$V4/s8c-pg-proof.sh; FIXTURE=$V4/s8c-fixture.sh
+---
+> V5=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v5
+> P=$V5/run-prep; R=$V5/run; DRIVER=$V5/s8c-pg-proof.sh; FIXTURE=$V5/s8c-fixture.sh
+18,23c18,23
+< LANE=$RUNTIME_ROOT/proof-v4/clusters/s8-c; SOCK=$RUNTIME_ROOT/proof-v4/run/s8-c
+< EXPECT_HEAD=e0cee7e04bef88811310f6dde1fd921f45d103ad
+< EXPECT_TREE=b249efb66e22f4c13529f255f3510d4a81314a99
+< EXPECT_DRIVER_SHA=73b291dba1725353583f27d61cb162017a95bc3d9aca0810227cfae0212db2bd
+< EXPECT_FIXTURE_SHA=c59326b56d8aaedf2cd509fb602cb64eb41620bf4c0c1773e2b4c5c6710685e9
+< EXPECT_BINDING_MANIFEST_SHA=c2cfd0a3f65b3889c41eef24313658be626651adc3f5205f9d11e50883dc5f03
+---
+> LANE=$RUNTIME_ROOT/proof-v5/clusters/s8-c; SOCK=$RUNTIME_ROOT/proof-v5/run/s8-c
+> EXPECT_HEAD=f428db9ab65f638da1651b8cd792c6f93b4983c1
+> EXPECT_TREE=f2623be642ddfbba025ffe8360256a683ac57997
+> EXPECT_DRIVER_SHA=b641db2d5fae07d9220e573a04cb512c5ec35814b08ae7c506c02499c314fd1d
+> EXPECT_FIXTURE_SHA=34a42ab8b2ffa75256f5fa600ca7a51bcdb3ae1f224ad989ff1ca7a4dd716f10
+> EXPECT_BINDING_MANIFEST_SHA=2995ed837fd352e3ea663949cc74e66ca5eec4566444739e8b7f53aab87c9eba
+49c49
+< [ "${S8C_PG4_GRANT:-}" = 1 ] || refuse 70 "S8C_PG4_GRANT=1 not set (explicit PG-4 grant after dual GO required)"
+---
+> [ "${S8C_PG5_GRANT:-}" = 1 ] || refuse 70 "S8C_PG5_GRANT=1 not set (explicit PG-5 grant after dual GO required)"
+55,56c55,56
+< [ "$(sha "$V4/BINDING.sha256")" = "$EXPECT_BINDING_MANIFEST_SHA" ] || refuse 71 "BINDING.sha256 sha drifted"
+< (cd "$V4" && sha256sum -c --quiet BINDING.sha256 >/dev/null 2>&1) || refuse 71 "BINDING.sha256 verification failed"
+---
+> [ "$(sha "$V5/BINDING.sha256")" = "$EXPECT_BINDING_MANIFEST_SHA" ] || refuse 71 "BINDING.sha256 sha drifted"
+> (cd "$V5" && sha256sum -c --quiet BINDING.sha256 >/dev/null 2>&1) || refuse 71 "BINDING.sha256 verification failed"
+69c69
+< { echo "LAUNCH_UTC=$(ts)"; echo "GRANT=PG-4 (execution/daceddc8/SCOPE.md); executor pid=$$ user=$(id -un)"
+---
+> { echo "LAUNCH_UTC=$(ts)"; echo "GRANT=PG-5 (execution/daceddc8/SCOPE.md); executor pid=$$ user=$(id -un)"
+74c74
+< S8C_PG4_GRANT=1 setsid nohup bash "$P/supervisor.sh" --child < /dev/null > "$P/supervisor.stdout" 2> "$P/supervisor.stderr" &
+---
+> S8C_PG5_GRANT=1 setsid nohup bash "$P/supervisor.sh" --child < /dev/null > "$P/supervisor.stdout" 2> "$P/supervisor.stderr" &
