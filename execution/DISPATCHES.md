@@ -7,10 +7,11 @@ Current scope: `64e33dc7/SCOPE.md`. Entries below the historical heading are not
 | Worker | Tier / requested route | Scope / sole writable surface | Status |
 |---|---|---|---|
 | Parent, session `64e33dc7-18e7-42d0-add5-7db69dc37a24` | Executive orchestration | State, scope, grants and private evidence publication only | ACTIVE |
-| `mobile_ci_disposition_mug8nlmc` | T3 / `claude_opus_5_5`, high | Read-only mobile CI diagnosis; optional `execution/64e33dc7/mobile-ci/DIAGNOSIS.md` only | ACTIVE; no tests, installs, commits or push |
+| `mobile_ci_disposition_mug8nlmc` | T3 / `claude_opus_5_5`, high | Read-only mobile CI diagnosis and independent exact-delta review; `execution/64e33dc7/mobile-ci/DIAGNOSIS.md` and `REVIEW.md` only | DONE; initial B-1 preserved, closed on `affc2818`; GO for existing CI, not runtime acceptance |
+| `mobile_ci_correction_mug8uc3o` | T1 / `gpt_5_6_terra`, medium | Two mobile test paths in `64e33dc7/MOBILE_CI_MINIMUM_CORRECTION_GRANT.md`; builder receipt only | DONE at `affc2818`; parent accepted and landed after PR #295 CI; no active mobile writer |
 | Predecessor S7-L / S8-C workers | Historical, no current telemetry | Prior candidate surfaces remain unclaimed by replacements | Ownership unresolved; exact source recovery required |
 
-Heavy slot: no new holder. Predecessor release is unverified. No heavy run, PG proof, dependency installation or canonical lock modification is granted. Read-only diagnosis and parent evidence publication do not take the slot.
+Heavy slot: no new holder. Predecessor release is unverified. No local heavy run, PG proof, dependency installation or canonical lock modification is granted. Mobile existing remote CI run `36080005511` passed 325/325 suites and 4180/4180 tests, and CodeQL run `36080005510` passed. Parent accepted and landed `affc2818` to mobile main at 01:03Z. This did not claim or release the canonical local slot. Backend queue remains gated on exact source recovery and explicit predecessor ownership release.
 
 Requested routes are not actual model/effort telemetry. No new T4 worker has been dispatched. Production, branch protection, native client-principal direction, G3-AUTH policy and real-account operations remain owner-reserved.
 

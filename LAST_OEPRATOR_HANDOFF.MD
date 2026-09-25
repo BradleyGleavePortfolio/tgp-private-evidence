@@ -4,11 +4,11 @@
 
 Read the current leading section of `LAST_OPERATOR_STATE.md` and `execution/64e33dc7/SCOPE.md` first. The historical text below remains unchanged. The canonical misspelled filename is retained.
 
-Do not restart N/Q1 or C: backend integration is `93389265`, including accepted S8-A and S8-B. Mobile is `67b646f4`; extension accepted staging is `8901d5f5`, still blocked from main by PR #27's required non-author approval. Backend main is production-coupled and unchanged.
+Do not restart N/Q1 or C: backend integration is `93389265`, including accepted S8-A and S8-B. Mobile is now `affc2818`, accepted and landed after the two-file CI correction on accepted M1 `67b646f4`; extension accepted staging is `8901d5f5`, still blocked from main by PR #27's required non-author approval. Backend main is production-coupled and unchanged.
 
 Exact continuation currently requires the S7-L source at `a585bf76` (tree `9a2c411b`), the latest S8-C source/worktree export, and an explicit predecessor worker/runtime release. Git fetch by the recorded candidate SHAs failed; no matching durable export was found; predecessor session and artifact-library recovery were unsuccessful. This is an affected-path recovery block, not a loss of accepted product work. Do not recreate accepted tests, synthesize the missing history, run the stale S7-L binding, or infer a heavy-slot release from an absent local lock.
 
-The parent may continue independent read-only work and private evidence publication. Mobile CI diagnosis is delegated without tests or product edits. Current owner EXECUTE authorizes ordinary accepted non-production landing but does not authorize approximation of missing candidate bytes, production promotion, protection bypass or reserved product/security decisions.
+The independent mobile CI lane is CLOSED: diagnosis, granted two-test-file correction, exact-delta review, green existing CI and parent acceptance/landing at `affc2818`. [PR #295](https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/295), CI run `36080005511`: 325 suites, 4180 tests and 5 snapshots all passed, plus TypeScript/lint/configuration/CodeQL. See `execution/64e33dc7/mobile-ci/BUILD.md`, `REVIEW.md` and `CI_AND_LANDING.md`. Original B-1 and red CI remain unchanged; M1 was not reopened. No local heavy slot was claimed. Current owner EXECUTE authorizes ordinary accepted non-production landing but does not authorize approximation of missing backend candidate bytes, production promotion, protection bypass or reserved product/security decisions.
 
 ## Historical handoff below, unchanged
 

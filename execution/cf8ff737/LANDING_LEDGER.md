@@ -85,3 +85,11 @@ The landing census found that GitHub's rebase-merge rewrites the committer to `G
 | 22:4xZ | backend `integration/importer` 3f043405 → 93389265 | S8-B 8a0075de | PR #538, CI green incl. migration dry-run | ce3748cb/S8_B_LOCAL_ACCEPTANCE.md |
 
 Correction (C): the four ce3748cb rows above timed "~22:10Z / ~22:40Z / ~22:45Z / ~00:20Z" were parent estimates, not observed times; the actual order is correct and all occurred before 22:05Z on 2026-09-24. GitHub push/PR timestamps are authoritative. Original rows kept unchanged.
+
+## EXEC-64E33DC7 landings
+
+| UTC | Ref | Candidate | Method | Evidence |
+|---|---|---|---|---|
+| 2026-09-25 01:03Z | mobile `main` `67b646f43d1bdb8bb0d1c59b7fdafc9584302c14` → `affc28184bb18b29d2011d25325ecba50587f9d1` | Two-file T1 correction of pre-existing mobile CI test defects; product bytes unchanged | Ordinary fast-forward, no force; fresh remote identity verified; Bradley author and committer preserved | `64e33dc7/mobile-ci/CI_AND_LANDING.md`; [PR #295](https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/295), [CI 36080005511](https://github.com/BradleyGleavePortfolio/growth-project-mobile/actions/runs/36080005511) green: 325 suites / 4180 tests / 5 snapshots; independent delta review GO |
+
+No backend, extension main, production, store or real-account action was taken in this execution. S7-L/S8-C exact source and predecessor runtime release remain recovery prerequisites, not reasons to repeat accepted work.
