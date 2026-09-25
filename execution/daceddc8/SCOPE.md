@@ -224,3 +224,19 @@ The canonical slot passes to S8-C BC-3 diagnostics.
 - **Commit:** one hooked commit, child of `4d7d4b4e`.
 - **Diagnostic b3:** on a FRESH scratch lane `scratch/s8c-diag2` (new initdb plus the unchanged bootstrap). It must show 13 of 13.
 - **Then:** checkpoint v7, binding v5 and run-prep v5 from that head.
+
+## E2-1 phase 2 grant (17:40Z)
+
+E2 is SOURCE_READY: tree `1c784e6c…`, diff `2f80dae0…`, class C only (`daceddc8/e2/SOURCE_READY.md`).
+
+`e2_status_reads_server` may:
+- self-acquire the canonical slot with `flock -n` on inode 674373, only when it is free. It polls at 60 s or more, never steals, and releases right after its gates and commit.
+- run `npm ci`, `npm test` and `npm run gates` with the repo-pinned prettier 3.9.6;
+- make one genuine hooked commit as Bradley on `land/e2-status-server`, based on `land/s4-r6` (`8901d5f5`);
+- push that branch, with no force;
+- open a DRAFT PR, using the base that runs the required CI on the exact head;
+- record the CI results.
+
+It may not mark the PR ready or merge it. Extension `main` needs the owner-reserved non-author approval, as for PR #27. It may not touch protection or settings.
+
+After CI is green: one independent T3 review on the exact head.

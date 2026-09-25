@@ -1,0 +1,2070 @@
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 2e6935f..2d30597 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -161,5 +161,48 @@
+   "prestart_unknown": {
+     "message": "The import could not start. No records were read or sent. Try again, and contact TGP support if this continues.",
+     "description": "No-run error: generic fallback for any lastError not in the approved catalog. Never shows raw worker text."
++  },
++  "server_status_heading": {
++    "message": "TGP server record",
++    "description": "Heading for what the TGP server itself has recorded for this run, kept separate from this browser's local receipts."
++  },
++  "server_status_note": {
++    "message": "What TGP itself has recorded for this transfer, shown separately from this browser's receipts above."
++  },
++  "server_status_not_yet_known": {
++    "message": "Not yet known. TGP has no record of this transfer to show yet. This does not mean nothing was sent.",
++    "description": "The status read answered 404, which the backend uses uniformly for no evidence yet, a foreign run or a dark route. Never shown as 0."
++  },
++  "server_status_unavailable": {
++    "message": "Could not check TGP. The receipts above are unchanged.",
++    "description": "Any network, auth, rate-limit or shape fault on the status read. No server state is guessed."
++  },
++  "server_status_open": {
++    "message": "No final state recorded on TGP yet.",
++    "description": "Server status is running. No percent, phase or ETA is shown."
++  },
++  "server_status_final": {
++    "message": "Final state (TGP server): $STATE$",
++    "description": "The server's settled terminal is the final state of this run.",
++    "placeholders": { "state": { "content": "$1", "example": "partial; some records may be missing" } }
++  },
++  "server_state_success": {
++    "message": "transfer settled; records staged, migration not verified",
++    "description": "Legacy server terminal success is a transport settlement, not a verified native migration."
++  },
++  "server_state_partial": { "message": "partial; some records may be missing" },
++  "server_state_failed": { "message": "failed" },
++  "server_state_complete": { "message": "complete" },
++  "server_state_blocked": { "message": "blocked" },
++  "server_state_cancelled": { "message": "cancelled" },
++  "server_state_timed_out": { "message": "timed out" },
++  "server_family_committed": {
++    "message": "$COUNT$ committed on TGP",
++    "description": "Server-committed count for one family. Never summed across families.",
++    "placeholders": { "count": { "content": "$1", "example": "12" } }
++  },
++  "server_family_unknown": {
++    "message": "Committed on TGP: not yet known",
++    "description": "A family this browser has receipts for that the server response does not list. Never shown as 0."
+   }
+ }
+diff --git a/background.js b/background.js
+index f1ecb5c..f2ba141 100644
+--- a/background.js
++++ b/background.js
+@@ -51,6 +51,12 @@ import {
+   readHeader,
+ } from "./shared/net.js";
+ import { createProgressReporter } from "./shared/progress.js";
++import {
++  IMPORT_STATUS_PATH,
++  isSendableIntentId,
++  readImportStatusReply,
++  unavailableServerStatus,
++} from "./shared/import-status.js";
+ import { logNetworkEvent } from "./shared/log.js";
+ import {
+   attachDebugger,
+@@ -98,6 +104,9 @@ function isRequestStatus(m) {
+ function isRequestSessionState(m) {
+   return isRecord(m) && m.kind === "request_session_state";
+ }
++function isRequestServerStatus(m) {
++  return isRecord(m) && m.kind === "request_server_status";
++}
+ function isStartCapture(m) {
+   return isRecord(m) && m.kind === "start_capture";
+ }
+@@ -465,6 +474,50 @@ async function postProgress(body, generation) {
+   }
+ }
+ 
++// ---- server status read (Check status) --------------------------------------
++
++// Read-only: GET /api/scout/import/status for the worker's OWN recorded run id
++// (never a caller-supplied id), with the current session's bearer. Mirrors
++// completeIngest's auth handling: one refresh on 401, bound to the session
++// generation captured here; never clears tokens, never broadcasts
++// auth_required, never touches the snapshot, Start or run control. Any fault
++// is "unavailable"; a 404 is "not yet known" (see shared/import-status.js).
++async function handleRequestServerStatus() {
++  const generation = getSessionGeneration();
++  try {
++    if (!importInFlight) await rehydrateSnapshot();
++    const intentId = readString(
++      Reflect.get(currentSnapshot, "intent"),
++      "intentId",
++    );
++    if (!isSendableIntentId(intentId)) {
++      return { kind: "server_status", state: "no_run" };
++    }
++    const url = `${TGP_API_ORIGIN}${IMPORT_STATUS_PATH}?intent_id=${encodeURIComponent(intentId)}`;
++    const attempt = (token) =>
++      fetchWithTimeout(
++        fetch,
++        url,
++        { method: "GET", headers: { Authorization: `Bearer ${token}` } },
++        undefined,
++        (response, signal) => readImportStatusReply(response, intentId, signal),
++      );
++    let res = await attempt(await ownedAccessToken(generation));
++    if (res.http === 401) {
++      const refreshed = await refreshAccessToken(generation);
++      if (refreshed === null || getSessionGeneration() !== generation) {
++        return { kind: "server_status", ...unavailableServerStatus() };
++      }
++      res = await attempt(refreshed);
++    }
++    return { kind: "server_status", ...res.reply };
++  } catch {
++    // No session, replaced session, timeout or transport fault: nothing is
++    // known from the server, and no worker detail reaches the popup.
++    return { kind: "server_status", ...unavailableServerStatus() };
++  }
++}
++
+ // ---- install / wake ---------------------------------------------------------
+ 
+ chrome.runtime.onInstalled.addListener(() => {
+@@ -1055,6 +1108,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+     );
+     return true; // async response
+   }
++  if (isRequestServerStatus(message)) {
++    // Spends the TGP bearer, so only this extension's own pages may ask.
++    if (!isTrustedExtensionPage(sender)) {
++      sendResponse({ ok: false, error: "untrusted_sender" });
++      return false;
++    }
++    void handleRequestServerStatus().then(sendResponse);
++    return true; // async response
++  }
+   if (isRequestSessionState(message)) {
+     // Non-secret routing/observability signal for the popup: a boolean only,
+     // never any token material.
+diff --git a/docs/TRANSFER_OUTCOME_BOUNDARY.md b/docs/TRANSFER_OUTCOME_BOUNDARY.md
+index 5a0977c..18cc800 100644
+--- a/docs/TRANSFER_OUTCOME_BOUNDARY.md
++++ b/docs/TRANSFER_OUTCOME_BOUNDARY.md
+@@ -14,7 +14,7 @@ The sender adds only `pendingTransfer: { entityType, count }` to the existing lo
+ 
+ ## Coach controls
+ 
+-The result appears before technical intent/platform details. Check status is read-only and inspects the same recorded run; it does not poll or reconcile the backend. Copy summary includes approved category names, counts and bounded guidance, never raw errors or identity data. Copy failure remains visible.
++The result appears before technical intent/platform details. Check status is read-only and inspects the same recorded run. On each click it also makes one `GET /api/scout/import/status` read for that run's own id, using the existing paired session (consumer-frozen at backend `integration/importer` `df713fd9`, contract `2.0.0-c1-s2.0`; fixture `test/fixtures/import-status/`). The server's record appears in a separate "TGP server record" region: its settled terminal is labelled as the final state, and its committed count is shown per family and never summed. A 404, or a family the server does not list, reads "not yet known", never 0. Any other fault reads "Could not check TGP". There is no percent, phase or ETA. The read does not poll, reconcile, retry, resume or change Start, its lock or the local receipts. Copy summary includes approved category names, counts and bounded guidance, never raw errors or identity data. Copy failure remains visible.
+ 
+ A recorded run disables the popup's Start button so a casual retry cannot replace its result with a new timestamp intent. This is a presentation safeguard, not server fencing. The existing worker entrypoints and backend authority remain unchanged. A supported new-run/resume action depends on the owned server lifecycle contract, not clearing this guard.
+ 
+diff --git a/popup/outcome.js b/popup/outcome.js
+index 5e9edfc..e86ce0e 100644
+--- a/popup/outcome.js
++++ b/popup/outcome.js
+@@ -145,3 +145,104 @@ export function preStartIssue(lastError, message) {
+               : "prestart_unknown";
+   return message(key);
+ }
++
++// Pure projection of the worker's server-status reply (GET
++// /api/scout/import/status, see shared/import-status.js) for the separate
++// "TGP server record" region. Returns null when nothing may be shown: no local
++// run, no run on the worker, or a reply for a different run than the one on
++// screen. Unknown is "not yet known", never 0; family counts are never summed;
++// no percent, phase or ETA; the server terminal is the final state and the
++// extension's own claim is never shown as the result.
++const SERVER_TERMINALS = [
++  "success",
++  "partial",
++  "failed",
++  "complete",
++  "blocked",
++  "cancelled",
++  "timed_out",
++];
++const SERVER_FAMILIES = ["clients", "notes", "exercises", "workouts", "plans"];
++function serverFamilyLabel(family, message) {
++  return message(
++    SERVER_FAMILIES.includes(family)
++      ? `outcome_family_${family}`
++      : "outcome_family_records",
++  );
++}
++function isServerCounts(counts) {
++  return (
++    Array.isArray(counts) &&
++    counts.every(
++      (row) =>
++        row &&
++        typeof row.entityType === "string" &&
++        row.entityType.length > 0 &&
++        count(row.committed),
++    )
++  );
++}
++export function serverStatusView(reply, snapshot, message) {
++  const intentId = snapshot?.intent?.intentId;
++  if (typeof intentId !== "string" || !reply || typeof reply !== "object")
++    return null;
++  const base = {
++    heading: message("server_status_heading"),
++    note: message("server_status_note"),
++    intentId,
++  };
++  const unavailable = {
++    ...base,
++    state: message("server_status_unavailable"),
++    lines: [],
++  };
++  if (reply.kind !== "server_status") return unavailable;
++  if (reply.state === "no_run") return null;
++  if (reply.state === "unavailable") return unavailable;
++  if (reply.state !== "not_yet_known" && reply.state !== "known")
++    return unavailable;
++  // Stale or foreign reply: never attach another run's server record.
++  if (reply.intentId !== intentId) return null;
++  if (reply.state === "not_yet_known")
++    return {
++      ...base,
++      state: message("server_status_not_yet_known"),
++      lines: [],
++    };
++  const terminal = SERVER_TERMINALS.includes(reply.status);
++  if (
++    (!terminal && reply.status !== "running") ||
++    !isServerCounts(reply.counts)
++  )
++    return unavailable;
++  const lines = reply.counts.map((row) => ({
++    label: serverFamilyLabel(row.entityType, message),
++    text: message("server_family_committed", [String(row.committed)]),
++  }));
++  // Families this browser has receipts for but the server does not list: the
++  // server stated no count for them, so they are not yet known (never 0).
++  const listed = new Set(reply.counts.map((row) => row.entityType));
++  const local = new Set(
++    snapshot.staging && typeof snapshot.staging === "object"
++      ? Object.keys(snapshot.staging)
++      : [],
++  );
++  if (typeof snapshot.pendingTransfer?.entityType === "string")
++    local.add(snapshot.pendingTransfer.entityType);
++  for (const family of local) {
++    if (listed.has(family)) continue;
++    lines.push({
++      label: serverFamilyLabel(family, message),
++      text: message("server_family_unknown"),
++    });
++  }
++  return {
++    ...base,
++    state: terminal
++      ? message("server_status_final", [
++          message(`server_state_${reply.status}`),
++        ])
++      : message("server_status_open"),
++    lines,
++  };
++}
+diff --git a/popup/popup.html b/popup/popup.html
+index db2bbea..13fe579 100644
+--- a/popup/popup.html
++++ b/popup/popup.html
+@@ -237,6 +237,18 @@
+       <p id="outcome-coverage"></p>
+       <p id="outcome-native"></p>
+       <p id="outcome-guidance"></p>
++      <section
++        id="server-status"
++        aria-labelledby="server-status-heading"
++        hidden
++      >
++        <h3 id="server-status-heading" data-i18n="server_status_heading">
++          TGP server record
++        </h3>
++        <p id="server-status-note" data-i18n="server_status_note"></p>
++        <p id="server-status-state" role="status" aria-live="polite"></p>
++        <div id="server-status-families"></div>
++      </section>
+       <details>
+         <summary data-i18n="outcome_details">Transfer details</summary>
+         <div class="row">
+diff --git a/popup/popup.js b/popup/popup.js
+index 976f4df..fd2608e 100644
+--- a/popup/popup.js
++++ b/popup/popup.js
+@@ -1,10 +1,11 @@
+ // TGP Importer — popup status UI.
+ // Requests a snapshot from the background worker and renders intent +
+ // per-entity progress + the last error. Re-renders on every broadcast.
+-import { outcomeView, preStartIssue } from "./outcome.js";
++import { outcomeView, preStartIssue, serverStatusView } from "./outcome.js";
+ 
+ let latestSnapshot = null;
+ let snapshotVersion = 0;
++let serverCheckVersion = 0;
+ function el(id) {
+   const node = document.getElementById(id);
+   if (!node) {
+@@ -112,6 +113,11 @@ function render(snapshot) {
+       list.appendChild(row);
+     }
+   }
++  // A server record belongs to exactly one run: drop it when the run on screen
++  // changes, so another run's server counts are never shown under this one.
++  const server = document.getElementById("server-status");
++  if (server && server.dataset.intentId !== snapshot.intent?.intentId)
++    paintServerStatus(document, null);
+   if (snapshot.lastError && !snapshot.intent) {
+     errorBox.hidden = false;
+     // Approved fact+remedy copy only; the raw worker-internal lastError (which
+@@ -180,9 +186,49 @@ export function wireStartImport(
+   });
+ }
+ 
++// Paint the separate "TGP server record" region, or hide and clear it (null).
++// Display only: never touches Start, its lock, the snapshot or the receipts.
++export function paintServerStatus(doc, view) {
++  const region = doc.getElementById("server-status");
++  if (!region) return;
++  const state = doc.getElementById("server-status-state");
++  const families = doc.getElementById("server-status-families");
++  region.hidden = view === null;
++  region.dataset.intentId = view === null ? "" : view.intentId;
++  if (state) state.textContent = view === null ? "" : view.state;
++  if (!families) return;
++  families.textContent = "";
++  for (const line of view === null ? [] : view.lines) {
++    const row = doc.createElement("div");
++    row.className = "row";
++    const label = doc.createElement("span");
++    label.className = "label";
++    label.textContent = line.label;
++    const value = doc.createElement("span");
++    value.textContent = line.text;
++    row.appendChild(label);
++    row.appendChild(value);
++    families.appendChild(row);
++  }
++}
++
++// Check status, second half: ask the worker to read the server for its own
++// run. Runs after the local refresh; a newer check supersedes an older reply.
++async function checkServerStatus(runtime, doc, message) {
++  const version = ++serverCheckVersion;
++  let reply;
++  try {
++    reply = await runtime.sendMessage({ kind: "request_server_status" });
++  } catch {
++    reply = { kind: "server_status", state: "unavailable" };
++  }
++  if (version !== serverCheckVersion) return;
++  paintServerStatus(doc, serverStatusView(reply, latestSnapshot, message));
++}
++
+ export function wireOutcomeActions(runtime, doc, clipboard, message, receive) {
+   const feedback = doc.getElementById("action-feedback");
+-  doc.getElementById("check-status").addEventListener("click", async () => {
++  async function checkLocalStatus() {
+     const version = snapshotVersion;
+     try {
+       const snapshot = await runtime.sendMessage({ kind: "request_status" });
+@@ -194,6 +240,10 @@ export function wireOutcomeActions(runtime, doc, clipboard, message, receive) {
+       if (version !== snapshotVersion) return;
+       feedback.textContent = message("outcome_check_failed");
+     }
++  }
++  doc.getElementById("check-status").addEventListener("click", async () => {
++    await checkLocalStatus();
++    await checkServerStatus(runtime, doc, message);
+   });
+   doc.getElementById("copy-summary").addEventListener("click", async () => {
+     try {
+diff --git a/shared/import-status.js b/shared/import-status.js
+new file mode 100644
+index 0000000..599e263
+--- /dev/null
++++ b/shared/import-status.js
+@@ -0,0 +1,107 @@
++// TGP Importer — read-only consumer of GET /api/scout/import/status.
++//
++// Shape frozen from the landed backend contract (growth-project-backend
++// integration/importer df713fd9, docs/contracts/importer-openapi.json
++// 2.0.0-c1-s2.0); the test fixture carries the verbatim schemas. Only the
++// fields this consumer displays are validated, strictly; every other field is
++// ignored so an additive contract change cannot break the read.
++//
++// Truth rules: a 404 is the backend's uniform "no evidence / dark route" answer
++// and means NOT YET KNOWN (never 0, never failed). Committed counts are kept per
++// family and never summed. The server's terminal is the final state; the
++// extension's own `claimed_status` is never read as the result.
++import { discardBody, readBoundedJson } from "./net.js";
++
++export const IMPORT_STATUS_PATH = "/api/scout/import/status";
++
++// A status body is a few hundred bytes per family; far above any real reply.
++export const MAX_STATUS_BODY_BYTES = 65536;
++const MAX_FAMILIES = 32;
++const MAX_FAMILY_NAME = 64;
++
++export const SERVER_STATUSES = [
++  "running",
++  "success",
++  "partial",
++  "failed",
++  "complete",
++  "blocked",
++  "cancelled",
++  "timed_out",
++];
++const MODES = ["legacy", "server"];
++
++// The contract bounds intent_id to 1..128; anything else is never sent.
++export function isSendableIntentId(value) {
++  return typeof value === "string" && value.length >= 1 && value.length <= 128;
++}
++
++function isRecord(value) {
++  return typeof value === "object" && value !== null && !Array.isArray(value);
++}
++
++// Validate a 200 body against the consumed subset. Returns the normalized
++// reply or null (caller reports "could not check" — never a guessed state).
++export function parseImportStatus(body, intentId) {
++  if (!isRecord(body) || body.intent_id !== intentId) return null;
++  if (!SERVER_STATUSES.includes(body.status)) return null;
++  if (!MODES.includes(body.mode)) return null;
++  if (body.completed_at !== null && typeof body.completed_at !== "string")
++    return null;
++  if (
++    !Array.isArray(body.entity_counts) ||
++    body.entity_counts.length > MAX_FAMILIES
++  )
++    return null;
++  const seen = new Set();
++  const counts = [];
++  for (const row of body.entity_counts) {
++    if (
++      !isRecord(row) ||
++      typeof row.entity_type !== "string" ||
++      row.entity_type.length === 0 ||
++      row.entity_type.length > MAX_FAMILY_NAME ||
++      seen.has(row.entity_type) ||
++      !Number.isSafeInteger(row.committed) ||
++      row.committed < 0
++    )
++      return null;
++    seen.add(row.entity_type);
++    counts.push({ entityType: row.entity_type, committed: row.committed });
++  }
++  return {
++    state: "known",
++    intentId,
++    status: body.status,
++    mode: body.mode,
++    settled: body.status !== "running",
++    counts,
++  };
++}
++
++// fetchWithTimeout consumer: classify one HTTP reply inside the request
++// deadline. `http` lets the caller decide on a single bound refresh for 401.
++export async function readImportStatusReply(response, intentId, signal) {
++  const http =
++    response && typeof response.status === "number" ? response.status : 0;
++  if (http === 200) {
++    let body;
++    try {
++      body = await readBoundedJson(response, signal, MAX_STATUS_BODY_BYTES);
++    } catch {
++      return { http, reply: unavailableServerStatus() };
++    }
++    const parsed = parseImportStatus(body, intentId);
++    return { http, reply: parsed ?? unavailableServerStatus() };
++  }
++  // Error bodies are never read or shown; only the status class matters.
++  discardBody(response);
++  if (http === 404) {
++    return { http, reply: { state: "not_yet_known", intentId } };
++  }
++  return { http, reply: unavailableServerStatus() };
++}
++
++export function unavailableServerStatus() {
++  return { state: "unavailable" };
++}
+diff --git a/test/fixtures/import-status/import-status.fixture.json b/test/fixtures/import-status/import-status.fixture.json
+new file mode 100644
+index 0000000..1e462a5
+--- /dev/null
++++ b/test/fixtures/import-status/import-status.fixture.json
+@@ -0,0 +1,702 @@
++{
++  "$comment": "Consumer-freeze fixture for GET /api/scout/import/status, derived from the landed backend contract. Schemas are verbatim copies; response bodies are synthetic examples that satisfy them. No real coach, intent or record data.",
++  "contract": {
++    "repo": "BradleyGleavePortfolio/growth-project-backend",
++    "ref": "integration/importer",
++    "commit": "df713fd9217df524915348ef8a42c797f288dde1",
++    "path": "docs/contracts/importer-openapi.json",
++    "blob": "3c1fd2ac528ef19bb565f4b6f073a2155e8bab3f",
++    "sha256": "fc42af0a8ec8f162dbc8e79dc05eeb09663d735b031314c316d98e834ed8d60e",
++    "info_version": "2.0.0-c1-s2.0"
++  },
++  "request": {
++    "method": "GET",
++    "path": "/api/scout/import/status",
++    "query": {
++      "intent_id": {
++        "in": "query",
++        "required": true,
++        "schema": {
++          "maxLength": 128,
++          "minLength": 1,
++          "type": "string"
++        }
++      }
++    },
++    "security": [
++      {
++        "bearer": []
++      }
++    ],
++    "operationId": "ScoutController_getImportStatus"
++  },
++  "response_refs": {
++    "200": "ScoutImportStatusResult",
++    "400": "ErrorEnvelope",
++    "401": "ErrorEnvelope",
++    "403": "ErrorEnvelope",
++    "404": "ErrorEnvelope",
++    "429": "RateLimitError"
++  },
++  "schemas": {
++    "ScoutImportStatusResult": {
++      "properties": {
++        "accepted_start_at": {
++          "description": "Server-owned start of a server run (written once at Start); null on legacy rows.",
++          "format": "date-time",
++          "nullable": true,
++          "type": "string"
++        },
++        "claimed_status": {
++          "description": "The extension's stored /complete claim (`success|partial|failed`); null while none. On a server run this is INPUT to the arbiter, never the terminal itself.",
++          "enum": [
++            "success",
++            "partial",
++            "failed"
++          ],
++          "nullable": true,
++          "type": "string"
++        },
++        "completed_at": {
++          "description": "Settled at (ISO-8601); null while running.",
++          "format": "date-time",
++          "nullable": true,
++          "type": "string"
++        },
++        "deadline_at": {
++          "description": "accepted_start_at + SCOUT_RUN_DEADLINE_MS; enforced lazily. Null on legacy rows.",
++          "format": "date-time",
++          "nullable": true,
++          "type": "string"
++        },
++        "entity_counts": {
++          "description": "Committed counts per entity.",
++          "items": {
++            "$ref": "#/components/schemas/ScoutImportEntityCountDto"
++          },
++          "type": "array"
++        },
++        "execution_epoch": {
++          "description": "Fence epoch of the run (1 until fenced).",
++          "minimum": 1,
++          "type": "number"
++        },
++        "families": {
++          "description": "Per-family evidence: staged unique rows and the reconstruction ledger tally. Native buckets are null (= not yet known, never 0) until later slices fill them.",
++          "items": {
++            "$ref": "#/components/schemas/ScoutImportFamilyDto"
++          },
++          "type": "array"
++        },
++        "intent_id": {
++          "description": "The intent id that was read.",
++          "type": "string"
++        },
++        "last_observed_at": {
++          "description": "Last write accepted through the run gate; null on legacy rows.",
++          "format": "date-time",
++          "nullable": true,
++          "type": "string"
++        },
++        "mode": {
++          "description": "`server` for a run started via POST /scout/runs/start; `legacy` otherwise.",
++          "enum": [
++            "legacy",
++            "server"
++          ],
++          "type": "string"
++        },
++        "phase": {
++          "description": "Open-run phase of a server run; null on legacy rows and once terminal.",
++          "enum": [
++            "discovering",
++            "transferring",
++            "reconciling"
++          ],
++          "nullable": true,
++          "type": "string"
++        },
++        "reason_code": {
++          "description": "Why the server run reached its terminal; null while open and on legacy rows.",
++          "enum": [
++            "reconciliation_not_performed",
++            "cancelled_by_coach",
++            "deadline_exceeded",
++            "transfer_failed",
++            "unresolved_family",
++            "revoked"
++          ],
++          "nullable": true,
++          "type": "string"
++        },
++        "started_at": {
++          "description": "Earliest evidence timestamp (ISO-8601): first committed entity, else lifecycle start, else latest progress snapshot. Null when none timestamped. For a settled run with zero committed entities and no snapshot this degenerates to the settle-time lifecycle start, so it may equal completed_at.",
++          "format": "date-time",
++          "nullable": true,
++          "type": "string"
++        },
++        "status": {
++          "description": "Proven lifecycle state.",
++          "enum": [
++            "running",
++            "success",
++            "partial",
++            "failed",
++            "complete",
++            "blocked",
++            "cancelled",
++            "timed_out"
++          ],
++          "type": "string"
++        }
++      },
++      "required": [
++        "intent_id",
++        "status",
++        "entity_counts",
++        "started_at",
++        "completed_at",
++        "mode",
++        "phase",
++        "accepted_start_at",
++        "deadline_at",
++        "last_observed_at",
++        "execution_epoch",
++        "claimed_status",
++        "reason_code",
++        "families"
++      ],
++      "type": "object"
++    },
++    "ScoutImportEntityCountDto": {
++      "properties": {
++        "committed": {
++          "description": "Entities actually committed (proof, not an estimate).",
++          "minimum": 0,
++          "type": "number"
++        },
++        "entity_type": {
++          "description": "Entity family.",
++          "example": "clients",
++          "type": "string"
++        }
++      },
++      "required": [
++        "entity_type",
++        "committed"
++      ],
++      "type": "object"
++    },
++    "ScoutImportFamilyDto": {
++      "properties": {
++        "already_present_verified": {
++          "description": "Verified already present (S9); null until known.",
++          "nullable": true,
++          "type": "number"
++        },
++        "created_native": {
++          "description": "Native rows created (S9); null until known.",
++          "nullable": true,
++          "type": "number"
++        },
++        "family": {
++          "description": "Entity family.",
++          "example": "clients",
++          "type": "string"
++        },
++        "ledger": {
++          "allOf": [
++            {
++              "$ref": "#/components/schemas/ScoutImportFamilyLedgerDto"
++            }
++          ],
++          "description": "Reconstruction ledger tally."
++        },
++        "observed_unique": {
++          "description": "Observed by the extension (S10); null until known.",
++          "nullable": true,
++          "type": "number"
++        },
++        "rejected": {
++          "description": "Rejected by reconciliation (S9); null until known.",
++          "nullable": true,
++          "type": "number"
++        },
++        "staged_unique": {
++          "description": "Distinct staged source identities for the family.",
++          "minimum": 0,
++          "type": "number"
++        },
++        "unresolved": {
++          "description": "Unresolved by reconciliation (S9); null until known.",
++          "nullable": true,
++          "type": "number"
++        }
++      },
++      "required": [
++        "family",
++        "observed_unique",
++        "staged_unique",
++        "created_native",
++        "already_present_verified",
++        "rejected",
++        "unresolved",
++        "ledger"
++      ],
++      "type": "object"
++    },
++    "ScoutImportFamilyLedgerDto": {
++      "properties": {
++        "failed": {
++          "minimum": 0,
++          "type": "number"
++        },
++        "reconstructed": {
++          "minimum": 0,
++          "type": "number"
++        },
++        "skipped": {
++          "minimum": 0,
++          "type": "number"
++        }
++      },
++      "required": [
++        "reconstructed",
++        "skipped",
++        "failed"
++      ],
++      "type": "object"
++    },
++    "ErrorEnvelope": {
++      "properties": {
++        "code": {
++          "description": "Machine-readable failure discriminant, present only when the handler set one (e.g. `extension_refresh_invalid`, `invalid`). Absent for generic validation/guard errors.",
++          "example": "invalid",
++          "type": "string"
++        },
++        "error": {
++          "description": "Short error class name (Nest default), e.g. `Bad Request`, `Unauthorized`.",
++          "example": "Bad Request",
++          "type": "string"
++        },
++        "message": {
++          "description": "Human-readable message. A single string for most errors; an array of strings when the global ValidationPipe reports one entry per failed constraint.",
++          "example": "Invalid pairing code.",
++          "oneOf": [
++            {
++              "type": "string"
++            },
++            {
++              "items": {
++                "type": "string"
++              },
++              "type": "array"
++            }
++          ]
++        },
++        "path": {
++          "description": "Request path the error occurred on.",
++          "example": "/api/scout/ingest",
++          "type": "string"
++        },
++        "request_id": {
++          "description": "Correlation id from RequestIdMiddleware; omitted when absent.",
++          "example": "5f2c9b1e-6d3a-4c8b-9f0e-1a2b3c4d5e6f",
++          "type": "string"
++        },
++        "statusCode": {
++          "description": "HTTP status code, echoed in the body.",
++          "example": 400,
++          "type": "number"
++        },
++        "timestamp": {
++          "description": "ISO-8601 instant the error envelope was built.",
++          "example": "2026-07-13T18:30:00.000Z",
++          "format": "date-time",
++          "type": "string"
++        }
++      },
++      "required": [
++        "statusCode",
++        "message",
++        "error",
++        "timestamp",
++        "path"
++      ],
++      "type": "object"
++    },
++    "RateLimitError": {
++      "properties": {
++        "error": {
++          "description": "Always `Too Many Requests`.",
++          "example": "Too Many Requests",
++          "type": "string"
++        },
++        "message": {
++          "description": "Generic backoff message (never echoes input or which limit fired).",
++          "example": "Too many attempts. Please wait before trying again.",
++          "type": "string"
++        },
++        "retryAfter": {
++          "description": "Seconds to wait before retrying; matches the `Retry-After` header.",
++          "example": 3600,
++          "type": "number"
++        },
++        "statusCode": {
++          "description": "Always 429.",
++          "example": 429,
++          "type": "number"
++        }
++      },
++      "required": [
++        "statusCode",
++        "error",
++        "message",
++        "retryAfter"
++      ],
++      "type": "object"
++    }
++  },
++  "responses": {
++    "legacy_running": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "running",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 12
++          },
++          {
++            "entity_type": "notes",
++            "committed": 3
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": null,
++        "mode": "legacy",
++        "phase": null,
++        "accepted_start_at": null,
++        "deadline_at": null,
++        "last_observed_at": null,
++        "execution_epoch": 1,
++        "claimed_status": null,
++        "reason_code": null,
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 12,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          },
++          {
++            "family": "notes",
++            "observed_unique": null,
++            "staged_unique": 3,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "legacy_success": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "success",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 12
++          },
++          {
++            "entity_type": "notes",
++            "committed": 3
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": "2026-09-25T16:05:00.000Z",
++        "mode": "legacy",
++        "phase": null,
++        "accepted_start_at": null,
++        "deadline_at": null,
++        "last_observed_at": null,
++        "execution_epoch": 1,
++        "claimed_status": "success",
++        "reason_code": null,
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 12,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          },
++          {
++            "family": "notes",
++            "observed_unique": null,
++            "staged_unique": 3,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "legacy_partial": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "partial",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 7
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": "2026-09-25T16:05:00.000Z",
++        "mode": "legacy",
++        "phase": null,
++        "accepted_start_at": null,
++        "deadline_at": null,
++        "last_observed_at": null,
++        "execution_epoch": 1,
++        "claimed_status": "partial",
++        "reason_code": null,
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 7,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "legacy_failed_zero_committed": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "failed",
++        "entity_counts": [],
++        "started_at": "2026-09-25T16:05:00.000Z",
++        "completed_at": "2026-09-25T16:05:00.000Z",
++        "mode": "legacy",
++        "phase": null,
++        "accepted_start_at": null,
++        "deadline_at": null,
++        "last_observed_at": null,
++        "execution_epoch": 1,
++        "claimed_status": "failed",
++        "reason_code": null,
++        "families": []
++      }
++    },
++    "server_open": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "running",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 4
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": null,
++        "mode": "server",
++        "phase": "transferring",
++        "accepted_start_at": "2026-09-25T16:00:00.000Z",
++        "deadline_at": "2026-09-25T17:00:00.000Z",
++        "last_observed_at": "2026-09-25T16:02:00.000Z",
++        "execution_epoch": 1,
++        "claimed_status": null,
++        "reason_code": null,
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 4,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "server_timed_out": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "timed_out",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 4
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": "2026-09-25T16:05:00.000Z",
++        "mode": "server",
++        "phase": null,
++        "accepted_start_at": "2026-09-25T16:00:00.000Z",
++        "deadline_at": "2026-09-25T17:00:00.000Z",
++        "last_observed_at": "2026-09-25T16:02:00.000Z",
++        "execution_epoch": 2,
++        "claimed_status": null,
++        "reason_code": "deadline_exceeded",
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 4,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 0,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "server_complete": {
++      "http_status": 200,
++      "body": {
++        "intent_id": "imp-1790000000000",
++        "status": "complete",
++        "entity_counts": [
++          {
++            "entity_type": "clients",
++            "committed": 4
++          }
++        ],
++        "started_at": "2026-09-25T16:00:00.000Z",
++        "completed_at": "2026-09-25T16:05:00.000Z",
++        "mode": "server",
++        "phase": null,
++        "accepted_start_at": "2026-09-25T16:00:00.000Z",
++        "deadline_at": "2026-09-25T17:00:00.000Z",
++        "last_observed_at": "2026-09-25T16:02:00.000Z",
++        "execution_epoch": 1,
++        "claimed_status": "success",
++        "reason_code": null,
++        "families": [
++          {
++            "family": "clients",
++            "observed_unique": null,
++            "staged_unique": 4,
++            "created_native": null,
++            "already_present_verified": null,
++            "rejected": null,
++            "unresolved": null,
++            "ledger": {
++              "reconstructed": 4,
++              "skipped": 0,
++              "failed": 0
++            }
++          }
++        ]
++      }
++    },
++    "not_found": {
++      "http_status": 404,
++      "body": {
++        "statusCode": 404,
++        "message": "Not Found",
++        "error": "Not Found",
++        "timestamp": "2026-09-25T16:05:00.000Z",
++        "path": "/api/scout/import/status"
++      }
++    },
++    "bad_request": {
++      "http_status": 400,
++      "body": {
++        "statusCode": 400,
++        "message": [
++          "intent_id must be shorter than or equal to 128 characters"
++        ],
++        "error": "Bad Request",
++        "timestamp": "2026-09-25T16:05:00.000Z",
++        "path": "/api/scout/import/status"
++      }
++    },
++    "unauthorized": {
++      "http_status": 401,
++      "body": {
++        "statusCode": 401,
++        "message": "Unauthorized",
++        "error": "Unauthorized",
++        "timestamp": "2026-09-25T16:05:00.000Z",
++        "path": "/api/scout/import/status"
++      }
++    },
++    "forbidden": {
++      "http_status": 403,
++      "body": {
++        "statusCode": 403,
++        "message": "Forbidden resource",
++        "error": "Forbidden",
++        "timestamp": "2026-09-25T16:05:00.000Z",
++        "path": "/api/scout/import/status"
++      }
++    },
++    "rate_limited": {
++      "http_status": 429,
++      "body": {
++        "statusCode": 429,
++        "error": "Too Many Requests",
++        "message": "Too many attempts. Please wait before trying again.",
++        "retryAfter": 60
++      }
++    }
++  }
++}
+diff --git a/test/import-status-contract.spec.js b/test/import-status-contract.spec.js
+new file mode 100644
+index 0000000..fb714b7
+--- /dev/null
++++ b/test/import-status-contract.spec.js
+@@ -0,0 +1,270 @@
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { describe, expect, it } from "vitest";
++import {
++  IMPORT_STATUS_PATH,
++  MAX_STATUS_BODY_BYTES,
++  SERVER_STATUSES,
++  isSendableIntentId,
++  parseImportStatus,
++  readImportStatusReply,
++} from "../shared/import-status.js";
++
++// Consumer freeze of GET /api/scout/import/status. The fixture is derived from
++// the landed backend contract (integration/importer df713fd9,
++// docs/contracts/importer-openapi.json 2.0.0-c1-s2.0): its `schemas` are
++// verbatim copies and its `responses` are synthetic examples. Every example is
++// first proven against the frozen schema, then driven through the consumer.
++const fixture = JSON.parse(
++  readFileSync(
++    join(
++      process.cwd(),
++      "test/fixtures/import-status/import-status.fixture.json",
++    ),
++    "utf8",
++  ),
++);
++const { schemas, responses } = fixture;
++const INTENT = "imp-1790000000000";
++
++// Minimal OpenAPI 3 subset validator (the constructs these six schemas use).
++function violations(schema, value, path = "$") {
++  if (schema.$ref) {
++    return violations(schemas[schema.$ref.split("/").at(-1)], value, path);
++  }
++  if (schema.allOf) {
++    return schema.allOf.flatMap((part) => violations(part, value, path));
++  }
++  if (schema.oneOf) {
++    const matches = schema.oneOf.filter(
++      (part) => violations(part, value, path).length === 0,
++    );
++    return matches.length === 1
++      ? []
++      : [`${path}: oneOf matched ${matches.length}`];
++  }
++  if (value === null) {
++    return schema.nullable === true ? [] : [`${path}: null not allowed`];
++  }
++  const out = [];
++  if (schema.enum && !schema.enum.includes(value)) out.push(`${path}: enum`);
++  switch (schema.type) {
++    case "object": {
++      if (typeof value !== "object" || Array.isArray(value))
++        return [`${path}: not an object`];
++      for (const key of schema.required ?? [])
++        if (!Object.hasOwn(value, key)) out.push(`${path}.${key}: missing`);
++      for (const [key, child] of Object.entries(value)) {
++        const prop = schema.properties?.[key];
++        if (!prop) out.push(`${path}.${key}: undeclared`);
++        else out.push(...violations(prop, child, `${path}.${key}`));
++      }
++      return out;
++    }
++    case "array":
++      if (!Array.isArray(value)) return [`${path}: not an array`];
++      return value.flatMap((item, index) =>
++        violations(schema.items, item, `${path}[${index}]`),
++      );
++    case "string":
++      if (typeof value !== "string") return [`${path}: not a string`];
++      if (schema.format === "date-time" && Number.isNaN(Date.parse(value)))
++        out.push(`${path}: not a date-time`);
++      if (schema.minLength !== undefined && value.length < schema.minLength)
++        out.push(`${path}: too short`);
++      if (schema.maxLength !== undefined && value.length > schema.maxLength)
++        out.push(`${path}: too long`);
++      return out;
++    case "number":
++      if (typeof value !== "number" || !Number.isFinite(value))
++        return [`${path}: not a number`];
++      if (schema.minimum !== undefined && value < schema.minimum)
++        out.push(`${path}: below minimum`);
++      return out;
++    default:
++      return out;
++  }
++}
++
++const successExamples = Object.entries(responses).filter(
++  ([, example]) => example.http_status === 200,
++);
++
++describe("frozen contract identity and request shape", () => {
++  it("pins the landed backend contract the fixture was derived from", () => {
++    expect(fixture.contract).toMatchObject({
++      ref: "integration/importer",
++      commit: "df713fd9217df524915348ef8a42c797f288dde1",
++      path: "docs/contracts/importer-openapi.json",
++      info_version: "2.0.0-c1-s2.0",
++    });
++  });
++
++  it("is a bearer GET with exactly one required, 1..128 intent_id query", () => {
++    expect(fixture.request.method).toBe("GET");
++    expect(fixture.request.path).toBe(IMPORT_STATUS_PATH);
++    expect(fixture.request.security).toEqual([{ bearer: [] }]);
++    expect(fixture.request.query).toEqual({
++      intent_id: {
++        in: "query",
++        required: true,
++        schema: { maxLength: 128, minLength: 1, type: "string" },
++      },
++    });
++    expect(isSendableIntentId("")).toBe(false);
++    expect(isSendableIntentId("x")).toBe(true);
++    expect(isSendableIntentId("x".repeat(128))).toBe(true);
++    expect(isSendableIntentId("x".repeat(129))).toBe(false);
++    expect(isSendableIntentId(null)).toBe(false);
++    expect(isSendableIntentId(INTENT)).toBe(true);
++  });
++
++  it("consumes exactly the frozen status and mode vocabularies", () => {
++    const result = schemas.ScoutImportStatusResult.properties;
++    expect(SERVER_STATUSES).toEqual(result.status.enum);
++    expect(result.mode.enum).toEqual(["legacy", "server"]);
++    expect(result.entity_counts.items.$ref).toBe(
++      "#/components/schemas/ScoutImportEntityCountDto",
++    );
++  });
++
++  it.each(Object.entries(responses))(
++    "fixture example %s satisfies its frozen schema",
++    (_name, example) => {
++      const ref = fixture.response_refs[String(example.http_status)];
++      expect(ref).toBeTypeOf("string");
++      expect(violations(schemas[ref], example.body)).toEqual([]);
++    },
++  );
++});
++
++describe("parseImportStatus over the fixture", () => {
++  it.each(successExamples)("%s -> a known reply", (_name, example) => {
++    const parsed = parseImportStatus(example.body, INTENT);
++    expect(parsed).toEqual({
++      state: "known",
++      intentId: INTENT,
++      status: example.body.status,
++      mode: example.body.mode,
++      settled: example.body.status !== "running",
++      counts: example.body.entity_counts.map((row) => ({
++        entityType: row.entity_type,
++        committed: row.committed,
++      })),
++    });
++    // The extension's own claim is never carried as the result.
++    expect(JSON.stringify(parsed)).not.toContain("claimed");
++  });
++
++  it("tolerates an additive, unconsumed field", () => {
++    const body = { ...responses.legacy_partial.body, future_field: { a: 1 } };
++    expect(parseImportStatus(body, INTENT)?.status).toBe("partial");
++  });
++
++  const base = responses.legacy_partial.body;
++  it.each([
++    ["another run's reply", { ...base, intent_id: "imp-1" }],
++    ["unknown status", { ...base, status: "imported" }],
++    ["unknown mode", { ...base, mode: "hybrid" }],
++    ["non-string completed_at", { ...base, completed_at: 5 }],
++    ["missing entity_counts", { ...base, entity_counts: undefined }],
++    [
++      "negative committed",
++      { ...base, entity_counts: [{ entity_type: "clients", committed: -1 }] },
++    ],
++    [
++      "fractional committed",
++      { ...base, entity_counts: [{ entity_type: "clients", committed: 1.5 }] },
++    ],
++    [
++      "string committed",
++      { ...base, entity_counts: [{ entity_type: "clients", committed: "7" }] },
++    ],
++    [
++      "empty family name",
++      { ...base, entity_counts: [{ entity_type: "", committed: 1 }] },
++    ],
++    [
++      "duplicate family",
++      {
++        ...base,
++        entity_counts: [
++          { entity_type: "clients", committed: 1 },
++          { entity_type: "clients", committed: 2 },
++        ],
++      },
++    ],
++    [
++      "unbounded family list",
++      {
++        ...base,
++        entity_counts: Array.from({ length: 33 }, (_, i) => ({
++          entity_type: `f${i}`,
++          committed: 1,
++        })),
++      },
++    ],
++    ["array body", [base]],
++    ["null body", null],
++  ])("rejects %s", (_name, body) => {
++    expect(parseImportStatus(body, INTENT)).toBeNull();
++  });
++});
++
++describe("readImportStatusReply classifies one HTTP reply", () => {
++  function reply(example) {
++    return new Response(JSON.stringify(example.body), {
++      status: example.http_status,
++      headers: { "content-type": "application/json" },
++    });
++  }
++
++  it.each(successExamples)("200 %s -> known", async (_name, example) => {
++    const { http, reply: out } = await readImportStatusReply(
++      reply(example),
++      INTENT,
++      null,
++    );
++    expect(http).toBe(200);
++    expect(out.state).toBe("known");
++  });
++
++  it("404 (uniform no-evidence / dark route) -> not yet known, never 0", async () => {
++    const { http, reply: out } = await readImportStatusReply(
++      reply(responses.not_found),
++      INTENT,
++      null,
++    );
++    expect(http).toBe(404);
++    expect(out).toEqual({ state: "not_yet_known", intentId: INTENT });
++  });
++
++  it.each(["bad_request", "unauthorized", "forbidden", "rate_limited"])(
++    "%s -> unavailable, error body never surfaced",
++    async (name) => {
++      const { http, reply: out } = await readImportStatusReply(
++        reply(responses[name]),
++        INTENT,
++        null,
++      );
++      expect(http).toBe(responses[name].http_status);
++      expect(out).toEqual({ state: "unavailable" });
++    },
++  );
++
++  it.each([
++    ["500", new Response("boom", { status: 500 })],
++    ["malformed 200", new Response("{not json", { status: 200 })],
++    [
++      "oversize 200",
++      new Response("x".repeat(MAX_STATUS_BODY_BYTES + 1), { status: 200 }),
++    ],
++    [
++      "wrong-shape 200",
++      new Response(JSON.stringify({ status: "success" }), { status: 200 }),
++    ],
++  ])("%s -> unavailable", async (_name, response) => {
++    const { reply: out } = await readImportStatusReply(response, INTENT, null);
++    expect(out).toEqual({ state: "unavailable" });
++  });
++});
+diff --git a/test/popup-server-status.spec.js b/test/popup-server-status.spec.js
+new file mode 100644
+index 0000000..e0783a1
+--- /dev/null
++++ b/test/popup-server-status.spec.js
+@@ -0,0 +1,344 @@
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { installChrome, makeBgMock } from "./helpers/background-mock.js";
++import { serverStatusView } from "../popup/outcome.js";
++import { parseImportStatus } from "../shared/import-status.js";
++
++// Popup half of Check status: the server record is shown in its own region,
++// labelled apart from local receipts. Unknown is "not yet known" (never 0), no
++// family counts are summed, there is no percent/ETA, the server terminal is the
++// final state, and nothing here touches Start or its lock.
++const fixture = JSON.parse(
++  readFileSync(
++    join(
++      process.cwd(),
++      "test/fixtures/import-status/import-status.fixture.json",
++    ),
++    "utf8",
++  ),
++);
++const INTENT = "imp-1790000000000";
++
++afterEach(() => {
++  vi.unstubAllGlobals();
++  vi.restoreAllMocks();
++});
++
++const local = {
++  kind: "status_snapshot",
++  intent: { intentId: INTENT, platform: "truecoach", status: "ingest_partial" },
++  progress: [{ entityType: "clients", sent: 7 }],
++  staging: { clients: { received: 7, inserted: 7, deduped: 0 } },
++  lastError: null,
++  workerActive: false,
++};
++
++function known(name) {
++  return {
++    kind: "server_status",
++    ...parseImportStatus(fixture.responses[name].body, INTENT),
++  };
++}
++
++function testDocument() {
++  function node() {
++    let text = "";
++    const handlers = new Map();
++    const children = [];
++    return {
++      hidden: false,
++      disabled: false,
++      className: "",
++      dataset: {},
++      children,
++      get textContent() {
++        return text;
++      },
++      set textContent(value) {
++        text = value;
++        children.length = 0;
++      },
++      appendChild(child) {
++        children.push(child);
++      },
++      addEventListener(type, handler) {
++        handlers.set(type, handler);
++      },
++      click() {
++        return handlers.get("click")?.();
++      },
++    };
++  }
++  const nodes = new Map();
++  const doc = {
++    getElementById(id) {
++      if (!nodes.has(id)) nodes.set(id, node());
++      return nodes.get(id);
++    },
++    createElement: node,
++    querySelectorAll: () => [],
++  };
++  return { doc, nodes };
++}
++
++/**
++ * @param {object} snapshot
++ * @param {() => unknown} serverReply
++ */
++async function popup(snapshot, serverReply) {
++  vi.resetModules();
++  const { doc, nodes } = testDocument();
++  const mock = makeBgMock();
++  const sendMessage = vi.fn((request, callback = (_response) => {}) => {
++    const response =
++      request.kind === "request_session_state"
++        ? { ok: true, hasSession: true }
++        : request.kind === "request_server_status"
++          ? serverReply()
++          : snapshot;
++    if (callback) callback(response);
++    return response instanceof Error
++      ? Promise.reject(response)
++      : Promise.resolve(response);
++  });
++  mock.chrome.runtime.sendMessage = sendMessage;
++  vi.stubGlobal("document", doc);
++  vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
++  installChrome(mock);
++  await import("../popup/popup.js");
++  return { mock, nodes, sendMessage };
++}
++
++function regionText(nodes) {
++  const families = nodes
++    .get("server-status-families")
++    .children.map((row) => row.children.map((cell) => cell.textContent));
++  return {
++    hidden: nodes.get("server-status").hidden,
++    state: nodes.get("server-status-state").textContent,
++    families,
++  };
++}
++
++function localReceipts(nodes) {
++  return nodes
++    .get("progress-list")
++    .children.map((row) => row.children.map((cell) => cell.textContent));
++}
++
++describe("Check status also reads the server (popup)", () => {
++  it("shows the server final state and committed counts apart from local receipts", async () => {
++    const result = await popup(local, () => known("legacy_partial"));
++    const receipts = localReceipts(result.nodes);
++    const start = result.nodes.get("start-import");
++    expect(start.disabled).toBe(true);
++    expect(result.nodes.get("server-status").hidden).toBe(true);
++    await result.nodes.get("check-status").click();
++    expect(regionText(result.nodes)).toEqual({
++      hidden: false,
++      state: "Final state (TGP server): partial; some records may be missing",
++      families: [["Client records", "7 committed on TGP"]],
++    });
++    // Local receipts and their label are unchanged and separate.
++    expect(localReceipts(result.nodes)).toEqual(receipts);
++    expect(result.nodes.get("status").textContent).toBe(
++      "Transfer needs attention",
++    );
++    expect(result.nodes.get("action-feedback").textContent).toContain(
++      "Local status checked",
++    );
++    // Start and its lock are untouched by the server read.
++    expect(start.disabled).toBe(true);
++    expect(start.dataset.outcomeLocked).toBe("true");
++    expect(
++      result.sendMessage.mock.calls.map(([request]) => request.kind),
++    ).not.toContain("start_import");
++  });
++
++  it("an open server run has no final state, percent, phase or ETA", async () => {
++    const result = await popup(local, () => known("server_open"));
++    await result.nodes.get("check-status").click();
++    const text = JSON.stringify(regionText(result.nodes));
++    expect(regionText(result.nodes).state).toBe(
++      "No final state recorded on TGP yet.",
++    );
++    expect(text).not.toMatch(
++      /%|\beta\b|remaining|minute|transferring|deadline/i,
++    );
++  });
++
++  it("a 404 reads 'not yet known', never 0", async () => {
++    const result = await popup(local, () => ({
++      kind: "server_status",
++      state: "not_yet_known",
++      intentId: INTENT,
++    }));
++    await result.nodes.get("check-status").click();
++    const region = regionText(result.nodes);
++    expect(region.state).toContain("Not yet known");
++    expect(region.families).toEqual([]);
++    expect(JSON.stringify(region)).not.toMatch(/\b0\b/);
++  });
++
++  it("a local family the server does not list is 'not yet known', never 0", async () => {
++    const result = await popup(
++      {
++        ...local,
++        staging: {
++          ...local.staging,
++          notes: { received: 2, inserted: 2, deduped: 0 },
++        },
++      },
++      () => known("legacy_partial"),
++    );
++    await result.nodes.get("check-status").click();
++    expect(regionText(result.nodes).families).toEqual([
++      ["Client records", "7 committed on TGP"],
++      ["Notes", "Committed on TGP: not yet known"],
++    ]);
++  });
++
++  it("never sums families into an 'imported' total", async () => {
++    const result = await popup(local, () => known("legacy_success"));
++    await result.nodes.get("check-status").click();
++    const region = regionText(result.nodes);
++    expect(region.families).toEqual([
++      ["Client records", "12 committed on TGP"],
++      ["Notes", "3 committed on TGP"],
++    ]);
++    const text = JSON.stringify(region);
++    expect(text).not.toContain("15");
++    expect(text).not.toMatch(/imported|total/i);
++    // A legacy success is a transport settlement, not a verified migration.
++    expect(region.state).toBe(
++      "Final state (TGP server): transfer settled; records staged, migration not verified",
++    );
++  });
++
++  it.each([
++    [
++      "unavailable reply",
++      () => ({ kind: "server_status", state: "unavailable" }),
++    ],
++    ["malformed reply", () => ({ ok: false })],
++    ["local snapshot echoed", () => local],
++    ["transport rejection", () => new Error("PRIVATE fault")],
++    [
++      "invalid counts",
++      () => ({ ...known("legacy_partial"), counts: [{ entityType: "x" }] }),
++    ],
++    ["unknown status", () => ({ ...known("legacy_partial"), status: "done" })],
++  ])("%s -> 'Could not check TGP', no detail", async (_name, reply) => {
++    const result = await popup(local, reply);
++    await result.nodes.get("check-status").click();
++    const region = regionText(result.nodes);
++    expect(region).toEqual({
++      hidden: false,
++      state: "Could not check TGP. The receipts above are unchanged.",
++      families: [],
++    });
++    expect(JSON.stringify(region)).not.toContain("PRIVATE");
++    expect(result.nodes.get("start-import").disabled).toBe(true);
++  });
++
++  it("drops a reply for another run instead of attaching it here", async () => {
++    const result = await popup(local, () => ({
++      ...known("legacy_partial"),
++      intentId: "imp-other",
++    }));
++    await result.nodes.get("check-status").click();
++    expect(regionText(result.nodes)).toEqual({
++      hidden: true,
++      state: "",
++      families: [],
++    });
++  });
++
++  it("clears the server record when a different run is broadcast", async () => {
++    const result = await popup(local, () => known("legacy_partial"));
++    await result.nodes.get("check-status").click();
++    expect(result.nodes.get("server-status").hidden).toBe(false);
++    await result.mock.dispatch({
++      ...local,
++      intent: { ...local.intent, intentId: "imp-1790000000999" },
++    });
++    expect(regionText(result.nodes)).toEqual({
++      hidden: true,
++      state: "",
++      families: [],
++    });
++  });
++
++  it("keeps the server record across a same-run broadcast", async () => {
++    const result = await popup(local, () => known("legacy_partial"));
++    await result.nodes.get("check-status").click();
++    await result.mock.dispatch({ ...local });
++    expect(result.nodes.get("server-status").hidden).toBe(false);
++  });
++
++  it("with no recorded run, the server read changes nothing and Start stays available", async () => {
++    const empty = {
++      kind: "status_snapshot",
++      intent: null,
++      progress: [],
++      lastError: null,
++    };
++    const result = await popup(empty, () => ({
++      kind: "server_status",
++      state: "no_run",
++    }));
++    expect(result.nodes.get("start-import").disabled).toBe(false);
++    await result.nodes.get("check-status").click();
++    expect(result.nodes.get("start-import").disabled).toBe(false);
++    expect(result.nodes.get("start-import").dataset.outcomeLocked).toBe(
++      "false",
++    );
++    expect(result.nodes.get("server-status").hidden).toBe(true);
++  });
++});
++
++describe("serverStatusView over every fixture example", () => {
++  const message = makeBgMock().chrome.i18n.getMessage;
++  const expected = {
++    legacy_running: "No final state recorded on TGP yet.",
++    legacy_success:
++      "Final state (TGP server): transfer settled; records staged, migration not verified",
++    legacy_partial:
++      "Final state (TGP server): partial; some records may be missing",
++    legacy_failed_zero_committed: "Final state (TGP server): failed",
++    server_open: "No final state recorded on TGP yet.",
++    server_timed_out: "Final state (TGP server): timed out",
++    server_complete: "Final state (TGP server): complete",
++  };
++  it("covers exactly the fixture's 200 examples", () => {
++    expect(
++      Object.entries(fixture.responses)
++        .filter(([, example]) => example.http_status === 200)
++        .map(([name]) => name),
++    ).toEqual(Object.keys(expected));
++  });
++  it.each(Object.entries(expected))("%s", (name, state) => {
++    const view = serverStatusView(known(name), local, message);
++    expect(view?.state).toBe(state);
++    expect(view?.heading).toBe("TGP server record");
++    // One row per server family, each its own count; nothing summed.
++    const counts = fixture.responses[name].body.entity_counts;
++    expect(
++      view?.lines.filter((line) => line.text.endsWith("committed on TGP")),
++    ).toHaveLength(counts.length);
++    expect(JSON.stringify(view)).not.toMatch(/%|claimed|reason|deadline/i);
++  });
++  it("every server terminal has approved copy (no empty or raw state)", () => {
++    for (const status of fixture.schemas.ScoutImportStatusResult.properties
++      .status.enum) {
++      const view = serverStatusView(
++        { ...known("legacy_partial"), status },
++        local,
++        message,
++      );
++      expect(view?.state, status).toBeTruthy();
++      expect(view?.state, status).not.toContain("_");
++    }
++  });
++});
+diff --git a/test/server-status-worker.spec.js b/test/server-status-worker.spec.js
+new file mode 100644
+index 0000000..2f3c902
+--- /dev/null
++++ b/test/server-status-worker.spec.js
+@@ -0,0 +1,203 @@
++import { readFileSync } from "node:fs";
++import { join } from "node:path";
++import { describe, expect, it, vi } from "vitest";
++import { installChrome, makeBgMock } from "./helpers/background-mock.js";
++
++// Worker half of Check status: `request_server_status` reads
++// GET /api/scout/import/status for the worker's OWN recorded run, with the
++// existing paired-session bearer. It must never change the snapshot, Start,
++// tokens or run control, and never accept a caller-supplied run id.
++const fixture = JSON.parse(
++  readFileSync(
++    join(
++      process.cwd(),
++      "test/fixtures/import-status/import-status.fixture.json",
++    ),
++    "utf8",
++  ),
++);
++const REFRESH_KEY = "tgp_refresh_token";
++const SNAPSHOT_KEY = "tgp_status_snapshot";
++const REFRESH_URL = "https://api.tgp.coach/api/auth/extension/refresh";
++const INTENT = "imp-1790000000000";
++const STATUS_URL = `https://api.tgp.coach/api/scout/import/status?intent_id=${INTENT}`;
++
++const recorded = {
++  kind: "status_snapshot",
++  intent: { intentId: INTENT, platform: "truecoach", status: "ingest_partial" },
++  progress: [{ entityType: "clients", sent: 7 }],
++  staging: { clients: { received: 7, inserted: 7, deduped: 0 } },
++  lastError: null,
++};
++
++let fetchMock = vi.fn();
++
++/** @param {{ session?: boolean, snapshot?: object | null }} [options] */
++async function load({ session = true, snapshot = recorded } = {}) {
++  vi.resetModules();
++  const mock = makeBgMock({
++    session: session ? new Map([[REFRESH_KEY, "seed-refresh"]]) : new Map(),
++  });
++  installChrome(mock);
++  fetchMock = vi.fn();
++  global.fetch = fetchMock;
++  await import("../background.js");
++  if (snapshot) mock.localMap.set(SNAPSHOT_KEY, structuredClone(snapshot));
++  return mock;
++}
++
++function answer(example) {
++  return new Response(JSON.stringify(example.body), {
++    status: example.http_status,
++    headers: { "content-type": "application/json" },
++  });
++}
++
++// Route refresh + status; `statuses` is consumed one reply per status call.
++function route(statuses) {
++  const calls = { refresh: 0, status: [] };
++  fetchMock.mockImplementation(async (url, init) => {
++    if (url === REFRESH_URL) {
++      calls.refresh += 1;
++      return {
++        ok: true,
++        status: 200,
++        json: async () => ({ access_token: `TGP-ACCESS-${calls.refresh}` }),
++      };
++    }
++    if (typeof url === "string" && url.includes("/api/scout/import/status")) {
++      calls.status.push({ url, init });
++      const next = statuses.shift();
++      if (next instanceof Error) throw next;
++      return answer(next);
++    }
++    throw new Error(`unrouted fetch ${url}`);
++  });
++  return calls;
++}
++
++function sideEffects(mock) {
++  return {
++    snapshot: JSON.stringify(mock.localMap.get(SNAPSHOT_KEY)),
++    refresh: mock.sessionMap.get(REFRESH_KEY),
++    broadcasts: mock.sent.length,
++  };
++}
++
++describe("request_server_status (worker)", () => {
++  it("reads the worker's own run with the session bearer and returns committed counts", async () => {
++    const mock = await load();
++    const calls = route([fixture.responses.legacy_partial]);
++    const before = sideEffects(mock);
++    const reply = await mock.dispatch({
++      kind: "request_server_status",
++      intentId: "imp-FORGED",
++    });
++    expect(reply).toEqual({
++      kind: "server_status",
++      state: "known",
++      intentId: INTENT,
++      status: "partial",
++      mode: "legacy",
++      settled: true,
++      counts: [{ entityType: "clients", committed: 7 }],
++    });
++    expect(calls.status).toHaveLength(1);
++    const [{ url, init }] = calls.status;
++    // Own run id only; the caller-supplied id is ignored.
++    expect(url).toBe(STATUS_URL);
++    expect(url).not.toContain("FORGED");
++    expect(init.method).toBe("GET");
++    expect(init.body).toBeUndefined();
++    expect(init.headers).toEqual({ Authorization: "Bearer TGP-ACCESS-1" });
++    // Display-only: snapshot, tokens and broadcasts are untouched.
++    expect(sideEffects(mock)).toEqual(before);
++    expect(JSON.stringify(reply)).not.toContain("TGP-ACCESS");
++  });
++
++  it("404 -> not yet known (never 0)", async () => {
++    const mock = await load();
++    route([fixture.responses.not_found]);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply).toEqual({
++      kind: "server_status",
++      state: "not_yet_known",
++      intentId: INTENT,
++    });
++  });
++
++  it("401 refreshes once, bound to the session, then reads", async () => {
++    const mock = await load();
++    const calls = route([
++      fixture.responses.unauthorized,
++      fixture.responses.legacy_running,
++    ]);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply.state).toBe("known");
++    expect(reply.status).toBe("running");
++    expect(reply.settled).toBe(false);
++    expect(calls.refresh).toBe(2);
++    expect(calls.status.map(({ init }) => init.headers.Authorization)).toEqual([
++      "Bearer TGP-ACCESS-1",
++      "Bearer TGP-ACCESS-2",
++    ]);
++  });
++
++  it("a second 401 is unavailable: tokens kept, no auth_required, no broadcast", async () => {
++    const mock = await load();
++    route([fixture.responses.unauthorized, fixture.responses.unauthorized]);
++    const before = sideEffects(mock);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply).toEqual({ kind: "server_status", state: "unavailable" });
++    expect(sideEffects(mock)).toEqual(before);
++    expect(mock.sent.some((m) => m && m.kind === "auth_required")).toBe(false);
++  });
++
++  it.each(["forbidden", "rate_limited", "bad_request"])(
++    "%s -> unavailable",
++    async (name) => {
++      const mock = await load();
++      route([fixture.responses[name]]);
++      const reply = await mock.dispatch({ kind: "request_server_status" });
++      expect(reply).toEqual({ kind: "server_status", state: "unavailable" });
++    },
++  );
++
++  it("a transport fault is unavailable and leaks no detail", async () => {
++    const mock = await load();
++    route([new Error("PRIVATE transport detail")]);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply).toEqual({ kind: "server_status", state: "unavailable" });
++  });
++
++  it("no recorded run -> no_run, and nothing is fetched", async () => {
++    const mock = await load({ snapshot: null });
++    route([]);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply).toEqual({ kind: "server_status", state: "no_run" });
++    expect(global.fetch).not.toHaveBeenCalled();
++  });
++
++  it("no session -> unavailable without a status request", async () => {
++    const mock = await load({ session: false });
++    const calls = route([]);
++    const reply = await mock.dispatch({ kind: "request_server_status" });
++    expect(reply).toEqual({ kind: "server_status", state: "unavailable" });
++    expect(calls.status).toHaveLength(0);
++  });
++
++  it("refuses a content-script principal before spending the bearer", async () => {
++    const mock = await load();
++    route([fixture.responses.legacy_partial]);
++    const reply = await mock.dispatch(
++      { kind: "request_server_status" },
++      {
++        id: "test-extension-id",
++        url: "https://app.truecoach.co/clients",
++        tab: { id: 9 },
++      },
++    );
++    expect(reply).toEqual({ ok: false, error: "untrusted_sender" });
++    expect(global.fetch).not.toHaveBeenCalled();
++  });
++});
+diff --git a/test/transfer-outcome-popup.spec.js b/test/transfer-outcome-popup.spec.js
+index a8f6b05..81f0c8e 100644
+--- a/test/transfer-outcome-popup.spec.js
++++ b/test/transfer-outcome-popup.spec.js
+@@ -182,9 +182,9 @@ describe("fail-closed popup initialization", () => {
+       expect(result.nodes.get("copy-summary").hidden).toBe(true);
+       result.sendMessage.mockClear();
+       await result.nodes.get("check-status").click();
+-      expect(result.sendMessage).toHaveBeenCalledExactlyOnceWith({
+-        kind: "request_status",
+-      });
++      expect(result.sendMessage.mock.calls.map(([request]) => request)).toEqual(
++        [{ kind: "request_status" }, { kind: "request_server_status" }],
++      );
+       expect(result.nodes.get("status").textContent).toBe(
+         "Transfer needs attention",
+       );
+@@ -330,9 +330,10 @@ describe("actual popup outcome flow", () => {
+     const result = await popup();
+     result.sendMessage.mockClear();
+     await result.nodes.get("check-status").click();
+-    expect(result.sendMessage).toHaveBeenCalledExactlyOnceWith({
+-      kind: "request_status",
+-    });
++    expect(result.sendMessage.mock.calls.map(([request]) => request)).toEqual([
++      { kind: "request_status" },
++      { kind: "request_server_status" },
++    ]);
+     expect(result.nodes.get("action-feedback").textContent).toContain(
+       "Local status checked",
+     );
