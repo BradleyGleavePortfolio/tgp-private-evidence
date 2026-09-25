@@ -17,13 +17,16 @@ import {
   G2_S8C_ADMIN_ROLE,
   G2_S8C_MIGRATION_ROLE,
   G2_S8C_RUNTIME_ROLE,
+  G2_S8C_BASE_HEAD,
+  G2_S8C_CANDIDATE_HEAD_ENV,
+  g2S8cCandidateHead,
   g2S8cTestTarget,
   withFixturePassword,
 } from './g2-s8c-db';
 
 export const root = resolve(__dirname, '..', '..');
 /** Base pin (kept identical in test/utils/g2-s8c-bootstrap.sh and test/scout/g2-s8c-db-guard.spec.ts). */
-export const BASE_HEAD = '93389265a846095b846fa8f1fb0dad782fb6ee9f';
+export const BASE_HEAD: string = G2_S8C_BASE_HEAD;
 export const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
 /** 170 accepted migrations through C plus S8-B; S8-C adds none. */
 export const EXPECTED_MIGRATIONS = 171;
@@ -37,6 +40,12 @@ if (!raw || !password || !psql || !directory) {
   throw new Error('S8-C G2 proof requires explicit database, password, psql and data directory');
 }
 export const target = g2S8cTestTarget(raw, process.env.G2_S8C_CONFIRM);
+/** The attested candidate head this run is bound to: the runtime root must be exactly there, clean. */
+export const candidateHead = g2S8cCandidateHead(
+  process.env[G2_S8C_CANDIDATE_HEAD_ENV],
+  execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }),
+  execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
+);
 const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
 /** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
 const asRole = (role: string) => {
@@ -101,6 +110,7 @@ export function worker(options: Record<string, unknown> = {}) {
   const config = {
     root,
     client: resolve(root, 'node_modules/.prisma/client'),
+    head: candidateHead,
     url: service.toString(),
     coach: 'coach',
     intent: 'intent',

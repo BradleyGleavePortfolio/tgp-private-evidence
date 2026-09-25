@@ -14,6 +14,7 @@ Read completely before writing: live `tgp-agent-context/AGENT_RULES.md`; mission
 - `prisma/schema.prisma`: ScoutImport lifecycle fields/constraints representation and required ImportIntent backrelation only.
 - `src/scout/lifecycle/**`, `src/scout/scout.controller.ts`, `src/scout/scout.dto.ts`, `src/scout/scout.service.ts`, `src/scout/scout.module.ts`, `src/scout/scout-ingest.service.ts`.
 - `src/analytics/events.ts`: only necessary additive lifecycle keys.
+- `src/scout/scout-ingest.controller.ts`: only the missing 409 response documentation and necessary decorator import, under the completion amendment below.
 - Corresponding existing scout controller/dto/service specs and new `test/scout/lifecycle/**`.
 - `test/rls-g2-s7l*.spec.ts`, `test/utils/g2-s7l-*`, `test/scout/g2-s7l-db-guard.spec.ts`.
 - Sole generator ownership: `scripts/importer-contract.ts`, `docs/contracts/importer-openapi.json`, `test/contracts/importer-contract.spec.ts`. Generate from real DTOs; no hand-authored generated artifact.
@@ -33,3 +34,11 @@ Source/test/binding drafting starts now in parallel with S8-C. No installs, gene
 When source is ready: checkpoint exact changed/untracked bytes into this lane's private export with a short manifest, report DRAFT_READY and required environment/gates. After parent slot relay, run scoped formatting/lint/R75, TypeScript (heap 4096), relevant default Jest and genuine hooks; ordinary Bradley author/committer commit, no trailers. Report exact base/head/tree and raw outcomes. Export a self-contained Git bundle after committing. No push or PG yet. Dual independent reviews then a separate one-run real-PG grant; accepted dependency-valid work lands to integration/importer, never production main.
 
 If a concrete A/B needs another path or contract change, state harm, blocked decision and minimum closure; continue unaffected owned work. C is record/qualify/continue, not new rerun or redesign.
+
+## Source-gate completion amendment
+
+The drafted lifecycle gate introduces real ingest 409 outcomes `run_not_started` and `run_fenced` which the generated consumer contract must document. Grant the narrow `scout-ingest.controller.ts` response decorator/import delta and a focused assertion in the already-owned contract spec. Regenerate through the real generator; preserve exact fixed-code semantics, no product behavior change or unrelated controller edits.
+
+Genuine hooks remain mandatory. Missing Prettier is being restored as an isolated pinned runtime tool under `FORMATTER_TOOLING_GRANT.md`, not by editing product dependencies. S7-L source-gate authority is temporarily paused while that tooling worker owns the slot; source-only documentation/binding work can proceed. Parent will relay the slot for the necessary contract check, formatting and ordinary hooked commit once tooling is ready. Do not rerun the 48 unaffected passing suites.
+
+Before independent review, provide a complete candidate-bound real-PG orchestration driver as source only: actual final head/tree and tool pins, canonical nonblocking flock held by the proof driver through cleanup, fresh unique data/socket paths, old-image/new-image setup, bounded timeout, raw result and cleanup receipts. The current SOURCE_READY sequence is preparation, not a PG grant; no PG may run until the parent separately authorizes it after both independent attestations.

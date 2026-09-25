@@ -117,3 +117,29 @@ export function withFixturePassword(
   parsed.password = password;
   return parsed.toString();
 }
+
+/**
+ * Candidate binding. The one-run S8-C proof is granted against ONE attested final head, so the
+ * driver refuses to run against anything else: the operator double-enters the attested head in
+ * G2_S8C_CANDIDATE_HEAD, and it must equal the checked-out HEAD of the runtime root exactly,
+ * that head must not be the base itself (a candidate, not the accepted tree), and the tree must
+ * be clean (an uncommitted edit would make the proof about bytes no attestation covers). Pure:
+ * the callers supply `git rev-parse HEAD` and `git status --porcelain` output.
+ */
+export const G2_S8C_CANDIDATE_HEAD_ENV = 'G2_S8C_CANDIDATE_HEAD';
+export const G2_S8C_BASE_HEAD = '93389265a846095b846fa8f1fb0dad782fb6ee9f';
+export function g2S8cCandidateHead(
+  declared: string | undefined,
+  checkedOut: string,
+  porcelain: string,
+): string {
+  if (!declared || !/^[0-9a-f]{40}$/.test(declared))
+    throw new Error(`S8-C G2 proof requires the attested candidate head in ${G2_S8C_CANDIDATE_HEAD_ENV}`);
+  if (declared === G2_S8C_BASE_HEAD)
+    throw new Error('S8-C G2 proof target is a candidate head, not the accepted base');
+  if (checkedOut.trim() !== declared)
+    throw new Error(`S8-C G2 proof runtime root is at ${checkedOut.trim()}, not the attested candidate ${declared}`);
+  if (porcelain.trim() !== '')
+    throw new Error('S8-C G2 proof runtime root has uncommitted changes; the attested head must be checked out clean');
+  return declared;
+}

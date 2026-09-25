@@ -5,7 +5,14 @@
 // exactly the seam ScoutReconstructService exposes (`families`). No query result or transaction
 // semantic is replaced. Used only by the explicitly guarded live proof test/rls-g2-s8c.spec.ts.
 const { join } = require('path');
+const { execFileSync } = require('child_process');
 const input = JSON.parse(process.env.G2_S8C_WORKER);
+// Candidate binding: the worker loads source from input.root, so that root must be at the attested
+// head the harness was bound to; a mismatch is a hard failure before any client is constructed.
+const workerHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: input.root, encoding: 'utf8' }).trim();
+if (workerHead !== input.head) {
+  throw new Error(`worker root ${input.root} is at ${workerHead}, not the attested candidate ${input.head}`);
+}
 const Module = require('module');
 const resolveFilename = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {

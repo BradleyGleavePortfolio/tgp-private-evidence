@@ -29,15 +29,19 @@ import {
   settle,
   stage,
 } from './utils/g2-s8c-harness';
+import { execFileSync } from 'child_process';
 import {
   appliedMigrations,
+  BASE_HEAD,
   blocked,
+  candidateHead,
   directory,
   EXPECTED_MIGRATIONS,
   expectedVersion,
   holdTransaction,
   json,
   quote,
+  root,
   run,
   sql,
   sqlAdmin,
@@ -102,6 +106,16 @@ describe('lane identity (bootstrap state, never repaired here)', () => {
       sql(`SELECT count(*) FROM information_schema.columns WHERE table_name='ScoutReconstructionLedger' AND column_name='target_kind'`),
     ).toBe('1');
     expect(sqlAdmin(`SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','authenticator')`)).toBe('0');
+  });
+
+  it('is bound to one attested candidate head that descends from the base', () => {
+    expect(candidateHead).toMatch(/^[0-9a-f]{40}$/);
+    expect(candidateHead).not.toBe(BASE_HEAD);
+    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()).toBe(candidateHead);
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()).toBe('');
+    expect(() =>
+      execFileSync('git', ['merge-base', '--is-ancestor', BASE_HEAD, candidateHead], { cwd: root, stdio: 'ignore' }),
+    ).not.toThrow();
   });
 
   it('the worker exposes the canonical family list with programs (N3) and refuses an unknown family', async () => {

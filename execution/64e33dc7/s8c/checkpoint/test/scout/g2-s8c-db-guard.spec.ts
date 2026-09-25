@@ -1,6 +1,9 @@
 import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
+  G2_S8C_BASE_HEAD,
+  G2_S8C_CANDIDATE_HEAD_ENV,
+  g2S8cCandidateHead,
   G2_S8C_CLUSTER_MARKER,
   G2_S8C_DATABASE_MARKER,
   g2S8cTestTarget,
@@ -136,7 +139,10 @@ describe('S8-C PG17 disposable target guard', () => {
     expect(bootstrap).toContain(`BASE_HEAD=${BASE_HEAD}\n`);
     expect(bootstrap).toContain(`EXPECTED_MIGRATIONS=${EXPECTED_MIGRATIONS}\n`);
     expect(bootstrap).toContain(`S8B_MIGRATION=${S8B_MIGRATION}\n`);
-    expect(harness).toContain(`export const BASE_HEAD = '${BASE_HEAD}';`);
+    expect(G2_S8C_BASE_HEAD).toBe(BASE_HEAD);
+    expect(harness).toContain(`export const BASE_HEAD: string = G2_S8C_BASE_HEAD;`);
+    expect(bootstrap).toContain(`G2_S8C_CANDIDATE_HEAD`);
+    expect(G2_S8C_CANDIDATE_HEAD_ENV).toBe('G2_S8C_CANDIDATE_HEAD');
     expect(harness).toContain(`export const EXPECTED_MIGRATIONS = ${EXPECTED_MIGRATIONS};`);
     expect(harness).toContain(`export const S8B_MIGRATION = '${S8B_MIGRATION}';`);
     // S8-C ships no migration: the repository tracks exactly the accepted 171 directories.
@@ -146,5 +152,16 @@ describe('S8-C PG17 disposable target guard', () => {
     expect(migrations).toHaveLength(EXPECTED_MIGRATIONS);
     expect(migrations).toContain(S8B_MIGRATION);
     expect(migrations.filter((name) => name > S8B_MIGRATION)).toEqual([]);
+  });
+  it('binds the proof to one attested, clean, non-base candidate head', () => {
+    const base = '93389265a846095b846fa8f1fb0dad782fb6ee9f';
+    const candidate = 'a'.repeat(40);
+    expect(g2S8cCandidateHead(candidate, `${candidate}\n`, '')).toBe(candidate);
+    expect(() => g2S8cCandidateHead(undefined, candidate, '')).toThrow(/G2_S8C_CANDIDATE_HEAD/);
+    expect(() => g2S8cCandidateHead('abc', candidate, '')).toThrow(/G2_S8C_CANDIDATE_HEAD/);
+    expect(() => g2S8cCandidateHead(candidate.toUpperCase(), candidate, '')).toThrow();
+    expect(() => g2S8cCandidateHead(base, base, '')).toThrow(/not the accepted base/);
+    expect(() => g2S8cCandidateHead(candidate, 'b'.repeat(40), '')).toThrow(/not the attested candidate/);
+    expect(() => g2S8cCandidateHead(candidate, candidate, ' M src/x.ts\n')).toThrow(/uncommitted/);
   });
 });

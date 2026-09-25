@@ -6,15 +6,15 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 
 | New lane | Tier / requested route | Sole writable surface | State |
 |---|---|---|---|
-| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, lifecycle/schema/generator | ACTIVE; exact draft-01 captured; source gates relayed by `S7L_SOURCE_GATES_GRANT.md`, no PG |
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; lifecycle/schema/generator plus narrow ingest 409 documentation | Source gates passed after narrow fixes, exact staged tree exported; no commit because genuine hook lacks pinned Prettier; released slot04:17:21Z; source-only completion until relay |
 | `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, native writers/families/typed ledger handoff and two mapping lines | DRAFT_READY, exact 22-file checkpoint; two-line mapping completion granted; source gates queued after S7-L; no PG |
-| `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | `64e33dc7/RUNTIME_SETUP_GRANT.md`; fresh tooling/donor namespace only | DONE rc0 at 03:29:43Z; canonical flock released; no database/test/compile started; `runtime/RUNTIME_SETUP_RECEIPT.md` |
+| `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | Initial setup DONE; new `64e33dc7/FORMATTER_TOOLING_GRANT.md`, isolated formatter tool only | ACTIVE bounded restoration of recorded Prettier3.9.9; no project dependency changes |
 | `s8_f_reader_readiness_muge8avl` | T3 / `claude_opus_5_5`, high | Read-only accepted native-reader contracts; `64e33dc7/s8f/READINESS.md` only, no product writes/runtime | DONE; A1 minimum typed-target handoff granted to S8-C; A2 qualified dark sequencing; no S8-F build yet |
 | `s8_g_orchestration_readiness_mugf57lu` | T4 / `claude_fable_5_1`, high | Read-only accepted lifecycle/native orchestration requirements; `64e33dc7/s8g/READINESS.md` only | DONE; prerequisites are final S7-L/S8-C interfaces and acceptance; no product/Git/runtime writes or slot grant |
 | `s8_f_native_reader_draft_mugg2i9f` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8F_SOURCE_PREPARATION_GRANT.md`; isolated entities/roster readers and tests | ACTIVE source preparation on frozen typed-target requirements; no gates/commit/runtime until accepted S8-C composition |
 | Parent | Executive | Scope, grants, evidence publication, acceptance/landing | ACTIVE |
 
-Heavy slot: canonical `execution/test-validation.lock`, setup released at 03:29:43Z; parent observed no `lslocks` holder. File remains in place. Current grantee: S7-L source gates under `64e33dc7/S7L_SOURCE_GATES_GRANT.md`, acquisition must be nonblocking; no lengthy source-only authoring while holding the slot. Queue: S8-C source gates when ready, then separately granted new proofs. Tooling/donor receipt: `64e33dc7/runtime/RUNTIME_SETUP_RECEIPT.md`. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
+Heavy slot: canonical `execution/test-validation.lock`, S7-L released04:17:21Z; parent observed no holder04:19:38Z. File remains in place. Current grantee: runtime setup worker under `FORMATTER_TOOLING_GRANT.md`, nonblocking acquisition. Queue: short S7-L source completion/hooked commit, then S8-C source gates and derived contract generation, then separately granted new proofs. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
 
 ## Earlier checkpoint, preserved
 

@@ -15,6 +15,8 @@
 #   G2_S8C_PASSWORD      disposable local fixture password shared by s8c_super/postgres/service_role
 #                         (never written to a file by this harness; only into process env / in-memory URLs)
 #   G2_S8C_PSQL          absolute path of a psql binary compatible with the PG17 server
+#   G2_S8C_CANDIDATE_HEAD  the attested final candidate head (40 hex); the runtime root must be
+#                        checked out exactly there and clean, and it must not be the base itself
 # Optional:
 #   G2_S8C_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
 set -euo pipefail
@@ -33,9 +35,17 @@ EXPECTED_VERSION="${G2_S8C_SERVER_VERSION:-170006}"
 CLUSTER_MARKER=s8c-disposable-pg17
 DB_MARKER=s8c-g2-native-writer-synthetic-disposable-fixture-safe-to-drop
 
-for name in G2_S8C_DATABASE_URL G2_S8C_CONFIRM G2_S8C_PASSWORD G2_S8C_PSQL; do
+for name in G2_S8C_DATABASE_URL G2_S8C_CONFIRM G2_S8C_PASSWORD G2_S8C_PSQL G2_S8C_CANDIDATE_HEAD; do
   [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
 done
+# Candidate binding (mirrors g2S8cCandidateHead in test/utils/g2-s8c-db.ts): one attested head, clean.
+[[ "$G2_S8C_CANDIDATE_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "G2_S8C_CANDIDATE_HEAD is not a 40-hex commit id" >&2; exit 2; }
+[[ "$G2_S8C_CANDIDATE_HEAD" != "$BASE_HEAD" ]] || { echo "G2_S8C_CANDIDATE_HEAD is the accepted base, not a candidate" >&2; exit 2; }
+ACTUAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+[[ "$ACTUAL_HEAD" == "$G2_S8C_CANDIDATE_HEAD" ]] || { echo "runtime root $ROOT is at $ACTUAL_HEAD, not the attested candidate $G2_S8C_CANDIDATE_HEAD" >&2; exit 2; }
+[[ -z "$(git -C "$ROOT" status --porcelain)" ]] || { echo "runtime root $ROOT has uncommitted changes; the attested head must be checked out clean" >&2; exit 2; }
+git -C "$ROOT" merge-base --is-ancestor "$BASE_HEAD" "$ACTUAL_HEAD" || { echo "candidate $ACTUAL_HEAD does not descend from base $BASE_HEAD" >&2; exit 2; }
+echo "CANDIDATE_HEAD=$ACTUAL_HEAD"
 [[ -x "$G2_S8C_PSQL" ]] || { echo "psql binary not executable: $G2_S8C_PSQL" >&2; exit 2; }
 [[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted dependency tree must be in place first; no npm ci)" >&2; exit 2; }
 # Dependency provenance is closed: nothing in this harness may auto-install.
