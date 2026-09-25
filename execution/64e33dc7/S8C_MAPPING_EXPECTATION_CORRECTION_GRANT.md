@@ -19,3 +19,9 @@ Make one ordinary follow-up with Bradley Gleave `<bradley@bradleytgpcoaching.com
 Prepare a new filled binding under `s8c/binding/v2/`, retaining the original files unchanged. Only the new head/tree pins and mechanical versioned binding/output paths change; six proof blobs, accepted-base ancestry, tool/fixture pins and execution behavior remain unchanged. Record the binding delta and hashes. No execution is granted by binding preparation.
 
 The two independent reviewers already examining `527fe2bc` should continue that new-source review using the committed object, then bind this test-only follow-up and final versioned driver without repeating unchanged analysis. Parent supplies final pins when ready. No final GO or PG grant while this B remains open.
+
+## Source-gate relay, 2026-09-25 05:01Z
+
+S7-L's actual correction driver released the canonical lock at04:57:54Z, rc0, at clean head `54970cd937afc8dea689b33243961abfef8b9dd6`. Parent read its terminal record and at05:00:50Z/05:01:10Z verified no lock holder or heavy test/database process; the two remaining Node processes are the platform code-mode daemon, not candidate work.
+
+S8-C is now the sole source-gate grantee for the exact one-test correction above. Its prepared `s8c/correction/s8c-correction-gate.sh` may run once after taking the existing canonical lock nonblocking in the working process. Perform the scoped format/lint, changed-file Jest and genuine hooked ordinary commit, preserve every output, and release promptly. Then finish the versioned export and v2 binding source-only. No PG action is authorized; S7-L remains frozen for changed-question review.

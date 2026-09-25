@@ -1,0 +1,43 @@
+PASS test/scout/lifecycle/lifecycle.service.spec.ts (9.975 s)
+  ScoutLifecycleService
+    deadline configuration (D-S7L-3)
+      ✓ defaults to five minutes and accepts only a positive integer override (4 ms)
+    resolve (§3.1 resolution precedes the gate)
+      ✓ a non-UUID string is legacy without touching the database (2 ms)
+      ✓ a UUID that is not an owned ImportIntent is legacy (foreign or unknown) (1 ms)
+      ✓ an owned intent whose run row is already legacy stays legacy (§7: never re-owned) (1 ms)
+      ✓ an owned intent with no legacy row resolves to server
+    start guard order (§3)
+      ✓ 404 for an intent the caller does not own (1 ms)
+      ✓ 409 intent_not_paired before any run lookup (5 ms)
+      ✓ 409 intent_superseded (1 ms)
+      ✓ 409 run_terminal when the run already settled (2 ms)
+      ✓ 409 legacy_run when the intent id names a legacy row (1 ms)
+      ✓ creates ONE server row with the server-owned clock and epoch 1, then emits scout.run.started (3 ms)
+      ✓ a duplicate Start on an open run returns the same body and does not insert (1 ms)
+      ✓ a Start race (P2002) re-reads and answers like the duplicate (1 ms)
+      ✓ an open run past its deadline is fenced timed_out first, then 409 run_terminal (1 ms)
+    cancel
+      ✓ 404 when no run exists for the caller (1 ms)
+      ✓ 409 legacy_run for a legacy row (6 ms)
+      ✓ is idempotent on an already cancelled run (1 ms)
+      ✓ 409 run_terminal when another terminal holds
+      ✓ fences an open run (epoch + 1, terminal cancelled / cancelled_by_coach) in one transaction (1 ms)
+      ✓ a CAS miss inside the fence (row already fenced) yields no writes and 409 run_terminal (1 ms)
+    closed-gate classification (§3.1)
+      ✓ no row → run_not_started (1 ms)
+      ✓ fenced row → run_fenced with its fence_reason
+      ✓ an open row that failed the gate is past its deadline → fenced timed_out lazily (1 ms)
+      ✓ an open row with a FUTURE deadline (Start committed after the gate) → run_not_started, no fence, no write (1 ms)
+    projections (§5)
+      ✓ a null / legacy row projects the legacy constants
+      ✓ a server row projects its clocks, phase, epoch and reason code; unknown values fall to null (2 ms)
+      ✓ families: staged_unique is the staged row count, ledger tallies fold, native buckets are null (2 ms)
+      ✓ server terminal guard admits only the server vocabulary (never `success`)
+      ✓ isUuid accepts RFC 4122 text and rejects legacy strings (12 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       29 passed, 29 total
+Snapshots:   0 total
+Time:        10.217 s
+Ran all test suites matching test/scout/lifecycle/lifecycle.service.spec.ts.

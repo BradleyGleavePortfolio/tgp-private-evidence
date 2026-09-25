@@ -1,0 +1,21 @@
+scout: S7-L close Review B F1/F2 (fresh-run classification, L06 role entry)
+
+F1 (class A): after a zero-row writer gate, classifyClosed rereads the run
+unlocked. When a concurrent Start committed in between, the reread sees an
+open row whose deadline_at is still in the future; fencing it timed_out
+would make a brand-new run permanently terminal and burn the unique intent.
+The guard now answers run_not_started for an open, not-yet-expired row,
+exactly as the failed gate did, with no fence and no write. The expired-row
+lazy timeout path is unchanged. One regression unit case proves the
+future-deadline result and the absence of any transaction/raw write/event.
+
+F2 (class B): L06 of the real-PG spec logged in as anon/authenticated, which
+the proof bootstrap deliberately creates NOLOGIN, so the connection failed
+before the RLS assertions ran. The API roles are now reached through SET
+ROLE from the owner session inside each statement (the accepted S8-B P06
+pattern). Every SELECT/INSERT/UPDATE/DELETE assertion and the service_role
+rollback case are preserved.
+
+Surface: src/scout/lifecycle/lifecycle.service.ts,
+test/scout/lifecycle/lifecycle.service.spec.ts, test/rls-g2-s7l.spec.ts.
+Ordinary follow-up on 839b54c5; no other path changes.

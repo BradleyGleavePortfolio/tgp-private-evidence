@@ -1,0 +1,75 @@
+diff --git a/src/scout/lifecycle/lifecycle.service.ts b/src/scout/lifecycle/lifecycle.service.ts
+index dbab4473..5949a293 100644
+--- a/src/scout/lifecycle/lifecycle.service.ts
++++ b/src/scout/lifecycle/lifecycle.service.ts
+@@ -435,12 +435,18 @@ export class ScoutLifecycleService {
+    * After a zero-row gate (the writer's transaction already rolled back): re-read unlocked and
+    * classify. No row → `run_not_started`. Fenced or terminal → `run_fenced`. Open but past its
+    * deadline → fence `timed_out` in a short transaction of our own (the row is free: the
+-   * triggering writer released it), then `run_fenced`.
++   * triggering writer released it), then `run_fenced`. Open and NOT yet expired → the row was
++   * committed by a Start after the gate ran (it did not exist, or was not visible, when the gate
++   * saw zero rows); answer `run_not_started` exactly as the failed gate did and never fence a
++   * fresh run as `timed_out`. No write happens on that path.
+    */
+   async classifyClosed(coachId: string, intentId: string): Promise<ClosedRun> {
+     const row = await this.readRun(coachId, intentId);
+     if (!row || row.mode !== 'server') return { kind: 'not_started' };
+     if (row.terminal_status === null && row.fenced_at === null) {
++      if (row.deadline_at !== null && row.deadline_at.getTime() > Date.now()) {
++        return { kind: 'not_started' };
++      }
+       const fenced = await this.fence(coachId, intentId, 'timed_out');
+       if (fenced) {
+         return {
+diff --git a/test/rls-g2-s7l.spec.ts b/test/rls-g2-s7l.spec.ts
+index 840b3fdc..052fa35d 100644
+--- a/test/rls-g2-s7l.spec.ts
++++ b/test/rls-g2-s7l.spec.ts
+@@ -524,12 +524,15 @@ describe('stage 3: constraints and API roles on S7-L', () => {
+   it('L06: anon/authenticated are refused by policy; a service_role transaction that rolls back persists nothing', () => {
+     const intentId = intent(COACH);
+     const count = runCount();
++    // anon/authenticated are NOLOGIN in the fixture (as in production); they are reached through
++    // SET ROLE from the owner session inside the statement itself (accepted S8-B P06 pattern), so
++    // the RLS decision, not a connection refusal, is what each statement exercises.
+     for (const role of ['anon', 'authenticated']) {
+-      expect(sqlAs(role, `SELECT count(*) FROM "${RUN}"`)).toBe('0');
+-      refused(serverRunInsert(COACH, intentId), 'row-level security', role);
++      expect(sql(`SET ROLE ${role}; SELECT count(*) FROM "${RUN}"`)).toBe('0');
++      refused(`SET ROLE ${role}; ${serverRunInsert(COACH, intentId)}`, 'row-level security');
+       // Policy-filtered UPDATE/DELETE see no rows: nothing changes.
+-      sqlAs(role, `UPDATE "${RUN}" SET phase='reconciling' WHERE mode='server'`);
+-      sqlAs(role, `DELETE FROM "${RUN}"`);
++      sql(`SET ROLE ${role}; UPDATE "${RUN}" SET phase='reconciling' WHERE mode='server'`);
++      sql(`SET ROLE ${role}; DELETE FROM "${RUN}"`);
+     }
+     expect(runCount()).toBe(count);
+     expect(sql(`SELECT count(*) FROM "${RUN}" WHERE phase='reconciling'`)).toBe('0');
+diff --git a/test/scout/lifecycle/lifecycle.service.spec.ts b/test/scout/lifecycle/lifecycle.service.spec.ts
+index eaf16439..52d4f144 100644
+--- a/test/scout/lifecycle/lifecycle.service.spec.ts
++++ b/test/scout/lifecycle/lifecycle.service.spec.ts
+@@ -395,6 +395,22 @@ describe('ScoutLifecycleService', () => {
+         terminal_status: 'timed_out',
+       });
+     });
++
++    it('an open row with a FUTURE deadline (Start committed after the gate) → run_not_started, no fence, no write', async () => {
++      // Review B F1: the zero-row gate ran before a concurrent Start committed; the reread now sees
++      // a fresh open run. It must not be fenced timed_out (that would make a new run permanently
++      // terminal and burn the unique intent). Same answer as the failed gate, and nothing mutated.
++      d.runFindUnique.mockResolvedValue(openRun({ deadline_at: new Date(Date.now() + 60_000) }));
++      const closed = await service.classifyClosed(COACH, INTENT);
++      expect(closed).toEqual({ kind: 'not_started' });
++      expect(ScoutLifecycleService.closedConflict(closed).getResponse()).toMatchObject({
++        code: 'run_not_started',
++      });
++      expect(d.transaction).not.toHaveBeenCalled();
++      expect(d.queryRaw).not.toHaveBeenCalled();
++      expect(d.executeRaw).not.toHaveBeenCalled();
++      expect(d.capture).not.toHaveBeenCalled();
++    });
+   });
+ 
+   describe('projections (§5)', () => {

@@ -1,0 +1,44 @@
+2,3c2,6
+< # S7-L real-PG proof — complete source-only execution binding, FILLED against the committed head
+< # 839b54c53ccb252f95b4ec63df0b08595bbe7698 (tree f02205c6). NOT RUN; NOT GRANTED. Derived as a code pattern from the
+---
+> # S7-L real-PG proof — binding v2 (S7L_MINIMUM_CORRECTION_GRANT: F1 classifyClosed guard, F2 L06 SET ROLE entry). Bound to
+> # the ORDINARY FOLLOW-UP commit whose exact parent is the preserved v1 candidate 839b54c53ccb252f95b4ec63df0b08595bbe7698
+> # (itself directly on the accepted base 93389265). Identical to binding/s7l-pg-proof.sh (v1) except: versioned paths
+> # (binding/v2, run receipts under binding/v2/run), EXPECT_PARENT pin + follow-up lineage/delta checks, and the candidate
+> # head/tree/spec-blob/fixture pins filled by freeze-v2.sh. NOT RUN; NOT GRANTED. Derived as a code pattern from the
+19c22
+< #   timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/s7l-pg-proof.sh
+---
+> #   timeout -k 30 3900 bash /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v2/s7l-pg-proof.sh
+21c24
+< D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding
+---
+> D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s7l/binding/v2
+29,31c32,35
+< EXPECT_HEAD=839b54c53ccb252f95b4ec63df0b08595bbe7698
+< EXPECT_TREE=f02205c60ad0bfeb24ce82d74b0025ee9a185df6
+< EXPECT_SPEC_BLOB=840b3fdcd8624f7b10a8ca073fdb76694fd1b10b                   # test/rls-g2-s7l.spec.ts
+---
+> EXPECT_PARENT=839b54c53ccb252f95b4ec63df0b08595bbe7698                       # v1 candidate: the exact parent of the ordinary follow-up commit
+> EXPECT_HEAD=54970cd937afc8dea689b33243961abfef8b9dd6                                  # v2 candidate head (F1/F2 minimum correction), filled by freeze-v2.sh
+> EXPECT_TREE=513c71d7c1390787e1521ccbfa46b30bb52b5462
+> EXPECT_SPEC_BLOB=052fa35d5c03658a5ee90cebe5e6eca467311d0d                   # test/rls-g2-s7l.spec.ts
+87,88c91,92
+< case "$EXPECT_FIXTURE_SHA" in *__*) log "PRECONDITION_FAIL fixture pin not frozen (run freeze.sh)"; fail 70;; esac
+< [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base, not a candidate"; fail 70; }
+---
+> case "$EXPECT_FIXTURE_SHA$EXPECT_HEAD$EXPECT_TREE$EXPECT_SPEC_BLOB" in *__*) log "PRECONDITION_FAIL v2 pins not frozen (run freeze-v2.sh after the follow-up commit)"; fail 70;; esac
+> [ "$EXPECT_HEAD" != "$BASE_HEAD" ] && [ "$EXPECT_HEAD" != "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base or the v1 parent, not the v2 candidate"; fail 70; }
+93c97,100
+< [ "$(git -C "$W" rev-parse HEAD^)" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL HEAD parent is not the base (single candidate commit expected)"; fail 70; }
+---
+> # ordinary follow-up lineage: HEAD^ is exactly the v1 candidate (never amended/replaced), whose own parent is the accepted base
+> [ "$(git -C "$W" rev-parse HEAD^)" = "$EXPECT_PARENT" ] || { log "PRECONDITION_FAIL HEAD parent != $EXPECT_PARENT (ordinary follow-up on the preserved v1 candidate expected)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^")" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL v1 parent $EXPECT_PARENT does not sit directly on the accepted base"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$EXPECT_PARENT^{tree}")" = f02205c60ad0bfeb24ce82d74b0025ee9a185df6 ] || { log "PRECONDITION_FAIL v1 parent tree changed (839b54c5 must be preserved byte-for-byte)"; fail 70; }
+94a102,105
+> # the follow-up delta from v1 is exactly the three granted correction paths
+> [ "$(git -C "$W" diff --name-only "$EXPECT_PARENT" HEAD | sort | tr '\n' ' ')" = \
+>   "src/scout/lifecycle/lifecycle.service.ts test/rls-g2-s7l.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts " ] \
+>   || { log "PRECONDITION_FAIL follow-up delta from v1 is not exactly the three granted F1/F2 paths"; fail 70; }
