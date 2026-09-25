@@ -121,3 +121,18 @@ PG-4a is consumed. It FAILED `RC=1 STAGE=jest`: 13 of 13 tests failed in harness
 - **Commit:** one genuine hooked Bradley commit on `exec64/s8c-replacement` (child of `e0cee7e0`).
 - **Evidence:** checkpoint v7 and binding v5, derived mechanically from v4 (paths under `proof-v5`, head/tree/changed-blob pins, fixture pin), plus `run-prep` v5 and a receipt. All writes go under `s8c/harness-correction/**`, `s8c/checkpoints/v7/` and `s8c/binding/v5/`.
 - **Slot:** the builder must acquire the canonical lock with `flock -n` and yield to any holder, and must never run concurrently with the S7-L proof.
+
+## LAND-1 grant: order swap and CI pre-staging (17:00Z)
+
+LAND-PREP-1 returned PLAN_READY (`daceddc8/landing/`, all risks class C). S8-C's v4 proof failed, and S7-L is next in the proof queue, so the parent takes the plan's symmetric alternative: **S7-L lands first by fast-forward, then S8-C is composed second.**
+
+**R5 decision:** pre-staging CI is allowed, as it was for PR #531. `landing_composition_prep` (T3, `claude_opus_5_5`) may:
+- push branch `land/s7-l-accepted` pointing exactly at `df713fd9217df524915348ef8a42c797f288dde1` (no new commits);
+- open a DRAFT PR to `integration/importer` titled "Land S7-L: …";
+- watch CI and record the check results.
+
+It may not:
+- mark the PR ready, merge, or push `integration/importer`;
+- touch `main`, protection or settings, or force-push.
+
+Acceptance and the fast-forward happen only on the parent's word, after the S7-L PG-4b proof passes.
