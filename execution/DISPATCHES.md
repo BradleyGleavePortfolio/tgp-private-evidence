@@ -6,13 +6,14 @@ Authority: `64e33dc7/OWNER_RECOVERY_RESET.md`. All predecessor S7-L/S8-C workers
 
 | New lane | Tier / requested route | Sole writable surface | State |
 |---|---|---|---|
-| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, lifecycle/schema/generator | ACTIVE source/test/binding drafting; heavy gates await relay |
+| `s7_l_replacement_builder_muge72rg` | T4 / `claude_fable_5_1`, high | `64e33dc7/S7L_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, lifecycle/schema/generator | ACTIVE; exact draft-01 captured; source gates relayed by `S7L_SOURCE_GATES_GRANT.md`, no PG |
 | `s8_c_replacement_builder_muge72rc` | T4 / `claude_fable_5_1`, high | `64e33dc7/S8C_REPLACEMENT_BUILD_GRANT.md`; fresh isolated worktree, native writers/families | ACTIVE source/test/binding drafting; heavy gates await relay |
 | `replacement_runtime_setup_muge72qn` | T3 / `claude_opus_5_5`, high | `64e33dc7/RUNTIME_SETUP_GRANT.md`; fresh tooling/donor namespace only | DONE rc0 at 03:29:43Z; canonical flock released; no database/test/compile started; `runtime/RUNTIME_SETUP_RECEIPT.md` |
 | `s8_f_reader_readiness_muge8avl` | T3 / `claude_opus_5_5`, high | Read-only accepted native-reader contracts; `64e33dc7/s8f/READINESS.md` only, no product writes/runtime | DONE; A1 minimum typed-target handoff granted to S8-C; A2 qualified dark sequencing; no S8-F build yet |
+| `s8_g_orchestration_readiness_mugf57lu` | T4 / `claude_fable_5_1`, high | Read-only accepted lifecycle/native orchestration requirements; `64e33dc7/s8g/READINESS.md` only | DONE; prerequisites are final S7-L/S8-C interfaces and acceptance; no product/Git/runtime writes or slot grant |
 | Parent | Executive | Scope, grants, evidence publication, acceptance/landing | ACTIVE |
 
-Heavy slot: canonical `execution/test-validation.lock`, setup released at 03:29:43Z; parent observed no `lslocks` holder. File remains in place. No current owner. Queue: first DRAFT_READY builder's source gates, then the other; parent must explicitly relay and each worker must acquire nonblocking flock. Tooling/donor receipt: `64e33dc7/runtime/RUNTIME_SETUP_RECEIPT.md`. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
+Heavy slot: canonical `execution/test-validation.lock`, setup released at 03:29:43Z; parent observed no `lslocks` holder. File remains in place. Current grantee: S7-L source gates under `64e33dc7/S7L_SOURCE_GATES_GRANT.md`, acquisition must be nonblocking; no lengthy source-only authoring while holding the slot. Queue: S8-C source gates when ready, then separately granted new proofs. Tooling/donor receipt: `64e33dc7/runtime/RUNTIME_SETUP_RECEIPT.md`. No real-PG run yet granted. Source work proceeds in parallel. Requested routes are not actual telemetry.
 
 ## Earlier checkpoint, preserved
 
