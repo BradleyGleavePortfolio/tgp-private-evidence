@@ -355,3 +355,20 @@ Bradley at 10:59 PT: "if they're ready to merge safely, lets go ahead and get th
 
   The operator will not bypass, change protection, or impersonate a reviewer.
 - **Backend PR #530:** this is a production release. `main` is unprotected, and `fly-deploy` runs on push. An independent T4 assessment has been spawned, with its output going to `daceddc8/prod/PR530_MERGE_SAFETY.md`. The merge happens only on a SAFE verdict, pinned to an exact head sha. Bradley confirms the exact payload first.
+
+## Owner authorization: bridge method (18:07Z)
+
+Bradley at 11:07 PT, verbatim: "I really don't care who commits or how it gets there, the bridge between a complete PR and the live GitHub files can be steel, wood, or straw, under any name, I do not care".
+
+Under the precedence rule, Bradley's latest instruction overrides the earlier rule, "Do NOT bypass required approval / change protection", for landing complete, accepted PRs.
+
+### EXT-LAND-1
+
+- **Scope:** extension `main` `0111be66` → FF to `8901d5f5` (PR #27, S4-R6, CI green), then FF to `a889f4ad` (PR #30, E2, independent review GO, CI green). These are exact accepted shas: 26 commits by Bradley, linear, no new commits.
+- **Why it is safe:** there is no publish or deploy workflow in the extension (`ci`, `codeql`, `secrets-scan` only). Chrome Web Store publishing stays manual.
+- **Method:**
+  1. Temporarily remove `enforce_admins`. The approval count and the required checks stay as they are.
+  2. Admin FF push.
+  3. Restore `enforce_admins` immediately.
+  4. Verify the protection matches its pre-state byte for byte, and verify the remote heads.
+- **Unchanged:** backend PR #530 is still a production release, gated on the T4 safety assessment.
