@@ -372,3 +372,11 @@ Under the precedence rule, Bradley's latest instruction overrides the earlier ru
   3. Restore `enforce_admins` immediately.
   4. Verify the protection matches its pre-state byte for byte, and verify the remote heads.
 - **Unchanged:** backend PR #530 is still a production release, gated on the T4 safety assessment.
+
+## S8-C LANDED (18:12:32Z)
+
+`integration/importer` moved `df713fd9` → `1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47` by FF, through PR #540 with green CI (`landing/ci/s8-c/LANDED.md`). `main` is untouched at `c23b9d9f`, and PR #530's head auto-updated.
+
+**Next:** the S9-0 doc commit goes on `1c10e2a1`.
+- The `landing_composition_prep` worktree `worktrees/daceddc8-land-s8-c` is handed to `s9_0_decision_doc`, since the landing agent uses fresh worktrees per composition.
+- S9-A then moves onto the S9-0 commit.

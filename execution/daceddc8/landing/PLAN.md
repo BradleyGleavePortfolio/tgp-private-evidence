@@ -280,3 +280,10 @@ There are no A or B findings against landing either candidate.
 - **PR #540 CI:** `build-and-test` is red. `test/scout/g2-s8c-db-guard.spec.ts` pins the repository at 171 migrations with none after S8-B, and composing with S7-L's migration makes it 172. Classified **B**, landing-blocking, test-only.
 - **Where things stand:** `integration/importer` is still `df713fd9`. See `ci/s8-c/CI_RED.md` for the closure options (a) fix-up commit on `land/s8-c`, or (b) lane correction and recompose.
 - **Method fix:** future composition gates must add specs that read repository files (`prisma/migrations`, contract JSON, base/migration pins) to the import-closure suite set.
+
+## LAND-2 complete (18:12Z)
+
+- **Landed:** `integration/importer` moved `df713fd9 → 1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47`, by the composition merge `2542af44` followed by the reviewed test-only fix-up.
+- **PR #540:** MERGED. CI green, 8 pass and 1 skip.
+- **Untouched:** `main` is still `c23b9d9f`; #530 was not touched.
+- **Record:** `ci/s8-c/LANDED.md`.
