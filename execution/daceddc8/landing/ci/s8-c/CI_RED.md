@@ -58,3 +58,18 @@ Migration Dry-Run did not trigger, which is correct because S8-C's diff against 
 - Remote `land/s8-c` = `2542af44`.
 - PR #540 is open.
 - The `land-second.sh ff` step was not run.
+
+## Disposition follow-up (18:05Z parent: L2-1 option (a))
+
+- **Draft conversion:** at 17:56:21Z, `gh pr ready 540 --undo` returned rc 0. #540 is now `isDraft=true`, still OPEN and unmerged, head `2542af44`. The remote is unchanged: `integration/importer` `df713fd9`, `land/s8-c` `2542af44`, `main` `c23b9d9f`. See `draft-conversion.log`.
+- **L2-2 method fix, applied in the scripts:**
+  - `compose-second.sh` step 6 now adds a second group of specs to the 27 import-closure suites: every default-config spec, as listed by `jest --listTests`, whose source matches `FS_PINNED_SPEC_RE` (`prisma/migrations`, `migrations` literals, `docs/contracts`, `importer-openapi`, `EXPECTED_MIGRATIONS`, `BASE_HEAD`).
+  - The list is written to `affected-suites.txt` and `fs-pinned-specs.txt` in the run directory.
+  - A static estimate on `2542af44` found 20 such non-rls specs (`analysis/fs-pinned-specs-static-2542af44.txt`), including `test/scout/g2-s8c-db-guard.spec.ts`.
+- **Fix-up path:** `land-second.sh advance` (`FIXUP_HEAD=… REVIEW_RECORD=…`) accepts exactly one single-parent, hooked, Bradley, trailer-free child of `2542af44` that touches only `test/scout/g2-s8c-db-guard.spec.ts`. It requires:
+  - the composition worktree clean at that head;
+  - a review record that names the head with GO and no NO-GO;
+  - remote `land/s8-c` = `2542af44`.
+
+  It then makes an ordinary fast-forward push of `land/s8-c`, checks that the PR head advanced, and marks #540 ready. After that, `land-second.sh ff` (`ACCEPT_RECORD=64e33dc7/S8C_ACCEPTANCE.md`) waits for green CI on the fix-up head, fast-forwards `integration/importer` from `df713fd9`, and verifies the result.
+- **Standing by** for the review GO. At 18:0xZ the S8-C builder's uncommitted edit to `test/scout/g2-s8c-db-guard.spec.ts` is present in the composition worktree, and I have not touched it.

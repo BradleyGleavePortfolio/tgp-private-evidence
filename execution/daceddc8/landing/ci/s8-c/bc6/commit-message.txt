@@ -1,0 +1,14 @@
+test(scout): make the S8-C migration-directory guard composition-tolerant
+
+The S8-C db guard scanned prisma/migrations and pinned exactly the 171
+directories of the S8-C proof base with none newer than the S8-B
+migration. That holds for the lane alone but not for a composition with
+a lane that landed a later migration (S7-L's
+20270123000000_scout_run_lifecycle_expand), so the default CI suite went
+red on the composed head.
+
+The scan now sorts the directories and asserts that the first 171 are the
+proof base's set, ending at the S8-B migration, and that every later
+directory is a well-formed, later-timestamped migration with a
+migration.sql. The bootstrap and harness pins and all other assertions
+are unchanged. Test-only; no product, schema or migration change.

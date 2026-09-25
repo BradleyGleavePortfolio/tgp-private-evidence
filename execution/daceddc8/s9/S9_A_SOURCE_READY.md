@@ -20,10 +20,27 @@
 | --- | --- | --- |
 | `src/scout/reconciliation/types.ts` | `eff1479cd2b735aacadc42ee3e2280dcfaf2e4fcc27a1fb90fd2c2bf2db1dbfa` | 386 |
 | `src/scout/reconciliation/coverage.ts` | `c6b224fa860261d6240c5bd62b07d419c6b9346c0b0de4eaac64dd9215926701` | 77 |
-| `src/scout/reconciliation/reconcile.ts` | `efb8f799f1c5f26b31c7ff9fedfe058c77297ee4d2c2db2a78cca14267c83263` | 420 |
-| `test/scout/reconciliation/reconcile.spec.ts` | `5b015fae6cd8c50861f87d37b288f8a8f01b60c308f47f564679cb26fa01fe85` | 1207 |
+| `src/scout/reconciliation/reconcile.ts` | `83d7673b024513bbee938bf4a5467c4faa9306739f15ae53b69722936d7d9e1f` | 428 |
+| `test/scout/reconciliation/reconcile.spec.ts` | `99068057b0b99d95c9601c02130e4eca2b3b07acd0e0088fae146cb2f54edb74` | 1236 |
 
 Hashes will change after `prettier --write`; the gate log must record post-format hashes.
+
+**Delta 2026-09-25 17:58Z (review `S9_A_REVIEW_A.md` B-1, closure (a), parent-mandated):**
+
+- `reconcile.ts` `closeRelationships`: the bucket-j map is now a **union per family name**
+  (`prev === undefined ? o.verified : new Set([...prev, ...o.verified])`) instead of last-writer
+  overwrite, so two type-valid `mapped:true` entries sharing a `family` can no longer hide the first
+  entry's bucket-j identities from an edge (previous sha `efb8f799…` → `83d7673b…`, +8 lines, one
+  hunk at the top of `closeRelationships`; nothing else changed).
+- `reconcile.spec.ts`: one new verdict-table row "R06 two mapped entries sharing a family name: a
+  failing edge from the first is still counted → partial / relationship_unverified (review B-1)"
+  (two `workouts` entries under different tokens, one `programs`, one `program_parent` edge from the
+  first `workouts` identity with `consistent:false`, coverage known for all, claim `success`;
+  asserts `conditions === ['relationship_unverified']` and `relationship_unverified === 1` on both
+  `workouts` rows). Previous sha `5b015fae…` → `99068057…`; verdict table now 45 rows.
+- B-2 carried to the S9-B grant (no S9-A change). Review C-2 (`filter(mapped)` for the synthesised
+  `staged` set) deliberately not applied: parent said keep everything else; the union already removes
+  the spurious `unverified` half of C-2, and the verdict was already correct.
 
 ## Design (as built)
 
@@ -92,7 +109,7 @@ The report also carries `required_families` and run-wide `ledger_without_staged`
 **Determinism.** Code-point comparators (no `localeCompare`), no `Date`, no mutation of input (the
 spec asserts byte identity across permuted input and a no-mutation snapshot).
 
-## Spec coverage (44 verdict-table rows + 21 unit `it`s, all pure)
+## Spec coverage (45 verdict-table rows + 21 unit `it`s, all pure)
 
 R01a/b/c/d, R02, R02b, R03, R03b, R04 (removed; foreign_owner/kind_mismatch/provenance_mismatch),
 R05 (equal counts, different sets; attributed-only), R06 (E-R1 false/null/parent-unresolved, E-R2,
@@ -132,6 +149,20 @@ never `blocked|failed|cancelled|timed_out`, `complete` only with non-null covera
    new report fields not in the D-S9-5 sketch (additive; S9-C may omit them from the DTO).
 7. R-B1: report fields are always present inside `ReconciliationReportV1`; optionality is a DTO
    property (S9-C). No S9-A type is optional.
+
+## Base move (parent mail 10:59Z; supersedes steps 1–2 below where they differ)
+
+- Landing chain: S8-C composition (2542af44 + one test-only fix, FF to `integration/importer`) →
+  S9-0 doc commit (= head **H**) → S9-A commit. S9-A lands by fast-forward, no recomposition.
+- On relay of H: `git -C /home/user/workspace/worktrees/daceddc8-s9a switch -c exec-dace/s9-a2 H`
+  carrying the four untracked files unchanged (verify the four sha256s above after the switch).
+- `node_modules` donor becomes `/home/user/workspace/worktrees/daceddc8-land-s8-c/node_modules`
+  (composed schema's prisma client; the s7l donor would mismatch S8-C models). Still `cp -a`,
+  still under the canonical slot (`flock -n`, yield if busy).
+- Then the gate list (prettier prefix → scoped prettier → eslint → tsc → jest → one genuine hooked
+  Bradley commit). **Do not push.**
+- Step 1's HEAD precondition becomes `HEAD == H`; step 6's tsc runs against the composed tree, so
+  an S8-C type mismatch (not S9-A's) is recorded, not fixed here.
 
 ## Gate list (to run only after the parent relays the slot; none run yet)
 
