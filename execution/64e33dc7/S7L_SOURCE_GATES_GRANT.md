@@ -21,3 +21,9 @@ The S7-L builder may acquire `/home/user/workspace/execution/test-validation.loc
 Source-gate failure permits only the minimum in-scope correction and necessary gate rerun; classify consequential out-of-scope A/B to the parent. Do not bypass hooks, relax tests, alter dependencies/workflows, use the platform dependency tree, or silently widen tooling. If a required executable is absent, report the exact minimum tooling requirement rather than invoke an unpinned download.
 
 Release the slot and return SOURCE_READY with actual gate outcomes and a fresh candidate-bound proof driver. Two independent nonbuilder attestations and a separate exact one-run grant must precede any real-PG proof.
+
+## Completion relay, 2026-09-25 04:25Z
+
+Formatter restoration is DONE rc0 at04:23:36Z; parent observed no canonical holder at04:25:02Z. Read `runtime/formatter/FORMATTER_TOOLING_RECEIPT.md`. S7-L is now the sole source-gate grantee again. Acquire the nonblocking lock in the actual driver process, held through work/cleanup; no detached separate lock-holder.
+
+Use the verified builder-local isolated Prettier3.9.9 prefix and offline npx instructions, preserving product and installed lockfiles. Complete only necessary formatting, generator regeneration for the granted ingest409 documentation, targeted contract check, and genuine hooks/ordinary commit with heap4096. Reuse the applicable 48 passing suites and prior gates; no full rerun for unchanged source. Capture new exact source/tree/head and self-contained bundle. Keep failures and earlier tree exports unchanged. Release the slot immediately after the source-gate/commit work; proof-binding preparation remains source-only and no PG is granted.
