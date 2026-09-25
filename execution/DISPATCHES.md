@@ -1,5 +1,22 @@
 # Current execution dispatches
 
+## EXEC-DACEDDC8 orchestrator-mode dispatch, 2026-09-25 16:38Z
+
+RT-2 runtime finished RC=0 and every pin was reproduced (`daceddc8/SCOPE.md`). The parent now orchestrates only. Ten parallel lanes are running:
+
+| Lane | Tier / requested route | Surface | State |
+|---|---|---|---|
+| `s7_l_worker_correction_muh68jv6` | T4 / `claude_fable_5_1` | S7-L worktree, worker.cjs only | SOURCE_READY; queued for the slot after S8-C releases |
+| `s8_c_bootstrap_completion_muh6mhet` | T4 / `claude_fable_5_1` | S8-C worktree, run/, v6, binding/v4 | SOLE heavy-slot grantee (gate commit) since 16:35Z |
+| `s8_f_composition_prep_muh6mhde` | T4 / `claude_fable_5_1` | `worktrees/daceddc8-s8f`, `s8f/composition/**` | Source only |
+| `s8_g_design_test_draft_muh6mhcm` | T4 / `claude_fable_5_1` | `s8g/draft/**` evidence only | Drafting |
+| `landing_composition_prep_muh6mhbh` | T3 / `claude_opus_5_5` | `daceddc8/landing/**` | Planning |
+| `s9_readiness_brief_muh6mhd2` | T4 / `claude_fable_5_1` | `daceddc8/s9/READINESS.md` | Planning |
+| `s7_l_review_a_muh6nhww` / `s7_l_review_b_muh6nhxa` | T4 / `claude_fable_5_1` | WORKER_CORRECTION_REVIEW_A / _B | Phase 1 (delta); phase 2 on final pins |
+| `s8_c_review_a_muh6nhx2` / `s8_c_review_b_muh6nhwp` | T4 / `claude_fable_5_1` | BOOTSTRAP_CORRECTION_REVIEW_A / _B | Phase 1 (delta); phase 2 on final pins |
+
+Heavy queue: S8-C gate commit, then S7-L gates, then the S8-C v4 PG proof, then the S7-L v4 PG proof, then composition gates. Requested routes are not telemetry.
+
 ## EXEC-DACEDDC8 takeover, 2026-09-25 16:25Z
 
 Bradley's current takeover prompt supersedes the 05:56Z freeze, and new grants are in `daceddc8/SCOPE.md`. Half-done work was reconstructed from durable and live state, because the prior disk is gone (`daceddc8/HALF_DONE_WORK.md`). The checkpoint is `daceddc8/TAKEOVER.md`.
