@@ -128,3 +128,31 @@ choice (55645 suggested).
   stay a literal derivative rather than a redesign.
 - No decision text above Addendum A was changed; the addendum records RC-1..3, C-5..C-10 (second
   half of C-7), deviations 2/3/5 and the B-2 sentence, plus the facts rules the doc left implicit.
+
+## 7. Addendum (14:59 PT relay): gate driver prepared, binding v2, lane port 55645
+
+- `gate/s9b-gate-1910.sh` (`bash -n` clean; refusal paths exercised, nothing acquired), `gate/PINS.env`
+  (`BASE=__FILL_M2__` only unfilled value), `gate/commit-message.txt`, `gate/commit-message-no-addendum.txt`,
+  `gate/README.md` (relay line, required clone state, exit codes). Modeled on `s9a/gate/s9a-gate-1910.sh`; S9-B
+  deltas: BASE variable, S9-A files asserted tracked+clean at accepted post-format shas, owned-path-only prettier
+  (`.sh` excluded), eslint on owned `.ts`/`.cjs`, whole-repo tsc, R75 working-tree + staged, jest targeted then full
+  default once, `S9B_INCLUDE_ADDENDUM=1|0` selects doc inclusion and message file.
+- `binding/v2/` (v1 kept byte-identical as history: `6fb78034`/`c41a9e79`/`bcb566d5`/`f32123b1`): `PORT=55645`,
+  `BASE_HEAD`/`BASE_TREE` → `__FILL_M2__` (covered by the runner's fill check), S9-A blob pins → accepted be88909f
+  post-format blobs. Accepted-path pins verified identical at `1c5fbb04` and `62471b11`.
+- Clone files untouched since §2 (reviews in progress): `git status` still 1 modified doc + 10 untracked owned + 4
+  untracked S9-A copies; shas as in §2.
+- Composition note for the parent (not actionable by this lane now): `g2-s9-db-guard.spec.ts` / `g2-s9-pg-harness.ts`
+  pin exactly 172 migration dirs ending at the S7-L migration — the same shape `1c10e2a1` had to relax for the S8-C
+  guard when a later lane landed a migration. Fine for M2 (no migration since 1c5fbb04); flag for any later
+  composition that adds one.
+
+## 8. CLOSURES-1 (15:16 PT disposition) — see `CLOSURES-1.md`
+
+- Re-pinned owned files: `facts.service.ts` `e2f40a79…`, `facts.service.spec.ts` `9dcfbd96…`, doc (Addendum A)
+  `be591e97…` (+99/-0 vs landed). All other owned shas in §2 stand. `gate/PINS.env` updated.
+- `test/rls-g2-s9.spec.ts` is a parent-GRANTED added test-only path (deviation from the S9-0 exact-path sketch;
+  the rls job's `test/rls-*.spec.ts` match is the reason it lives at the test root, as `rls-g2-s8c.spec.ts` does).
+- Binding: `binding/v1` historical, not to be used; `binding/v2` is the binding.
+- S9-A pre-format copies (four paths, §2b) are NOT in commit ownership; the gate runs on M2 where the accepted
+  post-format bytes are tracked and asserts the copies are gone.

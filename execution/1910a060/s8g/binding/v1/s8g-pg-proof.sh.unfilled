@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # S8-G real-PG proof — complete source-only execution binding (UNFILLED head pins; NOT RUN; NOT GRANTED).
 # Derived by substitution from the accepted S8-C binding execution/64e33dc7/s8c/binding/v3/s8c-pg-proof.sh with the
-# EXEC-1910A060 deltas: runtime root execution/1910a060/runtime (RT-NEW-1 receipt), base 1c5fbb04, fresh runtime namespace (RUNTIME_SETUP_RECEIPT), port 55643 / s8g_super / g2_s8g_disposable /
-# cluster s8g-disposable-pg17, NO OLD side (S8-G ships no migration: the base 1c5fbb04 prisma tree is the only schema
+# EXEC-1910A060 deltas: runtime root execution/1910a060/runtime (RT-NEW-1 receipt), base 62471b11 (merge of 1c5fbb04 + S8-F e1ec2fec; review B2), fresh runtime namespace (RUNTIME_SETUP_RECEIPT), port 55643 / s8g_super / g2_s8g_disposable /
+# cluster s8g-disposable-pg17, NO OLD side (S8-G ships no migration: the base 62471b11 (merge of 1c5fbb04 + S8-F e1ec2fec; review B2) prisma tree is the only schema
 # and the accepted S7-L/S8-C objects are the proof target), the candidate binding G2_S8G_CANDIDATE_HEAD, and the S8-G
 # bootstrap/spec. Runs the NEW spec test/rls-g2-s8g.spec.ts exactly once via the repo jest + jest.rls.config.js.
 # No new test framework, no retry, no inherited-proof replay (S8-B / S7-L / N/Q1 / C / R / B suites are never invoked).
@@ -26,8 +26,8 @@ W=/home/user/workspace/worktrees/1910a060-s8g
 R=$D/run; LOG=$R/s8g-pg-proof.log; SENT=$R/s8g-pg-proof.sentinel; JLOG=$R/jest.log
 LOCK=/home/user/workspace/execution/test-validation.lock
 # ---- pins: head pins are filled by the binding phase AFTER the attested S8-G head exists; the script refuses placeholders.
-BASE_HEAD=1c5fbb0441178e0cfe6e9f8d72e955c645c265e9                         # accepted base; identical in g2-s8g-db.ts/bootstrap
-BASE_TREE=82b56ad373c9cb4888b7c9b79544fbbb6f55c0d6
+BASE_HEAD=62471b116267fdec6746073c4b4c80a154d09834                         # accepted base; identical in g2-s8g-db.ts/bootstrap
+BASE_TREE=23614f0b7dc33dc37b90cf4f27fcb8331912e60f
 EXPECT_HEAD=__FILL_AFTER_ATTESTATION__
 EXPECT_TREE=__FILL_AFTER_ATTESTATION__
 EXPECT_SPEC_BLOB=__FILL_AFTER_ATTESTATION__                                 # test/rls-g2-s8g.spec.ts at the S8-G head
@@ -47,8 +47,8 @@ EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6
 EXPECT_NM_CLIENT_SHA=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6  # node_modules/.prisma/client/index.d.ts generated from schema blob 2e328bbc (== 1c5fbb04 prisma/schema.prisma; S8-G ships no schema change)
 EXPECT_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015      # prisma/schema.prisma @1c5fbb04 (blob 2e328bbc)
 EXPECT_PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55   # package-lock.json @1c5fbb04
-DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$CLUSTERS/s8-c; SOCK=$RUNTIME_ROOT/run/s8-g
-PORT=55643; DBNAME=g2_s8g_disposable; ADMIN=s8g_super; FIXPASS=s8g_local_synthetic
+DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$CLUSTERS/s8-g; SOCK=$RUNTIME_ROOT/run/s8-g
+PORT=55644; DBNAME=g2_s8g_disposable; ADMIN=s8g_super; FIXPASS=s8g_local_synthetic
 FIX=$D/s8g-fixture.sh
 export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1 NODE_OPTIONS=--max-old-space-size=4096 CHECKPOINT_DISABLE=1 \
        PRISMA_HIDE_UPDATE_MESSAGE=1 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false \
@@ -139,7 +139,7 @@ STAGE=preflight
 L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true); [ "$L" = 0 ] || { log "PREFLIGHT_FAIL port $PORT listeners=$L"; fail 71; }
 P=$(pgrep -cx postgres || true); [ "$P" = 0 ] || { log "PREFLIGHT_FAIL postgres procs=$P (another lane live; this proof never shares a server)"; fail 71; }
 OTHER0=""
-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-c ] || continue
+for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-g ] || continue
   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL $n postmaster.pid present"; fail 71; }
   h="$n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; OTHER0="$OTHER0 $h"
   log "PREFLIGHT other_lane=$h (must be unchanged at end; never started)"; done
@@ -183,7 +183,7 @@ log "STOP_STATE_OK postgres_procs=0 port$PORT=free datadir_retained=$LANE/pg-dat
 # ---- step 8 post (read-only)
 STAGE=post
 OTHER1=""
-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-c ] || continue
+for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-g ] || continue
   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "POST_FAIL $n postmaster.pid appeared"; fail 74; }
   OTHER1="$OTHER1 $n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; done
 [ "$OTHER0" = "$OTHER1" ] || { log "POST_FAIL other lanes changed: before=[$OTHER0] after=[$OTHER1]"; fail 74; }

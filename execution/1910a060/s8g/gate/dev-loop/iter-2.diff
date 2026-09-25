@@ -1,0 +1,133 @@
+--- /tmp/db-before.ts	2026-09-25 22:14:02.656507275 +0000
++++ test/utils/g2-s8g-db.ts	2026-09-25 22:14:02.672507275 +0000
+@@ -47,8 +47,9 @@
+ // 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
+ // R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
+ // S7-L lane; 55511 is the accepted S8-B lane; 55641 is the accepted S7-L (64e33dc7) lane; 55642 is
+-// the accepted S8-C lane. The S8-G lane port is chosen by the operator (55643 suggested,
+-// execution/1910a060 SCOPE), double-entered in the confirmation, never hard-coded.
++// the accepted S8-C lane; 55643 is the retained S8-F lane (EXEC-1910A060, landed 62471b11). The S8-G
++// lane port is chosen by the operator (55644 suggested, execution/1910a060 review C1), double-entered
++// in the confirmation, never hard-coded.
+ const REFUSED_PORTS = new Set([
+   '5432',
+   '5433',
+@@ -65,6 +66,7 @@
+   '55511',
+   '55641',
+   '55642',
++  '55643',
+ ]);
+ const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
+ 
+--- /tmp/guard-before.ts	2026-09-25 22:14:02.660507275 +0000
++++ test/scout/g2-s8g-db-guard.spec.ts	2026-09-25 22:14:24.616507275 +0000
+@@ -10,33 +10,34 @@
+   withFixturePassword,
+ } from '../utils/g2-s8g-db';
+ 
+-const base = 'postgresql://s8g_super@127.0.0.1:55643/g2_s8g_disposable';
+-const ack = 'g2_s8g_disposable:55643';
++const base = 'postgresql://s8g_super@127.0.0.1:55644/g2_s8g_disposable';
++const ack = 'g2_s8g_disposable:55644';
+ 
+ describe('S8-G PG17 disposable target guard', () => {
+   it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
+     expect(g2S8gTestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
+       prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
+       psqlUrl: `${base}?connect_timeout=5`,
+-      maintenanceUrl: `postgresql://s8g_super@127.0.0.1:55643/postgres?connect_timeout=5`,
+-      port: 55643,
++      maintenanceUrl: `postgresql://s8g_super@127.0.0.1:55644/postgres?connect_timeout=5`,
++      port: 55644,
+     });
+   });
+   it.each([
+     base.replace('127.0.0.1', 'localhost'),
+     base.replace('127.0.0.1', 'db.supabase.co'),
+-    base.replace('55643', '5432'),
+-    base.replace('55643', '6543'),
+-    base.replace('55643', '55439'),
+-    base.replace('55643', '70000'),
+-    base.replace('55643', '55461'),
+-    base.replace('55643', '55471'),
+-    base.replace('55643', '55481'),
+-    base.replace('55643', '55491'),
+-    base.replace('55643', '55501'),
+-    base.replace('55643', '55511'),
+-    base.replace('55643', '55641'),
+-    base.replace('55643', '55642'),
++    base.replace('55644', '5432'),
++    base.replace('55644', '6543'),
++    base.replace('55644', '55439'),
++    base.replace('55644', '70000'),
++    base.replace('55644', '55461'),
++    base.replace('55644', '55471'),
++    base.replace('55644', '55481'),
++    base.replace('55644', '55491'),
++    base.replace('55644', '55501'),
++    base.replace('55644', '55511'),
++    base.replace('55644', '55641'),
++    base.replace('55644', '55642'),
++    base.replace('55644', '55643'),
+     base.replace('g2_s8g_disposable', 'g2_b_drain_disposable'),
+     base.replace('g2_s8g_disposable', 'g2_r_ready_disposable'),
+     base.replace('g2_s8g_disposable', 'g2_nq1_disposable'),
+@@ -53,13 +54,13 @@
+     base.replace('s8g_super@', 's8c_super@'),
+     base.replace('g2_s8g_disposable', 'g2_tq0_disposable'),
+     base.replace('g2_s8g_disposable', 'g2_s5_etq0_disposable'),
+-    base.replace('55643', '54325'),
++    base.replace('55644', '54325'),
+     base.replace('g2_s8g_disposable', 'g2_ledger_expand_disposable'),
+     base.replace('g2_s8g_disposable', 'postgres'),
+     base.replace('s8g_super@', 'service_role@'),
+     base.replace('s8g_super@', 's8c_super:secret@'),
+     base.replace('s8g_super@', 'postgres@'),
+-    base.replace('55643', '54321'),
++    base.replace('55644', '54321'),
+     base.replace('postgresql:', 'postgres:'),
+     `${base}?host=remote`,
+     `${base}?sslmode=disable`,
+@@ -76,15 +77,15 @@
+   it('refuses absent, mistaken or port-mismatched confirmation', () => {
+     expect(() => g2S8gTestTarget(base)).toThrow();
+     expect(() => g2S8gTestTarget(base, 'g2_s8g_disposable')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_s8g_disposable:55644')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_s8c_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_tq0_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_b_drain_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_r_ready_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_nq1_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_c_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_s7l_disposable:55643')).toThrow();
+-    expect(() => g2S8gTestTarget(base, 'g2_s8b_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8g_disposable:55643')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8c_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_tq0_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_b_drain_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_r_ready_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_nq1_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_c_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s7l_disposable:55644')).toThrow();
++    expect(() => g2S8gTestTarget(base, 'g2_s8b_disposable:55644')).toThrow();
+   });
+   it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
+     expect(G2_S8G_CLUSTER_MARKER).toBe('s8g-disposable-pg17');
+@@ -102,13 +103,13 @@
+   });
+   it('attaches the fixture password only from the environment and only in plain form', () => {
+     expect(withFixturePassword(base, 'local_fixture')).toBe(
+-      'postgresql://s8g_super:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++      'postgresql://s8g_super:local_fixture@127.0.0.1:55644/g2_s8g_disposable',
+     );
+     expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
+-      'postgresql://service_role:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++      'postgresql://service_role:local_fixture@127.0.0.1:55644/g2_s8g_disposable',
+     );
+     expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
+-      'postgresql://postgres:local_fixture@127.0.0.1:55643/g2_s8g_disposable',
++      'postgresql://postgres:local_fixture@127.0.0.1:55644/g2_s8g_disposable',
+     );
+     for (const role of [
+       'anon',

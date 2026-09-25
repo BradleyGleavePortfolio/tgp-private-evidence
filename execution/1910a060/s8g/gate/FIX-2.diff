@@ -1,0 +1,24 @@
+--- /tmp/rr-before-fix2.ts	2026-09-25 22:08:01.600507275 +0000
++++ test/scout/orchestration/reconstruct-run.spec.ts	2026-09-25 22:08:01.620507275 +0000
+@@ -178,9 +178,18 @@
+     steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
+     families: {
+       clients: { displayName: { paths: [['name']], coerce: 'string' } },
+-      programs: { label: { paths: [['title']], coerce: 'string' } },
+-      workouts: { label: { paths: [['title']], coerce: 'string' } },
+-      client_history: { label: { paths: [['title']], coerce: 'string' } },
++      programs: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
++      workouts: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
++      client_history: {
++        clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++        label: { paths: [['title']], coerce: 'string' },
++      },
+     },
+   },
+   'reconstruct-run.spec:fixture',

@@ -27,16 +27,19 @@ and 5; `S9_A_REVIEW_A.md` B-2.
 - **C-6 (qualifier domains).** `unresolved_family:<token>` carries the staged token, which ingest
   accepts as any 1-128 character string; the token already projects as `families[].family`
   under the accepted S7-L contract, so no new exposure exists, but R14's PII guarantee does not
-  extend to tokens. The reason parser validates qualifier domains (family, field and model names
-  from the spec), not only the code prefix; anything else degrades to `reason_unrecognised`.
+  extend to tokens. The accepted S9-A parser recognises reason codes by their catalogue prefix
+  and does not validate qualifier domains; validating the qualifier against the spec's family,
+  field and model names before anything reaches a DTO is an S9-C obligation, recorded here, not
+  a property of the landed reconciler.
 - **C-7, second half (`qualifiers` enum).** `qualifiers[]` is a closed OpenAPI enum
   (`roster_bridge_pending` only in v1; append-only), never `string[]`. The 32-family R15 fixture
   and the CONSUMER_FREEZE L78 note stand as recorded in §3.
-- **C-9 (recompute-on-read).** S9-B collects every fact of one run inside a single read-only
-  `REPEATABLE READ` transaction (`Prisma.TransactionClient` passed in by the caller; the settle
-  path runs inside S8-G's transaction, the status path opens its own). Classification therefore
-  sees one snapshot across staging, ledger, provenance and native tables. S9-C adds a spec that
-  asserts S9-A's copy of the §3.7 catalogue equals S8-C's runtime `UNRESOLVED_CODE`.
+- **C-9 (recompute-on-read).** The S9-B facts service opens no transaction and issues only
+  reads; the caller supplies one `Prisma.TransactionClient` and is responsible for running it
+  at `REPEATABLE READ` so classification sees one snapshot across staging, ledger, provenance
+  and native tables. On the settle path that transaction is S8-G's (which also writes the
+  terminal); on the status path S9-C opens one for the read. S9-C adds a spec that asserts
+  S9-A's copy of the §3.7 catalogue equals S8-C's runtime `UNRESOLVED_CODE`.
 - **C-10 (wording).** `relationship_closure: 'not_applicable'` means "no bucket-j identity of the
   family carries a declared edge" (see A.2 deviation 5), never "not checked". R12's "`null` only
   for D-S9-3/D-S9-4 fields" also lists `media_policy`, `pagination_terminal_evidence` and

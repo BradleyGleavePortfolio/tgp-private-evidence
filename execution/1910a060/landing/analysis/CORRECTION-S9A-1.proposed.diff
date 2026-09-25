@@ -1,0 +1,21 @@
+--- land-s9a-1910.sh
++++ land-s9a-1910.sh (proposed CORRECTION-S9A-1)
+@@ -54,7 +54,7 @@
+ DONOR_HEAD=e1ec2fecb71f315b6721d426ba0dacb84f304498
+ PFX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9
+ PFX_MANIFEST=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/runtime/formatter/raw/prefix-files.sha256
+-W=/home/user/workspace/worktrees/1910a060-land-s9a            # fresh standalone composition clone (created by compose)
++W=/home/user/workspace/worktrees/1910a060-land-s9a-2          # (S9A-1: -2, first clone preserved) fresh standalone composition clone (created by compose)
+ BR=land1910/s9a
+ LANDING=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing
+ SELECT=$LANDING/analysis/select_suites.py
+@@ -235,7 +235,8 @@
+   # --- runtime: copy (never install) node_modules from the donor; donor is read-only
+   D=$DONOR_REPO/node_modules
+   [ "$(git -C "$DONOR_REPO" rev-parse HEAD)" = "$DONOR_HEAD" ] || refuse 71 "donor clone HEAD != $DONOR_HEAD"
+-  git -C "$DONOR_REPO" diff --quiet "$DONOR_HEAD" "$TIP" -- prisma package.json package-lock.json || refuse 71 "donor schema/package inputs differ from tip"
++  # CORRECTION-S9A-1: compare in the composition clone; the read-only donor clone does not hold object M
++  git -C "$W" diff --quiet "$DONOR_HEAD" "$TIP" -- prisma package.json package-lock.json || refuse 71 "donor schema/package inputs differ from tip"
+   [ -d "$D" ] && [ ! -L "$D" ] || refuse 71 "donor node_modules absent or symlink"
+   [ "$(sha "$D/.package-lock.json")" = "$DONOR_NM_LOCK_SHA" ] && [ "$(sha "$D/.prisma/client/index.d.ts")" = "$DONOR_CLIENT_DTS_SHA" ] \
+     && [ "$(sha "$D/.prisma/client/schema.prisma")" = "$DONOR_CLIENT_SCHEMA_SHA" ] || refuse 71 "donor pins != relayed values"

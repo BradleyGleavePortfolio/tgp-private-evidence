@@ -6,7 +6,7 @@
  * → ScoutReconstructService.reconstructRun → S7-L arbitration — in independent OS processes
  * (test/utils/g2-s8g-worker.cjs) with the owned family registry AND planner mappers injected from
  * the fixture spec + rule set, against the accepted S7-L run objects and S8-B provenance objects
- * on the base 1c5fbb04 schema (S8-G ships no migration). Every assertion reads the database
+ * on the base 62471b11 schema (S8-G ships no migration; identical to 1c5fbb04). Every assertion reads the database
  * through psql as the fixture owner. The fixture platform's staged tokens (`people`, `blocks`,
  * `routines`, `log`) deliberately differ from the family names so token forwarding is observable.
  *

@@ -1,0 +1,72 @@
+--- a/test/scout/reconciliation/facts.service.spec.ts
++++ b/test/scout/reconciliation/facts.service.spec.ts
+@@ -117,7 +117,8 @@
+         },
+       );
+     }
+-    return db as unknown as FactsDb;
++    // `Row` is `Record<string, any>`; one typed assertion narrows the double to the service's seam.
++    return db as FactsDb;
+   }
+ 
+   private matches(row: Row, where: Row): boolean {
+@@ -254,8 +255,11 @@
+     week_index: 0,
+     day_index: 1,
+   });
+-  stage(db, 'blocks', 'B1', { title: 'Block', weeks: 4, days: 3 }, PLATFORM, coach);
+-  stage(db, 'routines', 'W1', { title: 'Day', block_id: 'B1', week: 1, day: 2 }, PLATFORM, coach);
++  // Staged under the canonical tokens: the S8-C writer keys its ledger rows by canonical family,
++  // and the D-S9-2 join is on the raw wide identity (token, platform, source_id) — see the
++  // negative case under "ledger join on the wide identity".
++  stage(db, 'programs', 'B1', { title: 'Block', weeks: 4, days: 3 }, PLATFORM, coach);
++  stage(db, 'workouts', 'W1', { title: 'Day', block_id: 'B1', week: 1, day: 2 }, PLATFORM, coach);
+   ledger(db, 'programs', 'B1', 'reconstructed', { target_id: program.id, target_kind: 'workout_program' }, PLATFORM, coach);
+   ledger(db, 'workouts', 'W1', 'reconstructed', { target_id: plan.id, target_kind: 'workout_plan' }, PLATFORM, coach);
+   provenance(db, 'programs', 'B1', 'workout_program', program.id, 'created', null, PLATFORM, coach);
+@@ -368,10 +372,10 @@
+   describe('ledger join on the wide identity', () => {
+     it('attaches failed / skipped / reconstructed facts and leaves the missing row null', async () => {
+       const db = new FakeDb();
+-      stage(db, 'routines', 'W1', { title: 'a' });
+-      stage(db, 'routines', 'W2', { title: 'b' });
+-      stage(db, 'routines', 'W3', { title: 'c' });
+-      stage(db, 'routines', 'W4', { title: 'd' });
++      stage(db, 'workouts', 'W1', { title: 'a' });
++      stage(db, 'workouts', 'W2', { title: 'b' });
++      stage(db, 'workouts', 'W3', { title: 'c' });
++      stage(db, 'workouts', 'W4', { title: 'd' });
+       ledger(db, 'workouts', 'W1', 'failed', { reason: 'error:Error' });
+       ledger(db, 'workouts', 'W2', 'skipped', { reason: 'unresolved:missing_required_field:type' });
+       ledger(db, 'workouts', 'W3', 'reconstructed', { target_id: 'evidence-1', target_kind: null });
+@@ -398,6 +402,21 @@
+       expect(facts.ledger_without_staged).toBe(1);
+       expect(family(facts, 'workouts').ledger_without_staged).toBe(1);
+     });
++    it('does NOT join a step-token staged row to a canonical-token ledger row for the same id', async () => {
++      // D-S9-2 wide identity is raw: `routines/W1` and `workouts/W1` are two identities even though
++      // both resolve to `workouts`. The ledger row is an orphan attributed to the family it evidences.
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      ledger(db, 'workouts', 'W1', 'reconstructed', { target_id: 'p-1', target_kind: 'workout_plan' });
++      provenance(db, 'workouts', 'W1', 'workout_plan', 'p-1', 'created');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      const w = family(facts, 'workouts');
++      expect(w.identities.map((i) => [i.token, i.identity, i.ledger])).toEqual([
++        ['routines', identityKey(PLATFORM, 'W1'), null],
++      ]);
++      expect(w.ledger_without_staged).toBe(1);
++      expect(facts.ledger_without_staged).toBe(1);
++    });
+     it('counts an orphan ledger row run-wide even when its token resolves to no family', async () => {
+       const db = new FakeDb();
+       stage(db, 'routines', 'W1', { title: 'a' });
+@@ -478,7 +497,7 @@
+     });
+     it('carries an unresolved top-level provenance row verbatim (outcome, reason)', async () => {
+       const db = new FakeDb();
+-      stage(db, 'routines', 'W1', { title: 'a', client_id: 'C7' });
++      stage(db, 'workouts', 'W1', { title: 'a', client_id: 'C7' });
+       ledger(db, 'workouts', 'W1', 'reconstructed', { target_id: 'ev-1', target_kind: 'scout_entity' });
+       provenance(db, 'workouts', 'W1', 'workout_plan', null, 'unresolved', 'unresolved:no_native_client_principal');
+       const facts = await service().collect(db.client(), COACH, INTENT);

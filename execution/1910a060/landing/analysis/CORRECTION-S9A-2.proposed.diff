@@ -1,0 +1,22 @@
+--- land-s9a-1910.sh
++++ land-s9a-1910.sh (proposed CORRECTION-S9A-2)
+@@ -54,7 +54,7 @@
+ DONOR_HEAD=e1ec2fecb71f315b6721d426ba0dacb84f304498
+ PFX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9
+ PFX_MANIFEST=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/runtime/formatter/raw/prefix-files.sha256
+-W=/home/user/workspace/worktrees/1910a060-land-s9a-2          # (S9A-1: -2, first clone preserved) fresh standalone composition clone (created by compose)
++W=/home/user/workspace/worktrees/1910a060-land-s9a-3          # (S9A-2: -3; clones -1/-2 preserved) fresh standalone composition clone (created by compose)
+ BR=land1910/s9a
+ LANDING=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing
+ SELECT=$LANDING/analysis/select_suites.py
+@@ -284,7 +284,9 @@
+   [ $rc = 0 ] || refuse 79 "must-run Jest failed (raw log preserved; no retry)"
+   git diff --quiet || refuse 79 "a suite modified tracked files"
+   [ "$(git write-tree)" = "$PRED_TREE" ] || refuse 79 "index drifted from the predicted tree"
+-  [ -z "$(git status --porcelain --untracked-files=all | grep -v '^?? node_modules/' || true)" ] || refuse 79 "suites left untracked files: $(git status --porcelain --untracked-files=all | head -5 | tr '\n' ' ')"
++  # CORRECTION-S9A-2: only '??' entries are untracked; the 4 staged 'A ' merge adds are expected here
++  UT=$(git status --porcelain --untracked-files=all | grep '^??' | grep -v '^?? node_modules/' || true)
++  [ -z "$UT" ] || refuse 79 "suites left untracked files: $(echo "$UT" | head -5 | tr '\n' ' ')"
+   # --- one genuine hooked commit (pre-commit: R75 staged, tsc, eslint, prettier, prod-readiness-quick; commit-msg: R3)
+   MSG=$RUN_DIR/commit-message.txt
+   printf 'Merge S9-A reconciler (%s) into integration/importer\n\nComposes the accepted S9-A candidate %s (tree %s, parent %s) onto the landed S8-F merge\n%s. The merged tree %s is the exact union: the 4 S9-A paths byte for byte on top of\n%s, with no overlapping path. No composition edit and no regeneration.\nNon-production branch. Production promotion stays the separate owner stage.\n' \

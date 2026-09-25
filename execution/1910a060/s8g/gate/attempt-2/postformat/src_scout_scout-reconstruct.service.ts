@@ -1,0 +1,685 @@
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { Events } from '../analytics/events';
+import { PrismaService } from '../prisma.service';
+import { isCanonicalPlatform } from './scout-platform';
+import {
+  buildFamilyRegistry,
+  isPersistOutcome,
+  type FamilyReconstructor,
+  type StagedRow,
+} from './reconstruct/families';
+import {
+  planRun,
+  type PlannedSource,
+  type UnmappedGroup,
+} from './reconstruct/orchestration/family-plan';
+import {
+  LEGACY_RUN,
+  RunPassStopped,
+  type FamilyPassResult,
+  type RunContext,
+  type RunPassResult,
+  type ServerRunContext,
+} from './reconstruct/orchestration/run-context';
+import { buildSourceMapperRegistry } from './reconstruct/source-mapper-registry';
+import {
+  RECONSTRUCT_ENTITY_TYPE,
+  RECONSTRUCT_MAX_ROWS,
+  RECONSTRUCT_PAGE_SIZE,
+  RECONSTRUCT_STATUS,
+  type ScoutReconstructResult,
+} from './scout-reconstruct.dto';
+
+/**
+ * IMPORTER-F + IMPORTER-H — reconstruct a settled crawl intent's staged entities
+ * of one family into canonical records (D2, Op 59 + Op 63). The `clients` family
+ * reconstructs into invite-pending, non-login, tenant-owned roster `Person`
+ * records; non-person families (`workouts`, `client_history`) reconstruct into
+ * the generic canonical `ScoutReconstructedEntity` table. The engine is keyed on
+ * entity_type via a family registry — ONE parameterized mechanism, no cloned
+ * pipelines.
+ *
+ * Guarantees (family-independent — the engine owns them, not the family):
+ *  - Post-settle only: a still-running intent is rejected (no partial import).
+ *  - Fail-closed family: an unregistered entity_type is a 400 before any read.
+ *  - Bounded fan-out: staged rows are counted first, an over-ceiling intent is
+ *    rejected fail-closed, and the rest are read one deterministic page at a
+ *    time — never the whole roster at once and never an unbounded query burst.
+ *  - Idempotent: the canonical target is keyed on the tenant-scoped external_ref
+ *    and the ledger on the wide identity (coach_id, intent_id, entity_type,
+ *    source_platform, source_id), both upserted, so a replay mints no new rows
+ *    and returns identical counts. A concurrent replay that loses the insert
+ *    race (unique violation) is retried once and converges, never a spurious
+ *    `failed`. A unique violation that persists after the retry cannot be the
+ *    wide identity (the retry's upsert would have matched it): it is an
+ *    unexpected unique violation (G2-C: no narrow key remains) and is a 409
+ *    with nothing written, never a fabricated ledger outcome.
+ *  - Poison-row isolation: each staged row is reconstructed in its own
+ *    transaction inside a try/catch; one bad row is recorded `failed` and its
+ *    siblings still reconstruct.
+ *  - Honest accounting: counts are read back from the durable ledger, so
+ *    `staged === reconstructed + skipped + failed` always holds.
+ *  - No credential is ever minted and email is never used as a key.
+ */
+@Injectable()
+export class ScoutReconstructService {
+  private readonly logger = new Logger(ScoutReconstructService.name);
+  private readonly families = buildFamilyRegistry();
+  /** The planner's `(platform, token) → family` seam (S8-G); same repository specs the families read. */
+  private readonly sourceMappers = buildSourceMapperRegistry();
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analytics: AnalyticsService,
+  ) {}
+
+  async reconstruct(
+    coachId: string,
+    intentId: string,
+    entityType: string = RECONSTRUCT_ENTITY_TYPE,
+  ): Promise<ScoutReconstructResult> {
+    // Fail closed on an unknown family BEFORE any read or write, so a family the
+    // engine cannot map (e.g. billing) can never leave a partial reconciliation.
+    const family = this.families.get(entityType);
+    if (!family) {
+      throw new BadRequestException(`unsupported reconstruct family: ${entityType}`);
+    }
+
+    await this.assertSettled(coachId, intentId);
+
+    const where = {
+      coach_id: coachId,
+      intent_id: intentId,
+      entity_type: entityType,
+    };
+
+    const staged = await this.prisma.scoutIngestEntity.count({ where });
+    this.assertWithinBound(coachId, intentId, staged);
+
+    // Deterministic paged read (ordered by source_id, source_platform — the
+    // staged identity, total per family at G2-C): bounded memory + a
+    // bounded number of queries regardless of roster size. Each row is
+    // reconstructed idempotently, so a re-run picks up exactly where a prior
+    // pass left off without minting duplicates.
+    for (let skip = 0; skip < staged; skip += RECONSTRUCT_PAGE_SIZE) {
+      const page = await this.prisma.scoutIngestEntity.findMany({
+        where,
+        select: { source_id: true, source_platform: true, payload: true },
+        orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
+        take: RECONSTRUCT_PAGE_SIZE,
+        skip,
+      });
+      for (const row of page) {
+        await this.reconstructRow(family, coachId, intentId, row, LEGACY_RUN);
+      }
+    }
+
+    const result = await this.tally(coachId, intentId, entityType, staged);
+
+    // PII-safe observability: correlation ids + counts only, never any staged
+    // payload. A failed row is a warn so operators can alert on reconstruction
+    // failures without inspecting the service_role-only ledger table directly.
+    const summary = {
+      intent_id: intentId,
+      coach_id: coachId,
+      staged: result.staged,
+      reconstructed: result.reconstructed,
+      skipped: result.skipped,
+      failed: result.failed,
+    };
+    if (result.failed > 0) {
+      this.logger.warn(`scout.reconstruct completed with failures ${JSON.stringify(summary)}`);
+    } else {
+      this.logger.log(`scout.reconstruct completed ${JSON.stringify(summary)}`);
+    }
+
+    this.analytics.capture(coachId, Events.SCOUT_RECONSTRUCT_COMPLETED, {
+      intent_id: intentId,
+      entity_type: entityType,
+      staged: result.staged,
+      reconstructed: result.reconstructed,
+      skipped: result.skipped,
+      failed: result.failed,
+    });
+
+    return result;
+  }
+
+  /**
+   * S8-G — one reconstruction pass over an OPEN server run (phase `reconciling`,
+   * terminal null), driven by `ScoutLifecycleService.onTransferSettled`. Not the
+   * settled gate: the §3.1 gate inside every per-row transaction is the only
+   * admission check, so a fence (cancel, deadline, revoke) that lands between
+   * two rows stops the pass at the next row with nothing further written.
+   *
+   * The distinct staged `(source_platform, entity_type)` groups of the run are
+   * planned once (`planRun`: token → canonical family through the source spec,
+   * contract §3.8 order). Each planned source runs as the legacy engine would
+   * (count-bound, paged, one transaction per row) with the run context threaded
+   * into `reconstructRow`; the staged token is forwarded on each row so the
+   * native families dispatch on it and the ledger groups by it. An unmapped token
+   * is ledgered `skipped` per row with the exact S8-A reason (gate-first too).
+   *
+   * Family-level isolation: an over-ceiling source or a structural provenance
+   * conflict stops THAT source only (recorded on its result, no new reason code)
+   * and the next family still runs. A closed gate (`RunPassStopped`) ends the
+   * whole pass. The pass never writes `terminal_status`, `completed_at`,
+   * `reason_code`, `fenced_at` or `execution_epoch`: the caller's arbiter tail
+   * reads the durable rows under the run lock and writes the terminal under its
+   * CAS. Counts here are informational and read back from the ledger.
+   */
+  async reconstructRun(
+    coachId: string,
+    intentId: string,
+    ctx: ServerRunContext,
+  ): Promise<RunPassResult> {
+    const groups = await this.prisma.scoutIngestEntity.groupBy({
+      by: ['source_platform', 'entity_type'],
+      where: { coach_id: coachId, intent_id: intentId },
+      _count: { _all: true },
+    });
+    const plan = planRun(groups, this.sourceMappers, this.families);
+    const unmappedFamilies = [...new Set(plan.unmapped.map((group) => group.token))];
+    const families: FamilyPassResult[] = [];
+    let stopped: RunPassResult['stopped'] = null;
+    try {
+      for (const planned of plan.ordered) {
+        const family = this.families.get(planned.family);
+        // planRun only plans registered families; fail closed if that ever changes.
+        if (!family) throw new Error(`unregistered planned family: ${planned.family}`);
+        for (const source of planned.sources) {
+          families.push(await this.runFamilySource(family, coachId, intentId, source, ctx));
+        }
+      }
+      for (const group of plan.unmapped) {
+        families.push(await this.runUnmappedSource(coachId, intentId, group, ctx));
+      }
+    } catch (err) {
+      if (!(err instanceof RunPassStopped)) throw err;
+      stopped = 'gate_closed';
+    }
+    const summary = {
+      intent_id: intentId,
+      coach_id: coachId,
+      epoch: ctx.epoch,
+      stopped,
+      families: families.map((f) => ({
+        token: f.token,
+        family: f.family,
+        staged: f.staged,
+        reconstructed: f.reconstructed,
+        skipped: f.skipped,
+        failed: f.failed,
+        stopped: f.stopped,
+      })),
+      unmapped_families: unmappedFamilies,
+    };
+    if (stopped !== null || families.some((f) => f.failed > 0 || f.stopped !== null)) {
+      this.logger.warn(`scout.reconstruct run pass stopped or degraded ${JSON.stringify(summary)}`);
+    } else {
+      this.logger.log(`scout.reconstruct run pass completed ${JSON.stringify(summary)}`);
+    }
+    return { families, unmapped_families: unmappedFamilies, stopped };
+  }
+
+  /**
+   * One planned (platform, token) source of a canonical family: the legacy
+   * engine's count-bound paged loop with the token forwarded on every row.
+   * Over-ceiling (409 before any write) and a structural provenance conflict are
+   * isolated to this source; a closed gate propagates and ends the pass.
+   */
+  private async runFamilySource(
+    family: FamilyReconstructor,
+    coachId: string,
+    intentId: string,
+    source: PlannedSource,
+    ctx: ServerRunContext,
+  ): Promise<FamilyPassResult> {
+    let stopped: FamilyPassResult['stopped'] = null;
+    try {
+      this.assertWithinBound(coachId, intentId, source.staged);
+    } catch (err) {
+      if (!(err instanceof ConflictException)) throw err;
+      stopped = 'over_ceiling';
+    }
+    if (stopped === null) {
+      const where = {
+        coach_id: coachId,
+        intent_id: intentId,
+        entity_type: source.token,
+        source_platform: source.source_platform,
+      };
+      try {
+        for (let skip = 0; skip < source.staged; skip += RECONSTRUCT_PAGE_SIZE) {
+          const page = await this.prisma.scoutIngestEntity.findMany({
+            where,
+            select: { source_id: true, source_platform: true, payload: true, entity_type: true },
+            orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
+            take: RECONSTRUCT_PAGE_SIZE,
+            skip,
+          });
+          for (const row of page) {
+            await this.reconstructRow(family, coachId, intentId, row, ctx);
+          }
+        }
+      } catch (err) {
+        if (err instanceof RunPassStopped) throw err;
+        if (!(err instanceof ProvenanceConflict)) throw err;
+        stopped = 'provenance_conflict';
+      }
+    }
+    const result = await this.tallyPass(coachId, intentId, source);
+    this.analytics.capture(coachId, Events.SCOUT_RECONSTRUCT_COMPLETED, {
+      intent_id: intentId,
+      entity_type: source.token,
+      staged: source.staged,
+      reconstructed: result.reconstructed,
+      skipped: result.skipped,
+      failed: result.failed,
+    });
+    return {
+      token: source.token,
+      source_platform: source.source_platform,
+      family: family.entityType,
+      staged: source.staged,
+      ...result,
+      stopped,
+    };
+  }
+
+  /**
+   * A staged token no spec maps to a registered family: every row is ledgered
+   * `skipped` with the exact S8-A reason (`unresolved_family:<token>` or
+   * `unsupported_platform:<platform>`), gate-first, so the run's accounting
+   * (`staged = reconstructed + skipped + failed` per token) holds and the arbiter
+   * sees the token in `unmapped_families`. A noncanonical platform token is a
+   * structural conflict (the ledger CHECK would refuse it): nothing is written.
+   */
+  private async runUnmappedSource(
+    coachId: string,
+    intentId: string,
+    group: UnmappedGroup,
+    ctx: ServerRunContext,
+  ): Promise<FamilyPassResult> {
+    const base = {
+      token: group.token,
+      source_platform: group.source_platform,
+      family: null,
+      staged: group.staged,
+    };
+    if (!isCanonicalPlatform(group.source_platform)) {
+      return { ...base, reconstructed: 0, skipped: 0, failed: 0, stopped: 'provenance_conflict' };
+    }
+    const where = {
+      coach_id: coachId,
+      intent_id: intentId,
+      entity_type: group.token,
+      source_platform: group.source_platform,
+    };
+    for (let skip = 0; skip < group.staged; skip += RECONSTRUCT_PAGE_SIZE) {
+      const page = await this.prisma.scoutIngestEntity.findMany({
+        where,
+        select: { source_id: true, source_platform: true, payload: true, entity_type: true },
+        orderBy: [{ source_id: 'asc' }, { source_platform: 'asc' }],
+        take: RECONSTRUCT_PAGE_SIZE,
+        skip,
+      });
+      for (const row of page) {
+        await this.writeOutcome(
+          group.token,
+          coachId,
+          intentId,
+          row,
+          RECONSTRUCT_STATUS.skipped,
+          group.reason,
+          ctx,
+        );
+      }
+    }
+    const result = await this.tallyPass(coachId, intentId, group);
+    return { ...base, ...result, stopped: null };
+  }
+
+  /** Ledger read-back for one (platform, token) source of a run pass. */
+  private async tallyPass(
+    coachId: string,
+    intentId: string,
+    source: PlannedSource,
+  ): Promise<Pick<FamilyPassResult, 'reconstructed' | 'skipped' | 'failed'>> {
+    const grouped = await this.prisma.scoutReconstructionLedger.groupBy({
+      by: ['status'],
+      where: {
+        coach_id: coachId,
+        intent_id: intentId,
+        entity_type: source.token,
+        source_platform: source.source_platform,
+      },
+      _count: { _all: true },
+    });
+    const count = (status: string): number =>
+      grouped.find((g) => g.status === status)?._count._all ?? 0;
+    return {
+      reconstructed: count(RECONSTRUCT_STATUS.reconstructed),
+      skipped: count(RECONSTRUCT_STATUS.skipped),
+      failed: count(RECONSTRUCT_STATUS.failed),
+    };
+  }
+
+  /**
+   * §3.1 gate-first (S8-G): for a server run the caller-supplied `assertRunOpen`
+   * UPDATE is the first statement of the transaction and its row lock; the epoch
+   * it returns must equal the one the pass was started under (per-row CAS). A
+   * legacy context performs no statement at all.
+   */
+  private async gateRun(tx: Prisma.TransactionClient, ctx: RunContext): Promise<void> {
+    if (ctx.mode !== 'server') return;
+    const seen = await ctx.gate(tx);
+    if (seen === null || seen !== ctx.epoch) throw new RunPassStopped();
+  }
+
+  /**
+   * Reject reconstruction of an intent that has not settled to a terminal
+   * status. Post-settle only: reconstructing a live crawl would race the
+   * still-arriving ingest and produce a partial roster.
+   */
+  private async assertSettled(coachId: string, intentId: string): Promise<void> {
+    const importRow = await this.prisma.scoutImport.findUnique({
+      where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
+      select: { terminal_status: true },
+    });
+    if (!importRow || importRow.terminal_status === null) {
+      throw new ConflictException(
+        'scout import intent has not settled; reconstruction is post-settle only',
+      );
+    }
+  }
+
+  /**
+   * Reject an over-ceiling intent before any Person is minted or ledger row is
+   * written. Failing closed here (rather than truncating) keeps the pass
+   * all-or-nothing at the boundary and avoids partial-success ambiguity.
+   */
+  private assertWithinBound(coachId: string, intentId: string, staged: number): void {
+    if (staged > RECONSTRUCT_MAX_ROWS) {
+      this.logger.warn(
+        `scout.reconstruct rejected oversized intent ${JSON.stringify({
+          intent_id: intentId,
+          coach_id: coachId,
+          staged,
+          max: RECONSTRUCT_MAX_ROWS,
+        })}`,
+      );
+      throw new ConflictException(
+        `scout import intent has ${staged} staged entities, over the ${RECONSTRUCT_MAX_ROWS} per-pass ceiling`,
+      );
+    }
+  }
+
+  /**
+   * Reconstruct one staged row for the given family. Skips (mapper rejection)
+   * write a ledger outcome unless success was already committed. Ordinary map
+   * and target errors are isolated; structural provenance conflicts and terminal
+   * ledger failures stop the operation rather than inventing durable accounting.
+   *
+   * S8-G: `ctx` is threaded into every transaction this row opens; for a server
+   * run the §3.1 gate is the first statement of each (`gateRun`) and a closed
+   * gate (`RunPassStopped`) propagates unchanged — never a fabricated `failed`.
+   * The ledger row carries the staged token when the caller forwarded one
+   * (`row.entity_type`, run passes) and the family's own token otherwise (the
+   * coach-JWT route, which selects no token — unchanged).
+   */
+  private async reconstructRow(
+    family: FamilyReconstructor,
+    coachId: string,
+    intentId: string,
+    row: StagedRow,
+    ctx: RunContext,
+  ): Promise<void> {
+    // Old ingestion may have admitted noncanonical tokens. Never normalize or
+    // invent provenance; a structural failure stops this operation truthfully.
+    if (!isCanonicalPlatform(row.source_platform)) {
+      throw new ProvenanceConflict();
+    }
+    const ledgerType = row.entity_type ?? family.entityType;
+    let mapped: ReturnType<FamilyReconstructor['map']>;
+    try {
+      mapped = family.map(row);
+    } catch (err) {
+      await this.writeOutcome(
+        ledgerType,
+        coachId,
+        intentId,
+        row,
+        RECONSTRUCT_STATUS.failed,
+        summarizeError(err),
+        ctx,
+      );
+      return;
+    }
+    if (!mapped.ok) {
+      await this.writeOutcome(
+        ledgerType,
+        coachId,
+        intentId,
+        row,
+        RECONSTRUCT_STATUS.skipped,
+        mapped.reason,
+        ctx,
+      );
+      return;
+    }
+    try {
+      await retryContention(() =>
+        this.prisma.$transaction(async (tx) => {
+          // §3.1 gate first (server runs only); a legacy context issues nothing here.
+          await this.gateRun(tx, ctx);
+          // Keep target-before-ledger lock order compatible with old writers.
+          const result = await family.persist(tx, coachId, row.source_id, mapped.mapped);
+          if (isPersistOutcome(result)) {
+            // S8-C typed handoff: the native target kind/id (or the
+            // database-determined unresolved reason) lands in the SAME
+            // transaction and the SAME precedence update as the status.
+            if (!result.ok) {
+              await this.writeLedger(
+                tx,
+                ledgerType,
+                coachId,
+                intentId,
+                row,
+                RECONSTRUCT_STATUS.skipped,
+                null,
+                result.reason,
+              );
+              return;
+            }
+            await this.writeLedger(
+              tx,
+              ledgerType,
+              coachId,
+              intentId,
+              row,
+              RECONSTRUCT_STATUS.reconstructed,
+              result.targetId,
+              null,
+              result.targetKind,
+            );
+            return;
+          }
+          // Legacy `string | null` result: ledger target_kind stays NULL (never reinterpreted).
+          await this.writeLedger(
+            tx,
+            ledgerType,
+            coachId,
+            intentId,
+            row,
+            RECONSTRUCT_STATUS.reconstructed,
+            result,
+            null,
+          );
+        }),
+      );
+    } catch (err) {
+      if (err instanceof ProvenanceConflict) throw err;
+      if (err instanceof RunPassStopped) throw err;
+      await this.writeOutcome(
+        ledgerType,
+        coachId,
+        intentId,
+        row,
+        RECONSTRUCT_STATUS.failed,
+        summarizeError(err),
+        ctx,
+      );
+    }
+  }
+
+  private async writeOutcome(
+    entityType: string,
+    coachId: string,
+    intentId: string,
+    row: StagedRow,
+    status: string,
+    reason: string,
+    ctx: RunContext,
+  ): Promise<void> {
+    // A terminal ledger-write failure propagates: do not report a fabricated
+    // durable outcome. Success/skip/failure transactions each retry at most once.
+    await retryContention(() =>
+      this.prisma.$transaction(async (tx) => {
+        await this.gateRun(tx, ctx);
+        await this.writeLedger(tx, entityType, coachId, intentId, row, status, null, reason);
+      }),
+    );
+  }
+
+  /**
+   * Final (N) ledger write: one wide-identity upsert, then the precedence
+   * update. The staged row's platform is part of the identity, so there is no
+   * claim step — the database's NOT NULL + canonical CHECK (R) and the wide key
+   * are the arbiter. A concurrent insert of the same identity surfaces as P2002
+   * and the caller retries the whole transaction once; the retry's upsert then
+   * matches the committed row and proceeds to precedence.
+   */
+  private async writeLedger(
+    tx: Prisma.TransactionClient,
+    entityType: string,
+    coachId: string,
+    intentId: string,
+    row: StagedRow,
+    status: string,
+    targetId: string | null,
+    reason: string | null,
+    targetKind: string | null = null,
+  ): Promise<void> {
+    const identity = {
+      coach_id: coachId,
+      intent_id: intentId,
+      entity_type: entityType,
+      source_platform: row.source_platform,
+      source_id: row.source_id,
+    };
+    // `target_kind` (S8-B closed set, S8-C typed handoff) is only ever carried
+    // alongside a typed target; a legacy write leaves the column untouched so
+    // historical NULL kinds are never rewritten or reinterpreted.
+    const outcome = {
+      status,
+      target_id: targetId,
+      reason,
+      ...(targetKind === null ? {} : { target_kind: targetKind }),
+    };
+    await tx.scoutReconstructionLedger.upsert({
+      where: { coach_id_intent_id_entity_type_source_platform_source_id: identity },
+      create: { ...identity, ...outcome },
+      // Do NOT change status before checking precedence. A no-op upsert can
+      // race an insert; P2002 retries the entire transaction, never part of it.
+      update: {},
+    });
+    // The precedence UPDATE holds the row lock until commit. Under ReadCommitted
+    // a waiting writer rechecks the predicate against the winner's current row.
+    // Non-success attempts are last serialized writer wins; success dominates
+    // T attempts, preserving target AND reason of a committed reconstruction.
+    await tx.scoutReconstructionLedger.updateMany({
+      where: {
+        ...identity,
+        ...(status === RECONSTRUCT_STATUS.reconstructed
+          ? {}
+          : { status: { not: RECONSTRUCT_STATUS.reconstructed } }),
+      },
+      data: outcome,
+    });
+  }
+
+  /** Read counts back from the durable ledger so replays are self-consistent. */
+  private async tally(
+    coachId: string,
+    intentId: string,
+    entityType: string,
+    staged: number,
+  ): Promise<ScoutReconstructResult> {
+    const grouped = await this.prisma.scoutReconstructionLedger.groupBy({
+      by: ['status'],
+      where: { coach_id: coachId, intent_id: intentId, entity_type: entityType },
+      _count: { _all: true },
+    });
+    const count = (status: string): number =>
+      grouped.find((g) => g.status === status)?._count._all ?? 0;
+    return {
+      intent_id: intentId,
+      staged,
+      reconstructed: count(RECONSTRUCT_STATUS.reconstructed),
+      skipped: count(RECONSTRUCT_STATUS.skipped),
+      failed: count(RECONSTRUCT_STATUS.failed),
+    };
+  }
+}
+
+/** No source, tenant, payload or database detail in a structural error. */
+class ProvenanceConflict extends ConflictException {
+  constructor() {
+    super('reconstruction provenance conflict');
+  }
+}
+
+/**
+ * Only actual Prisma insert races / transaction conflicts, once per attempt. A
+ * unique violation that survives the retry is not a race: the wide-identity
+ * upsert would have matched a committed row of the same identity, so the
+ * violation comes from a unique key this writer does not select on (G2-C: no
+ * narrow key remains; an unexpected constraint, never the identity). It is
+ * reported as the same fail-closed 409 the T writer returned, with nothing
+ * written.
+ */
+async function retryContention<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (err) {
+    if (!isContention(err)) throw err;
+    try {
+      return await operation();
+    } catch (again) {
+      if (again instanceof Prisma.PrismaClientKnownRequestError && again.code === 'P2002') {
+        throw new ProvenanceConflict();
+      }
+      throw again;
+    }
+  }
+}
+
+function isContention(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(err.code)
+  );
+}
+
+/**
+ * Collapse an arbitrary thrown value into a short, non-PII reason string for the
+ * ledger. Never includes the staged payload — only the error class/code.
+ */
+function summarizeError(err: unknown): string {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) return `error:Prisma.${err.code}`;
+  // Error.name is mutable and can carry arbitrary source/database content.
+  if (err instanceof Error) return 'error:Error';
+  return 'error:unknown';
+}

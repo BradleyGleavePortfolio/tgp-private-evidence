@@ -1,0 +1,25 @@
+--- a/src/scout/reconciliation/facts.service.ts
++++ b/src/scout/reconciliation/facts.service.ts
+@@ -5,7 +5,6 @@
+   CHILD_ENTITY_TYPE,
+   NATIVE_KIND,
+   PROVENANCE_OUTCOME,
+-  childSourceIdPrefix,
+ } from '../reconstruct/native/native-contract';
+ import { buildNativeFamilies } from '../reconstruct/native/native-families';
+ import {
+@@ -537,9 +536,12 @@
+           target_kind: isLedgerTargetKind(led.target_kind) ? led.target_kind : null,
+           provenance: prov === null ? null : this.provenanceFacts(coachId, led, prov, children, native),
+         };
+-      default:
++      default: {
+         // Out-of-type status: surfaced as-is so S9-A's catch-all (k) sees it, never re-labelled.
+-        return { status: led.status } as unknown as LedgerRowFacts;
++        // `LedgerRowFacts` is a closed union; the single typed assertion widens `status` only.
++        const passthrough: { status: string } = { status: led.status };
++        return passthrough as LedgerRowFacts;
++      }
+     }
+   }
+ 

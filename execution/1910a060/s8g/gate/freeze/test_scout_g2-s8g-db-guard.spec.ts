@@ -133,7 +133,7 @@ describe('S8-G PG17 disposable target guard', () => {
     expect(() => withFixturePassword(base, 'a@b')).toThrow();
   });
   it('pins the base head and migration count identically across bootstrap, harness and repository', () => {
-    const BASE_HEAD = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
+    const BASE_HEAD = '62471b116267fdec6746073c4b4c80a154d09834';
     const EXPECTED_MIGRATIONS = 172;
     const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
     const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
@@ -169,7 +169,7 @@ describe('S8-G PG17 disposable target guard', () => {
     }
   });
   it('binds the proof to one attested, clean, non-base candidate head; the worker attests before any client', () => {
-    const base = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
+    const base = '62471b116267fdec6746073c4b4c80a154d09834';
     const candidate = 'a'.repeat(40);
     expect(g2S8gCandidateHead(candidate, `${candidate}\n`, '')).toBe(candidate);
     expect(() => g2S8gCandidateHead(undefined, candidate, '')).toThrow(/G2_S8G_CANDIDATE_HEAD/);
