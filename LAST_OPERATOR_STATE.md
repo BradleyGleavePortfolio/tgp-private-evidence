@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live proof cursor: 2026-09-25 05:39Z
+
+S7-L a68cdac7/tree6c00e248 has dual independent changed-question GO, closing the observed message assertion and leaked-holder proof defects. `execution/64e33dc7/S7L_V3_SINGLE_PG_PROOF_GRANT.md` activates one new exact v3 invocation on fresh `proof-v3` paths; S7-L alone owns the heavy slot. Parent verified no holder/process/listener and both retained lanes stopped05:38:04Z. No acceptance yet.
+
+S8-C87018a42 remains frozen after bootstraprc7 before Jest; both runtime-only causal reviews are active. Failed S7 v2 and S8 v3 clusters/receipts remain untouched. Neither replacement is accepted or landed; F stays frozen and G prerequisite-gated.
+
 ## Live proof cursor: 2026-09-25 05:35Z
 
 S8-C's first exact87018a42/v3 proof terminated naturallyrc7 during bootstrap05:33:24Z, before Jest. Its raw generated-client/schema byte comparison refused after migration application; causal classification is under two independent runtime-only reviews. Cleanup reports stop0/postgres0/listeners0/survivor none; parent verified no canonical holder/heavy process/55641-or-55642 listener05:34:42Z. Failed data, sentinel and logs stay intact; no retry, generation or acceptance. See `execution/64e33dc7/S8C_FAILED_PROOF_DISPOSITION.md`.

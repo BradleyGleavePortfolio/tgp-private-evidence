@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live proof cursor, 2026-09-25 05:39Z
+
+`S7L_V3_SINGLE_PG_PROOF_GRANT.md` is the sole active heavy authority: one exact a68cdac7/v3 proof on fresh proof-v3 paths after dual GO and verified stopped retained lanes. S8-C's first bootstrap failure is under independent read-only diagnosis only. No source correction, S8 retry or product acceptance is implied.
+
 ## Live failed-proof cursor, 2026-09-25 05:35Z
 
 S8-C's first v3 proof failedrc7 in bootstrap's raw client-schema comparison before Jest; cleanup and slot release are complete. `S8C_FAILED_PROOF_DISPOSITION.md` assigns only new runtime-receipt causal review and terminal receipt completion, no retry or correction. S7-L a68cdac7/v3 remains under dual changed-question review. No heavy grant is active, neither replacement is accepted or landed, and all prior failures remain intact.
