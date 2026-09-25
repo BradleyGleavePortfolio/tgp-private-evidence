@@ -21,8 +21,14 @@ BASE=93389265a846095b846fa8f1fb0dad782fb6ee9f          # integration/importer at
 MAIN_AT_PLAN=c23b9d9f3fcc106b92c061ceb7d04d7ec53038d7   # backend main, never written
 S7L_PARENT=a68cdac70d81aea384fdc99c01c9c983a08e80eb     # tree 6c00e248
 S8C_PARENT=87018a421f5be1064767d2cdd32e75ca935f7cdb     # tree cec7d05a
-S7L_FOLLOWUP_PATH=test/utils/g2-s7l-worker.cjs
-S8C_FOLLOWUP_PATH=test/utils/g2-s8c-bootstrap.sh
+S7L_FOLLOWUP_PATH=test/utils/g2-s7l-worker.cjs     # committed in df713fd9
+S8C_FOLLOWUP_PATH=test/utils/g2-s8c-bootstrap.sh    # committed in e0cee7e0
+S7L_OBSERVED_HEAD=df713fd9217df524915348ef8a42c797f288dde1   # informational; the head is always a parameter
+S8C_MIN_ANCESTOR=e0cee7e04bef88811310f6dde1fd921f45d103ad    # S8-C head must contain the bootstrap follow-up
+# Lane-private proof-harness paths (only default-Jest-excluded rls spec, g2 utils, lane db-guard spec).
+S7L_PRIVATE_RE='^(test/utils/g2-s7l-[^/]+|test/rls-g2-s7l\.spec\.ts|test/scout/g2-s7l-db-guard\.spec\.ts)$'
+S8C_PRIVATE_RE='^(test/utils/g2-s8c-[^/]+|test/rls-g2-s8c\.spec\.ts|test/scout/g2-s8c-db-guard\.spec\.ts)$'
+
 S7L_WT=/home/user/workspace/worktrees/64e33dc7-s7l
 S8C_WT=/home/user/workspace/worktrees/64e33dc7-s8c
 S7L_BRANCH=exec64/s7l-replacement
@@ -64,11 +70,11 @@ new_run_dir(){ # $1 = step name
   log "RUN $1 pid=$$ script=$0 script_sha=$(sha "$0") lib_sha=$(sha "${BASH_SOURCE[0]}")"
 }
 
-lane_vars(){ # $1 = s7l|s8c -> LANE_PARENT LANE_FOLLOWUP LANE_SLICE LANE_LABEL LANE_WT LANE_BRANCH
+lane_vars(){ # $1 = s7l|s8c -> LANE_PARENT(anchor) LANE_MIN LANE_PRIVATE_RE LANE_FOLLOWUP LANE_SLICE LANE_LABEL LANE_WT LANE_BRANCH
   case "$1" in
-    s7l) LANE_PARENT=$S7L_PARENT; LANE_FOLLOWUP=$S7L_FOLLOWUP_PATH; LANE_SLICE=s7-l
+    s7l) LANE_PARENT=$S7L_PARENT; LANE_MIN=; LANE_PRIVATE_RE=$S7L_PRIVATE_RE; LANE_FOLLOWUP=$S7L_FOLLOWUP_PATH; LANE_SLICE=s7-l
          LANE_LABEL="S7-L server-owned run lifecycle"; LANE_WT=$S7L_WT; LANE_BRANCH=$S7L_BRANCH ;;
-    s8c) LANE_PARENT=$S8C_PARENT; LANE_FOLLOWUP=$S8C_FOLLOWUP_PATH; LANE_SLICE=s8-c
+    s8c) LANE_PARENT=$S8C_PARENT; LANE_MIN=$S8C_MIN_ANCESTOR; LANE_PRIVATE_RE=$S8C_PRIVATE_RE; LANE_FOLLOWUP=$S8C_FOLLOWUP_PATH; LANE_SLICE=s8-c
          LANE_LABEL="S8-C native reconstruct writers"; LANE_WT=$S8C_WT; LANE_BRANCH=$S8C_BRANCH ;;
     *) refuse 64 "lane must be s7l or s8c, got '$1'" ;;
   esac
@@ -123,24 +129,37 @@ check_identity_range(){ # $1=base $2=head
   log "IDENTITY ok for $(git -C "$REPO" rev-list --count "$1..$2") commits in ${1:0:8}..${2:0:8}"
 }
 
-# Candidate lineage: HEAD^ == recorded parent (single parent), HEAD^..HEAD touches exactly the one follow-up path,
-# parent descends from BASE with no merges in BASE..HEAD.
+# Candidate lineage (LAND-1 revision). Each lane has a reviewed ANCHOR (the source-accepted head analysed by
+# LAND-PREP-1: S7-L a68cdac7, S8-C 87018a42) and an optional MIN ancestor (S8-C e0cee7e0, the committed bootstrap
+# follow-up). The candidate head is a PARAMETER because S8-C will get a new harness-correction head.
+# The rules:
+#  - the anchor, and MIN if set, are ancestors of the head;
+#  - every commit in BASE..head is single-parent (no merges);
+#  - anchor..head touches only lane-private proof-harness paths (LANE_PRIVATE_RE), none of them in the static import
+#    closure of the 27 composition suites (analysis/composition-suite-closure.txt), and never the contract;
+#  - the head's contract blob equals the analysed one;
+#  - the lane branch points at the head;
+#  - identity, no trailers and R3-clean over BASE..head.
 check_candidate_lineage(){ # $1=lane $2=head
-  lane_vars "$1"; local h=$2
+  lane_vars "$1"; local h=$2 p
   is_full_sha "$h" || refuse 64 "$1 head must be a full 40-hex sha"
   git -C "$REPO" cat-file -e "$h^{commit}" 2>/dev/null || refuse 74 "$1 head $h not present locally"
-  [ "$(git -C "$REPO" rev-list --parents -n1 "$h" | wc -w)" = 2 ] || refuse 74 "$1 head is not a single-parent commit"
-  [ "$(git -C "$REPO" rev-parse "$h^")" = "$LANE_PARENT" ] || refuse 74 "$1 head parent != $LANE_PARENT"
-  local paths; paths=$(git -C "$REPO" diff --name-only "$LANE_PARENT" "$h")
-  [ "$paths" = "$LANE_FOLLOWUP" ] || refuse 74 "$1 follow-up touches [$paths], expected only $LANE_FOLLOWUP"
+  git -C "$REPO" merge-base --is-ancestor "$LANE_PARENT" "$h" || refuse 74 "$1 anchor $LANE_PARENT is not an ancestor of $h"
+  if [ -n "$LANE_MIN" ]; then git -C "$REPO" merge-base --is-ancestor "$LANE_MIN" "$h" || refuse 74 "$1 required ancestor $LANE_MIN missing"; fi
   git -C "$REPO" merge-base --is-ancestor "$BASE" "$h" || refuse 74 "$1 head does not descend from $BASE"
   [ -z "$(git -C "$REPO" rev-list --merges "$BASE..$h")" ] || refuse 74 "$1 has merge commits over base"
+  local paths; paths=$(git -C "$REPO" diff --name-only "$LANE_PARENT" "$h")
+  for p in $paths; do
+    [[ "$p" =~ $LANE_PRIVATE_RE ]] || refuse 74 "$1 post-anchor path $p is not a lane-private proof-harness path"
+    grep -qxF "$p" "$LANDING_DIR/analysis/composition-suite-closure.txt" && refuse 74 "$1 post-anchor path $p is inside the composition suites' import closure"
+  done
   [ "$(git -C "$REPO" rev-parse "$h:$CONTRACT")" = "$( [ "$1" = s7l ] && echo $CONTRACT_S7L_BLOB || echo $CONTRACT_S8C_BLOB)" ] \
     || refuse 74 "$1 contract blob changed since the plan's merge-tree analysis"
   local br; br=$(git -C "$REPO" rev-parse "refs/heads/$LANE_BRANCH" 2>/dev/null || true)
   [ "$br" = "$h" ] || refuse 74 "$1 local branch $LANE_BRANCH is at ${br:-absent}, not $h"
   check_identity_range "$BASE" "$h"
-  log "LINEAGE $1 head=$h tree=$(git -C "$REPO" rev-parse "$h^{tree}") parent=$LANE_PARENT followup=$LANE_FOLLOWUP"
+  LANE_POST_ANCHOR_PATHS=$paths
+  log "LINEAGE $1 head=$h tree=$(git -C "$REPO" rev-parse "$h^{tree}") anchor=$LANE_PARENT min=${LANE_MIN:-none} post_anchor=[$(echo $paths)]"
 }
 
 # Acceptance record: an existing file naming the exact full head sha and an ACCEPT verdict.
@@ -175,10 +194,13 @@ check_pr_ci(){ # $1=pr number $2=expected head sha $3=1 if migration checks are 
 import json, sys
 checks = json.load(open(sys.argv[1])); want_mig = sys.argv[2] == "1"
 danger = {"danger", "danger dry-run (dangerfile.js)"}
+# LAND-1 correction. On a PR whose base is integration/importer, only these workflows trigger: CI,
+# Dependency Audit, H4 deploy readiness, pr-size-labeler and Migration Dry-Run (paths). Danger, CodeQL,
+# R75 / R100.A2, SBOM and Infra Lint trigger only for PRs whose base is main. Their results previously
+# attributed to #538 came from draft PR #530 (integration/importer -> main) being synchronized at 22:46Z;
+# see ci/s7-l/CHECKS.md. If a main-only check does appear, it must pass, except the Danger title rule.
 required = {"build-and-test", "rls-floor-guard", "rls-live-tests", "mwb-3-live-tests",
-            "Banned cast tokens (R75 / R100.A2)", "CodeQL JS/TS (javascript-typescript)",
-            "actionlint (.github/workflows/*.yml)", "shellcheck (scripts/*.sh)",
-            "npm audit (high+critical, whole graph)", "build-sbom", "test-deploy-readiness"}
+            "npm audit (high+critical, whole graph)", "test-deploy-readiness", "size-label"}
 if want_mig:
     required |= {"Forward migrations apply cleanly",
                  "New migrations are reversible (or explicitly marked IRREVERSIBLE)",

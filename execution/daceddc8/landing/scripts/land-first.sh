@@ -2,13 +2,16 @@
 # land-first.sh: land the FIRST accepted candidate onto integration/importer by ordinary fast-forward.
 # DRAFT, NOT EXECUTED by the planner (LAND-PREP-1). Parent-executed. No lock, no local heavy work.
 #
-# Usage (recommended order: FIRST=s8c; the symmetric FIRST=s7l is also supported, see PLAN.md section 1):
-#   FIRST=s8c FIRST_HEAD=<40-hex> bash land-first.sh preflight
-#   FIRST=s8c FIRST_HEAD=<40-hex> [DRAFT=1] bash land-first.sh stage
-#       Pushes land/<slice>-accepted and land/<slice> at the exact head, then opens the PR to integration/importer.
+# Usage (LAND-1 order: FIRST=s7l, FIRST_HEAD=df713fd9217df524915348ef8a42c797f288dde1; FIRST=s8c is the symmetric case):
+#   FIRST=s7l FIRST_HEAD=<40-hex> bash land-first.sh preflight
+#   FIRST=s7l FIRST_HEAD=<40-hex> [DRAFT=1] bash land-first.sh stage
+#       Pushes land/<slice>-accepted at the exact head and opens the PR from it to integration/importer. For a
+#       fast-forward first landing the landing head IS the accepted head, so no separate land/<slice> ref is pushed.
+#       LAND-1 note: for S7-L this stage was done by LAND-1 (draft PR #539 from land/s7-l-accepted). The
+#       adoption state file state/first-s7l.env lets 'ff' run without re-staging.
 #       DRAFT=1 lets the parent run CI while the PG proof or acceptance is pending. It is still a non-production
 #       remote write, so use it only if the parent authorises CI before acceptance (PROD-CI-1 precedent).
-#   FIRST=s8c FIRST_HEAD=<40-hex> ACCEPT_RECORD=<path> bash land-first.sh ff
+#   FIRST=s7l FIRST_HEAD=<40-hex> ACCEPT_RECORD=<path> bash land-first.sh ff
 #       Requires acceptance, PR head == exact head, green CI (Danger title = class C), and remote tip == BASE.
 #       Then it does one ordinary FF push and verifies with ls-remote.
 #
@@ -16,7 +19,7 @@
 . "$(dirname "$(readlink -f "$0")")/landing-lib.sh"
 
 STEP=${1:-}; case "$STEP" in preflight|stage|ff) ;; *) refuse 64 "usage: land-first.sh preflight|stage|ff" ;; esac
-: "${FIRST:=s8c}"; : "${FIRST_HEAD:?FIRST_HEAD (full sha of the accepted first candidate) is required}"
+: "${FIRST:=s7l}"; : "${FIRST_HEAD:?FIRST_HEAD (full sha of the accepted first candidate) is required}"
 lane_vars "$FIRST"
 new_run_dir "land-first-$STEP-$FIRST"
 STATE="$LANDING_DIR/state/first-$FIRST.env"; mkdir -p "$LANDING_DIR/state"
@@ -46,7 +49,6 @@ log "PREFLIGHT ok first=$FIRST head=$FIRST_HEAD tree=$(git -C "$REPO" rev-parse 
 if [ "$STEP" = stage ]; then
   [ -e "$STATE" ] && refuse 70 "state $STATE exists; a stage already ran (parent must disposition, no re-stage)"
   push_land_ref "$FIRST_HEAD" "land/$LANE_SLICE-accepted"
-  push_land_ref "$FIRST_HEAD" "land/$LANE_SLICE"
   BODY="$RUN_DIR/pr-body.md"
   cat >"$BODY" <<EOF
 Exact candidate bytes for $LANE_LABEL, head \`$FIRST_HEAD\` (tree \`$(git -C "$REPO" rev-parse "$FIRST_HEAD^{tree}")\`). This is a fast-forward of \`integration/importer\` \`${BASE:0:8}\`.
@@ -58,7 +60,7 @@ Exact candidate bytes for $LANE_LABEL, head \`$FIRST_HEAD\` (tree \`$(git -C "$R
 - The Danger PR-title failure is the known class C.
 EOF
   DRAFT_FLAG=(); [ "${DRAFT:-0}" = 1 ] && DRAFT_FLAG=(--draft)
-  URL=$(gh pr create -R "$GH_REPO" --base integration/importer --head "land/$LANE_SLICE" --title "$TITLE" \
+  URL=$(gh pr create -R "$GH_REPO" --base integration/importer --head "land/$LANE_SLICE-accepted" --title "$TITLE" \
         --body-file "$BODY" "${DRAFT_FLAG[@]}" 2>>"$RUN_DIR/gh.log") || refuse 77 "gh pr create failed"
   PR=${URL##*/}
   printf 'FIRST=%s\nFIRST_HEAD=%s\nPR=%s\nURL=%s\n' "$FIRST" "$FIRST_HEAD" "$PR" "$URL" >"$STATE"
@@ -72,7 +74,7 @@ fi
 [ "$FIRST" = "$(grep '^FIRST=' "$STATE" | cut -d= -f2)" ] || refuse 70 "state lane mismatch"
 PR=$(grep '^PR=' "$STATE" | cut -d= -f2); [[ "$PR" =~ ^[0-9]+$ ]] || refuse 70 "bad PR number in state"
 check_acceptance "$FIRST" "$FIRST_HEAD" "${ACCEPT_RECORD:-}"
-[ "$(remote_sha "refs/heads/land/$LANE_SLICE")" = "$FIRST_HEAD" ] || refuse 76 "land/$LANE_SLICE moved"
+[ "$(remote_sha "refs/heads/land/$LANE_SLICE-accepted")" = "$FIRST_HEAD" ] || refuse 76 "land/$LANE_SLICE-accepted moved"
 check_pr_ci "$PR" "$FIRST_HEAD" "$MIG"
 if [ "$(gh pr view "$PR" -R "$GH_REPO" --json isDraft --jq .isDraft)" = true ]; then
   gh pr ready "$PR" -R "$GH_REPO" >>"$RUN_DIR/gh.log" 2>&1 || refuse 77 "gh pr ready failed"

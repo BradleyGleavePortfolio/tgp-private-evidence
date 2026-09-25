@@ -15,6 +15,50 @@
 - `64e33dc7/S8C_SOURCE_GATES_GRANT.md` (the narrow generator transfer and the "later composition must regenerate from the combined real DTOs under a parent composition grant" rule)
 - `daceddc8/SCOPE.md` and `daceddc8/HALF_DONE_WORK.md` A5
 
+## LAND-1 revision (17:05Z): S7-L landed first, S8-C is composed second
+
+This section supersedes the order in section 1 and corrects the check list in section 4. The analysis in sections 2 and 3 is unchanged: the final tree does not depend on the order.
+
+**What happened**
+
+- S8-C's v4 proof failed (class B, harness only). S8-C will get a new head, a child of `e0cee7e0`.
+- The parent therefore took the symmetric fallback from section 1.
+- **S7-L `df713fd9` was accepted and landed by fast-forward.** PR [#539](https://github.com/BradleyGleavePortfolio/growth-project-backend/pull/539) was pre-staged as a draft. Its CI was green: 11 pass, 1 expected skip, no red. It was marked ready and then fast-forwarded with one ordinary push, `93389265..df713fd9`, at 17:05:00Z. The remote was verified with ls-remote and `gh api`. GitHub marked the PR MERGED at 17:05:02Z. `main` is still `c23b9d9f`. Full record: `ci/s7-l/LANDED.md`.
+
+**Next: compose S8-C second onto `df713fd9`.**
+- Command: `SECOND=s8c SECOND_HEAD=<accepted S8-C head> FIRST_HEAD=df713fd9217df524915348ef8a42c797f288dde1 timeout -k 30 5400 bash scripts/compose-second.sh`.
+- It uses prettier prefix `recovery-reset/s8c/tools/prettier-3.9.9`, which is manifest-verified at 17:06Z.
+- It uses the S7-L worktree `node_modules`, whose schema equals the combined schema. That worktree must stay unmodified until composition finishes.
+- Contract regeneration is unchanged: S7-L's generator, now landed, runs over the combined DTOs. Expected output is blob `f9109c06`.
+- With today's S8-C head `e0cee7e0`, the predicted merged tree is `5dab5d5e`. With the corrected head, it is `5dab5d5e` plus the S8-C harness paths.
+- Then run `SECOND=s8c [DRAFT=1] bash scripts/land-second.sh stage`, followed by `ff` after acceptance.
+- PR title: "Land S8-C: native reconstruct writers, composed with S7-L (<short>)". The Migration Dry-Run checks do not trigger for S8-C, which has no migration.
+
+**Script changes**
+- Default order is now `FIRST=s7l`, `SECOND=s8c`. Both remain symmetric.
+- The S8-C head is a parameter.
+- Lineage is now anchor-based:
+  - the anchor `a68cdac7` or `87018a42` must be an ancestor of the head;
+  - for S8-C, `e0cee7e0` must also be an ancestor;
+  - no merges;
+  - post-anchor paths must match the lane-private harness pattern (`test/utils/g2-<lane>-*`, `test/rls-g2-<lane>.spec.ts`, `test/scout/g2-<lane>-db-guard.spec.ts`) and must lie outside the static import closure of the 27 composition suites (`analysis/composition-suite-closure.txt`, 975 files);
+  - the contract blob must be unchanged.
+- The predicted-tree check allows only those post-anchor paths as differences from `bb5436dd`.
+- `land-first.sh` opens the fast-forward PR from `land/<slice>-accepted`, as done for #539.
+- `check_pr_ci` now requires the checks that trigger on an integration/importer base (correction below).
+
+**Correction to section 4 (class C, plan text only).** The 20 checks attributed to PR #538 are really two sets:
+- **The 12-check set** that runs on a PR whose base is `integration/importer`: CI ×4, Migration Dry-Run ×3 (only when migrations are touched), npm audit, H4 ×3 and size-label.
+- **The main-only set:** Danger ×2, CodeQL ×2, R75, actionlint, shellcheck and build-sbom. This set ran because draft PR #530 (`integration/importer` → `main`) synchronized at 22:46Z. Those workflows filter on `pull_request: branches: [main]`.
+
+So Danger never runs on a `land/*` PR. Its title failure is a #530 artifact, which is known class C. Every integration fast-forward, including this one at 17:05:06Z, re-triggers the main-only set on #530. That is not a landing gate. It does not deploy, because deploys run only on a push to `main`.
+
+**Risk updates**
+- **R1 has now happened (class C).** The label `2.0.0-c1-s2.0` currently means S7-L's contract without `programs`. After S8-C is composed, the same label will mean the contract with `programs`. No consumer is pinned to those enums. Recorded; no action.
+- **R4 no longer applies** to `land/*` PRs.
+- **R5 was used** under LAND-1.
+- **R3 is unchanged:** S8-F should move onto the composed tip before it regenerates the contract.
+
 ## 0. Live facts
 
 | Fact | Value | Evidence |

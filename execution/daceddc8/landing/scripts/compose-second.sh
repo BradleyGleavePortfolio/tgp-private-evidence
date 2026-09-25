@@ -4,8 +4,9 @@
 # DRAFT, NOT EXECUTED by the planner (LAND-PREP-1). It runs only under a parent composition grant and in the
 # canonical heavy slot (queue item 6). The canonical lock is taken nonblocking in THIS process and held to exit.
 #
-# Usage (recommended: SECOND=s7l after FIRST=s8c landed; the symmetric SECOND=s8c is supported):
-#   SECOND=s7l SECOND_HEAD=<40-hex> FIRST_HEAD=<40-hex, == remote integration/importer> \
+# Usage (LAND-1 order: S7-L landed first, so SECOND=s8c; the symmetric SECOND=s7l is still supported).
+# SECOND_HEAD is a parameter. S8-C gets a new harness-correction head, a child of e0cee7e0, before acceptance:
+#   SECOND=s8c SECOND_HEAD=<40-hex accepted S8-C head> FIRST_HEAD=df713fd9217df524915348ef8a42c797f288dde1 \
 #     timeout -k 30 5400 bash compose-second.sh
 #
 # The first failure stops the run. State is preserved for disposition: there is no merge --abort, no retry and no
@@ -14,7 +15,7 @@
 #             75 lock, 79 jest, 80 commit.
 . "$(dirname "$(readlink -f "$0")")/landing-lib.sh"
 
-: "${SECOND:=s7l}"; : "${SECOND_HEAD:?SECOND_HEAD required}"; : "${FIRST_HEAD:?FIRST_HEAD required}"
+: "${SECOND:=s8c}"; : "${SECOND_HEAD:?SECOND_HEAD required}"; : "${FIRST_HEAD:?FIRST_HEAD required}"
 FIRST=$(other_lane "$SECOND")
 new_run_dir "compose-second-$SECOND"
 SUITES_FILE="$LANDING_DIR/analysis/composition-jest-suites.txt"
@@ -26,8 +27,8 @@ verify_hooks
 fetch_objects
 TIP=$(remote_sha "$TARGET_REF")
 [ "$TIP" = "$FIRST_HEAD" ] || refuse 74 "integration/importer is $TIP; FIRST ($FIRST) must already be landed at $FIRST_HEAD"
-check_candidate_lineage "$FIRST" "$FIRST_HEAD"
-check_candidate_lineage "$SECOND" "$SECOND_HEAD"
+check_candidate_lineage "$FIRST" "$FIRST_HEAD"; POST_FIRST=$LANE_POST_ANCHOR_PATHS
+check_candidate_lineage "$SECOND" "$SECOND_HEAD"; POST_SECOND=$LANE_POST_ANCHOR_PATHS
 lane_vars "$SECOND"; SLICE=$LANE_SLICE; LABEL=$LANE_LABEL; PFX_LANE=$SECOND
 git -C "$REPO" merge-base --is-ancestor "$SECOND_HEAD" "$FIRST_HEAD" && refuse 74 "SECOND already contained in FIRST"
 [ "$(git -C "$REPO" merge-base "$FIRST_HEAD" "$SECOND_HEAD")" = "$BASE" ] || refuse 74 "merge-base != $BASE"
@@ -37,10 +38,10 @@ PRED=$(git -C "$REPO" merge-tree --write-tree --name-only "$FIRST_HEAD" "$SECOND
 PRED_TREE=$(printf '%s\n' "$PRED" | head -1)
 [ $rc = 0 ] || refuse 74 "merge-tree reports conflicts rc=$rc: $(printf '%s' "$PRED" | tr '\n' ' ')"
 DELTA=$(git -C "$REPO" diff --name-only "$PRE_FOLLOWUP_MERGED_TREE" "$PRED_TREE" | sort | tr '\n' ' ')
-case "$DELTA" in
-  ""|"$S7L_FOLLOWUP_PATH "|"$S8C_FOLLOWUP_PATH "|"$S7L_FOLLOWUP_PATH $S8C_FOLLOWUP_PATH ") ;;
-  *) refuse 74 "predicted tree differs from the plan's merge beyond the two follow-ups: [$DELTA]" ;;
-esac
+for p in $DELTA; do
+  printf '%s\n' $POST_FIRST $POST_SECOND | grep -qxF "$p" \
+    || refuse 74 "predicted tree differs from the plan's merge (bb5436dd) at $p, which is not a lane-private post-anchor path"
+done
 [ "$(git -C "$REPO" rev-parse "$PRED_TREE:$CONTRACT")" = "$CONTRACT_MERGED_BLOB" ] || refuse 73 "predicted contract blob != $CONTRACT_MERGED_BLOB"
 log "PREDICTED tree=$PRED_TREE delta_vs_plan=[${DELTA:-none}] contract_blob=$CONTRACT_MERGED_BLOB"
 

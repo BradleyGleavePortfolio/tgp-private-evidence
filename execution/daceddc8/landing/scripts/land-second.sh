@@ -2,14 +2,14 @@
 # land-second.sh: stage and land the composed SECOND candidate (the merge commit from compose-second.sh) by ordinary
 # fast-forward of integration/importer. DRAFT, NOT EXECUTED by the planner (LAND-PREP-1). Parent-executed. No lock.
 #
-#   SECOND=s7l [DRAFT=1] bash land-second.sh stage
-#   SECOND=s7l ACCEPT_RECORD=<path naming SECOND_HEAD with ACCEPT> bash land-second.sh ff
+#   SECOND=s8c [DRAFT=1] bash land-second.sh stage     (LAND-1 order; SECOND=s7l is the symmetric case)
+#   SECOND=s8c ACCEPT_RECORD=<path naming SECOND_HEAD with ACCEPT> bash land-second.sh ff
 # The SECOND_HEAD, FIRST_HEAD and MERGE values come only from state/compose-<lane>.env, which compose-second.sh
 # writes. Environment overrides are refused.
 . "$(dirname "$(readlink -f "$0")")/landing-lib.sh"
 
 STEP=${1:-}; case "$STEP" in stage|ff) ;; *) refuse 64 "usage: land-second.sh stage|ff" ;; esac
-: "${SECOND:=s7l}"; lane_vars "$SECOND"
+: "${SECOND:=s8c}"; lane_vars "$SECOND"
 new_run_dir "land-second-$STEP-$SECOND"
 CS="$LANDING_DIR/state/compose-$SECOND.env"; [ -f "$CS" ] || refuse 70 "no compose state $CS"
 [ -z "${MERGE:-}${SECOND_HEAD:-}${FIRST_HEAD:-}" ] || refuse 64 "do not pass MERGE/SECOND_HEAD/FIRST_HEAD; they come from $CS"
