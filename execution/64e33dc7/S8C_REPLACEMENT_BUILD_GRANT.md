@@ -12,6 +12,7 @@ Read completely before writing: `OWNER_RECOVERY_RESET.md`, live G01-G22, mission
 
 - `src/scout/reconstruct/native/**` (new).
 - `src/scout/reconstruct/families.ts`: native persist registration and `resolveStep` dispatch wiring only.
+- `src/scout/reconstruct/mapping-spec.ts`: only the additive optional `programs?: EntityFieldRules` member and matching `entityRules` dispatch, under the draft-readiness amendment below.
 - `src/scout/scout-reconstruct.service.ts`: typed persist-result handoff and atomic ledger `target_kind` propagation only, under the amendment below.
 - `src/scout/scout-reconstruct.dto.ts`: canonical family list.
 - New `test/scout/reconstruct/native/**`, `test/rls-g2-s8c*.spec.ts`, `test/utils/g2-s8c-*`, `test/scout/g2-s8c-db-guard.spec.ts`.
@@ -46,3 +47,11 @@ Add focused tests in the owned new native test area and new S8-C PG proof for th
 DRAFT_READY must pin N1-N4 from `s8f/READINESS.md`: persisted kind/id, client-linked-workout evidence behavior, canonical family exposure and which targets receive native provenance. Concrete additional-path requirements still come back to the parent.
 
 Readiness A2 is a non-production sequencing qualification, not another build blocker: no reader/customer/flag activation before S8-F native materialization is accepted. S8-F is the immediate dependent reader slice. Both remain dark on non-production integration; no misleading customer-visible completeness claim is authorized.
+
+## Draft-readiness amendment: program mapping and proof order
+
+The new canonical `programs` family must be declared in the existing data-only mapping type and dispatched by `entityRules`. S8-C owns exactly those two additive lines in `src/scout/reconstruct/mapping-spec.ts`; no accepted mapping rules, fixtures or source-specific mappings change. Keep the programs feature and proof cases rather than dropping them to avoid the compiler error. Cover the new family through the new native specs and affected existing mapping tests. This is a draft compile/proof prerequisite, not an observed customer defect.
+
+The two generated enum additions are derived from the real DTOs. S7-L is currently using the canonical source-gate slot and remains the generator owner. After its source-gate release the parent may transfer only execution of the unchanged generator in S8-C's isolated worktree; no manual artifact edit, script/version/spec change or premature drift test is permitted. Record the generated delta and resolve any later composition by generation, not guessed JSON.
+
+The final paragraph and section 7 of `s8c/DRAFT_READY.md` are NOT a runtime grant. Correct execution order is source gates, genuine hooked commit and exact source/binding export; two independent nonbuilder final-head attestations; then a separate parent-granted single real-PG proof. No initdb, server, bootstrap, migration or PG test is authorized now. Any future runtime acquisition uses the canonical nonblocking `execution/test-validation.lock`; fresh proof data/socket paths are separate from that lock.
