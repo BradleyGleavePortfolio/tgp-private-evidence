@@ -1,0 +1,22 @@
+4c4,6
+< # Usage: prepare-binding-v4.sh <committed-head-sha>   (refuses uncommitted/dirty trees and an existing v4)
+---
+> # EXEC-DACEDDC8 derivation (daceddc8/SCOPE.md S8C-BC-2): identical to the frozen prepare-binding-v4.sh (2c6f01c3…) except the
+> # recorded enumeration reconsideration: other-lane loops also enumerate proof-v4/clusters/*/ (sibling S7-L v4 lane).
+> # Usage: prepare-binding-v4-daceddc8.sh <committed-head-sha>   (refuses uncommitted/dirty trees and an existing v4)
+39c41
+<     '# fresh v4 lane; retained clusters/s8-c (failed v3 run) and proof-v3/clusters/* (S7-L) are other lanes: never adopted, hashed pre/post\n')
+---
+>     '# fresh v4 lane; retained clusters/s8-c (failed v3 run) proof-v3/clusters/* and proof-v4/clusters/* other than this lane (S7-L) are other lanes: never adopted, hashed pre/post\n')
+41c43
+<     'for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}\n', 2)
+---
+>     'for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}\n', 2)
+46c48
+< { echo; echo "## v4 (bootstrap correction, S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT)"; echo "Fresh lane \`recovery-reset/proof-v4/clusters/s8-c\` and socket \`proof-v4/run/s8-c\`; head $H (parent $PARENT, one-file bootstrap delta). The failed v3 run, its sentinel and lane \`clusters/s8-c\` are retained, never adopted; both other-lane loops now exclude the own lane by actual path and also enumerate \`proof-v3/clusters/*/\`."; } >> "$V4/README.md"
+---
+> { echo; echo "## v4 (bootstrap correction, S8C_BOOTSTRAP_MINIMUM_CORRECTION_GRANT)"; echo "Fresh lane \`recovery-reset/proof-v4/clusters/s8-c\` and socket \`proof-v4/run/s8-c\`; head $H (parent $PARENT, one-file bootstrap delta). The failed v3 run, its sentinel and lane \`clusters/s8-c\` are retained, never adopted; both other-lane loops now exclude the own lane by actual path and also enumerate \`proof-v3/clusters/*/\` and \`proof-v4/clusters/*/\` (EXEC-DACEDDC8 enumeration reconsideration)."; } >> "$V4/README.md"
+56c58
+< [ "$(grep -cF 'for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}' "$V4/s8c-pg-proof.sh" || true)" = 2 ] || { echo "LOOP_REWRITE_COUNT != 2" >&2; exit 1; }
+---
+> [ "$(grep -cF 'for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}' "$V4/s8c-pg-proof.sh" || true)" = 2 ] || { echo "LOOP_REWRITE_COUNT != 2" >&2; exit 1; }

@@ -1,0 +1,59 @@
+--- /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v4/s8c-pg-proof.sh.v3	2026-09-25 16:09:33.861603848 +0000
++++ /home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v4/s8c-pg-proof.sh	2026-09-25 16:39:17.469603848 +0000
+@@ -20,7 +20,7 @@
+ # two independent non-builder final-head attestations → fill EXPECT_HEAD/EXPECT_TREE/EXPECT_*_BLOB/EXPECT_FIXTURE_SHA
+ # from the attested head (PINS.txt) → separate PG grant → this script, once.
+ set -uo pipefail
+-D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v3
++D=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/s8c/binding/v4
+ RUNTIME_ROOT=/home/user/workspace/execution/64e33dc7/recovery-reset
+ W=/home/user/workspace/worktrees/64e33dc7-s8c
+ R=$D/run; LOG=$R/s8c-pg-proof.log; SENT=$R/s8c-pg-proof.sentinel; JLOG=$R/jest.log
+@@ -28,15 +28,15 @@
+ # ---- pins: head pins are filled by the binding phase AFTER the attested S8-C head exists; the script refuses placeholders.
+ BASE_HEAD=93389265a846095b846fa8f1fb0dad782fb6ee9f                         # accepted base; identical in g2-s8c-db.ts/bootstrap
+ BASE_TREE=a315dd651b8c54c2e82f2260fcc6058f0d13b64a
+-EXPECT_HEAD=87018a421f5be1064767d2cdd32e75ca935f7cdb
+-EXPECT_TREE=cec7d05a91876ec3f6badb1020bb97aacdb9331d
++EXPECT_HEAD=e0cee7e04bef88811310f6dde1fd921f45d103ad
++EXPECT_TREE=b249efb66e22f4c13529f255f3510d4a81314a99
+ EXPECT_SPEC_BLOB=dc804fdef00757732a7e75eeb13dcd30d1920cb4                                 # test/rls-g2-s8c.spec.ts at the S8-C head
+-EXPECT_BOOTSTRAP_BLOB=8aa86de8164fef29d85ec6b0720ece0903fb8a70                            # test/utils/g2-s8c-bootstrap.sh
++EXPECT_BOOTSTRAP_BLOB=7c3fba471f991e3750eb56fd29e271101652196e                            # test/utils/g2-s8c-bootstrap.sh
+ EXPECT_DB_BLOB=a7d67217fe959f65daae9615e5f00806cc3764d3                                   # test/utils/g2-s8c-db.ts
+ EXPECT_PGH_BLOB=4059883d70c26aed46398af707645aaacb306868                                  # test/utils/g2-s8c-pg-harness.ts
+ EXPECT_HARNESS_BLOB=d5cbf8779007dddf3ae75db76d706e3050ef9ceb                              # test/utils/g2-s8c-harness.ts
+ EXPECT_WORKER_BLOB=484030636dee841bcd5aff1af42536128858ac77                               # test/utils/g2-s8c-worker.cjs
+-EXPECT_FIXTURE_SHA=1a7faa5ff4a4937216c329fa8ce810f559085c7ca8f9295c15f9e7a57c0a07b3                               # sha256 of binding/s8c-fixture.sh (frozen with this file)
++EXPECT_FIXTURE_SHA=c59326b56d8aaedf2cd509fb602cb64eb41620bf4c0c1773e2b4c5c6710685e9                               # sha256 of binding/s8c-fixture.sh (frozen with this file)
+ # ---- tool pins (RUNTIME_SETUP_RECEIPT.md, 2026-09-25T03:29:43Z; compare only, never adjusted at run time)
+ EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+ EXPECT_INITDB_SHA=b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
+@@ -47,7 +47,8 @@
+ EXPECT_NM_CLIENT_SHA=b6716a865a705ffc0efab30ed88cd163b461e5344ad64e5926a0dff078b49f44  # node_modules/.prisma/client/index.d.ts (schema 77f33bcd; S8-C ships no schema change)
+ EXPECT_SCHEMA_SHA=77f33bcdc36802f8e1d52553d011f546f56f757cacb391f23436ab266a148589
+ EXPECT_PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55   # package-lock.json @93389265
+-DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$CLUSTERS/s8-c; SOCK=$RUNTIME_ROOT/run/s8-c
++DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$RUNTIME_ROOT/proof-v4/clusters/s8-c; SOCK=$RUNTIME_ROOT/proof-v4/run/s8-c
++# fresh v4 lane; retained clusters/s8-c (failed v3 run) proof-v3/clusters/* and proof-v4/clusters/* other than this lane (S7-L) are other lanes: never adopted, hashed pre/post
+ PORT=55642; DBNAME=g2_s8c_disposable; ADMIN=s8c_super; FIXPASS=s8c_local_synthetic
+ FIX=$D/s8c-fixture.sh
+ export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1 NODE_OPTIONS=--max-old-space-size=4096 CHECKPOINT_DISABLE=1 \
+@@ -134,7 +135,7 @@
+ L=$(ss -ltn 2>/dev/null | grep -c ":$PORT " || true); [ "$L" = 0 ] || { log "PREFLIGHT_FAIL port $PORT listeners=$L"; fail 71; }
+ P=$(pgrep -cx postgres || true); [ "$P" = 0 ] || { log "PREFLIGHT_FAIL postgres procs=$P (another lane live; this proof never shares a server)"; fail 71; }
+ OTHER0=""
+-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-c ] || continue
++for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}
+   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "PREFLIGHT_FAIL $n postmaster.pid present"; fail 71; }
+   h="$n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; OTHER0="$OTHER0 $h"
+   log "PREFLIGHT other_lane=$h (must be unchanged at end; never started)"; done
+@@ -178,7 +179,7 @@
+ # ---- step 8 post (read-only)
+ STAGE=post
+ OTHER1=""
+-for d in "$CLUSTERS"/*/; do [ -d "$d" ] || continue; n=$(basename "$d"); [ "$n" != s8-c ] || continue
++for d in "$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/; do [ -d "$d" ] || continue; [ "${d%/}" != "$LANE" ] || continue; n=${d#$RUNTIME_ROOT/}; n=${n%/}
+   [ ! -e "$d/pg-data/postmaster.pid" ] || { log "POST_FAIL $n postmaster.pid appeared"; fail 74; }
+   OTHER1="$OTHER1 $n:$(sha "$d/pg-data/postgresql.conf" 2>/dev/null || echo ABSENT):$(sha "$d/pg-data/global/pg_control" 2>/dev/null || echo ABSENT)"; done
+ [ "$OTHER0" = "$OTHER1" ] || { log "POST_FAIL other lanes changed: before=[$OTHER0] after=[$OTHER1]"; fail 74; }

@@ -1,0 +1,46 @@
+From e0cee7e04bef88811310f6dde1fd921f45d103ad Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Fri, 25 Sep 2026 16:37:31 +0000
+Subject: [PATCH] S8-C: pin the accepted generated client schema copy by SHA256
+ in the G2 bootstrap
+
+Prisma normalizes the schema text it copies into the generated client, so a
+raw byte comparison against prisma/schema.prisma can never succeed even for
+the correct accepted client. Verify the copy by its exact accepted SHA256
+instead, still refusing a missing or different file with the same exit code,
+and keep every other engine, runtime, head, ancestry, migration and model
+check unchanged.
+---
+ test/utils/g2-s8c-bootstrap.sh | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/test/utils/g2-s8c-bootstrap.sh b/test/utils/g2-s8c-bootstrap.sh
+index 8aa86de8..7c3fba47 100755
+--- a/test/utils/g2-s8c-bootstrap.sh
++++ b/test/utils/g2-s8c-bootstrap.sh
+@@ -187,6 +187,8 @@ PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUN
+ 
+ # 6. Candidate client in the candidate root: generated once by the runtime setup (the schema is
+ #    the base schema, so it is the accepted S8-B client) and only VERIFIED here; no `prisma generate`.
++#    Prisma normalizes (re-aligns/reorders attributes in) the schema copy it emits into the client, so
++#    the copy is never byte-equal to prisma/schema.prisma; it is identity-pinned by exact SHA256 instead.
+ [[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
+ CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
+ [[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
+@@ -194,8 +196,11 @@ CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT
+ CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
+ [[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
+   || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
+-cmp -s "$ROOT/node_modules/.prisma/client/schema.prisma" "$ROOT/prisma/schema.prisma" \
+-  || { echo "candidate client schema is not the candidate prisma/schema.prisma (stale client; regenerate in the runtime slot, never here)" >&2; exit 7; }
++ACCEPTED_CLIENT_SCHEMA_SHA=ded50406332707e4fd473a75e0a5407d54eb309085a99edcaaceaa05cb25b249 # normalized copy emitted for the accepted schema
++[[ -f "$ROOT/node_modules/.prisma/client/schema.prisma" ]] \
++  || { echo "candidate client schema copy missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++[[ "$(sha256sum "$ROOT/node_modules/.prisma/client/schema.prisma" | cut -c1-64)" == "$ACCEPTED_CLIENT_SCHEMA_SHA" ]] \
++  || { echo "candidate client schema copy is not the accepted generated copy (expected sha256 $ACCEPTED_CLIENT_SCHEMA_SHA)" >&2; exit 7; }
+ grep -q 'model ImportNativeProvenance ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
+   || { echo "candidate client lacks ImportNativeProvenance (pre-S8-B client)" >&2; exit 7; }
+ awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +target_kind +String\?' \
+-- 
+2.53.0
+
