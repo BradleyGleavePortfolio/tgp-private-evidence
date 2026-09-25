@@ -8,6 +8,10 @@ New parallel T4 lineages start from freshly verified accepted backend integratio
 
 Canonical local lock/process absence was verified. Initial slot may be assigned to `RUNTIME_SETUP_GRANT.md`; source builders run concurrently without heavy tooling until relay. Fresh runtime namespace is `execution/64e33dc7/recovery-reset`, proof ports 55641/55642, distinct fresh data directories. Every acquisition still uses the canonical nonblocking lock, never deletion.
 
+Runtime setup completed once, rc0 at 03:29:43Z, with genuine npm lifecycle scripts, pinned PG17.6 tooling and an isolated dependency donor at the accepted base. The canonical lock was released and left in place; no cluster, database, compile or test ran. See `runtime/RUNTIME_SETUP_RECEIPT.md`. Builder source gates await an exact draft checkpoint and parent relay; PG still requires a separate grant.
+
+S8-C's narrow typed persistence-result/ledger `target_kind` handoff is authorized in its amended build grant. S8-F readiness is recorded at `s8f/READINESS.md`; native readers/customer flags stay inactive until the dependent native materialization slice is accepted. This non-production sequencing qualification does not block S7-L or S8-C source work.
+
 After acceptance and dependency reconciliation, land automatically to `integration/importer`. Production main, branch protection, G3-AUTH, S8-D/E principal/roster direction and real accounts remain reserved. Mobile CI lane stays accepted and closed at `affc2818`.
 
 ## Prior takeover snapshot, preserved

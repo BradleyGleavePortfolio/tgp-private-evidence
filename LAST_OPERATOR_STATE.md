@@ -8,6 +8,8 @@ Parallel source work is authorized on disjoint paths. S7-L owns lifecycle/schema
 
 Prior recovery-block statements below are preserved history and superseded by this owner-directed reset.
 
+Runtime setup is now DONE rc0 at 03:29:43Z; see `execution/64e33dc7/runtime/RUNTIME_SETUP_RECEIPT.md`. Its nonblocking canonical lock was released without deleting the file. No database, compile or test ran. Both replacement source lanes remain active; source gates await parent relay after a durable exact draft checkpoint. S8-C also owns only the narrow typed-target ledger handoff granted in its amendment; native reader/customer activation remains withheld until S8-F.
+
 ## Current takeover: EXEC-64E33DC7, September 25, 2026
 
 Current scope: `execution/64e33dc7/SCOPE.md`. Current ownership: the leading section of `execution/DISPATCHES.md`. Bradley's current-session EXECUTE and the autonomous-landing amendment remain active. The older cursor below is preserved verbatim as history, not current execution.
