@@ -133,3 +133,7 @@ There are no class A or B findings.
 | E2-F10 | C | Pre-formatting used prettier 3.9.9, while the repo pins 3.9.6. | None | The authoritative `check:format` runs under the slot (gate 5). | Commit |
 
 SOURCE_READY
+
+## Phase 2 addendum (17:36Z)
+
+The commit is `a889f4ade0e13d9f45aabd69c5878ff07e2038bf`, with tree `1c784e6c…`, the same tree as above. Local results: 69 files / 1859 tests, all gates passed, 0 audit findings and a genuine hook pass. The branch was pushed without force. The DRAFT PR is #30 on base `land/s4-r6`. CI is GREEN on the exact head: test ×2, codeql and secrets-scan. The details are in `ci/CI_RESULTS.md`.
