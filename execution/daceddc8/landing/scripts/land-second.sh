@@ -39,7 +39,8 @@ else TITLE="Land S8-C: native reconstruct writers, composed with S7-L (${SECOND_
 
 if [ "$STEP" = stage ]; then
   [ -e "$STATE" ] && refuse 70 "state $STATE exists; no re-stage"
-  push_land_ref "$SECOND_HEAD" "land/$LANE_SLICE-accepted"
+  # LAND-2 grants only land/<slice>. The land/<slice>-accepted convenience ref is opt-in (PUSH_ACCEPTED_REF=1).
+  [ "${PUSH_ACCEPTED_REF:-0}" = 1 ] && push_land_ref "$SECOND_HEAD" "land/$LANE_SLICE-accepted"
   push_land_ref "$MERGE" "land/$LANE_SLICE"
   BODY="$RUN_DIR/pr-body.md"
   cat >"$BODY" <<EOF
@@ -48,7 +49,7 @@ Composition of the accepted $LANE_LABEL candidate \`$SECOND_HEAD\` onto the land
 - The textual merge is conflict-free. The only path both candidates touch is \`$CONTRACT\`. It was regenerated from the combined DTOs with the unchanged S7-L generator and is byte-identical to the textual merge (blob \`${CONTRACT_MERGED_BLOB:0:12}\`). A cold-process regeneration also matched.
 - Local composition gates: the hooks ran R75, tsc (heap 4096), eslint and prettier 3.9.9, and the 27 Jest suites whose import closure spans both candidates passed. Receipt: \`$(basename "$(dirname "$(dirname "$RECEIPT")")")\`.
 - Landing: an ordinary fast-forward push of this exact merge after green CI. The GitHub merge button is not used. Non-production. \`main\` is untouched (#530 stays owner-reserved).
-- The Danger PR-title failure is the known class C.
+- Danger, CodeQL, R75, SBOM and Infra Lint trigger only for PRs whose base is \`main\`, so they do not run here (see #539).
 EOF
   DRAFT_FLAG=(); [ "${DRAFT:-0}" = 1 ] && DRAFT_FLAG=(--draft)
   URL=$(gh pr create -R "$GH_REPO" --base integration/importer --head "land/$LANE_SLICE" --title "$TITLE" \

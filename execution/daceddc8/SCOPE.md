@@ -299,3 +299,9 @@ See `64e33dc7/S8C_ACCEPTANCE.md`.
 - **Limits:** never touch `main`; no force. Any mismatch or red check other than known class C: stop and report.
 
 Afterwards the order is: S9-0 docs lands on the new head, then S8-F moves onto it, then S8-G starts.
+
+## E2 review GO (18:00Z)
+
+The independent T3 review (`daceddc8/e2/reviews/E2_REVIEW.md`) is GO on `a889f4ad`: no class A or B, 8 new class C items.
+
+PR #30 stays a DRAFT, stacked on `land/s4-r6` / PR #27. The parent did not change PR state and did not modify PR #27. Marking it ready and landing it on extension `main` both stay with Bradley: PR #27 first, then PR #30 retargeted, each with a non-author approval.
