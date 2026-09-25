@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live failed-proof cursor, 2026-09-25 05:35Z
+
+S8-C's first v3 proof failedrc7 in bootstrap's raw client-schema comparison before Jest; cleanup and slot release are complete. `S8C_FAILED_PROOF_DISPOSITION.md` assigns only new runtime-receipt causal review and terminal receipt completion, no retry or correction. S7-L a68cdac7/v3 remains under dual changed-question review. No heavy grant is active, neither replacement is accepted or landed, and all prior failures remain intact.
+
 ## Live proof cursor, 2026-09-25 05:29Z
 
 S8-C87018a42 is dual-GO for its exact v3 proof binding. `S8C_SINGLE_PG_PROOF_GRANT.md` grants one first real-PG execution after verified free canonical slot/processes, with S8-C sole heavy owner; the explicit execution relay has been delivered. It is not product acceptance. S7-L corrected spec is committeda68cdac7, source gates done and released; its fresh v3 binding froze05:30:27Z and final pins have been delivered to both changed-question reviewers. No S7-L rerun or other heavy work is granted.

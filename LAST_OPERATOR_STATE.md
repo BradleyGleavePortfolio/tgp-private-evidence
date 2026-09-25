@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live proof cursor: 2026-09-25 05:35Z
+
+S8-C's first exact87018a42/v3 proof terminated naturallyrc7 during bootstrap05:33:24Z, before Jest. Its raw generated-client/schema byte comparison refused after migration application; causal classification is under two independent runtime-only reviews. Cleanup reports stop0/postgres0/listeners0/survivor none; parent verified no canonical holder/heavy process/55641-or-55642 listener05:34:42Z. Failed data, sentinel and logs stay intact; no retry, generation or acceptance. See `execution/64e33dc7/S8C_FAILED_PROOF_DISPOSITION.md`.
+
+S7-L a68cdac7/v3 is frozen and both changed-question reviewers have exact pins. No heavy work is currently granted. Neither replacement is accepted or landed; F remains frozen and G prerequisite-gated.
+
 ## Live proof cursor: 2026-09-25 05:29Z
 
 S8-C87018a42/treecec7d05a has dual independent v3 GO with all four review findings closed. `execution/64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md` now grants its first single exact-bound database proof; S8-C alone owns the heavy slot. Parent verified no holder/process and absent fresh lane/sentinel at05:29:07Z. The earlier unauthorized source-gate retry remains expressly recorded, not retrospectively authorized.

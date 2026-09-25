@@ -1,5 +1,9 @@
 # LAST OPERATOR HANDOFF
 
+## Live continuation: 2026-09-25 05:35Z
+
+S8-C's first v3 run is terminal failedrc7 at bootstrap05:33:24Z, no Jest. Read `execution/64e33dc7/S8C_FAILED_PROOF_DISPOSITION.md`; two existing reviewers are assigned runtime-only causal diagnosis of the generated-client/schema byte mismatch. Cleanup and release were observed; authority ended, failed lane/sentinel/receipts frozen, no regeneration or retry. Await those dispositions and S7-L's two a68cdac7/v3 changed-question reviews before issuing any new minimum grant. No candidate acceptance or landing is implied.
+
 ## Live continuation: 2026-09-25 05:29Z
 
 S8-C87018a42 now has both independent v3 GO reports; `execution/64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md` is active for one exact-bound first database proof. S8-C alone has the heavy slot. Read its live run/sentinel before any later action; no retry, source correction or acceptance is implied. The unauthorized earlier source-gate retry is fully recorded and was not retrospectively authorized.

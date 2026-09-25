@@ -1,5 +1,11 @@
 # Current execution dispatches
 
+## Live override, 2026-09-25 05:35Z
+
+S8-C first PG authority ended on natural bootstraprc7 at05:33:24Z, before Jest; parent verified release/no heavy processes05:34:42Z. Builder may only finish the terminal receipt. Existing independent S8 reviewers are active for new RUNTIME_REVIEW_A/B under `64e33dc7/S8C_FAILED_PROOF_DISPOSITION.md`, limited to the actual generated-client/schema refusal and runtime evidence. No regeneration, repair or retry is granted.
+
+S7-L builder is frozen at a68cdac7/v3; its existing independent reviewers are active for RUNTIME_CORRECTION_REVIEW_A/B. No S7 PG yet and no heavy grantee. F remains frozen; G prerequisite-gated; no replacement acceptance or landing.
+
 ## Live override, 2026-09-25 05:29Z
 
 S8-C builder is the sole heavy grantee for exactly one first real-PG run under `64e33dc7/S8C_SINGLE_PG_PROOF_GRANT.md`, head87018a42/treecec7d05a/v3driver9ddb52de. Both REVIEW_A_V3 and REVIEW_B_V3 are GO; all four findings closed, source-gate deviation recorded without retroauthorization. Parent verified slot/process/lane preconditions05:29:07Z. No retry or source edit is granted.
