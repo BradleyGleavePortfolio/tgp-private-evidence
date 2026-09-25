@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live correction cursor: 2026-09-25 05:22Z
+
+Both S7-L runtime reviews are complete: the first proof remains failed and unaccepted, with no product defect evidenced because the S7-L schema was never reached. Parent granted only the SQLSTATE-message correction and unconditional release in that same held-transaction test, ordinary follow-up on54970cd9, and a v3 binding using fresh versioned data/socket/old-root paths. The failed v2 lane and all receipts stay intact. See `execution/64e33dc7/S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`; this explicitly updates the earlier one-line-only disposition after the second independent finding.
+
+S8-C's seven-path correction is committed at87018a42, treecec7d05a, four suites44/44 and genuine hooks passed; it released05:20:40Z. Parent verified no lock/heavy process at05:22:14Z and relayed only narrow source gates to S7-L. S8-C finishes its source-only exact export/v3 binding for changed-question dual review. Neither lane has a current PG execution grant; F remains frozen and G prerequisite-gated. No replacement is accepted or landed.
+
 ## Live correction cursor: 2026-09-25 05:16Z
 
 S7-L head54970cd9's first PG proof failed:21 failed/3 passed/24 total. It bootstrapped171 migrations, but the initial lock-test assertion expected SQLSTATE55P03 absent from default psql output; downstream failures include held locks and missing lifecycle columns. Independent reviewers are dispositioning the actual causal defects, not re-auditing accepted history. After the failed summary remained open, parent verified and terminated only the Jest-stage process group. The unchanged driver completed cleanup at05:14:22Z, terminalrc124, stoprc0, postgres0/listener0/survivor none; lock released, data retained. No acceptance or landing. See `execution/64e33dc7/S7L_FAILED_PROOF_DISPOSITION.md`.

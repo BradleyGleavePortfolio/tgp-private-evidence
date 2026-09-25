@@ -1,0 +1,53 @@
+# S7-L runtime failure disposition — independent reviewer A (first PG run of head 54970cd9 / binding v2)
+
+Reviewer: independent reviewer A (T4, nonbuilder). Written 2026-09-25T05:2xZ after the observed terminal cleanup (parent mail 05:14Z). Read-only disposition from the exact run receipts and the pinned source/proof objects; no tests, probes, Git, PG, lock or peer-review reads. `REVIEW_A.md` and `REVIEW_A_V2.md` untouched. **This run is NOT accepted**: the proof never reached the S7-L schema (POST_JEST applied_migrations=171), so no lifecycle behaviour on real PG is proven by it.
+
+## 1. Run identity and receipts (read)
+
+- Launch: `timeout -k 30 3900 bash …/s7l/binding/v2/s7l-pg-proof.sh` (`run/LAUNCHER.txt`, setsid), driver pid 17284, lock inode 691716 held in-process; `PRECONDITIONS_OK` 05:06:27Z (PG 17.6, psql 18.6, node 20.20.1, jest 30.4.1, prisma 6.19.3), `PREFLIGHT_OK` 05:06:34Z (lane/old-root absent, port free, porcelain sha = empty-string sha), `OLD_ROOT rc=0`, `FIXTURE_INIT rc=0`, `FIXTURE_START rc=0` (postmaster 18796), `BOOTSTRAP rc=0` 05:06:58Z (171 OLD migrations applied, OLD client generated, candidate client verified, same engine sha), `IDENTITY_OK` 05:06:59Z (170006, cluster marker, 171 applied, S7-L columns 0), `JEST_START` 05:06:59Z with the bound command on head `54970cd9…`.
+- Jest terminal summary (`run/jest.log`, sha256 `d6253d28…92a5`, matches `RECEIPTS.sha256`): `Tests: 21 failed, 3 passed, 24 total`, `Time: 294.68 s`, then `Jest did not exit one second after the test run has completed` (open handle).
+- Termination: `run/PARENT_TERM.txt` — parent verified stage pgid 19276 / jest pid 19277 and sent TERM to the stage group only at 05:14:22Z; driver 17284 untouched. Driver log: `JEST_END rc=124` (the `timeout` wrapper forwarding the TERM, not the 1800 s bound, which had ~7.4 min of 30 elapsed), `POST_JEST applied_migrations=171`, `STOP_FIRST_FAILURE stage=jest rc=124`, `S7L_FIXTURE_STOP_OK`, `CLEANUP_STOP rc=0 postgres_procs=0 port55641_listeners=0 survivor_pid=none`, `END rc=124 stage=jest`. Sentinel `RC=124 STAGE=jest … HEAD=54970cd9… LOCK_INODE=691716`. Now: no postgres/psql/jest processes; data dir `recovery-reset/clusters/s7l/pg-data` retained as designed.
+- `RECEIPTS.sha256`: `jest.log` OK; `s7l-pg-proof.log` FAILED — expected by construction: `finish()` hashes the log and then appends the `END …` line (driver L79-82), so the driver log's recorded hash is always of the pre-END content. Cosmetic (C4 below).
+
+## 2. What passed (3) — real observations, not acceptance
+
+Stage 1 tests 1-3 (`test/rls-g2-s7l.spec.ts` L222-262): the OLD-image legacy `/complete` writer settled a legacy run on the pre-S7-L schema (`PG17_PROCESS g2l_1 old:true acknowledged:true, 4 queries`); a decoy relation holding the partial-unique name and a decoy CHECK constraint holding an S7-L name each made `migration.sql` refuse with the fixed text `G2-S7L run lifecycle already present` with nothing created (shape/OIDs unchanged). These exercise the migration entry gates and the OLD writer on the fresh 171-migration cluster.
+
+## 3. First causal failure and the cascade
+
+**Failure 1 (first causal, proof defect):** stage 1 test 4 "a held transaction on the run table makes up hit lock_timeout (55P03)" — `test/rls-g2-s7l.spec.ts` L269 `refusedFile(upFile, '55P03')`. Observed: `migration.sql:28: ERROR: canceling statement due to lock timeout` after `migration.sql:25: WARNING: there is already a transaction in progress` (the documented redundant `--single-transaction`). The migration did exactly what it is designed to do — `SET LOCAL lock_timeout='5s'` (L26) then `LOCK TABLE public."ScoutImport" IN ACCESS EXCLUSIVE MODE` (L28) was cancelled by the held `FOR UPDATE` (ROW SHARE) holder — but psql at default `VERBOSITY` prints the message text, never the SQLSTATE `55P03`, so the substring assertion failed. The accepted S8-B proof asserts the message (`test/rls-g2-s8b.spec.ts` L254 `toMatch(/canceling statement due to lock timeout/)`); the S7-L spec deviated. Timing/shape assertions on L270-272 never ran.
+
+**Failure 2 (co-causal, proof defect, turns one failure into 21 + a hung process):** the same test has no `try/finally`; `holder.release()` (L273) is after the failing assertion, so the `holdTransaction` psql child (`g2-s7l-pg-harness.ts` L228-247, `service_role`, `BEGIN; SELECT 1 FROM "ScoutImport" WHERE coach_id='coach' FOR UPDATE; SELECT 'HELD'`) stayed alive with its transaction open for the rest of the run. S8-B wraps the same pattern in `try { … } finally { holder.release() }` (L245-262). Consequences observed:
+- Test 5 (down on OLD shape): `down.sql:17 LOCK TABLE … ACCESS EXCLUSIVE` → lock timeout instead of the `absent` text (cascade).
+- L01 `prisma migrate deploy`: 172 found, applying S7-L → `current transaction is aborted` (Prisma reports the last statement; the first was the same lock timeout) → S7-L never applied; POST_JEST 171 (cascade).
+- L02 rerun refusal: lock timeout instead of `already present` (cascade).
+- §3.1 gate SQL and FOR NO KEY UPDATE tests: `column "mode" of relation "ScoutImport" does not exist` (S7-L absent; cascade).
+- Stage 3, 4, 5 `beforeAll → resetData()` (spec L414/L550/L1004; `g2-s7l-harness.ts` L246-251 `DELETE FROM "ScoutImport"`) blocked on the holder's row locks → `spawnSync psql ETIMEDOUT` at the 60 s harness bound → every test in those describes reported the same error (14 failures) (cascade). `afterAll → resetData()` (L218) likewise → "Test suite failed to run" (cascade).
+- Elapsed 294.68 s ≈ 4 × 60 s psql timeouts + 4 × 5 s lock timeouts + baseline; `Jest did not exit`: the open handle is the holder child's stdio pipes; only the parent's TERM ended the stage.
+
+All 21 failures are accounted for by failure 1 (assertion text) and failure 2 (no release on failure). No failure message points at product code: the first ALTER/DDL of S7-L was never reached, no lifecycle service ran on the S7-L schema, no gate/fence/CAS/deadline/RLS assertion executed.
+
+## 4. Classification
+
+| # | Kind | Class | Concrete harm | Exact decision blocked | Minimum closure (paths) | Execution unlocked |
+|---|---|---|---|---|---|---|
+| P1 | Proof defect | **B** (proof only) | A correct product behaviour (lock_timeout cancel under a held lock) is asserted with a SQLSTATE token psql never prints; the single proof fails deterministically at stage 1 test 4 on every run. | S7-L runtime acceptance (the one PG proof). | `test/rls-g2-s7l.spec.ts` L269: expect the message text `canceling statement due to lock timeout` (S8-B pattern), no product change. | The next single PG run can pass stage 1 and reach L01. |
+| P2 | Proof defect | **B** (proof only) | An assertion failure inside the held-transaction test leaks a live psql holder: every later DDL/DELETE times out, 20 unrelated tests fail, Jest hangs on the open handle and needs an external TERM; one full proof slot and lane are consumed without testing the decision. | Same proof; also the ability to read any later stage's evidence from a run with one early failure. | `test/rls-g2-s7l.spec.ts` L263-278: wrap in `try { … } finally { holder.release(); }` (kill fallback if not exited), exactly as `test/rls-g2-s8b.spec.ts` L245-262; optionally track holders and `kill()` any survivor in `afterAll` before `resetData()`. No harness or product change required. | Same run; and a future single failure stays a single failure with the remaining stages still informative. |
+| — | Product defect | none evidenced | — | — | — | — |
+
+No class A finding. Nothing in this run evidences a product (migration, service, controller) defect; what the product did (171-history bootstrap, entry-gate refusals with the fixed text, lock_timeout cancel at the first LOCK TABLE, OLD legacy writer unchanged) matched the decision. That is evidence of those specific behaviours only, not acceptance.
+
+Class C records (no fixer, test or delay created):
+- C1: `JEST_END rc=124` is the `timeout` wrapper's exit after forwarding the parent's SIGTERM, not the 1800 s jest bound; the driver treated it correctly as a first-failure stop and ran the bounded fixture stop. Record only.
+- C2: The retained cluster's `_prisma_migrations` carries an unfinished S7-L row from the failed deploy (count query filters `finished_at IS NOT NULL`, hence 171). Irrelevant for a fresh lane; the driver preflight requires the lane absent, so the next run needs a parent-authorised `s7l-fixture.sh destroy` (marker-gated, separate decision) or a versioned lane path before it can start. Decision consequence: include lane disposal in the next execution grant.
+- C3: `migration.sql`/`down.sql` take `LOCK TABLE` before the existence gate (L28 / L17), so under a held conflicting lock they report lock timeout rather than the fixed gate text. This is the accepted S8-B ordering (stable existence check under the lock) and matched the proof's own design for test 4; test 5's `absent` expectation is only reached with no holder — which P2's closure restores. No change.
+- C4: `RECEIPTS.sha256` records the driver log before its final `END` line by construction (v1 and v2 alike). Cosmetic; a v3 binding may hash after logging END if convenient.
+- C5: The driver deliberately runs jest without `--forceExit`/`--detectOpenHandles` (header comment). With P2 closed the holder cannot leak; no driver change required for this cause.
+
+## 5. Candid limits of this run
+
+Nothing about S7-L on real PG beyond §2 is verified: L01 catalog exactness and RLS byte-equality, L02, the §3.1 gate serialization, the constraint matrix, L06 (`SET ROLE` mechanism), all stage-4 real-writer cases (L07-L12, CAS, lazy deadline incl. the F1 guard), and L03/L04 down/up remain unexecuted. The pinned `pg_get_constraintdef/indexdef` renderings are still unverified. The F1 guard and F2 role entry closed by 54970cd9 were not reached by this run. No S9 verdict path; no deployment or customer acceptance claimed.
+
+## 6. Disposition
+
+NOT ACCEPTED (failed run). Path to the next single PG proof, without reopening accepted architecture or the unchanged S7-L source audit: a minimum proof-only correction grant for `test/rls-g2-s7l.spec.ts` (P1 one expected string at L269; P2 try/finally around L263-278 with holder kill fallback), ordinary hooked Bradley follow-up commit on 54970cd9 with scoped gates (prettier/eslint/R75 on the one file; no unit suite is affected), binding v3 pinning the new head/tree/spec blob with `EXPECT_PARENT=54970cd9…` and the same fixture/tool pins, lane disposal authorised, two changed-question re-attestations, then one run. The product surface (`src/**`, `prisma/**`) needs no change for anything observed in this run.

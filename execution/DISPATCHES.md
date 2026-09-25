@@ -1,5 +1,11 @@
 # Current execution dispatches
 
+## Live override, 2026-09-25 05:22Z
+
+S8-C's seven-path correction is committed87018a42, treecec7d05a,44/44 and genuine hooks passed, released05:20:40Z. Builder completes only source-only export/v3 binding; no further gates or PG. Existing reviewers A/B await final pins for new immutable REVIEW_A_V3/REVIEW_B_V3 changed-question reports.
+
+S7-L's two runtime dispositions are complete. Parent adopted the one-spec error-text correction and actual same-stanza leaked-holder release as proof-only B under `64e33dc7/S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`, explicitly superseding the earlier one-line-only message after independent A. No global hardening or C work. At05:22:14Z parent verified no canonical holder/heavy process, inode691716 intact and free55641/55642; S7-L is sole narrow source-gate grantee. Fresh v3 data/socket/old-root paths preserve failed v2 state. Both lanes need final-head/binding changed-question dual GO and separate PG grants; neither proof is currently granted. F stays frozen, G prerequisite-gated.
+
 ## Live override, 2026-09-25 05:16Z
 
 S7-L terminal failed proof: rc124 after completed21-failed/3-passed summary and verified parent TERM of only the stuck Jest stage; bound cleanup rc0 and canonical lock released05:14:22Z. Builder receipt and two independent runtime-only failure dispositions remain active, with no source/gate/proof authority.

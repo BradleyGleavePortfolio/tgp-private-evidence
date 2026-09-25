@@ -1,0 +1,126 @@
+diff --git a/src/scout/reconstruct/native/native-contract.ts b/src/scout/reconstruct/native/native-contract.ts
+index b13313e8..b1b729bc 100644
+--- a/src/scout/reconstruct/native/native-contract.ts
++++ b/src/scout/reconstruct/native/native-contract.ts
+@@ -37,6 +37,7 @@ export type NativeFamily = (typeof NATIVE_FAMILY)[keyof typeof NATIVE_FAMILY];
+ export const UNRESOLVED_CODE = {
+   missing_required_field: 'missing_required_field',
+   invalid_value: 'invalid_value',
++  enum_unmapped: 'enum_unmapped',
+   prescription_not_integral: 'prescription_not_integral',
+   exercise_reference: 'exercise_reference',
+   no_native_client_principal: 'no_native_client_principal',
+@@ -53,6 +54,7 @@ export type UnresolvedCode = (typeof UNRESOLVED_CODE)[keyof typeof UNRESOLVED_CO
+ const QUALIFIED: ReadonlySet<UnresolvedCode> = new Set<UnresolvedCode>([
+   UNRESOLVED_CODE.missing_required_field,
+   UNRESOLVED_CODE.invalid_value,
++  UNRESOLVED_CODE.enum_unmapped,
+   UNRESOLVED_CODE.prescription_not_integral,
+   UNRESOLVED_CODE.relationship_pending,
+   UNRESOLVED_CODE.relationship_missing,
+diff --git a/src/scout/reconstruct/native/native-rules.ts b/src/scout/reconstruct/native/native-rules.ts
+index 4ee6d266..0b9aadec 100644
+--- a/src/scout/reconstruct/native/native-rules.ts
++++ b/src/scout/reconstruct/native/native-rules.ts
+@@ -326,7 +326,11 @@ function enumField(
+   if (typeof raw !== 'string' && typeof raw !== 'number') return invalid(field);
+   const key = String(raw).trim();
+   const mapped = Object.prototype.hasOwnProperty.call(rule.map, key) ? rule.map[key] : undefined;
+-  return mapped !== undefined && allowed.includes(mapped) ? present(mapped) : invalid(field);
++  // A present key absent from the explicit map is `enum_unmapped` (§3.7): the spec needs an
++  // entry, the data is not invalid. A mapped destination outside the native enum stays invalid.
++  if (mapped === undefined)
++    return { ok: false, reason: unresolved(UNRESOLVED_CODE.enum_unmapped, field) };
++  return allowed.includes(mapped) ? present(mapped) : invalid(field);
+ }
+ 
+ function flagField(payload: Prisma.JsonValue, rule: NativeRule | undefined): boolean {
+diff --git a/src/scout/reconstruct/native/native-writers.ts b/src/scout/reconstruct/native/native-writers.ts
+index db115ee9..605b59cc 100644
+--- a/src/scout/reconstruct/native/native-writers.ts
++++ b/src/scout/reconstruct/native/native-writers.ts
+@@ -368,13 +368,15 @@ export async function persistEvidence(
+     const existing = await findProvenance(tx, provenance);
+     if (existing !== null && existing.outcome !== PROVENANCE_OUTCOME.unresolved) {
+       // A native plan was already brought across for this identity; it stays the target.
++      // A failed verification (§3.5 `native_target_removed` / `identity_conflict`) is returned
++      // as-is before any evidence or provenance write: the CREATED row is never rewritten.
+       const verified = await verifyTarget(tx, coachId, existing, 'workout_plan');
+-      if (verified.ok)
+-        return ok(
+-          verified.targetId,
+-          LEDGER_TARGET_KIND.workout_plan,
+-          await countUnresolvedChildren(tx, provenance),
+-        );
++      if (!verified.ok) return verified;
++      return ok(
++        verified.targetId,
++        LEDGER_TARGET_KIND.workout_plan,
++        await countUnresolvedChildren(tx, provenance),
++      );
+     }
+   }
+   const record = await tx.scoutReconstructedEntity.upsert({
+diff --git a/test/scout/reconstruct/native/native-rules.spec.ts b/test/scout/reconstruct/native/native-rules.spec.ts
+index 1c74b7fc..b695a72c 100644
+--- a/test/scout/reconstruct/native/native-rules.spec.ts
++++ b/test/scout/reconstruct/native/native-rules.spec.ts
+@@ -319,7 +319,12 @@ describe('interpretWorkout', () => {
+     expect(
+       linked.ok && [linked.mapped.programSourceId, linked.mapped.weekIndex, linked.mapped.dayIndex],
+     ).toEqual(['p-1', 0, 2]);
++    // Present key absent from the explicit enum map → enum_unmapped (§3.7), not invalid_value.
+     expect(interpretWorkout(rules, seam({ kind: 'yoga' }))).toEqual({
++      ok: false,
++      reason: 'unresolved:enum_unmapped:type',
++    });
++    expect(interpretWorkout(rules, seam({ kind: { not: 'a key' } }))).toEqual({
+       ok: false,
+       reason: 'unresolved:invalid_value:type',
+     });
+diff --git a/test/scout/reconstruct/native/native-writers.spec.ts b/test/scout/reconstruct/native/native-writers.spec.ts
+index c5d26c88..3c83d39e 100644
+--- a/test/scout/reconstruct/native/native-writers.spec.ts
++++ b/test/scout/reconstruct/native/native-writers.spec.ts
+@@ -446,4 +446,41 @@ describe('persistEvidence (workouts kept as evidence)', () => {
+     });
+     expect(tx.entities.size).toBe(0);
+   });
++
++  it('returns a failed verification as-is and writes nothing (plan gone or foreign)', async () => {
++    const tx = fresh();
++    const native = await persistWorkoutTemplate(tx.asTx(), COACH, ROW, standalone);
++    if (!native.ok) throw new Error('setup');
++    const created = { ...[...tx.provenance.values()][0] };
++    expect(created).toMatchObject({ outcome: 'created', native_id: native.targetId });
++
++    // Coach archived the plan → native_target_removed; no evidence row, provenance untouched.
++    tx.plans.get(native.targetId)!.archived_at = new Date();
++    tx.calls = [];
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
++    expect(tx.calls).toEqual(['importNativeProvenance.findUnique', 'workoutPlan.findUnique']);
++
++    // Coach deleted the plan → still native_target_removed.
++    tx.plans.delete(native.targetId);
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
++
++    // Provenance points at another tenant, or at the wrong native kind → identity_conflict.
++    tx.plans.set(native.targetId, { id: native.targetId, coach_id: 'coach-b', archived_at: null });
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    [...tx.provenance.values()][0].native_kind = 'workout_program';
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++
++    expect(tx.entities.size).toBe(0);
++    expect(tx.plans.size).toBe(1);
++    expect([...tx.provenance.values()]).toEqual([{ ...created, native_kind: 'workout_program' }]);
++    expect(tx.calls.filter((c) => /upsert|update|create/.test(c))).toEqual([]);
++  });
+ });

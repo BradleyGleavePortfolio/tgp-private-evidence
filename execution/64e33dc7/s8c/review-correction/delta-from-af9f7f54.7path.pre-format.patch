@@ -1,0 +1,310 @@
+diff --git a/src/scout/reconstruct/native/native-contract.ts b/src/scout/reconstruct/native/native-contract.ts
+index b13313e8..3a08d3de 100644
+--- a/src/scout/reconstruct/native/native-contract.ts
++++ b/src/scout/reconstruct/native/native-contract.ts
+@@ -32,11 +32,18 @@ export type ProvenanceOutcome = (typeof PROVENANCE_OUTCOME)[keyof typeof PROVENA
+  */
+ export const NATIVE_FAMILY = { programs: 'programs', workouts: 'workouts' } as const;
+ export type NativeFamily = (typeof NATIVE_FAMILY)[keyof typeof NATIVE_FAMILY];
++/**
++ * Provenance `entity_type` of a workout's nested exercise children (§3.3). Not a
++ * staged family: the unique provenance key omits `native_kind` and top-level
++ * source ids are arbitrary text, so children live in their own namespace.
++ */
++export const CHILD_ENTITY_TYPE = { workouts_exercise: 'workouts.exercise' } as const;
+ 
+ /** Closed unresolved code catalogue (§3.7). A code takes at most one qualifier. */
+ export const UNRESOLVED_CODE = {
+   missing_required_field: 'missing_required_field',
+   invalid_value: 'invalid_value',
++  enum_unmapped: 'enum_unmapped',
+   prescription_not_integral: 'prescription_not_integral',
+   exercise_reference: 'exercise_reference',
+   no_native_client_principal: 'no_native_client_principal',
+@@ -53,6 +60,7 @@ export type UnresolvedCode = (typeof UNRESOLVED_CODE)[keyof typeof UNRESOLVED_CO
+ const QUALIFIED: ReadonlySet<UnresolvedCode> = new Set<UnresolvedCode>([
+   UNRESOLVED_CODE.missing_required_field,
+   UNRESOLVED_CODE.invalid_value,
++  UNRESOLVED_CODE.enum_unmapped,
+   UNRESOLVED_CODE.prescription_not_integral,
+   UNRESOLVED_CODE.relationship_pending,
+   UNRESOLVED_CODE.relationship_missing,
+diff --git a/src/scout/reconstruct/native/native-provenance.ts b/src/scout/reconstruct/native/native-provenance.ts
+index 7f475f20..daf4fd0f 100644
+--- a/src/scout/reconstruct/native/native-provenance.ts
++++ b/src/scout/reconstruct/native/native-provenance.ts
+@@ -1,5 +1,6 @@
+ import { Prisma } from '@prisma/client';
+ import {
++  CHILD_ENTITY_TYPE,
+   NATIVE_KIND,
+   PROVENANCE_OUTCOME,
+   childSourceIdPrefix,
+@@ -116,7 +117,7 @@ export async function countUnresolvedChildren(tx: Tx, parent: ProvenanceKey): Pr
+     where: {
+       coach_id: parent.coachId,
+       source_namespace: parent.sourceNamespace,
+-      entity_type: parent.entityType,
++      entity_type: CHILD_ENTITY_TYPE.workouts_exercise,
+       source_id: { startsWith: childSourceIdPrefix(parent.sourceId) },
+       native_kind: NATIVE_KIND.workout_plan_exercise,
+       outcome: PROVENANCE_OUTCOME.unresolved,
+diff --git a/src/scout/reconstruct/native/native-rules.ts b/src/scout/reconstruct/native/native-rules.ts
+index 4ee6d266..0b9aadec 100644
+--- a/src/scout/reconstruct/native/native-rules.ts
++++ b/src/scout/reconstruct/native/native-rules.ts
+@@ -326,7 +326,11 @@ function enumField(
+   if (typeof raw !== 'string' && typeof raw !== 'number') return invalid(field);
+   const key = String(raw).trim();
+   const mapped = Object.prototype.hasOwnProperty.call(rule.map, key) ? rule.map[key] : undefined;
+-  return mapped !== undefined && allowed.includes(mapped) ? present(mapped) : invalid(field);
++  // A present key absent from the explicit map is `enum_unmapped` (§3.7): the spec needs an
++  // entry, the data is not invalid. A mapped destination outside the native enum stays invalid.
++  if (mapped === undefined)
++    return { ok: false, reason: unresolved(UNRESOLVED_CODE.enum_unmapped, field) };
++  return allowed.includes(mapped) ? present(mapped) : invalid(field);
+ }
+ 
+ function flagField(payload: Prisma.JsonValue, rule: NativeRule | undefined): boolean {
+diff --git a/src/scout/reconstruct/native/native-writers.ts b/src/scout/reconstruct/native/native-writers.ts
+index db115ee9..4f17e17b 100644
+--- a/src/scout/reconstruct/native/native-writers.ts
++++ b/src/scout/reconstruct/native/native-writers.ts
+@@ -1,6 +1,7 @@
+ import { Prisma } from '@prisma/client';
+ import type { MappedEntity } from '../mapping-spec';
+ import {
++  CHILD_ENTITY_TYPE,
+   NATIVE_FAMILY,
+   NATIVE_KIND,
+   PROVENANCE_OUTCOME,
+@@ -284,7 +285,11 @@ export async function persistWorkoutTemplate(
+   const written: ExerciseRow[] = [];
+   let unresolvedChildren = 0;
+   for (const child of mapped.exercises) {
+-    const childKey: ProvenanceKey = { ...provenance, sourceId: child.childSourceId };
++    const childKey: ProvenanceKey = {
++      ...provenance,
++      entityType: CHILD_ENTITY_TYPE.workouts_exercise,
++      sourceId: child.childSourceId,
++    };
+     if (!child.ok) {
+       unresolvedChildren += 1;
+       await recordUnresolved(tx, childKey, NATIVE_KIND.workout_plan_exercise, child.reason);
+@@ -368,13 +373,15 @@ export async function persistEvidence(
+     const existing = await findProvenance(tx, provenance);
+     if (existing !== null && existing.outcome !== PROVENANCE_OUTCOME.unresolved) {
+       // A native plan was already brought across for this identity; it stays the target.
++      // A failed verification (§3.5 `native_target_removed` / `identity_conflict`) is returned
++      // as-is before any evidence or provenance write: the CREATED row is never rewritten.
+       const verified = await verifyTarget(tx, coachId, existing, 'workout_plan');
+-      if (verified.ok)
+-        return ok(
+-          verified.targetId,
+-          LEDGER_TARGET_KIND.workout_plan,
+-          await countUnresolvedChildren(tx, provenance),
+-        );
++      if (!verified.ok) return verified;
++      return ok(
++        verified.targetId,
++        LEDGER_TARGET_KIND.workout_plan,
++        await countUnresolvedChildren(tx, provenance),
++      );
+     }
+   }
+   const record = await tx.scoutReconstructedEntity.upsert({
+diff --git a/test/rls-g2-s8c.spec.ts b/test/rls-g2-s8c.spec.ts
+index 9fc44a2b..a2a8bca7 100644
+--- a/test/rls-g2-s8c.spec.ts
++++ b/test/rls-g2-s8c.spec.ts
+@@ -239,23 +239,23 @@ describe('native persistence: target + provenance + typed ledger in one transact
+       outcome: 'created',
+       reason: null,
+     });
+-    expect(byKey(provenance, 'workouts', childSourceId('rt-1', { id: 'e1' }))).toMatchObject({
++    expect(byKey(provenance, 'workouts.exercise', childSourceId('rt-1', { id: 'e1' }))).toMatchObject({
+       native_kind: 'workout_plan_exercise',
+       native_id: rows[0].id,
+       outcome: 'created',
+     });
+-    expect(byKey(provenance, 'workouts', childSourceId('rt-1', { id: 'e2' }))).toMatchObject({
++    expect(byKey(provenance, 'workouts.exercise', childSourceId('rt-1', { id: 'e2' }))).toMatchObject({
+       native_kind: 'workout_plan_exercise',
+       native_id: rows[1].id,
+       outcome: 'created',
+     });
+-    expect(byKey(provenance, 'workouts', childSourceId('rt-1', { ordinal: 2 }))).toMatchObject({
++    expect(byKey(provenance, 'workouts.exercise', childSourceId('rt-1', { ordinal: 2 }))).toMatchObject({
+       native_kind: 'workout_plan_exercise',
+       native_id: null,
+       outcome: 'unresolved',
+       reason: 'unresolved:exercise_reference',
+     });
+-    expect(byKey(provenance, 'workouts', childSourceId('rt-1', { id: 'e4' }))).toMatchObject({
++    expect(byKey(provenance, 'workouts.exercise', childSourceId('rt-1', { id: 'e4' }))).toMatchObject({
+       native_kind: 'workout_plan_exercise',
+       native_id: null,
+       outcome: 'unresolved',
+@@ -509,7 +509,9 @@ describe('legacy compatibility and unchanged precedence', () => {
+   it('legacy families and pre-existing NULL-kind ledger rows are untouched by the native writer', async () => {
+     sql(`INSERT INTO "ScoutReconstructionLedger" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id,target_kind)
+       VALUES ('legacy-1','coach','intent','clients','p-1','s8c-proof','reconstructed','person-legacy',NULL)`);
+-    stage('h-1', 'client_history', { title: 'Ran 5k', client_id: 'c-1' });
++    // Legacy client_history resolves through the repository mapping registry (not the native seam):
++    // stage it on the accepted TrueCoach source so the accepted path is what runs.
++    stage('h-1', 'client_history', { title: 'Ran 5k', client_id: 'c-1' }, 'coach', 'intent', 'truecoach');
+     stage('rt-1', 'workouts', STANDALONE);
+     const history = await run({ ...REGISTRY, family: 'client_history' });
+     const workouts = await run({ ...REGISTRY, family: 'workouts' });
+@@ -529,7 +531,9 @@ describe('legacy compatibility and unchanged precedence', () => {
+       target_kind: null,
+     });
+     expect(byKey(ledgerRows(), 'client_history', 'h-1')?.target_id).toBeTruthy();
+-    expect(provenanceRows().filter((r) => r.entity_type !== 'workouts')).toEqual([]);
++    expect(
++      provenanceRows().filter((r) => !['workouts', 'workouts.exercise'].includes(r.entity_type ?? '')),
++    ).toEqual([]);
+   });
+ 
+   it('a later-removed or archived native target does not downgrade the reconstructed ledger row and mints nothing new', async () => {
+diff --git a/test/scout/reconstruct/native/native-rules.spec.ts b/test/scout/reconstruct/native/native-rules.spec.ts
+index 1c74b7fc..b695a72c 100644
+--- a/test/scout/reconstruct/native/native-rules.spec.ts
++++ b/test/scout/reconstruct/native/native-rules.spec.ts
+@@ -319,7 +319,12 @@ describe('interpretWorkout', () => {
+     expect(
+       linked.ok && [linked.mapped.programSourceId, linked.mapped.weekIndex, linked.mapped.dayIndex],
+     ).toEqual(['p-1', 0, 2]);
++    // Present key absent from the explicit enum map → enum_unmapped (§3.7), not invalid_value.
+     expect(interpretWorkout(rules, seam({ kind: 'yoga' }))).toEqual({
++      ok: false,
++      reason: 'unresolved:enum_unmapped:type',
++    });
++    expect(interpretWorkout(rules, seam({ kind: { not: 'a key' } }))).toEqual({
+       ok: false,
+       reason: 'unresolved:invalid_value:type',
+     });
+diff --git a/test/scout/reconstruct/native/native-writers.spec.ts b/test/scout/reconstruct/native/native-writers.spec.ts
+index c5d26c88..fb342b6b 100644
+--- a/test/scout/reconstruct/native/native-writers.spec.ts
++++ b/test/scout/reconstruct/native/native-writers.spec.ts
+@@ -193,14 +193,14 @@ describe('persistWorkoutTemplate', () => {
+       ['plank', 0, plan.id],
+     ]);
+     const prov = [...tx.provenance.values()];
+-    expect(prov.map((p) => [p.source_id, p.native_kind, p.outcome, p.reason])).toEqual([
+-      ['3:w-1#id:b', 'workout_plan_exercise', 'created', null],
+-      ['3:w-1#id:a', 'workout_plan_exercise', 'created', 'prescription:time'],
+-      ['w-1', 'workout_plan', 'created', null],
+-    ]);
+     expect(
+-      prov.every((p) => p.entity_type === 'workouts' && p.source_namespace === 's8c-proof'),
+-    ).toBe(true);
++      prov.map((p) => [p.entity_type, p.source_id, p.native_kind, p.outcome, p.reason]),
++    ).toEqual([
++      ['workouts.exercise', '3:w-1#id:b', 'workout_plan_exercise', 'created', null],
++      ['workouts.exercise', '3:w-1#id:a', 'workout_plan_exercise', 'created', 'prescription:time'],
++      ['workouts', 'w-1', 'workout_plan', 'created', null],
++    ]);
++    expect(prov.every((p) => p.source_namespace === 's8c-proof')).toBe(true);
+     // Target rows are written before their provenance; the parent's provenance is last.
+     expect(tx.calls.indexOf('workoutPlan.create')).toBeLessThan(
+       tx.calls.indexOf('workoutPlanExercise.create'),
+@@ -236,11 +236,11 @@ describe('persistWorkoutTemplate', () => {
+       '22222222-2222-4222-8222-222222222222',
+     ]);
+     const unresolved = [...tx.provenance.values()].filter((p) => p.outcome === 'unresolved');
+-    expect(unresolved.map((p) => [p.source_id, p.native_id, p.reason])).toEqual([
+-      ['3:w-1#id:c', null, 'unresolved:exercise_reference'],
+-      ['3:w-1#id:s', null, 'unresolved:exercise_reference'],
+-      ['3:w-1#id:n', null, 'unresolved:exercise_reference'],
+-      ['3:w-1#ord:4', null, 'unresolved:invalid_value:sets'],
++    expect(unresolved.map((p) => [p.entity_type, p.source_id, p.native_id, p.reason])).toEqual([
++      ['workouts.exercise', '3:w-1#id:c', null, 'unresolved:exercise_reference'],
++      ['workouts.exercise', '3:w-1#id:s', null, 'unresolved:exercise_reference'],
++      ['workouts.exercise', '3:w-1#id:n', null, 'unresolved:exercise_reference'],
++      ['workouts.exercise', '3:w-1#ord:4', null, 'unresolved:invalid_value:sets'],
+     ]);
+     // Replay: already_present with the unresolved children re-counted.
+     expect(await persistWorkoutTemplate(tx.asTx(), COACH, ROW, template)).toEqual({
+@@ -248,6 +248,38 @@ describe('persistWorkoutTemplate', () => {
+       unresolvedChildren: 4,
+     });
+     expect(tx.plans.size).toBe(1);
++
++    // §3.3 namespace: a top-level workout whose raw source id equals an encoded child id is a
++    // distinct identity (entity_type `workouts` vs `workouts.exercise`) and the parent's
++    // unresolved children are still re-reported on replay.
++    const collidingRow = { ...ROW, source_id: '3:w-1#id:n' };
++    const colliding = await persistWorkoutTemplate(tx.asTx(), COACH, collidingRow, {
++      ...standalone,
++      exercises: [],
++    });
++    expect(colliding).toEqual({
++      ok: true,
++      targetId: expect.any(String),
++      targetKind: 'workout_plan',
++      unresolvedChildren: 0,
++    });
++    expect(tx.plans.size).toBe(2);
++    expect(
++      [...tx.provenance.values()]
++        .filter((p) => p.source_id === '3:w-1#id:n')
++        .map((p) => [p.entity_type, p.native_kind, p.outcome]),
++    ).toEqual([
++      ['workouts.exercise', 'workout_plan_exercise', 'unresolved'],
++      ['workouts', 'workout_plan', 'created'],
++    ]);
++    expect(await persistWorkoutTemplate(tx.asTx(), COACH, ROW, template)).toEqual({
++      ...out,
++      unresolvedChildren: 4,
++    });
++    expect(await persistWorkoutTemplate(tx.asTx(), COACH, collidingRow, standalone)).toEqual({
++      ...colliding,
++      unresolvedChildren: 0,
++    });
+     expect(tx.exercises.size).toBe(1);
+   });
+ 
+@@ -446,4 +478,41 @@ describe('persistEvidence (workouts kept as evidence)', () => {
+     });
+     expect(tx.entities.size).toBe(0);
+   });
++
++  it('returns a failed verification as-is and writes nothing (plan gone or foreign)', async () => {
++    const tx = fresh();
++    const native = await persistWorkoutTemplate(tx.asTx(), COACH, ROW, standalone);
++    if (!native.ok) throw new Error('setup');
++    const created = { ...[...tx.provenance.values()][0] };
++    expect(created).toMatchObject({ outcome: 'created', native_id: native.targetId });
++
++    // Coach archived the plan → native_target_removed; no evidence row, provenance untouched.
++    tx.plans.get(native.targetId)!.archived_at = new Date();
++    tx.calls = [];
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
++    expect(tx.calls).toEqual(['importNativeProvenance.findUnique', 'workoutPlan.findUnique']);
++
++    // Coach deleted the plan → still native_target_removed.
++    tx.plans.delete(native.targetId);
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
++
++    // Provenance points at another tenant, or at the wrong native kind → identity_conflict.
++    tx.plans.set(native.targetId, { id: native.targetId, coach_id: 'coach-b', archived_at: null });
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    [...tx.provenance.values()][0].native_kind = 'workout_program';
++    expect(
++      await persistEvidence(tx.asTx(), COACH, ROW, entity, { recordNoNativePrincipal: true }),
++    ).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++
++    expect(tx.entities.size).toBe(0);
++    expect(tx.plans.size).toBe(1);
++    expect([...tx.provenance.values()]).toEqual([{ ...created, native_kind: 'workout_program' }]);
++    expect(tx.calls.filter((c) => /upsert|update|create/.test(c))).toEqual([]);
++  });
+ });

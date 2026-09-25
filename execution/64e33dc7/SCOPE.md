@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live correction cursor, 2026-09-25 05:22Z
+
+S7-L's first v2 proof failed21/24 with its schema never applied; existing cleanup completed and the failed lane is retained. Both runtime reviews are complete. `S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md` authorizes only the observed error-message assertion and same-stanza unconditional holder release, new ordinary head and fresh versioned binding, not PG execution. S8-C's seven-path correction is committed at87018a42,44/44 and genuine hooks passed, released05:20:40Z. Parent verified slot/process absence05:22:14Z and relayed the narrow source gates to S7-L. Both candidates require changed-question dual attestations before separate PG grants.
+
 ## Live proof cursor, 2026-09-25 05:07Z
 
 S7-L dual v2 GO closes its F1/F2 findings at `54970cd9`; `S7L_SINGLE_PG_PROOF_GRANT.md` is the only active heavy-runtime authority, for one exact v2 execution. S8-C's test-only B correction is committed at `af9f7f54`, changed-file40/40 and genuine hooks passed; final head/v2 binding are under dual independent review, no PG granted. S8-F's existing draft stays frozen until accepted S8-C composition. All accepted history and reserved boundaries remain unchanged.

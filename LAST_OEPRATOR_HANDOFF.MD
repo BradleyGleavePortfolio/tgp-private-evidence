@@ -1,5 +1,11 @@
 # LAST OPERATOR HANDOFF
 
+## Live continuation: 2026-09-25 05:22Z
+
+S7-L's v2 PG run at54970cd9 failed21/24 and did not apply its schema. Cleanup ended05:14:22Z after the parent terminated only the completed, stuck Jest stage; logs, failed data and old-root are retained. Read both runtime reviews and `execution/64e33dc7/S7L_RUNTIME_MINIMUM_CORRECTION_GRANT.md`: one-spec message correction plus same-stanza unconditional release, ordinary follow-up and fresh versioned binding. S7-L alone now has its narrow source-gate relay after verified S8-C release and no live holder/process; no PG rerun is granted.
+
+S8-C's seven-path contract-preserving correction committed87018a42 with44/44 and genuine hooks; it released05:20:40Z and finishes only its immutable export/v3 binding. Then both existing reviewers re-attest changed questions only. Neither replacement is accepted or landed; F remains frozen, G prerequisite-gated, production and all reserved boundaries unchanged. Continue exact-head review and separately granted proofs without reopening accepted history.
+
 ## Live continuation: 2026-09-25 05:07Z
 
 S7-L now has dual v2 GO at `54970cd9` and a separate active `S7L_SINGLE_PG_PROOF_GRANT.md`; do not restart or retry its one-shot driver. Read the actual pending run/sentinel before deciding its next step. S8-C is frozen at `af9f7f54` after the one-test40/40 correction, with v2 binding delivered to both active independent reviewers; no PG granted there. Preserve all earlier candidates/failures, accept only observed proof, and land accepted dependency-valid work to integration automatically. Backend main is unchanged and production-reserved.
