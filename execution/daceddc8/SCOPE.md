@@ -97,3 +97,16 @@ Per Bradley's 16:32Z instruction, the parent orchestrates only. Coding, gates, b
 - **S8G-DRAFT-1:** `s8g_design_test_draft` (T4, `claude_fable_5_1`). Evidence only, under `64e33dc7/s8g/draft/**`: design and acceptance-test drafting from READINESS E1–E6/N1–N4 on the DRAFT_READY pins. No product bytes, worktree writes, gates or PG.
 - **LAND-PREP-1:** `landing_composition_prep` (T3, `claude_opus_5_5`). Read-only plan and scripts under `daceddc8/landing/**` for landing S7-L and S8-C onto `integration/importer`: order, the `importer-openapi.json` overlap and regeneration ownership, CI, and the PR/FF procedure. No pushes, PRs or heavy runs.
 - **S9-READY-1:** `s9_readiness` (T4, `claude_fable_5_1`). Read-only readiness brief under `daceddc8/s9/READINESS.md`. No product writes.
+
+## PG-4a grant: S8-C v4 single real-PG proof (16:48Z)
+
+- **Preconditions met:** `BOOTSTRAP_CORRECTION_REVIEW_A.md` (`c63de02f…`) and `_B.md` are both final GO. All findings are class C: HEAD.txt label, PINS.txt L57 documentary line, and a no-op reflog reset.
+- **Parent read-only preflight (16:46:29Z):**
+  - lock inode 674373, 0 holders
+  - 0 postgres; 55641, 55642 and 55643 free
+  - `proof-v4/{clusters,run}/s8-c` absent; `binding/v4/run/` absent
+  - supervisor `798d9f7c…`, RUN_PREP 2/2 OK
+- **Grantee:** `s8c_bootstrap_completion` as proof executor.
+- **Launch:** exactly once, `S8C_PG4_GRANT=1 bash …/s8c/binding/v4/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s8c/binding/v4/s8c-pg-proof.sh` against candidate `e0cee7e0…` (tree `b249efb6…`), with driver `73b291db…`, fixture `c59326b5…` and manifest `c2cfd0a3…`.
+- **Rules:** no rerun on any rc, no edits, preserve all receipts. A full pass (END rc=0, stage=post, all Jest passed) means the parent may accept and land. Anything else goes to disposition.
+- **Heavy queue:** the S7-L v4 proof waits for this run's release plus its own dual GO.
