@@ -136,3 +136,16 @@ It may not:
 - touch `main`, protection or settings, or force-push.
 
 Acceptance and the fast-forward happen only on the parent's word, after the S7-L PG-4b proof passes.
+
+## PG-4b grant: S7-L v4 single real-PG proof (16:58Z)
+
+- **Preconditions met:** `WORKER_CORRECTION_REVIEW_A.md` and `_B.md` (`d9634549…`) are both final GO, class C only.
+- **B's C-8 item:** the parent verified run-prep separately: supervisor `eb9bb86b…`, RUN_PREP 2/2 OK, only 3 files, `binding/v4/run` absent.
+- **Parent preflight (16:57:24Z):**
+  - lock inode 674373, 0 holders; 0 postgres; no 556xx listeners
+  - `proof-v4/{clusters,run}/s7l` and `proof-v4/s7l/old-root` absent
+  - no jest/tsc/prisma/prettier/eslint/lefthook/driver process
+- **Grantee:** `s7_l_worker_correction` as proof executor.
+- **Launch:** exactly once, `S7L_PG4_GRANT=1 bash …/s7l/binding/v4/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s7l/binding/v4/s7l-pg-proof.sh` against `df713fd9…` (tree `796f437f…`), with driver `8b03f4c2…`, fixture `74aed261…` and manifest `6c912b96…`.
+- **Rules:** a lock-busy refusal before `LAUNCH.txt` or the sentinel does not consume the grant. No rerun on any consumed rc. A full pass means accept, then land by FF under LAND-1.
+- **Slot:** the S8-C diagnostics yield until this run ends.

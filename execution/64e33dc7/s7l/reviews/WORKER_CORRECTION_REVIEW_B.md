@@ -143,4 +143,102 @@ No class A or B.
 
 ## PHASE 2 — committed head, receipt, bundle v4, binding v4
 
-_Pending the parent's final pins._
+Written 2026-09-25 ~16:58Z after the parent's final pins (HEAD `df713fd9…`, TREE `796f437f…`, worker blob `155ffdcc…`,
+driver `8b03f4c2…`, fixture `74aed261…`, `BINDING.sha256` `6c912b96…`). Read-only: `git rev-parse`/`diff`/`sha256sum -c`
+only; nothing under `proof-v4/clusters/s8-c` (sibling S8-C proof running under the lock) was opened.
+
+### 2.1 Committed head (worktree `worktrees/64e33dc7-s7l`)
+
+- `HEAD` = `df713fd9217df524915348ef8a42c797f288dde1`, `HEAD^{tree}` = `796f437fea80550a379b5f54dc485bc5dbba67e1`,
+  `HEAD^` = `a68cdac70d81aea384fdc99c01c9c983a08e80eb`; `git status --porcelain` → 0 lines. Branch `exec64/s7l-replacement`.
+- `git cat-file -p HEAD`: exactly one parent; `author` and `committer` both `Bradley Gleave <bradley@bradleytgpcoaching.com>`,
+  same timestamp 1790354654 (+0000 = 2026-09-25T16:44:14Z). `git interpret-trailers --parse --only-trailers` on the
+  message → 0 bytes (no Co-authored-by/Signed-off-by/AI trailers). Subject `test(scout): S7-L PG proof worker — resolve
+  @prisma/client/runtime/library to the custom-output client runtime`; body describes exactly the Phase-1 delta and states
+  "no assertion changed" — consistent with what the diff shows.
+- One-path delta: `git diff --name-only HEAD^ HEAD` = `test/utils/g2-s7l-worker.cjs`; `--stat` = 1 file, +14/−3;
+  `git ls-tree HEAD test/utils/g2-s7l-worker.cjs` = blob `155ffdcc…` (identical to the Phase-1 pre-format blob: prettier
+  changed nothing). **`git diff HEAD^ HEAD` is byte-identical to `p1-source-delta-preformat.patch`** (`diff` empty), so the
+  committed bytes are exactly the bytes reviewed in Phase 1 (1.1–1.7 carry over unchanged).
+- Lineage `git log`: df713fd9 → a68cdac7 → 54970cd9 → 839b54c5 → 93389265 (merge of S8-B). Reflog: one `commit:` entry at
+  16:44:14Z; no amend/reset after it. The only other reflog entry (`reset: moving to HEAD`, 16:16:20Z) predates the
+  builder's SOURCE_READY (16:25Z) and belongs to worktree provisioning; it moved nothing (same commit).
+- Genuine hooks: `commit-attempt-1.raw.log` (sha `3d438d20…`, matches `RECEIPTS.sha256`) shows lefthook v2.1.9
+  `pre-commit` (prod-readiness-quick ✔, banned-cast-tokens R75 `--cached` ✔ "no positive token change", tsc 44.98 s ✔;
+  eslint/prettier "skip, no files for inspection" because the hook globs exclude `.cjs`) and `commit-msg` (no-ai-tokens ✔),
+  then `[exec64/s7l-replacement df713fd9] … 1 file changed, 14 insertions(+), 3 deletions(-)`. The hooks in the shared git
+  dir are the SCOPE-pinned ones: `pre-commit` `3b741de3…`, `commit-msg` `71029ce8…`. `s7l-worker-gate.sh` (`32683a5e…`)
+  contains no `--no-verify`, `LEFTHOOK`, `hooksPath`, `amend`, `push` or `--force`; commit is `git commit -F commit-message.txt`
+  after `git add -- test/utils/g2-s7l-worker.cjs` and a staged-set equality check.
+- Scoped lint receipts: `prettier-check-1.log` "All matched files use Prettier code style!" (rc0, no write);
+  `eslint.raw.log` empty (sha `e3b0c442…` = empty file, rc0); `gate.log` `PREFIX_VERIFY rc=0 ok_lines=56`,
+  `NPX_PRETTIER_VERSION=3.9.9`, `NM_HIDDEN_LOCK=05bc530a…`, `NM_CLIENT_INDEX_DTS=9042e713…`, lock `ACQUIRED 16:44:10Z`
+  inode 674373 → `RELEASING … rc=0` 16:45:01Z, `STAGED_TREE=796f437f… WORKER_BLOB=155ffdcc…`. No Jest/PG in the gate.
+
+### 2.2 `worker-correction/CORRECTION_RECEIPT.md` and `RECEIPTS.sha256`
+
+`sha256sum -c RECEIPTS.sha256` → 13/13 OK (SOURCE_READY, CORRECTION_RECEIPT, commit-message, gate script, gate.log,
+gate.stdout, commit raw log, eslint/prettier logs, p1/p2 patches — both `da8ecfb2…`, prepare-binding-v4.py). Every
+identity claim in the receipt (§1 lineage and trees, §2 blob/sha/patch equality, §3 hook/lint results, §4 bundle hashes,
+§5 pins and fresh paths) was re-derived above or in 2.3–2.4 and matches. It correctly states NOT accepted / no PG run.
+
+### 2.3 `bundle/v4`
+
+`sha256sum -c SHA256SUMS` → 6/6 OK; `SHA256SUMS` itself `29dcc469…` (parent pin). From the worktree (the evidence repo
+lacks the prerequisite commit, which is expected for a thin bundle): thin `s7l-v4-df713fd9217d.bundle` (`f81254c3…`)
+"is okay", contains `df713fd9… HEAD`, requires `93389265…`; full-history bundle (`4c56330f…`) "is okay", records a complete
+history with HEAD and `refs/heads/exec64/s7l-replacement` at df713fd9. `s7l-v4-followup-…patch` is byte-identical to the
+Phase-1 patch; `s7l-v4-cumulative-93389265a846-to-df713fd9217d.patch` equals `git diff 93389265 df713fd9` byte-for-byte
+(30 files, +5623/−35). `MANIFEST-name-status` = `M test/utils/g2-s7l-worker.cjs`; `HEAD-df713fd9217d.txt` fields match.
+
+### 2.4 `binding/v4`
+
+- `sha256sum -c BINDING.sha256` → 9/9 OK; file sha `6c912b96…` (parent pin). `SUPPLEMENT.sha256` → 3/3 OK
+  (`driver-v3-to-v4.filled.diff`, `BINDING.sha256`, `freeze-v4.log`). `bash -n` on driver, fixture and freeze-v4 OK.
+- **Driver diff v3→v4, computed independently (`diff v3/s7l-pg-proof.sh v4/s7l-pg-proof.sh`) and equal to the recorded
+  `driver-v3-to-v4.filled.diff`** (the pre-fill `driver-v3-to-v4.diff` differs only in `EXPECT_FIXTURE_SHA=__FILLED_BY_FREEZE__`).
+  Every hunk falls in the granted categories: (a) header comment L2–11; (b) paths — usage line, `D=…/binding/v4`,
+  `LANE/SOCK=…/proof-v4/…`, `OLDROOT=…/proof-v4/s7l/old-root` (`OLDCLIENT` derived); (c) pins — `EXPECT_PARENT` a68cdac7,
+  `EXPECT_HEAD` df713fd9, `EXPECT_TREE` 796f437f, `EXPECT_WORKER_BLOB` 155ffdcc, `EXPECT_FIXTURE_SHA` 74aed261;
+  (d) lineage shifted one level — HEAD^ = a68cdac7 with tree 6c00e248, ^^ = 54970cd9 tree 513c71d7, ^^^ = 839b54c5 tree
+  f02205c6, ^^^^ = base; (e) one-path delta string `test/utils/g2-s7l-worker.cjs`; (f) the two other-lane loops (preflight
+  L165, post L215) enumerate `"$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-v3/clusters/*/ "$RUNTIME_ROOT"/proof-v4/clusters/*/`,
+  keep `[ -d ]`, exclude own `$LANE` by path (`"${d%/}" != "$LANE"`), and name lanes `RUNTIME_ROOT`-relative (so retained
+  v2 `clusters/s7l`, failed v3 `proof-v3/clusters/s7l` and sibling `proof-v4/clusters/s8-c` are distinct names). The
+  sibling S8-C v4 lane is only hashed/`postmaster.pid`-checked, never started; a live sibling makes preflight refuse
+  (rc 71), and the lock serializes anyway. (g) The not-frozen placeholder `case` now scans `EXPECT_WORKER_BLOB` instead
+  of `EXPECT_SPEC_BLOB` (both are filled; see C-7). No other line changed: lock handling, fixture calls, bootstrap,
+  identity, single Jest invocation, stop/post logic and bounds are byte-identical to v3.
+- Fixture diff v3→v4 = exactly 3 lines (comment L12, `LANE`, `DATA/LOG/SOCK`) and equals the recorded `fixture-v3-to-v4.diff`.
+- **All pins re-verified against the committed head** (`git rev-parse df713fd9:<path>`): spec 94e7fac4, bootstrap
+  ebef51fc, old-root cb1137fe, db 384e1b74, pg-harness d8b71d68, harness f0860a8d, worker 155ffdcc, guard 27fcba5f,
+  migration tree 4ce57646, schema blob 2e328bbc — 10/10 OK; `BASE_TREE` a315dd65 OK. Worktree shas: schema 0eb41f9a,
+  package-lock b7fed5ed, jest.rls.config 99c9f4f1, hidden lock 05bc530a, `.prisma/client/index.d.ts` 9042e713 — OK.
+  Tool shas: postgres 23cd1748, initdb b7db9bc2, pg_ctl af53d826, psql wrapper a200e38c, node a03953a7 — OK.
+  **The full set of unchanged `EXPECT_*` pins is textually identical between v3 and v4** (diff of the extracted lines
+  empty); `PORT/DBNAME/ADMIN/FIXPASS/CLUSTER_MARKER/DB_MARKER/BASE_HEAD/BASE_TREE/LOCK/W` identical.
+- Fresh paths: `proof-v4/clusters/s7l`, `proof-v4/run/s7l`, `proof-v4/s7l/` and `binding/v4/run/` are all absent
+  (only `proof-v4/clusters/s8-c` and `proof-v4/run/` exist — the sibling's, untouched). `freeze-v4.log`: HEAD_PIN_OK ×14,
+  TOOL_PIN_OK ×10, FROZEN_V4 at 16:50:11Z.
+- Immutability of consumed lanes: v3 `BINDING.sha256 -c` and `run/RUN_FREEZE.sha256 -c` all OK; v3 run receipts unchanged.
+
+### 2.5 Final verdict — **GO**
+
+Head `df713fd9` is an ordinary, genuinely hooked, trailer-free Bradley commit whose only delta from the preserved
+`a68cdac7` is the exact Phase-1 worker resolver change (causal closure of the v3 L05/L12 failure, NEW image unchanged, no
+vacuous assertion). Receipts, bundle v4 and binding v4 verify; the v4 driver/fixture differ from v3 only in the granted
+categories with every other pin unchanged; the fresh v4 lane paths are absent. This GO covers the changed question only
+and authorizes nothing by itself: the single PG-4 invocation `timeout -k 30 3900 bash binding/v4/s7l-pg-proof.sh` remains
+the parent's separate grant, serialized on the canonical lock after the sibling S8-C proof ends, and a full pass would
+accept exactly `df713fd9` and nothing else.
+
+### 2.6 Phase-2 findings (Safety-ROI)
+
+No class A or B. Phase-1 C-1…C-4 stand; C-5 is closed (post-format blob = pre-format blob `155ffdcc…`, pinned in v4).
+
+| # | Class | Observation | Concrete harm | Decision blocked | Minimum closure | Execution unlocked |
+|---|---|---|---|---|---|---|
+| C-6 | C | Lefthook's pre-commit eslint/prettier globs skip `.cjs`; the only lint of the worker file is the gate's scoped pinned prettier/eslint (both rc0, receipts hashed). Same situation as the accepted `g2-tq0-worker.cjs`. | none | none | record only | n/a |
+| C-7 | C | v4 driver L96 placeholder guard checks `EXPECT_WORKER_BLOB` for `__` where v3 checked `EXPECT_SPEC_BLOB`. Both pins are filled and both are separately enforced by the object-pin loop (L115–119), so the guard's coverage is equivalent; it is a one-token deviation from "all other lines unchanged" and is recorded for the delta ledger. | none | none | record only | n/a |
+| C-8 | C | `binding/v4/run-prep/` (PREFLIGHT.md, supervisor.sh, RUN_PREP.sha256, ~16:55Z) appeared during this review, outside `BINDING.sha256` and outside the pins I was given; not audited here beyond noting its outer command string equals the frozen invocation. The parent's PG-4 grant should verify it separately. | none | none | parent read-only check before launch | n/a |
+| C-9 | C | Reflog `reset: moving to HEAD` at 16:16:20Z (worktree provisioning, pre-builder) — no ref movement; recorded so it is not mistaken for a post-commit reset. | none | none | record only | n/a |
