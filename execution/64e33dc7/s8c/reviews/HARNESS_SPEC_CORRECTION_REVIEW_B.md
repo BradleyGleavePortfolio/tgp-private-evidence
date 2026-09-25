@@ -64,3 +64,45 @@ Diffed `e0cee7e0:test/rls-g2-s8c.spec.ts` vs HEAD for the `lane identity` test: 
 
 ## PHASE1 DONE — verdict-so-far: **GO** (pending Phase 2 pins)
 Phase 2 will verify: BC-5 head/tree pins as delivered by the parent (observed `f428db9a` / `f2623be6…`, spec blob `9d701783`, harness blob `1a8f1797`), checkpoint v7, binding v5 (proof-v5 paths, PINS L57 fill fix), run-prep v5 `S8C_PG5_GRANT`, gate receipts, genuine lefthook hooks, Bradley identity, no trailers.
+
+---
+
+## PHASE 2 — final pins (parent mail 10:28 PDT, evidence 716b46a)
+
+Every value below was recomputed by this reviewer (read-only: `git rev-parse`/`show`/`diff`/`bundle verify`, `sha256sum -c`, `cmp`, `diff`); nothing was taken from the mail on trust.
+
+### Head, lineage, blobs
+- Worktree HEAD `f428db9ab65f638da1651b8cd792c6f93b4983c1`, tree `f2623be642ddfbba025ffe8360256a683ac57997`, porcelain 0. `git log -5`: `f428db9a → 4d7d4b4e → 9cc76401 → e0cee7e0 → 87018a42` — matches the mailed lineage.
+- Blobs at HEAD: bootstrap `7c3fba471f99…` (unchanged since e0cee7e0), harness `1a8f17970a10…`, spec `9d701783eeb7…`. `git diff-tree 87018a42 f428db9a` names exactly the three test files (spec +18/−5 … total 28+/10−); `prisma/`, `src/`, `docs/` unchanged from 87018a42 (0 diff lines).
+- **Committed bytes = reviewed WIP**: `git hash-object test/rls-g2-s8c.spec.ts` = `9d701783…` = the WIP blob recorded in Phase 1; `git diff 4d7d4b4e f428db9a` is byte-identical to `spec-correction-bc5/spec.patch` (both sha256 `6d21a41e…`).
+- Commit f428db9a: author = committer = Bradley Gleave `<bradley@bradleytgpcoaching.com>`, `%(trailers)` empty; subject "S8-C: assert no minted User against the pre-writer baseline in the live proof".
+
+### Hooks genuine (BC-5 gate)
+- Repo hooks `.git/hooks/pre-commit` sha256 `3b741de3…`, `commit-msg` `71029ce8…` (same as REV-2), both lefthook stubs (32 `lefthook` references each).
+- `spec-correction-bc5/run/commit.raw.log`: `lefthook v2.1.9 hook: pre-commit` → ✔ prod-readiness-quick, banned-cast-tokens, prettier, eslint, tsc (47.68 s); `hook: commit-msg` → ✔ no-ai-tokens. `SPEC_CORRECTION_BC5.sha256` 10/10 OK.
+
+### Receipts and manifests
+- `harness-correction/CORRECTION_RECEIPT.md` sha256 `963d4939f43e156be511c4f54612a6418440b1aed926769dfe81a4c887db5952` (matches mail). `HARNESS_CORRECTION.sha256` 46/46 OK; `spec-correction/SPEC_CORRECTION.sha256` 17/17 OK.
+- Diag b3 (non-accepting): `diagnostic/b3/jest.log` 13/13; `diag-b3.log` `PRECONDITIONS_OK head=f428db9a`, fresh `scratch/s8c-diag2` initdb, port 55644, PG 17, post-state `postgres_procs=0`.
+
+### Checkpoint v7
+- `MANIFEST.sha256` sha256 `1554ef88d972cb…` (matches), 6/6 OK. Bundle `s8c-f428db9a.bundle` sha256 `65aa92451e4a…` (matches); `git bundle verify` → "is okay"; single head `f428db9a refs/heads/exec64/s8c-replacement`. `e0cee7e0..HEAD.patch` == `git format-patch --stdout e0cee7e0..f428db9a` (3 commits) byte-for-byte. `HEAD.txt`: BASE `93389265…`, lineage/HEAD/TREE/blobs as above, `PORCELAIN=0`, PRISMA/SRC/DOCS unchanged flags = yes, `CHANGED_PATHS_from_87018a42` = the three test files. `EXPORTED_BY` still labelled "execution/daceddc8 T4 builder s8c_bootstrap_completion" (REV-2 C2, unchanged, documentary).
+
+### Binding v5
+- sha256: driver `b641db2d5fae07d9220e573a04cb512c5ec35814b08ae7c506c02499c314fd1d`, fixture `34a42ab8b2ffa75256f5fa600ca7a51bcdb3ae1f224ad989ff1ca7a4dd716f10`, `BINDING.sha256` `2995ed837fd352e3ea663949cc74e66ca5eec4566444739e8b7f53aab87c9eba` — all three match the mail; `sha256sum -c BINDING.sha256` 10/10 OK.
+- `*.v4` copies are `cmp`-identical to `binding/v4/{s8c-pg-proof.sh,s8c-fixture.sh,PINS.txt}` (73b291db / c59326b5 / f2b5ee7c); all three `.diff-v4-to-v5` files regenerate exactly from `diff -u`.
+- **v4→v5 driver diff limited to the expected**: `D=…/binding/v5`; `EXPECT_HEAD/TREE` → f428db9a / f2623be6; `EXPECT_SPEC_BLOB` → 9d701783; `EXPECT_HARNESS_BLOB` → 1a8f1797; `EXPECT_FIXTURE_SHA` → 34a42ab8; `LANE/SOCK` → `proof-v5/clusters/s8-c` / `proof-v5/run/s8-c`; both other-lane loops (preflight L138, post L182) add `proof-v5/clusters/*/`; one comment line. Nothing else changed. Fixture diff: two comment lines + `LANE`/`DATA/SOCK` to proof-v5. PINS diff: header dir, the same nine pins, **L57 lane line now `DATA=…/proof-v5/clusters/s8-c/pg-data SOCK=…/proof-v5/run/s8-c`** (REV-2 C4 closed), receipts path → `binding/v5/run/`.
+- **Other pins unchanged and correct**: `grep` of BASE_*/tool/unchanged-blob pins in v4 vs v5 drivers is identical (`UNCHANGED_PINS_IDENTICAL_V4_V5`). Independently re-derived against HEAD: DB `a7d67217`, PGH `4059883d`, WORKER `48403063`, BOOTSTRAP `7c3fba47`, SPEC, HARNESS all equal `git rev-parse HEAD:<path>`; `BASE_TREE a315dd65` = `93389265^{tree}`; `EXPECT_NM_CLIENT_SHA` (index.d.ts), `EXPECT_SCHEMA_SHA`, `EXPECT_PKG_LOCK_SHA` equal live sha256 in the worktree; hidden lock pin `05bc530a` carried. `bash -n` clean on driver, fixture, supervisor. No non-comment `proof-v4/…/s8-c` reference remains in driver/fixture (the prep script's self-check is correctly narrowed to non-comment lines because the driver's explanatory comment legitimately names the retained failed v4 lane).
+- Prep script `harness-correction/v5-prep/prepare-binding-v5-daceddc8.sh`: refuses existing v5, wrong HEAD/lineage, dirty tree, and a delta from e0cee7e0 other than exactly spec+harness; asserts unchanged-pin set equals v4, loop rewrite count 2, no `__FILL`; `prepare-binding-v5.log` `V5_FILLED head=f428db9a…` with the same manifest lines.
+
+### Run-prep v5
+- `binding/v5/run-prep/supervisor.sh` sha256 `5407d27458ea705c471dda2c328067ea0219233769826383e5f8770b099eabec` (matches); `RUN_PREP.sha256` 3/3 OK; `supervisor.sh.diff-v4-to-v5` regenerates exactly from `diff` against `binding/v4/run-prep/supervisor.sh`. Delta: v4→v5 paths, `S8C_PG4_GRANT`→`S8C_PG5_GRANT` (env gate + child launch), `EXPECT_HEAD/TREE/DRIVER_SHA/FIXTURE_SHA/BINDING_MANIFEST_SHA` → the five v5 values above, once-only checks against `binding/v5/run/` and its sentinel. Nothing else.
+- Preconditions observed now: `binding/v5/run/` absent, `recovery-reset/proof-v5/` absent (fresh lane will be created by the driver), no `postgres` process, no listener on 5564x, no `postmaster.pid` in `proof-v4/clusters/{s7l,s8-c}` or `scratch/{s8c-diag,s8c-diag2}`.
+
+### Phase 2 findings (Safety-ROI)
+- **C4 — scratch diagnostic lanes are not enumerated by the driver's other-lane hash loops.** Class C. The loops cover `clusters/`, `proof-v3/`, `proof-v4/`, `proof-v5/`; `scratch/s8c-diag{,2}` (port 55644) are not hashed pre/post. Concrete harm: none — preflight already refuses on any live `postgres` process or port listener, the scratch lanes are stopped (no `postmaster.pid`), and the proof lane uses its own fresh directory and port 55642. Decision blocked: none. Minimum closure: none; optional hygiene for a future binding. Execution unlocked: yes.
+- **C5 — `HEAD.txt` `EXPORTED_BY` label** unchanged from REV-2 C2 (still says `s8c_bootstrap_completion`). Class C, documentary. No action required.
+- No A/B finding in Phase 2.
+
+## FINAL VERDICT: **GO**
+Committed bytes equal the reviewed WIP (spec blob `9d701783`); hooks are genuine lefthook v2.1.9 runs with all six steps ✔; v4→v5 driver/fixture/PINS/supervisor diffs are limited to the expected head/blob/fixture/manifest pins, v5 lane paths, the `proof-v5` loop entries and the PG-5 grant name; PINS L57 is fixed; every unchanged pin is byte-identical to v4 and re-derives from HEAD/the worktree; checkpoint v7 bundle verifies and reproduces the patch; and the three assertion changes preserve the product assertions (Phase 1). Findings C1–C5 are all record-only. PG-5 execution of `binding/v5/run-prep/supervisor.sh` once, under `S8C_PG5_GRANT=1`, is unblocked from reviewer B's side.

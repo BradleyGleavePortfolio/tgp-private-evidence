@@ -263,3 +263,15 @@ The independent T3 review (`s9/reviews/S9_0_REVIEW.md`) found one class A and on
   - a numeric R16 deadline window;
   - a note on E2's 64 KiB body bound.
 - **Next:** the author amends, then the same reviewer does a changed-part re-review. After GO, the doc is committed and lands.
+
+## PG-4c grant: S8-C v5 single real-PG proof (17:34Z)
+
+- **Preconditions met:** `HARNESS_SPEC_CORRECTION_REVIEW_A.md` (`a63a80f8…`) and `_B.md` are both final GO, class C only.
+- **Parent read-only preflight (17:33:19Z):**
+  - 0 postgres; ports free
+  - `proof-v5/` and `binding/v5/run/` absent
+  - binding v5 10/10 and run-prep 3/3 verified by the parent
+  - the slot is currently held by the E2 extension gates (`npm run gates`)
+- **Grantee:** `s8c_bootstrap_completion` as proof executor.
+- **Waiting rule:** poll read-only, at least 60 s apart, until 0 holders and no E2 gate process. Then re-run PREFLIGHT and launch exactly once: `S8C_PG5_GRANT=1 bash …/s8c/binding/v5/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s8c/binding/v5/s8c-pg-proof.sh` against `f428db9a…` (tree `f2623be6…`), with driver `b641db2d…`, fixture `34a42ab8…` and manifest `2995ed83…`.
+- **Rules:** no rerun on any consumed rc. A full pass means accept, then compose onto `integration/importer` `df713fd9` under the LAND-1 scripts.
