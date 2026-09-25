@@ -95,3 +95,46 @@ Verified OK:
 
 - Accept exactly `820ce85be2ebf994112afbb90739eb9469ad628e` / tree `7ede6dbb8f6f2d0ddcc349882a47ef67d415c32a` on parent `62471b11…`; product blobs `1a6db74e / fb728502 / 0a75e656 / b07ebb85`; 14 PATHS.
 - Binding v1 may be filled and granted one run only after B-BIND-1 (real psql pin `d1108fdb…`), B-BIND-2 (`EXPECT_TESTS=19` + 1 suite), B-BIND-3 (regenerate the binding manifest) are applied; then fill the nine head pins from `BINDING-PINS-820ce85be2eb.txt` (fixture sha will change if the fixture is edited — it should not need to be; only the runner/PINS/manifest change).
+
+---
+
+## Binding re-review 1 (diff-only, after CLOSURES-BIND-1) — **GO for ONE run**
+
+Read-only. Runner not executed, canonical lock not touched (inode read via `stat` only). Reviewer B not read.
+
+### Identity of what was re-reviewed
+`binding/v1/`: `s8g-pg-proof.sh` sha256 `4fccd1353edb47bfbeea0a7fab159660cee64f5356bccbf70280aba00705c40a` (216 lines), `s8g-fixture.sh` `62de28baa4ad3a669729aa33bebdb603b72642e9a41a2a57345b344093b3d24d`, `PINS.txt` `63c2122c275362706a8230e9e010d66dd39bbdacca36614e2083c9d634b985db`, `README.md` `9e04de132f5b375a0e598b0446bf74e92eb7f56fc95ec837eff4bbc827c30c18`; `BINDING.sha256` covers exactly these four and `sha256sum -c` passes 4/4. `history/s8g-pg-proof.sh.unfilled` is byte-identical to the template I reviewed (`b600ef12…`), and applying `CLOSURES-BIND-1.runner-from-reviewed-unfilled.diff` to it reproduces the filled runner exactly (`4fccd135…`), so the diff is the complete change. `bash -n` passes on runner and fixture. No `__FILL`, `/usr/bin/psql`, `a200e38c`, `77f33` or `55643 free` remains in runner/fixture/PINS (README keeps them only in its explicitly superseded "historical" section; PINS mentions `a200e38c` only to say it is no longer the pin).
+
+### B-BIND-1..3 — closed
+- **B-BIND-1 (psql):** `PSQL=/usr/lib/postgresql/18/bin/psql`, `EXPECT_PSQL_SHA=d1108fdb…`; precondition `[ -x $PSQL ] && sha == pin` plus `"$PSQL" --version` must match `^psql \(PostgreSQL\) 18\.`; `G2_S8G_PSQL=$PSQL`; `psqlq` and the PRECONDITIONS_OK log use `$PSQL`. Verified on disk: sha256 of that binary = `d1108fdb…`, `--version` = `psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)`. Matches the S8-F v2 pattern. Closed.
+- **B-BIND-2 (test count):** `EXPECT_TESTS=19`; after the rc gate: `grep -qE "^Tests: +19 passed, 19 total"` and `grep -qE "^Test Suites: +1 passed, 1 total"` on `jest.log`, else `fail 72` (STARTED=1 → bounded fixture stop). Verified `820ce85b:test/rls-g2-s8g.spec.ts` has exactly 19 top-level `it(`, 0 `it.each`, 0 skip/only/todo. Regexes match Jest's summary format and reject any `skipped`/`failed`/`todo` variant. Closed.
+- **B-BIND-3 (manifest):** `BINDING.sha256` regenerated over the current four files; verified 4/4 OK. Closed.
+
+### All filled pins verified against `820ce85b` objects, the runtime on disk, and the clone
+| Pin | Verified |
+|---|---|
+| `EXPECT_HEAD` `820ce85b…` / `EXPECT_TREE` `7ede6dbb…` | = clone `HEAD` / `HEAD^{tree}` |
+| `BASE_HEAD` `62471b11…` / `BASE_TREE` `23614f0b…` | = `62471b11^{tree}`; base is the sole parent |
+| 6 S8-G proof blobs (spec `86a944c1`, bootstrap `2ab85a13`, db `c654e6bd`, pgh `a0261246`, harness `ee2a41a2`, worker `65ee972d`) | all = `HEAD:<path>` |
+| 37 accepted-file blob pins in the runner loop (20 S7-L/S8-C/base incl. `package-lock.json 354de3da` + 17 S8-F) | 37/37 = `HEAD:<path>` |
+| `EXPECT_FIXTURE_SHA` `62de28ba…` | = sha256 of the current `s8g-fixture.sh` (pre-BIND-1 fixture `b2dd548a…` differs by one comment line only) |
+| `EXPECT_PSQL_SHA` `d1108fdb…` | = `/usr/lib/postgresql/18/bin/psql` |
+| `EXPECT_POSTGRES/INITDB/PGCTL_SHA` | = `runtime/pg17/dist/bin/{postgres,initdb,pg_ctl}`; `PROVENANCE.txt result=success` |
+| `EXPECT_NODE_SHA` | = resolved `node` (v20.20.1) |
+| `EXPECT_NM_LOCK_SHA` / `EXPECT_NM_CLIENT_SHA` | = clone `node_modules/.package-lock.json` / `.prisma/client/index.d.ts` (isolated real directory inside the clone, not a symlink) |
+| `EXPECT_SCHEMA_SHA` / `EXPECT_PKG_LOCK_SHA` | = clone `prisma/schema.prisma` / `package-lock.json` (= base objects) |
+| `EXPECT_TESTS=19`, `EXPECT_MIGRATIONS=172` | = 19 `it(`; 172 migration directories at HEAD |
+| `EXPECT_LOCK_INODE=667698` | = `stat -c %i execution/test-validation.lock`; asserted before `exec 9>>; flock -n` |
+PINS.txt and the runner agree on every one of the 23 named pins (compared programmatically).
+
+### Runner ↔ fixture consistency
+Both: `RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime` (real path, exists), `LANE=$RUNTIME_ROOT/clusters/s8-g`, `DATA=$LANE/pg-data`, `SOCK=$RUNTIME_ROOT/run/s8-g`, `PORT=55644`, superuser `s8g_super`, `MARKER=s8g-disposable-pg17` (= `G2_S8G_CLUSTER_MARKER` in the committed guard). Runner exports `G2_S8G_DATA_DIRECTORY=$LANE/pg-data` and asserts `SHOW data_directory`; INIT/START marker greps match the fixture's echo lines; fixture refuses standalone use unless `/proc/$S8G_RUNNER_PID/cmdline` contains `s8g-pg-proof.sh` (the filled file name matches). Current state (read-only): `runtime/clusters` and `runtime/run/s8-g` absent (fresh-lane preflight will pass), port 55644 has no listener, `pgrep -cx postgres` = 0, clone clean with no `MERGE_HEAD`.
+
+### No weakening, no new A/B
+Stage order and bounds, once-only sentinel (76), first-failure stop with bounded fixture stop, data-dir retention, marker-gated destroy, the single jest command (`--config jest.rls.config.js test/rls-g2-s8g.spec.ts --runInBand --ci`, once) and all post checks are unchanged. Changes are strictly additive or tightening: lock-inode assertion, real-psql pin + version check, test-count assertion, 18 additional accepted blob pins, other-lane scan extended to `$RUNTIME_ROOT/proof-*/clusters/*/` (covers the retained S8-F lane `proof-s8f-v2/clusters/s8-f`, which exists) with the own-lane skip by full path (`${d%/} != $LANE`), `EXPECT_MIGRATIONS` used in the identity check, stale text corrected. My C-BIND-1..4 are all addressed.
+
+### C (record only)
+- C-RR-1 README's "Original v1 notes" section still mentions `.unfilled` files, base 1c5fbb04 and port 55643; it is labelled historical/superseded at the top, so no action required.
+- C-RR-2 Unmatched globs in the other-lane loop stay literal under `set -u` without `nullglob`; `[ -d "$d" ] || continue` handles them (no failure path).
+
+**Verdict: binding v1 as frozen in `BINDING.sha256` (runner `4fccd135…`, fixture `62de28ba…`, PINS `63c2122c…`, README `9e04de13…`) — GO for ONE run under the parent's single-run PG grant.**

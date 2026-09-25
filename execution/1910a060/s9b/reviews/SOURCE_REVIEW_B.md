@@ -493,3 +493,75 @@ fails closed — but B-v2-1/B-v2-2/B-v2-3 make a successful run impossible and B
 Everything else the parent listed (refusal while unfilled, 13 accepted-path pins at both bases, 172 migrations, schema
 `2e328bbc`/`0eb41f9a`, lockfile `b7fed5ed`, PG17.6 binaries, node 20, lock inode 667698, once-only, read-only and
 bounded-stop assertions, no prod URLs) verifies. Not read: reviewer A. Not run: any script.
+
+---
+
+## Re-review 2 (reviewer B; CLOSURES-2, diff-only; read-only; reviewer A not read)
+
+Basis: `s9b/CLOSURES-2.md`, `s9b/closures-2/{pre-*,*.diff}`, `binding/v2/**` (post), `gate/PINS.env`. The clone was
+touched only to hash the two owned files and to read git objects (the builder's concurrent re-base was not reviewed).
+Nothing executed except `sha256sum`, `diff`, `grep`, `git rev-parse/log/diff --name-only` and a `bash -n` parse of the
+two shell files (parse only, no run; the runner takes the lock before its first check).
+
+### RR2.1 Provenance of the diffs
+- Every `closures-2/pre-*` hashes to the bytes I reviewed: runner `0633ec92…`, fixture `02dd93da…`, PINS `84b548f9…`,
+  README `4de31052…`, `g2-s9-db.ts` `a1611c51…`, guard spec `307d8fa4…`, `gate/PINS.env` `9e6d0bc7…`.
+- My own `diff -u pre → post` is byte-identical (after header lines) to each published `.diff` for all six files.
+- Post shas: runner `7ba9353b…`, fixture `1ee36964…`, PINS `11882143…`, README `c9210cbd…`; `binding/v2/BINDING.sha256`
+  (`c0e503ac…`) → `sha256sum -c` 4/4 OK. Clone files at review time: `g2-s9-db.ts` `39ba033b…`, guard spec `a99cf9c9…`
+  (= CLOSURES-2 and the re-pinned `gate/PINS.env`; PINS.env diff is exactly those two lines).
+
+### RR2.2 Closures of B-v2-1..4 (verified in the post bytes)
+- **B-v2-1 closed.** Runner L30 `D=…/binding/v2`; usage line → `binding/v2`; `EXPECT_FIXTURE_SHA` comment → v2;
+  fixture header L5 → v2 runner; PINS header L1 → v2. `rg 'binding/v1|recovery-reset'` over the four files: only the
+  fixture's "never … 64e33dc7/recovery-reset paths" negative-list comment (L15) remains — correct.
+- **B-v2-2 closed.** Fixture L24 `RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime` (bare line); runner
+  L31 same literal (receipt path; exists on disk). New whole-line cross-checks placed right after the fixture-sha check:
+  `grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT" "$FIX"` and
+  `grep -qx "PORT=$PORT; SUPER=$ADMIN; PASS=$FIXPASS; MARKER=s9-disposable-pg17" "$FIX"` → `fail 70`. I confirmed
+  both `grep -nx` patterns match the post fixture (L24, L27) from a plain shell; runner `PORT/ADMIN/FIXPASS` (L62) are
+  defined before the greps execute. Lane dir (`$RUNTIME_ROOT/clusters/s9-b`), socket dir and marker are now the same in
+  both files.
+- **B-v2-3 closed.** `PSQL=/usr/lib/postgresql/18/bin/psql`; `EXPECT_PSQL_REAL_SHA=d1108fdb…` (= receipt §4 and my own
+  on-disk hash in V2.2); `[ -x "$PSQL" ] && sha == pin` plus `--version | grep -qE '^psql \(PostgreSQL\) 18\.'`;
+  `$PSQL` used for `G2_S9_PSQL`, `psqlq` and the PRECONDITIONS_OK line; `EXPECT_PSQL_REAL_SHA` replaces `EXPECT_PSQL_SHA`
+  in the L88-equivalent fill `case`; wrapper sha demoted to a comment. Mirrors S8-F v2 L49-50/L144-145.
+- **B-v2-4 closed.** `EXPECT_TESTS=10` (my count: 10 `it(` / 4 `describe(`, no `it.each`/`test(`);
+  `grep -qE "^Tests: +$EXPECT_TESTS passed, $EXPECT_TESTS total" "$JLOG" || fail 72` sits after `[ $JRC = 0 ] || fail`,
+  before the stop stage, so a count mismatch still reaches the bounded stop via `fail`. PINS documents re-verifying the
+  count at fill against the attested head (correct: it must track the committed spec).
+
+### RR2.3 Additional changes (not requested by me; checked for weakening)
+- Lock inode assertion `EXPECT_LOCK_INODE=667698` via `stat -c %i` immediately after `flock -n 9`, `exit 75` (no
+  sentinel written — same class as the L69-71 refusals). Matches `LOCK_ESTABLISHED.txt` and the on-disk inode. Strengthens.
+- Other-lane scan (both preflight and post, identical loops) now iterates `"$CLUSTERS"/*/ "$RUNTIME_ROOT"/proof-*/clusters/*/`,
+  skips only `${d%/} == $LANE`, keys by runtime-root-relative path. Unmatched globs are dropped by `[ -d "$d" ] || continue`
+  (no `nullglob` needed). Covers the retained `proof-s8f-v2/clusters/s8-f` (present) and a future `clusters/s8-g`. Closes
+  C-v2-2. Strengthens.
+- `EXPECT_FIXTURE_SHA` filled now (`1ee36964…` = post fixture). Acceptable because the fixture is head-independent and
+  frozen by `BINDING.sha256`; any later fixture edit must re-fill it and re-issue BINDING.sha256.
+- Header/README prose updates only; the fill-refusal `case` still covers all remaining `__FILL_*__` pins (BASE_HEAD/TREE,
+  EXPECT_HEAD/TREE, six S9-B blobs, six tool pins) — 16 placeholders remain, all in the case list.
+- Owned code: `g2-s9-db.ts` adds `'55644'` to `REFUSED_PORTS` and corrects the lane comment (55643 = S8-F, 55644 = S8-G,
+  55645 = chosen); nothing removed. Guard spec `it.each` refusal matrix gains 55642/55643/55644 URL cases — additive,
+  each is a `toThrow` expectation; no existing case altered. Closes C-v2-1. No R75-banned tokens introduced
+  (`rg 'as unknown as|as any|as never|@ts-'` on both: 0). These two files are new bytes relative to my CLOSURES-1
+  re-review; they are small and I read them in full — no new A/B.
+
+### RR2.4 M2 now observable (resolves C-v2-4)
+`9497ca52` exists in the s9b clone: "Merge S9-A reconciler (be88909f) into integration/importer", parent `62471b11`,
+tree **`737c34a3b50cb823c9317d13e1b23797127338b9`** (= the parent's predicted tree). `git diff --name-only 62471b11 9497ca52`
+= exactly the four S9-A files, blobs `b7599427 f50d9401 bcc85e49 11f2a524` (= FROZEN_S9A pins). All accepted-path pins
+re-checked at 9497ca52: `2e328bbc 654550cb 44c96915 c4ae4b8e c345dd54 711bfb09 a7d67217 … 9d701783` unchanged;
+`package-lock.json` sha256 `b7fed5ed…`. So the `BASE_HEAD=9497ca52…` / `BASE_TREE=737c34a3…` fill is consistent with
+every other pin in the binding; the runner will additionally re-derive it at L93-94.
+
+### RR2.5 Verdict
+No assertion weakened; no new class-A/B finding. B-v2-1..4 closed exactly as specified; C-v2-1, C-v2-2 and C-v2-4 also
+closed. Remaining C: C-v2-3 (a premature invocation after fill still consumes the once-only sentinel — grant wording),
+C-v2-5 (clone has no `node_modules` yet; L124-129 refuse until the donor copy lands and `EXPECT_NM_*` are filled).
+
+**Binding v2 (CLOSURES-2 bytes, BINDING.sha256 `c0e503ac…`): GO-for-one-run-after-fill.** Fill set: `BASE_HEAD/BASE_TREE`
+from 9497ca52/737c34a3 (verify with `rev-parse` at fill), `EXPECT_HEAD/TREE` + six S9-B blobs from the attested hooked
+head, six tool pins from the receipt after re-verification, `EXPECT_TESTS` re-grepped at that head; then template→filled
+diff + BINDING.sha256 re-issue, dual attestation, separate single-run grant. Not run by me: anything beyond `bash -n`.

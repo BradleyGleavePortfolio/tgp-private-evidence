@@ -33,8 +33,8 @@ W=/home/user/workspace/worktrees/1910a060-s9b
 R=$D/run; LOG=$R/s9b-pg-proof.log; SENT=$R/s9b-pg-proof.sentinel; JLOG=$R/jest.log
 LOCK=/home/user/workspace/execution/test-validation.lock
 # ---- pins: head pins are filled by the binding phase AFTER the attested S9-B head exists; the script refuses placeholders.
-BASE_HEAD=__FILL_M2__                                                 # M2 = S9-A be88909f composed onto integration/importer 62471b11 (filled by the parent at relay)
-BASE_TREE=__FILL_M2__                                                 # git rev-parse <M2>^{tree}
+BASE_HEAD=9497ca5275938c9228c6ec6fa0dfa8c34f39f724                                                 # M2 = S9-A be88909f composed onto integration/importer 62471b11 (filled by the parent at relay)
+BASE_TREE=737c34a3b50cb823c9317d13e1b23797127338b9                                                 # git rev-parse <M2>^{tree}
 EXPECT_HEAD=__FILL_AFTER_ATTESTATION__
 EXPECT_TREE=__FILL_AFTER_ATTESTATION__
 EXPECT_SPEC_BLOB=__FILL_AFTER_ATTESTATION__                                 # test/rls-g2-s9.spec.ts at the S9-B head

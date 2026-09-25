@@ -156,3 +156,37 @@ Subject: `execution/1910a060/s9b/binding/v2/` — `s9b-pg-proof.sh` `0633ec92…
 ### Verdict
 
 **NO-GO for the one-run grant as v2 stands** — B-V2-1 (runner→v1 fixture path and fixture→nonexistent 64e33dc7 runtime root: the fixture cannot start, and if it could, the lane would be created in a different root than the runner verifies) and B-V2-2 (psql pin check inconsistent with the receipt's designated real-binary pin). Both are fail-closed (no harm class), both are a handful of literal edits, and both must be re-pinned (`EXPECT_FIXTURE_SHA`, binding sha256s) after the fix. With B-V2-1 and B-V2-2 closed and the fill completed from the attested head and receipt, **GO-for-one-run-after-fill**; C-V2-1/2 are recommended hardening for the same edit, not conditions.
+
+## Re-review 2 (diff-only, after CLOSURES-2) — 15:4x PT
+
+Scope: parent's diff-only request; reviewed from `CLOSURES-2.md`, `closures-2/pre-*` and `closures-2/*.diff`, and the `binding/v2` files — not the live clone (being re-based). Read-only: `sha256sum`, `patch` into a temp dir (evidence copies only), `bash -n`, `grep`, `stat`, `ls`. Reviewer B not read.
+
+### Byte accounting
+
+- Every `closures-2/pre-*` hashes to the bytes I reviewed in Re-review 1 / Binding v2 review: runner `0633ec92…`, fixture `02dd93da…`, PINS.txt `84b548f9…`, README `4de31052…`, `g2-s9-db.ts` `a1611c51…`, guard spec `307d8fa4…`, `gate/PINS.env` `9e6d0bc7…`.
+- Independently re-applied each recorded diff to its pre copy: results hash exactly to the announced post values — runner `7ba9353b…`, fixture `1ee36964…`, PINS.txt `11882143…`, README `c9210cbd…`, `g2-s9-db.ts` `39ba033b…`, guard spec `a99cf9c9…`, `PINS.env` `ebc12e89…`. The `binding/v2` files on disk equal the patched results; `sha256sum -c BINDING.sha256` OK (4/4). `bash -n` clean on both scripts. The diffs therefore are the whole change; no other file is touched.
+
+### Closure verification
+
+- **B-V2-1 closed.** Runner `D=…/binding/v2`; fixture `RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime`, and the runner now carries the same literal (no longer a fill pin) and cross-checks the fixture whole-line right after the fixture-sha check: `grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT"` and `grep -qx "PORT=$PORT; SUPER=$ADMIN; PASS=$FIXPASS; MARKER=s9-disposable-pg17"` → fail 70. I ran both greps against the final fixture from a plain shell: both match. `pg17/dist/bin/postgres` exists under that root. All v1 labels (runner usage line, `EXPECT_FIXTURE_SHA` comment, fixture header, PINS header/fixture-sha note) now say v2; the identity comment lists `G2_S8G_*, G2_S8F_*, G2_S8C_*, G2_S8B_*, G2_S7L_*`. `EXPECT_FIXTURE_SHA=1ee36964…` equals the final fixture (head-independent, so filling it now is sound).
+- **B-V2-2 closed.** `PSQL=/usr/lib/postgresql/18/bin/psql`, `EXPECT_PSQL_REAL_SHA=d1108fdb…`, `--version` asserted `^psql \(PostgreSQL\) 18\.`; `$PSQL` is used for `G2_S9_PSQL`, `psqlq` and the PRECONDITIONS_OK line; `EXPECT_PSQL_REAL_SHA` replaces `EXPECT_PSQL_SHA` in the fill-refusal `case`. On this host: the file is executable, `sha256sum` = `d1108fdb…`, `psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)` — matches the receipt. Committed `g2-s9-bootstrap.sh` L51 only requires an executable absolute path and the harness only requires the variable be set, so the real-binary path composes.
+- **C-V2-1 closed.** `EXPECT_TESTS=10`; after `JRC=0`, `grep -qE "^Tests: +10 passed, 10 total"` else `JEST_COUNT_FAIL` → 72. The reviewed `test/rls-g2-s9.spec.ts` (`b854fd59…`, unchanged) has exactly 10 `it(` cases and no `it.each`/`test(`; a skipped case would print `N skipped, …` and fail the match. PINS.txt records the re-verify-at-fill rule.
+- **C-V2-2 closed.** `EXPECT_LOCK_INODE=667698` asserted with `stat -c %i` immediately after `flock -n 9` succeeds → exit 75. Host inode of `execution/test-validation.lock` is 667698 now (matches `LOCK_ESTABLISHED.txt`).
+- **C-V2-3 closed (source).** `g2-s9-db.ts` `REFUSED_PORTS` gains `'55644'`; comment now attributes 55643 = S8-F, 55644 = S8-G, 55645 = chosen S9 port. Guard spec `it.each` refusal matrix gains 55642/55643/55644 URL cases — additive; no case removed, no expectation changed. Both are the only hunks; the R75 token classes do not appear in the added lines.
+- **C-V2-4 closed** (labels), see B-V2-1.
+- **Other-lane scan widened** (reviewer-independent change 6): preflight and post now iterate `$CLUSTERS/*/` and `$RUNTIME_ROOT/proof-*/clusters/*/`, skip only `${d%/} == $LANE`, and key fingerprints by the root-relative path. On this host `runtime/proof-s8f-v2/clusters/s8-f` exists and `runtime/clusters/` does not yet, so the S8-F lane is covered and the `clusters_dir=ABSENT` log line is accurate. The two loops (preflight/post) are textually identical, so `OTHER0`/`OTHER1` compare like-for-like.
+
+### Weakening / new A/B check
+
+- Nothing removed from the precondition, preflight, identity, stop or post stages; every change adds a check or replaces a weaker check with a stronger one (wrapper hash → real binary hash + version). The fill-refusal `case` still covers all head/blob pins, `EXPECT_FIXTURE_SHA`, `PORT`, `RUNTIME_ROOT`, the six remaining tool pins, `EXPECT_PSQL_REAL_SHA`, `BASE_HEAD`, `BASE_TREE`. Runner still writes the sentinel on every `finish` path; the new inode refusal (75) exits before any state change, like the existing 75/76 refusals.
+- No new A/B. Two notes (C): (i) `EXPECT_TESTS` is pinned to the reviewed spec; if the attested head changes the spec's case count the pin must be re-derived at fill (PINS.txt already says so). (ii) `RUNTIME_ROOT` is now a literal in three places (runner, fixture, PINS.txt); the runner↔fixture pair is machine-checked, PINS.txt is documentation only.
+
+### Still unfilled (by design, refused by the runner)
+
+`BASE_HEAD`/`BASE_TREE` (M2), `EXPECT_HEAD`/`EXPECT_TREE`, six S9-B blob pins, and `EXPECT_POSTGRES_SHA`/`EXPECT_INITDB_SHA`/`EXPECT_PGCTL_SHA`/`EXPECT_NODE_SHA`/`EXPECT_NM_LOCK_SHA`/`EXPECT_NM_CLIENT_SHA` (copy from the receipt after re-verification). Note the builder is re-basing onto `9497ca52`; the six S9-B blob pins and `EXPECT_TESTS` must be derived from the final attested head, and the 12 accepted-path blob pins should be re-confirmed identical at that base (they were identical at `1c5fbb04` and `62471b11`).
+
+### Verdict
+
+**Source hunks (`g2-s9-db.ts` `39ba033b…`, guard spec `a99cf9c9…`): SOURCE GO** — additive port refusals, no weakening, no new A/B.
+
+**Binding v2 at `7ba9353b…` / `1ee36964…` / `11882143…` / `c9210cbd…` (BINDING.sha256 `c0e503ac…`): GO-for-one-run-after-fill.** B-V2-1 and B-V2-2 are closed and verified against the host; C-V2-1..4 are closed. Conditions for the run remain: fill the head/blob/tool pins from the attested head and the receipt, re-derive `EXPECT_TESTS`, re-record `BINDING.sha256` over the filled runner, and dual-attest the filled binding — none of which reopens this review.

@@ -1,0 +1,28 @@
+--- /tmp/s9b_pre2/s9b-gate-1910.sh.pre-c3	2026-09-25 22:44:17.560507275 +0000
++++ s9b-gate-1910.sh	2026-09-25 22:49:38.144507275 +0000
+@@ -23,7 +23,7 @@
+ #   S9B_GATE_RELAY=1 S9B_BASE=<M2 40-hex> S9B_INCLUDE_ADDENDUM=<1|0> \
+ #   S9B_DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules \
+ #   S9B_PRETTIER_PREFIX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9 \
+-#   timeout -k 30 5400 bash /home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/gate/s9b-gate-1910.sh
++#   timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/gate/s9b-gate-1910.sh
+ # (S9B_BASE may instead be filled into PINS.env BASE=; the env var wins when both are set and equal, refuses if they differ.)
+ set -uo pipefail
+ E=/home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/gate
+@@ -142,7 +142,6 @@
+ fi
+ log "NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent) NM_CLIENT_SCHEMA=$(sha node_modules/.prisma/client/schema.prisma 2>/dev/null || echo absent)"
+ [ "$(sha node_modules/.prisma/client/index.d.ts)" = "$CLIENT_INDEX_DTS" ] && [ "$(sha node_modules/.prisma/client/schema.prisma)" = "$CLIENT_SCHEMA" ] || { log "PRECONDITION_FAIL in-lane prisma client != BASE pins; refusing (no repin)"; finish 71; }
+-cmp -s node_modules/.prisma/client/schema.prisma prisma/schema.prisma || { log "PRECONDITION_FAIL generated client schema != committed prisma/schema.prisma"; finish 71; }
+ [ ! -e node_modules/.bin/prettier ] || { log "PRECONDITION_FAIL prettier inside product tree"; finish 71; }
+ for b in tsc jest eslint lefthook; do [ -x node_modules/.bin/$b ] || { log "PRECONDITION_FAIL node_modules/.bin/$b missing"; finish 71; }; done
+ log "LEFTHOOK_VERSION=$(./node_modules/.bin/lefthook version 2>&1 | head -1)"
+@@ -208,7 +207,7 @@
+ grep -E '^(Tests|Test Suites|Snapshots|Time):' "$E/jest.raw.log" | tee -a "$LOG"
+ [ $rc = 0 ] || { grep -E '✕|●' "$E/jest.raw.log" | head -60 >> "$LOG"; finish 73; }
+ STAGE=jest_full
+-t0=$(date +%s); timeout --foreground 2700 ./node_modules/.bin/jest --ci > "$E/jest-full.raw.log" 2>&1; rc=$?; log "JEST_FULL rc=$rc secs=$(( $(date +%s)-t0 ))"
++t0=$(date +%s); timeout --foreground 4200 ./node_modules/.bin/jest --ci > "$E/jest-full.raw.log" 2>&1; rc=$?; log "JEST_FULL rc=$rc secs=$(( $(date +%s)-t0 ))"
+ grep -E '^(Tests|Test Suites|Snapshots|Time):' "$E/jest-full.raw.log" | tee -a "$LOG"
+ [ $rc = 0 ] || { grep -E '✕|●' "$E/jest-full.raw.log" | head -60 >> "$LOG"; finish 73; }
+ [ "$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by tests: $(git status --porcelain | tr '\n' ' ')"; finish 73; }

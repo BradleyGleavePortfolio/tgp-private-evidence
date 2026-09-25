@@ -1,0 +1,27 @@
+--- v1-pre-review-snapshot/s8g-fixture.sh	2026-09-25 22:17:11.976507275 +0000
++++ v1/s8g-fixture.sh	2026-09-25 22:43:15.376507275 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S8-G disposable PostgreSQL 17.6 cluster helper (lane s8-c only, EXEC-64E33DC7), derived by substitution from the
++# S8-G disposable PostgreSQL 17.6 cluster helper (lane s8-g only, EXEC-1910A060), derived by substitution from the
+ # accepted S8-B fixture execution/ce3748cb/s8b/binding/s8b-fixture.sh (unchanged there). LOCK-FREE BY DESIGN: it
+ # takes no flock itself and must be invoked only by the S8-G proof binding
+ # execution/1910a060/s8g/binding/v1/s8g-pg-proof.sh, the single canonical lock holder. Standalone use is refused
+@@ -7,7 +7,7 @@
+ #   * cluster_name = 's8g-disposable-pg17' (pinned marker required by start, bootstrap and destroy; identical to
+ #     test/utils/g2-s8g-db.ts G2_S8G_CLUSTER_MARKER)
+ #   * FRESH INIT ONLY: init refuses if the data directory exists (no marking/adopting unknown clusters)
+-#   * listen 127.0.0.1 only, port 55643 (operator-chosen; SOURCE_READY suggests 55643), superuser s8g_super / s8g_local_synthetic
++#   * listen 127.0.0.1 only, port 55644 (operator-chosen, review C1: 55643 is the retained S8-F lane and is refused by g2-s8g-db.ts; SOURCE_READY-FINAL and PINS.txt pin 55644), superuser s8g_super / s8g_local_synthetic
+ #     (synthetic value; scram, S5 shape)
+ #   * FRESH NAMESPACE (RUNTIME_SETUP_RECEIPT §Donor-copy 6-7): binaries from the SHA-pinned
+ #     runtime/pg17/dist; data and socket directories under runtime/clusters/s8-g and
+@@ -22,7 +22,7 @@
+ RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime
+ # ---- end lane constants
+ PGHOME=$RUNTIME_ROOT/pg17/dist
+-PORT=55643; SUPER=s8g_super; PASS=s8g_local_synthetic; MARKER=s8g-disposable-pg17
++PORT=55644; SUPER=s8g_super; PASS=s8g_local_synthetic; MARKER=s8g-disposable-pg17
+ LANE=$RUNTIME_ROOT/clusters/s8-g
+ DATA=$LANE/pg-data; LOG=$LANE/pg.log; SOCK=$RUNTIME_ROOT/run/s8-g
+ STOP_TIMEOUT="${S8G_STOP_TIMEOUT:-45}"

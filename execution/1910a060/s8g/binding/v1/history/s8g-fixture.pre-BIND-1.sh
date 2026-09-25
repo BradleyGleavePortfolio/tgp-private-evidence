@@ -7,7 +7,7 @@
 #   * cluster_name = 's8g-disposable-pg17' (pinned marker required by start, bootstrap and destroy; identical to
 #     test/utils/g2-s8g-db.ts G2_S8G_CLUSTER_MARKER)
 #   * FRESH INIT ONLY: init refuses if the data directory exists (no marking/adopting unknown clusters)
-#   * listen 127.0.0.1 only, port 55644 (operator-chosen, review C1: 55643 is the retained S8-F lane and is refused by g2-s8g-db.ts; SOURCE_READY-FINAL and PINS.txt pin 55644), superuser s8g_super / s8g_local_synthetic
+#   * listen 127.0.0.1 only, port 55644 (operator-chosen, review C1: 55643 is the retained S8-F lane and is refused by g2-s8g-db.ts; SOURCE_READY suggests 55643), superuser s8g_super / s8g_local_synthetic
 #     (synthetic value; scram, S5 shape)
 #   * FRESH NAMESPACE (RUNTIME_SETUP_RECEIPT §Donor-copy 6-7): binaries from the SHA-pinned
 #     runtime/pg17/dist; data and socket directories under runtime/clusters/s8-g and

@@ -1,10 +1,4 @@
-# S8-G PG proof binding v1 — FILLED + BIND-1 closures (NOTHING here has been executed; awaiting the parent's single-run grant after diff-only re-review)
-
-Current files: `s8g-pg-proof.sh` (filled runner), `s8g-fixture.sh`, `PINS.txt`, `BINDING.sha256` (over those three + this README). `history/` keeps the
-`.unfilled` templates and pre-BIND-1 copies; `../v1-pre-review-snapshot/` keeps the pre-review state; `../CLOSURES-BIND-1.md` records every diff.
-Head: `820ce85be2ebf994112afbb90739eb9469ad628e` (tree 7ede6dbb) on base 62471b11. Port 55644, lane clusters/s8-g, real psql /usr/lib/postgresql/18/bin/psql (d1108fdb…), EXPECT_TESTS=19, lock inode 667698 asserted.
-
-## Original v1 notes (historical; superseded where they conflict with the above)
+# S8-G PG proof binding v1 (source-only; NOTHING here has been executed; NOT granted)
 
 Derived by substitution from the accepted S8-C binding `execution/64e33dc7/s8c/binding/v3/{s8c-pg-proof.sh,s8c-fixture.sh}`
 for the S8-G lane of execution 1910a060: runtime root `execution/1910a060/runtime` (RT-NEW-1 receipt), base

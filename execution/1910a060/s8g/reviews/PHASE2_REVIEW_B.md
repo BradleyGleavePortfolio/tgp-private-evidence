@@ -164,3 +164,45 @@ attempt-4/*}`; `s8g/binding/v1/*`; `execution/1910a060/runtime/RUNTIME_SETUP_REC
 `execution/daceddc8/landing/ci/*` and `execution/cf8ff737/nq1*` (skipped-suite baseline); system binaries
 `/usr/share/postgresql-common/pg_wrapper`, `/usr/lib/postgresql/18/bin/psql`, `pg17/dist/bin/*`, `/usr/local/bin/node`
 (sha256 only).
+
+---
+
+## Binding re-review 1 (diff-only, after CLOSURES-BIND-1) — reviewer B, 2026-09-25 ~15:50 PDT
+
+**Verdict: GO for ONE run** of `binding/v1/s8g-pg-proof.sh` sha256 `4fccd1353edb47bfbeea0a7fab159660cee64f5356bccbf70280aba00705c40a`
+with fixture `62de28baa4ad3a669729aa33bebdb603b72642e9a41a2a57345b344093b3d24d`, under the parent's separate single-run
+PG grant. No class A or B remains. Nothing was executed here (`bash -n` only; the canonical lock was not touched; only
+`stat` on the lock file).
+
+### What was checked (read-only)
+
+| Check | Result |
+|---|---|
+| `BINDING.sha256` | `sha256sum -c` OK for runner `4fccd135…`, fixture `62de28ba…`, `PINS.txt` `63c2122c…`, `README.md` `9e04de13…` (values as mailed). `bash -n` OK for runner and fixture. |
+| Diff scope | `CLOSURES-BIND-1.runner-from-reviewed-unfilled.diff` (reviewed template → filled runner) contains only: header/comment text, the nine head pins, `PSQL`/`EXPECT_PSQL_SHA`/`EXPECT_TESTS`/`EXPECT_MIGRATIONS`/`EXPECT_LOCK_INODE` additions, lock-inode refusal, 18 added blob pins in the accepted-file loop, `$PSQL` substitution (3 sites), psql major-version check, B4 count block, other-lane scan widened to `proof-*/clusters/*/`, stale texts fixed. No stage, bound, sentinel, sentinel-write, `fail`/`finish`, jest command or fixture-stop line changed. Fixture delta vs `history/s8g-fixture.pre-BIND-1.sh`: header text and `PORT=55643→55644` only. `PINS.txt` delta: nine fills + the new pin lines + 17 S8-F entries; no removed pins. |
+| **B3 closed** | `PSQL=/usr/lib/postgresql/18/bin/psql`; `EXPECT_PSQL_SHA=d1108fdb…` = sha256 of that binary on disk (re-measured); `"$PSQL" --version` = `psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)` matches `^psql \(PostgreSQL\) 18\.`; `G2_S8G_PSQL=$PSQL` exported; `psqlq()` and `PRECONDITIONS_OK` use `"$PSQL"`; `/usr/bin/psql` no longer appears anywhere in runner or fixture. |
+| **B4 closed** | `EXPECT_TESTS=19`; committed spec `820ce85b:test/rls-g2-s8g.spec.ts` has 19 top-level `it(` and no `it.each`/`test(`/`.skip`/`.only`/`it.todo` (the two regex hits are `.test(q)` on RegExp objects in helpers, not jest modifiers). Count block sits after `[ $JRC = 0 ] || fail $JRC`, before fixture-stop: `^Tests: +19 passed, 19 total` and `^Test Suites: +1 passed, 1 total`, else `fail 72` with the actual line logged; `JEST_COUNT_OK` logged. |
+| Nine head pins | `EXPECT_HEAD` = `rev-parse 820ce85b`; `EXPECT_TREE` = `820ce85b^{tree}` `7ede6dbb…`; spec `86a944c1`, bootstrap `2ab85a13`, db `c654e6bd`, pg-harness `a0261246`, harness `ee2a41a2`, worker `65ee972d` all equal `rev-parse 820ce85b:<path>`; `EXPECT_FIXTURE_SHA=62de28ba…` = sha256 of the shipped `s8g-fixture.sh` (correctly re-pinned to the post-BIND-1 fixture rather than the gate-time `b2dd548a…`). `BASE_HEAD 62471b11` / `BASE_TREE 23614f0b` verified; placeholder `case *__*` refusal retained (no `__FILL` left in runner or PINS). |
+| Runtime/tool pins vs disk | postgres `23cd1748…`, initdb `b7db9bc2…`, pg_ctl `af53d826…` (runtime `pg17/dist/bin`), node `a03953a7…` (`readlink -f /usr/local/bin/node`), `node_modules/.package-lock.json` `05bc530a…`, `.prisma/client/index.d.ts` `9042e713…` (real dir in the s8g worktree, populated by the gate), `prisma/schema.prisma` `0eb41f9a…`, `package-lock.json` `b7fed5ed…` — all equal on this host. `EXPECT_MIGRATIONS=172` matches guard/bootstrap; identity check now uses the variable. |
+| Accepted-file loop | 37 `"path blob"` pins (19 S7-L/S8-C + `package-lock.json 354de3da` + 17 S8-F) — every one equals `820ce85b:<path>`. Prior C3 closed. |
+| Runner↔fixture | `RUNTIME_ROOT` identical; runner `LANE=$CLUSTERS/s8-g`, fixture `LANE=$RUNTIME_ROOT/clusters/s8-g`; `SOCK=$RUNTIME_ROOT/run/s8-g` both; `PORT=55644` both (accepted by the committed guard; 55641/55642/55643 refused); marker `s8g-disposable-pg17` both; `ADMIN/SUPER=s8g_super`, same synthetic password; `DBNAME=g2_s8g_disposable`, confirm `g2_s8g_disposable:55644`. Fixture still refuses standalone use unless `S8G_RUNNER_PID` is a live `s8g-pg-proof.sh`. |
+| Sentinel / lock | `SENT` exists → exit 76 (once-only); lock absent → 75; **new**: `stat -c %i "$LOCK"` must equal `EXPECT_LOCK_INODE=667698` (verified: current inode 667698) → 75; then `exec 9>>"$LOCK"; flock -n 9` → 75 if busy. `finish` writes `RC/STAGE/END/HEAD/LOCK_INODE` to the sentinel and holds fd 9 to exit. Unchanged from the reviewed template apart from the inode assertion (strictly tighter). |
+| Bounded stop | unchanged: `S8G_STOP_TIMEOUT=45`, `timeout -k 30 75 bash "$FIX" stop`, failure path `timeout -k 30 60 … stop`, survivor detection, data dir retained; stage bounds 60/60/900/15×n/1500/75 inside the documented `timeout -k 30 3600` outer. `set -uo pipefail` same as the template and the accepted S8-F v2 runner (explicit `fail` handles cleanup). |
+| Other-lane scan | widened to `$CLUSTERS/*/` and `$RUNTIME_ROOT/proof-*/clusters/*/`, skipping only `$LANE`; verified `runtime/proof-s8f-v2/clusters/s8-f` exists and `runtime/clusters` does not yet (glob-guarded by `[ -d ]`). S8-F lane is now recorded-and-never-started as intended. |
+| Preflight state now | no `postgres` process, no listener on 55644, `runtime/run` and `binding/v1/run` absent — runner would pass its lane-absent preflight. |
+| Stale text | `77f33bcd`, `55643 free`, `/usr/bin/psql`, `s8-c` all absent from runner and fixture. Prior C4/C5 closed. |
+| Weakening | none: no assertion removed or loosened; only additions (inode, psql version, test count, 18 blob pins, wider lane scan). |
+
+### Findings
+
+- Class A: none. Class B: none (B3, B4 closed; B-BIND-1..3 as recorded by the builder are consistent with what I verified).
+- Class C (record only, no closure needed before the run):
+  - **C6** `history/BINDING.sha256.unfilled` attests the template; the final `BINDING.sha256` covers the four shipped files. The template→filled diff itself is attested only via this record and `CLOSURES-BIND-1.md`'s sha table — acceptable; the diff files' sha256 (runner-from-reviewed `23196b1e…`, runner `b1a2430e…`, fixture `ccfd79b3…`, pins `0bc4e6c4…`, md `1978aa9a…`) are noted here for the archive.
+  - **C7** `EXPECT_FIXTURE_SHA` differs from `gate/attempt-4/BINDING-PINS-820ce85be2eb.txt` (`b2dd548a…`) because the fixture header/PORT text moved after the gate; the shipped fixture is the one pinned, so this is correct, but the grant record should cite `62de28ba…`, not the gate-time value.
+  - **C8** The runner's `[ $JRC = 0 ]` check precedes the count check, so a jest exit 0 with a wrong count fails as 72 (correct); a jest exit ≠ 0 still surfaces the `Tests:` line via the pre-existing `grep -E '^(Test Suites|Tests…)'` tee — sufficient.
+
+### Grant conditions restated
+Run exactly once as `timeout -k 30 3600 bash execution/1910a060/s8g/binding/v1/s8g-pg-proof.sh` on this host with the
+canonical lock free (inode 667698), worktree at 820ce85b and clean, no `postgres` running; accept only a sentinel with
+`RC=0 STAGE=done` plus `JEST_COUNT_OK tests=19 suites=1` and `FIXTURE_STOP rc=0` in the log; destroy of the retained
+data dir remains a separate grant.

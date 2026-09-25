@@ -1,0 +1,105 @@
+--- v1-pre-review-snapshot/PINS.txt.unfilled	2026-09-25 22:17:11.976507275 +0000
++++ v1/PINS.txt	2026-09-25 22:43:15.740507275 +0000
+@@ -1,6 +1,6 @@
+-# S8-G PG proof binding pins (execution/1910a060/s8g/binding/v1). UNFILLED head pins = proposal stage; s8g-pg-proof.sh refuses to run.
++# S8-G PG proof binding pins (execution/1910a060/s8g/binding/v1) — FILLED from committed head 820ce85b (Phase-2 FINAL GO, both reviewers); BIND-1 closures applied. NOT RUN.
+ # Derived from the accepted S8-C v3 binding pattern. Fill ORDER: source gates on the uncommitted candidate (parent relay on lock
+-# inode 667698) -> hooked Bradley commit on exec1910/s8g -> fill the nine __FILL_AFTER_ATTESTATION__ values from that head
++# inode 667698) -> hooked Bradley commit on exec1910/s8g -> fill the nine head values from that head (DONE 2026-09-25 from 820ce85b)
+ # (sed; keep this template and s8g-pg-proof.sh.unfilled; record template->filled diff + sha256 in BINDING.sha256) -> independent
+ # attestation of final head + FILLED binding -> separate parent-granted single real-PG run. Never fill from an uncommitted tree.
+ # Fill commands (read-only against the attested head H in W=/home/user/workspace/worktrees/1910a060-s8g):
+@@ -13,29 +13,33 @@
+ #   EXPECT_HARNESS_BLOB   = git -C $W rev-parse HEAD:test/utils/g2-s8g-harness.ts
+ #   EXPECT_WORKER_BLOB    = git -C $W rev-parse HEAD:test/utils/g2-s8g-worker.cjs
+ #   EXPECT_FIXTURE_SHA    = sha256sum binding/v1/s8g-fixture.sh
+-# Current UNCOMMITTED working-tree blobs (build/blob-hashes.txt) are informational only; gates (prettier --write etc.) may change them.
+-BASE_HEAD=1c5fbb0441178e0cfe6e9f8d72e955c645c265e9
+-BASE_TREE=82b56ad373c9cb4888b7c9b79544fbbb6f55c0d6
+-EXPECT_HEAD=__FILL_AFTER_ATTESTATION__
+-EXPECT_TREE=__FILL_AFTER_ATTESTATION__
+-EXPECT_SPEC_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_BOOTSTRAP_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_DB_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_PGH_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_HARNESS_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_WORKER_BLOB=__FILL_AFTER_ATTESTATION__
+-EXPECT_FIXTURE_SHA=__FILL_AFTER_ATTESTATION__
++# Filled 2026-09-25 from gate/attempt-4/BINDING-PINS-820ce85be2eb.txt; every value re-derived read-only from the clone at 820ce85b (build/SOURCE_READY-FINAL.md).
++BASE_HEAD=62471b116267fdec6746073c4b4c80a154d09834
++BASE_TREE=23614f0b7dc33dc37b90cf4f27fcb8331912e60f
++EXPECT_HEAD=820ce85be2ebf994112afbb90739eb9469ad628e
++EXPECT_TREE=7ede6dbb8f6f2d0ddcc349882a47ef67d415c32a
++EXPECT_SPEC_BLOB=86a944c11d69f4561812f86bd82431e625832752
++EXPECT_BOOTSTRAP_BLOB=2ab85a1341cd4545edeb145dded67e6bef3fa2bf
++EXPECT_DB_BLOB=c654e6bd7364be70fba9b63d9f061aa60646b122
++EXPECT_PGH_BLOB=a02612463dcb2ed8b7605d68348011a0b1321be8
++EXPECT_HARNESS_BLOB=ee2a41a2c118d4576878b65bf9b65cf220d0cf27
++EXPECT_WORKER_BLOB=65ee972d3bb44eca84a6007d81b4675452e2d94c
++EXPECT_FIXTURE_SHA=62de28baa4ad3a669729aa33bebdb603b72642e9a41a2a57345b344093b3d24d
+ # Tool / runtime pins (RUNTIME_SETUP_RECEIPT.md of execution/1910a060/runtime; postgres re-measured read-only here; compare-only)
+ EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+ EXPECT_INITDB_SHA=b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
+ EXPECT_PGCTL_SHA=af53d826845af4679a0aaba2bda319f5e527f3b94f3794c67fa174049c9b9401
+-EXPECT_PSQL_SHA=a200e38c89b111d3abdf26927b186fdd423bef3d84f157af0f4b65db6f8e6c94   # /usr/bin/psql -> pg_wrapper (client 18.6); real binary d1108fdb…
++PSQL=/usr/lib/postgresql/18/bin/psql   # B3: real client binary (pg_wrapper dispatcher a200e38c… is NOT the pin any more)
++EXPECT_PSQL_SHA=d1108fdb45b87f2313d7acfbb91a0a65ca97c6c2195f15d8ae9295121029ef67   # sha256 of $PSQL; `psql (PostgreSQL) 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)`; runner asserts --version matches ^psql \(PostgreSQL\) 18\.
++EXPECT_TESTS=19                        # B4: top-level it( count in test/rls-g2-s8g.spec.ts @820ce85b (grep -cE "^\s*it\(" = 19; no it.each/it.skip/it.only/test(); runner greps "Tests: 19 passed, 19 total" and "Test Suites: 1 passed, 1 total" → fail 72)
++EXPECT_MIGRATIONS=172
++EXPECT_LOCK_INODE=667698               # runtime/LOCK_ESTABLISHED.txt; runner refuses (exit 75) if the lock file inode differs, before flock
+ EXPECT_NODE_SHA=a03953a7b16bff002b94d6fb58ada900b68241cbcaee6efc400b20dadd36dddc
+ EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44   # donor worktrees/1910a060-s8f/node_modules/.package-lock.json
+ EXPECT_NM_CLIENT_SHA=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6 # donor .prisma/client/index.d.ts (schema blob 2e328bbc == 1c5fbb04)
+ EXPECT_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
+ EXPECT_PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
+-# Accepted-file blob pins at base 1c5fbb04 (must be unchanged at the S8-G head; embedded in the runner)
++# Accepted-file blob pins recomputed at base 62471b11 (all 20 identical to their 1c5fbb04 values — verified 2026-09-25; must be unchanged at the S8-G head; embedded in the runner)
+ test/utils/g2-s8c-db.ts=a7d67217fe959f65daae9615e5f00806cc3764d3
+ test/utils/g2-s8c-pg-harness.ts=4059883d70c26aed46398af707645aaacb306868
+ test/utils/g2-s8c-harness.ts=1a8f17970a1095f9b802badacf093e773caabd76
+@@ -57,9 +61,44 @@
+ jest.config.js=769a414698125340d6e347160f6ad81122cce863
+ package-lock.json=354de3dae19449970497da6e4d87f0a1225a8f43
+ # Lane identity (never read from the environment inside the repo guard; the runner exports them)
+-PORT=55643 (operator may choose another free port; 55641/55642 refused by g2-s8g-db.ts) DB=g2_s8g_disposable ADMIN=s8g_super CLUSTER=s8g-disposable-pg17
++PORT=55644 (review C1; operator may choose another free port; 55641/55642/55643 refused by g2-s8g-db.ts — 55643 is the retained S8-F lane) DB=g2_s8g_disposable ADMIN=s8g_super CLUSTER=s8g-disposable-pg17
+ DB_MARKER=s8g-g2-run-orchestration-synthetic-disposable-fixture-safe-to-drop
+ RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime
+ DIST=$RUNTIME_ROOT/pg17/dist  DATA=$RUNTIME_ROOT/clusters/s8-g/pg-data  SOCK=$RUNTIME_ROOT/run/s8-g
+ LOCK=/home/user/workspace/execution/test-validation.lock (inode 667698; flock -n on fd 9, append-open, held to exit, never deleted)
+ RECEIPTS=execution/1910a060/s8g/binding/v1/run/{s8g-pg-proof.log,jest.log,s8g-pg-proof.sentinel,RECEIPTS.sha256}
++
++# S8-F accepted-at-base pins (17 paths landed in 62471b11 via e1ec2fec; blobs at 62471b11; must be unchanged at the S8-G head)
++docs/contracts/importer-openapi.json=8ebf936a9f12087a807cb37b069592d0c1e96cb2
++src/scout/scout-entities.controller.ts=8060a3685e707d88a4ccf65fe19e3f111a70e53c
++src/scout/scout-entities.dto.ts=8b0f8ec063344702e13139a69d9165b8479fc6cc
++src/scout/scout-entities.service.ts=77db2ee4f72993b22db8af19e730c2cbd155462a
++src/scout/scout-roster.controller.ts=02904b3db04a3245eab32d8cc070f0bef5d9670d
++src/scout/scout-roster.dto.ts=939713d7846fe1020074c9e77840f16f11a89ac2
++src/scout/scout-roster.service.ts=4435cbf03805a15daab0964b79c98098b438a828
++test/contracts/importer-contract.spec.ts=4300eec371c3edbde48cf058e6f1f06021924b60
++test/rls-g2-s8f.spec.ts=77785ec5fa3d0bb15731ba7787c4ede4968eb51d
++test/scout/entities/scout-entities.contract.spec.ts=1b2f183e3a0dc7e55da6b7b9a5bb77c2345bcccb
++test/scout/entities/scout-entities.service.spec.ts=b16d0b752ae3da384420dc41f8a9ade5f51c2c54
++test/scout/g2-s8f-db-guard.spec.ts=9d1042a432f13d3f49409ca436e3cffad152da6f
++test/scout/roster/scout-roster.controller.spec.ts=1c94e4de73557b2c46c2a7c16c117cd1e92ac43f
++test/scout/roster/scout-roster.service.spec.ts=882ad737f5ebfe03549ad7eaef10c3f36ec66fd1
++test/utils/g2-s8f-bootstrap.sh=5ac2753bdc0498899d1a9eef297ef4acc467ccb8
++test/utils/g2-s8f-db.ts=aeff4cb0f06d0d65b969bf7742c1d8cf377f4c79
++test/utils/g2-s8f-pg-harness.ts=a8acd231d10194d4552546339a7a4309c86fb8d4
++
++# Phase-2 review scoping — S8-G harness files vs their accepted S8-C ancestors (blobs at 62471b11). "normalized_delta_lines"
++# = diff lines remaining after mapping s8c→s8g, S8-C→S8-G, 55642→55644, s8-c→s8-g. NONE differs by pin literals alone;
++# every file carries substantive lane-design changes (server-mode worker, epoch/fence facts, S8-G markers), so all seven
++# need Phase-2 reading. S8-G blobs are pre-commit working-tree blobs (attempt-4 tree; prettier check-1 rc 0 so final unless noted).
++test/utils/g2-s8g-db.ts           s8c=a7d67217 s8g=c654e6bd normalized_delta_lines=30
++test/utils/g2-s8g-pg-harness.ts   s8c=4059883d s8g=a0261246 normalized_delta_lines=36
++test/utils/g2-s8g-harness.ts      s8c=1a8f1797 s8g=ee2a41a2 normalized_delta_lines=200
++test/utils/g2-s8g-bootstrap.sh    s8c=7c3fba47 s8g=2ab85a13 normalized_delta_lines=58
++test/utils/g2-s8g-worker.cjs      s8c=48403063 s8g=65ee972d normalized_delta_lines=234
++test/scout/g2-s8g-db-guard.spec.ts s8c=c3fc6bde s8g=4009f753 normalized_delta_lines=109
++test/rls-g2-s8g.spec.ts           s8c=9d701783 s8g=86a944c1 normalized_delta_lines=1309
++
++# Other-lane scan (C): runner scans $RUNTIME_ROOT/clusters/*/ AND $RUNTIME_ROOT/proof-*/clusters/*/ (covers the retained S8-F lane
++# proof-s8f-v2/clusters/s8-f), skipping only its own LANE=$RUNTIME_ROOT/clusters/s8-g; postgresql.conf + pg_control sha256 recorded before and compared after.
++# Accepted-file enforcement: the runner loop now checks 37 blobs at HEAD — 20 S7-L/S8-C/base pins + package-lock.json + the 17 S8-F blobs listed above (C).
