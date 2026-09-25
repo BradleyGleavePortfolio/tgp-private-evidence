@@ -240,3 +240,26 @@ E2 is SOURCE_READY: tree `1c784e6c…`, diff `2f80dae0…`, class C only (`daced
 It may not mark the PR ready or merge it. Extension `main` needs the owner-reserved non-author approval, as for PR #27. It may not touch protection or settings.
 
 After CI is green: one independent T3 review on the exact head.
+
+## S9-0 review NO-GO: parent disposition (17:50Z)
+
+The independent T3 review (`s9/reviews/S9_0_REVIEW.md`) found one class A and one class B issue. Both close with doc-text changes.
+
+- **R-A1 (class A), accepted closure:**
+  - Define `required_families` as the union of staged families, coverage-map families, and every family the platform's mapping spec declares.
+  - If that set is empty or unknown, the run stays `partial/coverage_basis_unknown`. `complete` needs a basis for every required family.
+  - Add R18b and R01d.
+  - This binds S9-A's `coverage.ts`.
+- **R-B1 (class B), option (i):**
+  - The new `families[]` report fields are optional DTO properties, omitted entirely when no report applies (legacy rows and pre-S9 terminals).
+  - The accepted `toEqual` assertions at `scout.service.spec.ts` L766 and `lifecycle.service.spec.ts` L465 stay untouched.
+  - R13 and R15 are reworded to match.
+- **Class C, fold in now while the doc is open:**
+  - the `lifecycle.service.ts` import and optional-constructor hunks;
+  - a classification catch-all bucket;
+  - `ledger_without_staged` counted run-wide;
+  - per-row histogram keys for client-linked workout evidence (S8-DOC L149);
+  - R cases for unsupported-platform rows and rejected rows;
+  - a numeric R16 deadline window;
+  - a note on E2's 64 KiB body bound.
+- **Next:** the author amends, then the same reviewer does a changed-part re-review. After GO, the doc is committed and lands.

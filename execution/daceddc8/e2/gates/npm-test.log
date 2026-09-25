@@ -1,0 +1,20 @@
+
+> tgp-importer-extension@0.3.0-rc.1 test
+> vitest run --passWithNoTests=false
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/workspace/repos/tgp-importer-extension[39m
+
+ [32m✓[39m test/replay-blueprint.spec.js [2m([22m[2m227 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m test/replay-engine.spec.js [2m([22m[2m50 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2maccepted Start binds its owner before the cold preflight refresh (S4-R4-A-01)[2m > [22m[2mstart_import: preflight refresh TIMEOUT after the replacement landed → replaced, not 'login required'
+[22m[39m{"src":"tgp-importer","event":"refresh_timeout"}
+
+[90mstderr[2m | test/session-ownership-preflight.spec.js[2m > [22m[2ma refresh on behalf of an obsolete run never presents the replacement's token (S4-R4-A-02)[2m > [22m[2mcontrol — rotation persist FAILURE for the current session: no new token published, auth_required exactly once, no replacement involved
+[22m[39m{"src":"tgp-importer","event":"refresh_rotation_persist_failed"}
+
+ [32m✓[39m test/session-ownership-preflight.spec.js [2m([22m[2m19 tests[22m[2m)[22m[33m 4384[2mms[22m[39m
+     [33m[2m✓[22m[39m control — start_import cold preflight with no transition: mints once and imports under the minted bearer [33m 1010[2mms[22m[39m
+     [33m[2m✓[22m[39m control — pending establish FAILURE during the preflight refresh: the OLD session stays current and the run proceeds under it [33m 1009[2mms[22m[39m
+     [33m[2m✓[22m[39m settlement (complete) 401 → refresh queued behind the replacement's establish: nothing presented, run left unsettled, replacement intact [33m 1011[2mms[22m[39m
+     [33m[2m✓[22m[39m control — ingest 401 → refresh with no transition: OLD presented once, retry under the minted bearer, success [33m 1006[2mms[22m[39m
