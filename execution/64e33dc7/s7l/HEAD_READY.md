@@ -1,4 +1,5 @@
 # S7-L HEAD_READY — 2026-09-25T04:30:19Z (slot released at driver exit)
+(see FINAL_RECEIPT.md for the frozen binding and full-history bundle)
 base=93389265a846095b846fa8f1fb0dad782fb6ee9f
 head=839b54c53ccb252f95b4ec63df0b08595bbe7698
 tree=f02205c60ad0bfeb24ce82d74b0025ee9a185df6

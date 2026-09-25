@@ -1,5 +1,9 @@
 # EXEC-64E33DC7: exact continuation and recovery scope
 
+## Live correction cursor, 2026-09-25 04:51Z
+
+S7-L original head `839b54c5`, filled binding and reviews are preserved. Review B's concrete F1 A and F2 B supersede one-review GO for execution. `S7L_MINIMUM_CORRECTION_GRANT.md` authorizes only the three-path correction, ordinary follow-up, versioned binding and changed-question dual re-review. Source edits proceed concurrently with S8-C; no S7-L heavy gate until explicit relay, and no PG without the later exact one-run grant. S8-C remains sole source-gate grantee. S8-F's exact 15-path draft is frozen and published, awaiting accepted S8-C composition. No scope expansion, accepted-proof rerun or owner decision is needed.
+
 ## Live source/proof cursor, 2026-09-25 04:33Z
 
 S7-L new lineage is committed at `839b54c53ccb252f95b4ec63df0b08595bbe7698`, tree `f02205c60ad0bfeb24ce82d74b0025ee9a185df6`, on accepted `93389265`. Its source gates/genuine hooks passed; raw failures are preserved. Two independent nonbuilder reviewers examine the frozen new source while the builder finishes its filled PG binding. A final GO requires both exact source and binding. No real-PG execution is granted yet.

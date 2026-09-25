@@ -1,5 +1,11 @@
 # LAST OPERATOR STATE
 
+## Live cursor: 2026-09-25 04:51Z
+
+S7-L `839b54c5` and its original filled binding are preserved, not accepted. Review A returned GO; Review B identified F1 A (a newly committed future-deadline Start can be permanently timed out) and F2 B (L06 attempts login as NOLOGIN roles). Parent granted only the service guard, one regression unit case and L06 owner-session SET ROLE under `execution/64e33dc7/S7L_MINIMUM_CORRECTION_GRANT.md`. The builder is active source-only; its source gates queue after S8-C. A new ordinary head and versioned binding require only changed-question re-attestation by the same two reviewers before a separately granted first PG proof.
+
+S8-C remains sole source-gate grantee; parent observed its live canonical holder at 04:49Z. Its initial gate failures are preserved while minimum new-adapter/fixture closures proceed. S8-F's 15-path exact draft is published and frozen pending accepted S8-C composition; no re-authoring or runtime is authorized there. No backend replacement is accepted or landed, no PG proof has run, and no owner decision is required for these narrow corrections. Accepted product heads and reserved boundaries below remain unchanged.
+
 ## Live cursor: 2026-09-25 04:33Z
 
 S7-L replacement source is committed at `839b54c53ccb252f95b4ec63df0b08595bbe7698`, tree `f02205c60ad0bfeb24ce82d74b0025ee9a185df6`, based on accepted landed backend `93389265a846095b846fa8f1fb0dad782fb6ee9f`. Genuine hooks passed with the pinned isolated formatter; applicable source gates and targeted contract 56/56 are recorded in `execution/64e33dc7/s7l/HEAD_READY.md`. Earlier failures remain unchanged. This is source readiness, not PG proof or acceptance.
