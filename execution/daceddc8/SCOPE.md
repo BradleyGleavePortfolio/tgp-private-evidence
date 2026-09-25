@@ -380,3 +380,19 @@ Under the precedence rule, Bradley's latest instruction overrides the earlier ru
 **Next:** the S9-0 doc commit goes on `1c10e2a1`.
 - The `landing_composition_prep` worktree `worktrees/daceddc8-land-s8-c` is handed to `s9_0_decision_doc`, since the landing agent uses fresh worktrees per composition.
 - S9-A then moves onto the S9-0 commit.
+
+## PROD-MERGE-1: backend PR #530 (18:20Z)
+
+**Authority:** Bradley at 10:59 PT said "if they're ready to merge safely, lets go ahead and get them merged!" At 11:07 PT he added that the method is his to leave to the operator ("steel, wood, or straw").
+
+**Safety basis:** the T4 assessment `prod/PR530_MERGE_SAFETY.md` gives SAFE-WITH-CONDITIONS, and SAFE at `1c10e2a1` once #530 is green there.
+- The merge does NOT deploy: the PR makes `fly-deploy.yml` `workflow_dispatch`-only, and push workflows run from the pushed commit.
+- Production stays on image `5076a07a`.
+
+**Grant:** one executor may run the following, in order:
+1. After every #530 check on `1c10e2a1` is completed and green (or skipping, as expected), confirm `main` = `c23b9d9f` and that it is an ancestor.
+2. Push exactly `1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47:refs/heads/main` as an FF push, no force. This matches the pinned sha, even if `integration/importer` moves meanwhile through S9-0 LAND-3.
+3. Verify the remote, and that #530 is closed as merged. If it is still open because `integration/importer` moved, record that and leave it open for the next release.
+4. Watch the push workflows on `main`, and assert that no Fly deploy job ran.
+
+**Deployment and flag enablement remain owner-reserved (assessment D1–D6).** This grant does NOT authorize a `workflow_dispatch` of the deploy, secret or flag workflows, and does not authorize protection changes.
