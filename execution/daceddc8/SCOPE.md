@@ -110,3 +110,14 @@ Per Bradley's 16:32Z instruction, the parent orchestrates only. Coding, gates, b
 - **Launch:** exactly once, `S8C_PG4_GRANT=1 bash …/s8c/binding/v4/run-prep/supervisor.sh`. That runs one detached `timeout -k 30 3900 bash …/s8c/binding/v4/s8c-pg-proof.sh` against candidate `e0cee7e0…` (tree `b249efb6…`), with driver `73b291db…`, fixture `c59326b5…` and manifest `c2cfd0a3…`.
 - **Rules:** no rerun on any rc, no edits, preserve all receipts. A full pass (END rc=0, stage=post, all Jest passed) means the parent may accept and land. Anything else goes to disposition.
 - **Heavy queue:** the S7-L v4 proof waits for this run's release plus its own dual GO.
+
+## PG-4a result and S8C-BC-3 grant (16:56Z)
+
+PG-4a is consumed. It FAILED `RC=1 STAGE=jest`: 13 of 13 tests failed in harness `catalog()` on the `ExerciseCatalogItem.updated_at` NOT NULL. See `64e33dc7/S8C_V4_FAILED_PROOF_DISPOSITION.md` (class B, harness-only).
+
+- **Grantee:** `s8c_bootstrap_completion` (T4, `claude_fable_5_1`) under **S8C-BC-3**.
+- **Harness correction:** minimum harness-only fix plus a full sweep of the raw SQL in S8-C test support.
+- **Diagnostics:** scratch-lane diagnostics under the slot, as the disposition allows.
+- **Commit:** one genuine hooked Bradley commit on `exec64/s8c-replacement` (child of `e0cee7e0`).
+- **Evidence:** checkpoint v7 and binding v5, derived mechanically from v4 (paths under `proof-v5`, head/tree/changed-blob pins, fixture pin), plus `run-prep` v5 and a receipt. All writes go under `s8c/harness-correction/**`, `s8c/checkpoints/v7/` and `s8c/binding/v5/`.
+- **Slot:** the builder must acquire the canonical lock with `flock -n` and yield to any holder, and must never run concurrently with the S7-L proof.

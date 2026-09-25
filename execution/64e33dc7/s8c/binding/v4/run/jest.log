@@ -1,0 +1,273 @@
+FAIL rls-live test/rls-g2-s8c.spec.ts (20.304 s)
+  lane identity (bootstrap state, never repaired here)
+    ✕ is the S8-C disposable PG17 lane with the full accepted history and S8-B objects present (250 ms)
+    ✕ is bound to one attested candidate head that descends from the base (134 ms)
+    ✕ the worker exposes the canonical family list with programs (N3) and refuses an unknown family (130 ms)
+  native persistence: target + provenance + typed ledger in one transaction
+    ✕ creates a WorkoutProgram from a programs row with workout_program provenance and ledger kind (N1, N4) (128 ms)
+    ✕ creates a standalone WorkoutPlan with ordered exercises, exact catalog links and unresolved children (126 ms)
+    ✕ replays byte-identical: no duplicate targets, no provenance drift, coach edits preserved (128 ms)
+    ✕ program-day workouts: relationship pending until the program lands, then converge with revision 0 (137 ms)
+  client principal: explicit unresolved, never a User (N2)
+    ✕ client-linked workout stays generic evidence with an unresolved provenance marker; no plan, no User (127 ms)
+  tenant isolation
+    ✕ the same source identifiers for two coaches yield separate targets; neither coach sees the other (127 ms)
+  contention and atomicity
+    ✕ two concurrent identical runs converge on ONE plan; the loser rolls its target back with its transaction (129 ms)
+    ✕ a held ledger identity blocks the writer; its first attempt (target included) rolls back and the retry converges (128 ms)
+  legacy compatibility and unchanged precedence
+    ✕ legacy families and pre-existing NULL-kind ledger rows are untouched by the native writer (126 ms)
+    ✕ a later-removed or archived native target does not downgrade the reconstructed ledger row and mints nothing new (122 ms)
+
+  ● lane identity (bootstrap state, never repaired here) › is the S8-C disposable PG17 lane with the full accepted history and S8-B objects present
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.162, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● lane identity (bootstrap state, never repaired here) › is bound to one attested candidate head that descends from the base
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.32, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● lane identity (bootstrap state, never repaired here) › the worker exposes the canonical family list with programs (N3) and refuses an unknown family
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.45, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● native persistence: target + provenance + typed ledger in one transaction › creates a WorkoutProgram from a programs row with workout_program provenance and ledger kind (N1, N4)
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.58, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● native persistence: target + provenance + typed ledger in one transaction › creates a standalone WorkoutPlan with ordered exercises, exact catalog links and unresolved children
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.706, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● native persistence: target + provenance + typed ledger in one transaction › replays byte-identical: no duplicate targets, no provenance drift, coach edits preserved
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.835, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● native persistence: target + provenance + typed ledger in one transaction › program-day workouts: relationship pending until the program lands, then converge with revision 0
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:16.972, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● client principal: explicit unresolved, never a User (N2) › client-linked workout stays generic evidence with an unresolved provenance marker; no plan, no User
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.101, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● tenant isolation › the same source identifiers for two coaches yield separate targets; neither coach sees the other
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.229, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● contention and atomicity › two concurrent identical runs converge on ONE plan; the loser rolls its target back with its transaction
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.359, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● contention and atomicity › a held ledger identity blocks the writer; its first attempt (target included) rolls back and the retry converges
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.488, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● legacy compatibility and unchanged precedence › legacy families and pre-existing NULL-kind ledger rows are untouched by the native writer
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.615, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+  ● legacy compatibility and unchanged precedence › a later-removed or archived native target does not downgrade the reconstructed ledger row and mints nothing new
+
+    Command failed: /usr/bin/psql -X -w -qAt -v ON_ERROR_STOP=1 postgresql://postgres@127.0.0.1:55642/g2_s8c_disposable?connect_timeout=5
+    ERROR:  null value in column "updated_at" of relation "ExerciseCatalogItem" violates not-null constraint
+    DETAIL:  Failing row contains (11111111-1111-4111-8111-111111111111, synthetic-bench-press, Synthetic synthetic-bench-press, strength, full_body, {}, {}, beginner, {}, null, null, null, public, none, null, null, null, 2026-09-25 16:49:17.738, null, null, null).
+
+      60 |
+      61 | const psqlRun = (url: string, args: string[], input?: string) =>
+    > 62 |   execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
+         |               ^
+      63 |     input,
+      64 |     encoding: 'utf8',
+      65 |     timeout: 60000,
+
+      at psqlRun (test/utils/g2-s8c-pg-harness.ts:62:15)
+      at sql (test/utils/g2-s8c-pg-harness.ts:69:46)
+      at catalog (test/utils/g2-s8c-harness.ts:113:8)
+      at Object.<anonymous> (test/rls-g2-s8c.spec.ts:85:10)
+
+Test Suites: 1 failed, 1 total
+Tests:       13 failed, 13 total
+Snapshots:   0 total
+Time:        20.546 s
+Ran all test suites matching test/rls-g2-s8c.spec.ts.
