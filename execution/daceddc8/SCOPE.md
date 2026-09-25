@@ -188,3 +188,23 @@ The canonical slot passes to S8-C BC-3 diagnostics.
   - Step 2: build E2 in a fresh extension clone or worktree based on `land/s4-r6` (`8901d5f5`, which carries E1). It may push branch `land/e2-status-server` and open a DRAFT PR for CI.
   - Merging to extension `main` still needs the owner-reserved non-author approval, as for PR #27.
 - **Heavy queue:** S8-C BC-3 diagnostics and commit, then S9-0 commit, then the E2 gates, then the S9-A gates, then the S8-C v5 proof after dual GO.
+
+## S8C-BC-3 result and S8C-BC-4 grant (17:20Z)
+
+### BC-3 result
+- **Commit:** `9cc76401…` (tree `82083614…`, parent `e0cee7e0`). One-function harness fix: `catalog()` now supplies `updated_at`. Gates and hooks are genuine.
+- **Diagnostic (a):** confirmed an exact single omission across the 27 required columns.
+- **Diagnostic (b):** non-accepting scratch run, 10 of 13 passed. It exposed three spec-side test-assumption defects (`s8c/harness-correction/diagnostic/FINDINGS.md`).
+- **Step 4 (v7 checkpoint / v5 binding):** correctly withheld, to avoid binding a known-failing head.
+
+### Parent disposition (all three are class B test defects; none is a product defect)
+- **F1:** the lane-identity observation reads `data_directory` via the non-superuser migration role. Closure: observe via the spec's existing admin connection (`jsonAdmin`). The asserted values stay unchanged. No bootstrap or GRANT change.
+- **F2:** `weight_lbs` is 1 ulp off after the Prisma Float round-trip, and the writer passes `toPounds` unchanged. Closure: `toBeCloseTo(toPounds(100,'kg'), 9)` on that float field only. A 1e-9 tolerance still catches any unit or conversion error.
+- **F3:** `count('User')` = 2 includes the accepted seed `b5-system-coach-tgp`. Closure: scope the assertion so it still proves the writer created no User, for example by excluding the named seed id or comparing against a pre-writer baseline.
+
+### S8C-BC-4 grant: `s8c_bootstrap_completion`
+- Exactly those three assertion sites in `test/rls-g2-s8c.spec.ts`, plus the harness only if needed by F1's admin observation. Nothing else.
+- One genuine hooked commit, child of `9cc76401`.
+- Then a scratch diagnostic (b) rerun under the slot, non-accepting; it must show 13 of 13. Any new failure: stop for disposition.
+- Then checkpoint v7, binding v5 (proof-v5 paths, all changed-blob pins, and the PINS L57 fill fix) and run-prep v5 (`S8C_PG5_GRANT`), from the final head.
+- Reviewers for v5 must check that the three assertion changes do not weaken product assertions.

@@ -1,0 +1,11 @@
+S8-C: supply updated_at in the G2 proof harness catalog fixture rows
+
+ExerciseCatalogItem.updated_at is @updatedAt, which Prisma fills client-side
+and which has no database default, so the raw fixture INSERT in
+test/utils/g2-s8c-harness.ts violated its NOT NULL constraint and every
+live-PG spec failed in beforeEach before any writer behaviour ran. Supply
+now() for that column. A sweep of every other raw INSERT/UPDATE in the S8-C
+test support (User, ScoutImport, ScoutIngestEntity, ScoutReconstructionLedger)
+against the columns as they exist after the 171 accepted migrations found no
+other NOT NULL column without a default that is omitted. Test support only:
+no product source, schema, migration or spec assertion changes.
