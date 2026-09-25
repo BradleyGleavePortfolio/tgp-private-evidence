@@ -107,6 +107,18 @@ log "CONTRACT deterministic: two cold-process runs byte-identical to the textual
 # ---------- 6. affected Jest suites (import closure spans both candidates), heap 4096 ----------
 mapfile -t SUITES <"$SUITES_FILE"
 for s in "${SUITES[@]}"; do [ -f "$s" ] || refuse 79 "suite missing: $s"; done
+# L2-2 method fix (binding for S8-F and S8-G compositions). Import closure misses specs that READ repository files.
+# Add every default-config spec (per `jest --listTests`) whose source mentions prisma/migrations, docs/contracts,
+# the contract artifact, or base/migration pins. The LAND-2 miss was test/scout/g2-s8c-db-guard.spec.ts.
+FS_RE="$FS_PINNED_SPEC_RE"
+./node_modules/.bin/jest --listTests 2>>"$RUN_DIR/run.log" | sed "s|^$PWD/||" | sort -u >"$RUN_DIR/default-config-specs.txt" \
+  || refuse 79 "jest --listTests failed"
+[ -s "$RUN_DIR/default-config-specs.txt" ] || refuse 79 "jest --listTests returned nothing"
+git grep -l -E "$FS_RE" -- '*.spec.ts' | sort -u | comm -12 - "$RUN_DIR/default-config-specs.txt" >"$RUN_DIR/fs-pinned-specs.txt"
+mapfile -t FS_SPECS <"$RUN_DIR/fs-pinned-specs.txt"
+mapfile -t SUITES < <(printf '%s\n' "${SUITES[@]}" "${FS_SPECS[@]}" | sort -u)
+printf '%s\n' "${SUITES[@]}" >"$RUN_DIR/affected-suites.txt"
+log "AFFECTED import-closure=27 fs-pinned=${#FS_SPECS[@]} union=${#SUITES[@]} (see affected-suites.txt)"
 timeout -k 30 2400 ./node_modules/.bin/jest --ci --runTestsByPath "${SUITES[@]}" >"$RUN_DIR/jest-affected.raw.log" 2>&1; rc=$?
 log "JEST rc=$rc $(grep -E '^(Test Suites|Tests):' "$RUN_DIR/jest-affected.raw.log" | tr '\n' ' ')"
 [ $rc = 0 ] || refuse 79 "affected Jest failed (raw log preserved)"

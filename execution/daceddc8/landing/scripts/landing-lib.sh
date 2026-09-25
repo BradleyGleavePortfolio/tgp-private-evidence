@@ -55,6 +55,9 @@ AUTHOR_EMAIL=bradley@bradleytgpcoaching.com
 # Same token set as the repo commit-msg hook (lefthook no-ai-tokens), applied before we ever commit/push.
 BANNED_RE='claude|anthropic|openai|gpt[- ]|computer[- ]agent|perplexity|co-authored[- ]by|generated with|🤖|ai assist|\b(ai|agent)\b'
 
+# L2-2: default-config specs whose source reads repository state the other lane can change.
+FS_PINNED_SPEC_RE="prisma/migrations|['\"/]migrations['\"]|docs/contracts|importer-openapi|EXPECTED_MIGRATIONS|BASE_HEAD"
+
 export GIT_OPTIONAL_LOCKS=0
 
 ts(){ date -u +%FT%TZ; }

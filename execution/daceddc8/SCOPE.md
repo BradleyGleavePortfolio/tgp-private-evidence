@@ -328,3 +328,19 @@ PR #30 stays a DRAFT, stacked on `land/s4-r6` / PR #27. The parent did not chang
 - **B-1** (A reviewer; duplicate mapped family entries overwrite the bucket-j map, which gives a false `complete`): the closure is in S9-A source, a per-family union plus one spec row. The builder applies it before gates.
 - **B-2** (S9-B must emit one edge per declared relationship, including unresolvable parents): carried into the S9-B grant.
 - **Deviations 2, 3 and 5:** the one-line doc amendments are deferred to an S9-0 addendum that lands with S9-B. They are verdict-neutral in v1.
+
+## Parallelism expansion (18:08Z)
+
+The composition head `2542af44`, plus the pending one-file test commit, will reach `integration/importer` by FF, which keeps the same sha. So downstream source work may start now against that composition instead of waiting for the landing. This relaxes the older S8-G READINESS rule, "no S8-G bytes before L+C landed". Both S7-L and S8-C are now accepted, and the base bytes are identical once they land.
+
+Rules for these lanes: gates and commits happen only after the landing and a slot relay. If the landed head differs, the builder moves its uncommitted source across.
+
+- **S8G-BUILD-1:** `s8g_design_test_draft` becomes the sole T4 builder (`claude_fable_5_1`).
+  - Worktree: `worktrees/64e33dc7-s8c`, retired as the S8-C lane and with node_modules for S8-C's schema, which equals the composition schema. It switches to a new branch `exec-dace/s8g` at `2542af44`.
+  - Paths: exactly those in `64e33dc7/s8g/draft/PATHS.md`.
+  - Source first.
+- **S9B-BUILD-1:** `s9_b_facts` (T4, `claude_fable_5_1`).
+  - New worktree `worktrees/daceddc8-s9b` at `2542af44`.
+  - Scope: facts service plus module, per the S9-0 doc (`cda68d82`) and READINESS. It carries B-2 (one edge per declared relationship, including unresolvable parents), the re-review's RC-1..3 and C-5/6/7/9/10 as an S9-0 addendum draft, and the S9-A deviations 2, 3 and 5 amendments.
+  - Source first; plus a real-PG proof harness and binding drafted under the S7-L/S8-C patterns.
+- **S8-F:** moves to the composition once BC-6 is committed (parent relay).
