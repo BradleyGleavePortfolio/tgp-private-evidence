@@ -1,0 +1,1273 @@
+diff --git a/src/scout/scout-entities.controller.ts b/src/scout/scout-entities.controller.ts
+index 7756cda7..8060a368 100644
+--- a/src/scout/scout-entities.controller.ts
++++ b/src/scout/scout-entities.controller.ts
+@@ -40,7 +40,11 @@ export class ScoutEntitiesController {
+       'no full-collection total scan and is not a second progress system. ' +
+       'Excludes cross-tenant rows and cascade-erased rows; never returns email or ' +
+       'billing fields. Returns 404 when the intent is unknown for the caller or ' +
+-      'when the scout flags are off.',
++      'when the scout flags are off. Each row reports its materialized target_kind: ' +
++      'generic scout_entity evidence (native_id null, the effective kind of every ' +
++      'legacy row) or an owned native workout_program / workout_plan row (native_id ' +
++      'set), the latter served only when the coach owns a live native row backed by ' +
++      'matching import provenance; anything else is dropped from the page.',
+   })
+   @ApiResponse({
+     status: 200,
+diff --git a/src/scout/scout-entities.dto.ts b/src/scout/scout-entities.dto.ts
+index 4f15339b..8b0f8ec0 100644
+--- a/src/scout/scout-entities.dto.ts
++++ b/src/scout/scout-entities.dto.ts
+@@ -42,6 +42,24 @@ export const ENTITY_REVIEW_FAMILIES: readonly string[] = RECONSTRUCT_ENTITY_TYPE
+   (family) => family !== RECONSTRUCT_ENTITY_TYPE,
+ );
+ 
++/**
++ * S8-F — the materialized target kinds an entity row can report. Mirrors the
++ * non-person values of the ledger's nullable `target_kind` column (S8-B/S8-C):
++ *  - `scout_entity`: generic canonical evidence in `ScoutReconstructedEntity`
++ *    (also the EFFECTIVE kind reported for legacy NULL-kind ledger rows);
++ *  - `workout_program`: a tenant-owned native `WorkoutProgram`;
++ *  - `workout_plan`: a tenant-owned native `WorkoutPlan`.
++ * The person kind is never served here (roster contract). Any other kind is
++ * dropped from the page (fail closed), never guessed.
++ */
++export const ENTITY_TARGET_KIND = {
++  scout_entity: 'scout_entity',
++  workout_program: 'workout_program',
++  workout_plan: 'workout_plan',
++} as const;
++export type EntityTargetKind = (typeof ENTITY_TARGET_KIND)[keyof typeof ENTITY_TARGET_KIND];
++export const ENTITY_TARGET_KINDS: readonly EntityTargetKind[] = Object.values(ENTITY_TARGET_KIND);
++
+ /**
+  * GET /api/scout/reconstruct/entities query. coach_id is taken from the bearer
+  * identity (never a query/body field); the inputs are which settled intent to
+@@ -106,11 +124,43 @@ export class ScoutEntitiesQueryDto {
+  * key. `client_source_id` is the soft provenance link to the owning client and
+  * `label` a best-effort PII-minimal title. NEVER any email, billing, or
+  * credential field.
++ *
++ * S8-F (additive): `target_kind` names what `id` points at and `native_id` is
++ * the tenant-owned native record id when the row was reconstructed into a
++ * native table (`workout_program` / `workout_plan`); it is null for generic
++ * `scout_entity` evidence, including every legacy row. All established fields
++ * keep their meaning; a native row's `label` is the native record's name and
++ * its `client_source_id` is null (never invented).
+  */
+ export class ReconstructedEntityDto {
+-  @ApiProperty({ description: 'Opaque server-issued canonical entity id.', format: 'uuid' })
++  @ApiProperty({
++    description:
++      'Opaque server-issued canonical id: the ScoutReconstructedEntity id for ' +
++      '`scout_entity` rows, or the owned native record id for native target kinds.',
++    format: 'uuid',
++  })
+   id!: string;
+ 
++  @ApiProperty({
++    description:
++      'What `id` references. `scout_entity` is generic canonical evidence (also the ' +
++      'effective kind of legacy rows); `workout_program` / `workout_plan` are ' +
++      'tenant-owned native records. Rows of any other kind are never served.',
++    enum: ENTITY_TARGET_KINDS,
++    example: ENTITY_TARGET_KIND.scout_entity,
++  })
++  target_kind!: EntityTargetKind;
++
++  @ApiProperty({
++    type: String,
++    format: 'uuid',
++    nullable: true,
++    description:
++      'The owned native record id when `target_kind` is a native kind ' +
++      '(equal to `id`); null for `scout_entity` evidence rows.',
++  })
++  native_id!: string | null;
++
+   @ApiProperty({ description: 'Source platform slug (provenance).', example: 'truecoach' })
+   source_platform!: string;
+ 
+diff --git a/src/scout/scout-entities.service.ts b/src/scout/scout-entities.service.ts
+index 50adeeb6..77db2ee4 100644
+--- a/src/scout/scout-entities.service.ts
++++ b/src/scout/scout-entities.service.ts
+@@ -14,6 +14,8 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
++  EntityTargetKind,
+   ReconstructedEntityDto,
+   ScoutEntitiesResult,
+ } from './scout-entities.dto';
+@@ -22,6 +24,25 @@ import { RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ /** Prisma transaction client — the interactive-transaction handle passed to $transaction. */
+ type Tx = Prisma.TransactionClient;
+ 
++/** One reconstructed ledger row as the page read projects it (S8-F adds the nullable kind). */
++type LedgerPageRow = {
++  source_id: string;
++  source_platform: string;
++  target_id: string | null;
++  target_kind: string | null;
++};
++
++/**
++ * S8-F: the native provenance outcomes that prove a same-coach native row was
++ * produced (or found already present) by an accepted import. `unresolved` and
++ * every other outcome never qualify, so an `unresolved` provenance row with a
++ * NULL native_id can never dress an evidence row up as native.
++ */
++const NATIVE_PROVENANCE_OUTCOMES: readonly string[] = ['created', 'already_present'];
++
++/** Minimal native projection shared by WorkoutPlan and WorkoutProgram (name only; no payload). */
++type NativeRecord = { id: string; name: string; created_at: Date; updated_at: Date };
++
+ /**
+  * IMPORTER-I — authoritative read bridge for reconstructed NON-person canonical
+  * entities (D2, site-agnostic). Projects one settled intent's `workouts` /
+@@ -50,6 +71,12 @@ type Tx = Prisma.TransactionClient;
+  *    so it drops from the page — there is no `Deleted` state to leak.
+  *  - Read-only, idempotent, PII-safe: no mutation, no email/billing/secret in the
+  *    response or logs.
++ *  - Native targets (S8-F): a ledger row typed `workout_plan` / `workout_program`
++ *    resolves to the coach's own live native row, and only when a same-coach
++ *    native provenance row (`created` / `already_present`) vouches for that
++ *    (kind, id). Legacy NULL-kind and `scout_entity` rows keep the generic
++ *    evidence join unchanged. The response is additive: `target_kind` +
++ *    nullable `native_id`; every established field keeps its meaning.
+  */
+ @Injectable()
+ export class ScoutEntitiesService {
+@@ -123,7 +150,7 @@ export class ScoutEntitiesService {
+             status: RECONSTRUCT_STATUS.reconstructed,
+             ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, source_platform: true, target_id: true },
++          select: { source_id: true, source_platform: true, target_id: true, target_kind: true },
+           orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+@@ -165,55 +192,168 @@ export class ScoutEntitiesService {
+   }
+ 
+   /**
+-   * Join reconstructed ledger rows to their canonical `ScoutReconstructedEntity`,
+-   * preserving ledger order and dropping any missing target (erasure preserved).
+-   * The entity read re-asserts coach_id AND entity_type so a stale/forged
+-   * target_id can never cross tenants or families. Runs on the caller's
++   * Join reconstructed ledger rows to what they target, preserving ledger order
++   * and dropping any missing target (erasure preserved). Runs on the caller's
+    * transaction client so it shares the one consistent snapshot.
++   *
++   * Dispatch is by the ledger row's `target_kind` (S8-F):
++   *  - NULL (legacy) or `scout_entity` → the generic canonical
++   *    `ScoutReconstructedEntity` join, unchanged: it re-asserts coach_id AND
++   *    entity_type so a stale/forged target_id can never cross tenants or
++   *    families. Reported with the EFFECTIVE kind `scout_entity`, native_id null.
++   *  - `workout_plan` / `workout_program` → the tenant-owned native table, which
++   *    must hold a same-coach, NOT archived row, AND a same-coach
++   *    `ImportNativeProvenance` row with matching (native_kind, native_id) and a
++   *    `created` / `already_present` outcome. Missing row, other tenant,
++   *    archived, missing/mismatched provenance or a non-qualifying outcome all
++   *    drop the row (fail closed). The join never touches `import_intent_id`.
++   *  - a typed kind with a NULL target_id, or any unknown kind → dropped.
++   * Dropped rows still advance paging because next_cursor anchors to the ledger.
+    */
+   private async materialize(
+     tx: Tx,
+     coachId: string,
+     family: string,
+-    rows: Array<{ source_id: string; target_id: string | null }>,
++    rows: LedgerPageRow[],
+   ): Promise<ReconstructedEntityDto[]> {
+-    const targetIds = rows.map((r) => r.target_id).filter((id): id is string => id !== null);
+-    if (targetIds.length === 0) return [];
++    const evidenceIds: string[] = [];
++    const planIds: string[] = [];
++    const programIds: string[] = [];
++    for (const row of rows) {
++      const kind = ScoutEntitiesService.effectiveKind(row);
++      if (row.target_id === null || kind === null) continue;
++      if (kind === ENTITY_TARGET_KIND.scout_entity) evidenceIds.push(row.target_id);
++      else if (kind === ENTITY_TARGET_KIND.workout_plan) planIds.push(row.target_id);
++      else programIds.push(row.target_id);
++    }
++    if (evidenceIds.length + planIds.length + programIds.length === 0) return [];
+ 
+-    const records = await tx.scoutReconstructedEntity.findMany({
+-      where: {
+-        id: { in: targetIds },
+-        coach_id: coachId,
+-        entity_type: family,
+-      },
+-      select: {
+-        id: true,
+-        source_platform: true,
+-        entity_type: true,
+-        source_id: true,
+-        client_source_id: true,
+-        label: true,
+-        created_at: true,
+-        updated_at: true,
+-      },
+-    });
++    const evidence = evidenceIds.length
++      ? await tx.scoutReconstructedEntity.findMany({
++          where: {
++            id: { in: evidenceIds },
++            coach_id: coachId,
++            entity_type: family,
++          },
++          select: {
++            id: true,
++            source_platform: true,
++            entity_type: true,
++            source_id: true,
++            client_source_id: true,
++            label: true,
++            created_at: true,
++            updated_at: true,
++          },
++        })
++      : [];
++    const evidenceById = new Map(evidence.map((r) => [r.id, r]));
++
++    // Native joins: same coach, live (archived_at IS NULL), name-only projection.
++    const nativeSelect = { id: true, name: true, created_at: true, updated_at: true } as const;
++    const plans: NativeRecord[] = planIds.length
++      ? await tx.workoutPlan.findMany({
++          where: { id: { in: planIds }, coach_id: coachId, archived_at: null },
++          select: nativeSelect,
++        })
++      : [];
++    const programs: NativeRecord[] = programIds.length
++      ? await tx.workoutProgram.findMany({
++          where: { id: { in: programIds }, coach_id: coachId, archived_at: null },
++          select: nativeSelect,
++        })
++      : [];
++    const nativeById = new Map<string, NativeRecord>();
++    for (const r of plans) nativeById.set(`${ENTITY_TARGET_KIND.workout_plan}:${r.id}`, r);
++    for (const r of programs) nativeById.set(`${ENTITY_TARGET_KIND.workout_program}:${r.id}`, r);
++
++    // Provenance: a same-coach (native_kind, native_id) row with a qualifying
++    // outcome is REQUIRED for every native row served. Keyed by kind so a plan id
++    // can never be vouched for by a program provenance row (or vice versa).
++    const proven = new Set<string>();
++    if (nativeById.size > 0) {
++      const kinds: Array<{ native_kind: string; native_id: { in: string[] } }> = [];
++      if (plans.length)
++        kinds.push({
++          native_kind: ENTITY_TARGET_KIND.workout_plan,
++          native_id: { in: plans.map((r) => r.id) },
++        });
++      if (programs.length)
++        kinds.push({
++          native_kind: ENTITY_TARGET_KIND.workout_program,
++          native_id: { in: programs.map((r) => r.id) },
++        });
++      const provenance = await tx.importNativeProvenance.findMany({
++        where: {
++          coach_id: coachId,
++          outcome: { in: [...NATIVE_PROVENANCE_OUTCOMES] },
++          OR: kinds,
++        },
++        select: { native_kind: true, native_id: true },
++      });
++      for (const p of provenance) {
++        if (p.native_id !== null) proven.add(`${p.native_kind}:${p.native_id}`);
++      }
++    }
+ 
+-    const byId = new Map(records.map((r) => [r.id, r]));
+     const out: ReconstructedEntityDto[] = [];
+     for (const row of rows) {
+-      const r = row.target_id ? byId.get(row.target_id) : undefined;
+-      if (!r) continue;
++      const kind = ScoutEntitiesService.effectiveKind(row);
++      if (row.target_id === null || kind === null) continue;
++      if (kind === ENTITY_TARGET_KIND.scout_entity) {
++        const r = evidenceById.get(row.target_id);
++        if (!r) continue;
++        out.push({
++          id: r.id,
++          target_kind: ENTITY_TARGET_KIND.scout_entity,
++          native_id: null,
++          source_platform: r.source_platform,
++          entity_type: r.entity_type,
++          source_id: r.source_id,
++          client_source_id: r.client_source_id,
++          label: r.label,
++          created_at: r.created_at.toISOString(),
++          updated_at: r.updated_at.toISOString(),
++        });
++        continue;
++      }
++      const key = `${kind}:${row.target_id}`;
++      const native = nativeById.get(key);
++      if (!native || !proven.has(key)) continue;
+       out.push({
+-        id: r.id,
+-        source_platform: r.source_platform,
+-        entity_type: r.entity_type,
+-        source_id: r.source_id,
+-        client_source_id: r.client_source_id,
+-        label: r.label,
+-        created_at: r.created_at.toISOString(),
+-        updated_at: r.updated_at.toISOString(),
++        id: native.id,
++        target_kind: kind,
++        native_id: native.id,
++        // Provenance stays the LEDGER's (source_platform, source_id): the native
++        // table carries no source identity and none is invented here.
++        source_platform: row.source_platform,
++        entity_type: family,
++        source_id: row.source_id,
++        client_source_id: null,
++        label: native.name,
++        created_at: native.created_at.toISOString(),
++        updated_at: native.updated_at.toISOString(),
+       });
+     }
+     return out;
+   }
++
++  /**
++   * The kind a ledger row is materialized as: NULL means the pre-S8-B generic
++   * evidence row (`scout_entity`); the two native kinds pass through; anything
++   * else (person, a future kind, garbage) is `null` = not served here.
++   */
++  private static effectiveKind(row: Pick<LedgerPageRow, 'target_kind'>): EntityTargetKind | null {
++    switch (row.target_kind) {
++      case null:
++      case ENTITY_TARGET_KIND.scout_entity:
++        return ENTITY_TARGET_KIND.scout_entity;
++      case ENTITY_TARGET_KIND.workout_plan:
++        return ENTITY_TARGET_KIND.workout_plan;
++      case ENTITY_TARGET_KIND.workout_program:
++        return ENTITY_TARGET_KIND.workout_program;
++      default:
++        return null;
++    }
++  }
+ }
+diff --git a/src/scout/scout-roster.controller.ts b/src/scout/scout-roster.controller.ts
+index fbe6eae2..02904b3d 100644
+--- a/src/scout/scout-roster.controller.ts
++++ b/src/scout/scout-roster.controller.ts
+@@ -37,7 +37,10 @@ export class ScoutRosterController {
+       'accounting { staged, reconstructed, skipped, failed } and deterministic, ' +
+       'bounded cursor pagination. Excludes deleted and cross-tenant rows; never ' +
+       'returns email or billing fields. Returns 404 when the intent is unknown ' +
+-      'for the caller or when the scout flags are off.',
++      'for the caller or when the scout flags are off. The response carries ' +
++      'roster_bridge_pending: true (also on empty pages): these are interim Person ' +
++      'bridge rows, not native roster clients or principals, until the S8-D bridge ' +
++      'is accepted. Only person-kind ledger rows are materialized here.',
+   })
+   @ApiResponse({ status: 200, description: 'Reconstructed roster page.', type: ScoutRosterResult })
+   @ApiResponse({
+diff --git a/src/scout/scout-roster.dto.ts b/src/scout/scout-roster.dto.ts
+index 7f7e797f..939713d7 100644
+--- a/src/scout/scout-roster.dto.ts
++++ b/src/scout/scout-roster.dto.ts
+@@ -24,6 +24,23 @@ export const ROSTER_DEFAULT_PAGE_SIZE = 50;
+  */
+ export const ROSTER_MAX_PAGE_SIZE = 200;
+ 
++/**
++ * S8-F — the only ledger `target_kind` the roster materializes (besides the
++ * legacy NULL kind, which means the same pre-S8-B Person target). Mirrors the
++ * ledger's person kind value written by the clients writer; any other kind is
++ * never joined to Person here.
++ */
++export const ROSTER_TARGET_KIND = 'person';
++
++/**
++ * S8-F — response-level qualifier. The roster remains the interim accepted
++ * Person bridge (native contract §4.1): imported clients are NOT yet visible in
++ * the User-based coach roster and no principal is minted here. Fixed `true`
++ * until the accepted S8-D bridge lands and this reader is revised; it is never
++ * derived from row contents or counts.
++ */
++export const ROSTER_BRIDGE_PENDING = true as const;
++
+ /**
+  * GET /api/scout/reconstruct/roster query. coach_id is taken from the bearer
+  * identity (never a query/body field); the only inputs are which settled intent
+@@ -163,4 +180,14 @@ export class ScoutRosterResult {
+ 
+   @ApiProperty({ type: ScoutRosterPageDto, description: 'Pagination envelope.' })
+   page!: ScoutRosterPageDto;
++
++  @ApiProperty({
++    type: Boolean,
++    description:
++      'Always true for now: these rows are the interim reconstructed Person bridge, ' +
++      'not native coach-roster clients or principals. Imported clients stay absent from ' +
++      'the User-based roster until the S8-D bridge is accepted. Present on empty pages too.',
++    example: true,
++  })
++  roster_bridge_pending!: boolean;
+ }
+diff --git a/src/scout/scout-roster.service.ts b/src/scout/scout-roster.service.ts
+index ef355bcb..d5659c8b 100644
+--- a/src/scout/scout-roster.service.ts
++++ b/src/scout/scout-roster.service.ts
+@@ -12,8 +12,10 @@ import {
+ } from './scout-cursor';
+ import { RECONSTRUCT_ENTITY_TYPE, RECONSTRUCT_STATUS } from './scout-reconstruct.dto';
+ import {
++  ROSTER_BRIDGE_PENDING,
+   ROSTER_DEFAULT_PAGE_SIZE,
+   ROSTER_MAX_PAGE_SIZE,
++  ROSTER_TARGET_KIND,
+   ScoutRosterPersonDto,
+   ScoutRosterResult,
+ } from './scout-roster.dto';
+@@ -120,7 +122,7 @@ export class ScoutRosterService {
+             status: RECONSTRUCT_STATUS.reconstructed,
+             ...scoutCursorWhere(position),
+           },
+-          select: { source_id: true, source_platform: true, target_id: true },
++          select: { source_id: true, source_platform: true, target_id: true, target_kind: true },
+           orderBy: scoutCursorOrder(),
+           take: limit + 1,
+         });
+@@ -170,6 +172,10 @@ export class ScoutRosterService {
+       },
+       persons,
+       page: { limit, next_cursor: nextCursor, has_more: hasMore },
++      // S8-F: the roster is still the interim Person bridge (native contract
++      // §4.1). Always true — including on an empty page — until the accepted
++      // S8-D principal bridge replaces it. Not a per-row flag, not a count.
++      roster_bridge_pending: ROSTER_BRIDGE_PENDING,
+     };
+   }
+ 
+@@ -178,13 +184,22 @@ export class ScoutRosterService {
+    * dropping any Deleted or missing target (erasure preserved). The Person read
+    * re-asserts coach_id so a stale/forged target_id can never cross tenants. Runs
+    * on the caller's transaction client so it shares the one consistent snapshot.
++   *
++   * S8-F: only rows whose ledger `target_kind` is NULL (legacy) or `person` are
++   * Person targets. Any other kind is never joined to Person — it is dropped
++   * (paging still advances because next_cursor anchors to the ledger row).
+    */
+   private async materialize(
+     tx: Tx,
+     coachId: string,
+-    rows: Array<{ source_id: string; target_id: string | null }>,
++    rows: Array<{ source_id: string; target_id: string | null; target_kind: string | null }>,
+   ): Promise<ScoutRosterPersonDto[]> {
+-    const targetIds = rows.map((r) => r.target_id).filter((id): id is string => id !== null);
++    const personRows = rows.filter(
++      (r) => r.target_kind === null || r.target_kind === ROSTER_TARGET_KIND,
++    );
++    const targetIds = personRows
++      .map((r) => r.target_id)
++      .filter((id): id is string => id !== null);
+     if (targetIds.length === 0) return [];
+ 
+     const persons = await tx.person.findMany({
+@@ -206,7 +221,7 @@ export class ScoutRosterService {
+ 
+     const byId = new Map(persons.map((p) => [p.id, p]));
+     const out: ScoutRosterPersonDto[] = [];
+-    for (const row of rows) {
++    for (const row of personRows) {
+       const p = row.target_id ? byId.get(row.target_id) : undefined;
+       if (!p) continue;
+       out.push({
+diff --git a/test/scout/entities/scout-entities.contract.spec.ts b/test/scout/entities/scout-entities.contract.spec.ts
+index ca402ea4..1b2f183e 100644
+--- a/test/scout/entities/scout-entities.contract.spec.ts
++++ b/test/scout/entities/scout-entities.contract.spec.ts
+@@ -10,6 +10,8 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
++  ENTITY_TARGET_KINDS,
+   ReconstructedEntityDto,
+   ScoutEntitiesResult,
+ } from '../../../src/scout/scout-entities.dto';
+@@ -149,15 +151,38 @@ describe('IMPORTER-I OpenAPI route shape', () => {
+         'entity_type',
+         'id',
+         'label',
++        'native_id',
+         'source_id',
+         'source_platform',
++        'target_kind',
+         'updated_at',
+       ].sort(),
+     );
+-    for (const banned of ['email', 'price', 'billing', 'coach_id', 'payload']) {
++    for (const banned of ['email', 'price', 'billing', 'coach_id', 'payload', 'owner_user_id']) {
+       expect(props).not.toContain(banned);
+     }
+   });
++
++  it('S8-F: publishes target_kind as the closed non-person kind enum and native_id nullable', () => {
++    const props = rec(
++      dig(document, 'components', 'schemas', 'ReconstructedEntityDto', 'properties'),
++    );
++    const kind = rec(props.target_kind);
++    expect((kind.enum as string[]).slice().sort()).toEqual([...ENTITY_TARGET_KINDS].sort());
++    expect(kind.enum).not.toContain('person');
++    const nativeId = rec(props.native_id);
++    expect(nativeId.nullable).toBe(true);
++    expect(nativeId.type).toBe('string');
++    // Both are required members of the row (additive, always present).
++    const required = dig(
++      document,
++      'components',
++      'schemas',
++      'ReconstructedEntityDto',
++      'required',
++    ) as string[];
++    expect(required).toEqual(expect.arrayContaining(['target_kind', 'native_id']));
++  });
+ });
+ 
+ describe('IMPORTER-I frozen-slice membership (R80)', () => {
+@@ -183,6 +208,8 @@ describe('IMPORTER-I PR-M4 fixture consumer', () => {
+   function entity(sourceId: string): ReconstructedEntityDto {
+     return {
+       id: `id-${sourceId}`,
++      target_kind: ENTITY_TARGET_KIND.scout_entity,
++      native_id: null,
+       source_platform: 'truecoach',
+       entity_type: RECONSTRUCT_FAMILY.workouts,
+       source_id: sourceId,
+@@ -254,4 +281,19 @@ describe('IMPORTER-I PR-M4 fixture consumer', () => {
+       expect(Object.prototype.hasOwnProperty.call(row, banned)).toBe(false);
+     }
+   });
++
++  it('S8-F: a consumer can distinguish evidence from native rows by target_kind alone', () => {
++    const evidence = entity('a');
++    const native: ReconstructedEntityDto = {
++      ...entity('b'),
++      id: 'plan-b',
++      target_kind: ENTITY_TARGET_KIND.workout_plan,
++      native_id: 'plan-b',
++      client_source_id: null,
++    };
++    expect(evidence.native_id).toBeNull();
++    expect(native.native_id).toBe(native.id);
++    expect(ENTITY_TARGET_KINDS).toContain(evidence.target_kind);
++    expect(ENTITY_TARGET_KINDS).toContain(native.target_kind);
++  });
+ });
+diff --git a/test/scout/entities/scout-entities.service.spec.ts b/test/scout/entities/scout-entities.service.spec.ts
+index 30c418fa..af91d197 100644
+--- a/test/scout/entities/scout-entities.service.spec.ts
++++ b/test/scout/entities/scout-entities.service.spec.ts
+@@ -8,6 +8,7 @@ import {
+   ENTITIES_DEFAULT_PAGE_SIZE,
+   ENTITIES_MAX_PAGE_SIZE,
+   ENTITY_REVIEW_FAMILIES,
++  ENTITY_TARGET_KIND,
+ } from '../../../src/scout/scout-entities.dto';
+ import { RECONSTRUCT_FAMILY } from '../../../src/scout/scout-reconstruct.dto';
+ import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+@@ -35,6 +36,28 @@ interface LedgerRow {
+   source_platform: string;
+   status: string;
+   target_id: string | null;
++  /** S8-F: the ledger's nullable kind. Omitted (legacy) reads back as NULL. */
++  target_kind?: string | null;
++}
++/** S8-F: a native WorkoutPlan / WorkoutProgram row (only the columns the reader touches). */
++interface NativeRow {
++  id: string;
++  coach_id: string;
++  name: string;
++  archived_at: Date | null;
++  created_at: Date;
++  updated_at: Date;
++}
++/** S8-F: an ImportNativeProvenance row (identity columns kept for realism; never joined on). */
++interface ProvenanceRow {
++  coach_id: string;
++  import_intent_id: string | null;
++  source_namespace: string;
++  entity_type: string;
++  source_id: string;
++  native_kind: string;
++  native_id: string | null;
++  outcome: string;
+ }
+ interface EntityRow {
+   id: string;
+@@ -57,6 +80,10 @@ interface Where {
+   source_platform?: { gt?: string };
+   OR?: Where[];
+   id?: { in?: string[] };
++  archived_at?: null;
++  native_kind?: string;
++  native_id?: { in?: string[] };
++  outcome?: { in?: string[] };
+ }
+ 
+ class FakePrisma {
+@@ -116,10 +143,63 @@ class FakePrisma {
+         source_id: r.source_id,
+         source_platform: r.source_platform,
+         target_id: r.target_id,
++        target_kind: r.target_kind ?? null,
+       }));
+     },
+   };
+ 
++  // S8-F native tables + provenance. Real predicate semantics for the columns
++  // the reader filters on (id IN, coach_id, archived_at IS NULL; coach_id,
++  // outcome IN, OR over (native_kind, native_id IN)) so tenancy, archive and
++  // provenance denial are proven by behaviour, not by a pre-decided answer.
++  plans: NativeRow[] = [];
++  programs: NativeRow[] = [];
++  provenance: ProvenanceRow[] = [];
++  nativeReads: Array<{ table: string; where: Where }> = [];
++
++  private nativeFindMany(table: 'plans' | 'programs') {
++    return async (args: { where: Where }) => {
++      this.noteRead();
++      this.nativeReads.push({ table, where: args.where });
++      const ids = new Set(args.where.id?.in ?? []);
++      return this[table]
++        .filter(
++          (n) =>
++            ids.has(n.id) &&
++            (args.where.coach_id === undefined || n.coach_id === args.where.coach_id) &&
++            (args.where.archived_at === undefined || n.archived_at === null),
++        )
++        .map((n) => ({
++          id: n.id,
++          name: n.name,
++          created_at: n.created_at,
++          updated_at: n.updated_at,
++        }));
++    };
++  }
++
++  workoutPlan = { findMany: this.nativeFindMany('plans') };
++  workoutProgram = { findMany: this.nativeFindMany('programs') };
++
++  importNativeProvenance = {
++    findMany: async (args: { where: Where }) => {
++      this.noteRead();
++      this.nativeReads.push({ table: 'provenance', where: args.where });
++      const matchKind = (p: ProvenanceRow, w: Where): boolean =>
++        (w.native_kind === undefined || p.native_kind === w.native_kind) &&
++        (w.native_id?.in === undefined ||
++          (p.native_id !== null && w.native_id.in.includes(p.native_id)));
++      return this.provenance
++        .filter(
++          (p) =>
++            (args.where.coach_id === undefined || p.coach_id === args.where.coach_id) &&
++            (args.where.outcome?.in === undefined || args.where.outcome.in.includes(p.outcome)) &&
++            (args.where.OR === undefined || args.where.OR.some((o) => matchKind(p, o))),
++        )
++        .map((p) => ({ native_kind: p.native_kind, native_id: p.native_id }));
++    },
++  };
++
+   scoutReconstructedEntity = {
+     findMany: async (args: { where: Where }) => {
+       this.noteRead();
+@@ -708,14 +788,17 @@ describe('ScoutEntitiesService.getEntities', () => {
+         'entity_type',
+         'id',
+         'label',
++        'native_id',
+         'source_id',
+         'source_platform',
++        'target_kind',
+         'updated_at',
+       ].sort(),
+     );
+     expect(row).not.toHaveProperty('email');
+     expect(row).not.toHaveProperty('coach_id');
+     expect(row).not.toHaveProperty('price');
++    expect(row).not.toHaveProperty('payload');
+   });
+ 
+   it('is site-agnostic: projects a non-TrueCoach source platform identically', async () => {
+@@ -876,3 +959,403 @@ describe('ScoutEntitiesService.getEntities', () => {
+     });
+   });
+ });
++
++/**
++ * S8-F — native target materialization (readiness F01–F09, F11). Legacy and
++ * `scout_entity` rows keep the generic evidence join; typed `workout_plan` /
++ * `workout_program` rows resolve to the coach's own live native row ONLY when a
++ * same-coach provenance row with a `created` / `already_present` outcome vouches
++ * for that exact (native_kind, native_id). Everything else is dropped, and the
++ * ledger-anchored cursor still advances past dropped rows.
++ */
++describe('ScoutEntitiesService S8-F native targets', () => {
++  const T0 = new Date('2026-09-01T00:00:00.000Z');
++  const T1 = new Date('2026-09-02T00:00:00.000Z');
++  const PROGRAMS_FAMILY = 'programs';
++  // The `programs` family joins RECONSTRUCT_FAMILY in S8-C (N3) and is therefore
++  // reviewable only once S8-F is composed onto S8-C. Until then this case is
++  // marked skipped (visible in the run summary), never a silent pass.
++  const itPrograms = (ENTITY_REVIEW_FAMILIES as readonly string[]).includes(PROGRAMS_FAMILY)
++    ? it
++    : it.skip;
++
++  function ledger(
++    fake: FakePrisma,
++    row: Partial<LedgerRow> & { source_id: string; target_id: string | null },
++  ): void {
++    fake.ledgerRows.push({
++      coach_id: COACH,
++      intent_id: INTENT,
++      entity_type: FAM,
++      source_platform: 'truecoach',
++      status: 'reconstructed',
++      ...row,
++    });
++  }
++  function plan(fake: FakePrisma, id: string, opts: Partial<NativeRow> = {}): void {
++    fake.plans.push({
++      id,
++      coach_id: COACH,
++      name: `Plan ${id}`,
++      archived_at: null,
++      created_at: T0,
++      updated_at: T1,
++      ...opts,
++    });
++  }
++  function program(fake: FakePrisma, id: string, opts: Partial<NativeRow> = {}): void {
++    fake.programs.push({
++      id,
++      coach_id: COACH,
++      name: `Program ${id}`,
++      archived_at: null,
++      created_at: T0,
++      updated_at: T1,
++      ...opts,
++    });
++  }
++  function vouch(
++    fake: FakePrisma,
++    nativeKind: string,
++    nativeId: string | null,
++    opts: Partial<ProvenanceRow> = {},
++  ): void {
++    fake.provenance.push({
++      coach_id: COACH,
++      // S8-C C2: written NULL by the native writer; the reader must never join on it.
++      import_intent_id: null,
++      source_namespace: 'truecoach',
++      entity_type: FAM,
++      source_id: `src-${nativeId ?? 'none'}`,
++      native_kind: nativeKind,
++      native_id: nativeId,
++      outcome: 'created',
++      ...opts,
++    });
++  }
++
++  it('F01: a legacy NULL-kind row is unchanged apart from the additive fields', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: `e-${COACH}-${FAM}-s000`,
++        target_kind: ENTITY_TARGET_KIND.scout_entity,
++        native_id: null,
++        source_platform: 'truecoach',
++        entity_type: FAM,
++        source_id: 'truecoach_s000',
++        client_source_id: 'truecoach_client_0',
++        label: 'Item s000',
++        created_at: '2026-07-18T00:00:00.000Z',
++        updated_at: '2026-07-18T00:00:00.000Z',
++      },
++    ]);
++    // The generic evidence join is the ONLY join a legacy page triggers.
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F01: an explicit scout_entity kind takes the identical evidence path', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    fake.ledgerRows[0].target_kind = 'scout_entity';
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toHaveLength(1);
++    expect(res.entities[0]).toMatchObject({
++      target_kind: ENTITY_TARGET_KIND.scout_entity,
++      native_id: null,
++      id: `e-${COACH}-${FAM}-s000`,
++    });
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F02: a workout_plan row resolves to the owned native plan with provenance', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1', { name: 'Upper Body — Week 3' });
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: 'plan-1',
++        target_kind: ENTITY_TARGET_KIND.workout_plan,
++        native_id: 'plan-1',
++        source_platform: 'truecoach',
++        entity_type: FAM,
++        source_id: 'w1',
++        client_source_id: null,
++        label: 'Upper Body — Week 3',
++        created_at: T0.toISOString(),
++        updated_at: T1.toISOString(),
++      },
++    ]);
++    expect(res.page_count).toBe(1);
++    // Same-coach, live-only native read; provenance keyed by (kind, id) and
++    // restricted to the qualifying outcomes; no import_intent_id predicate.
++    const planRead = fake.nativeReads.find((r) => r.table === 'plans');
++    expect(planRead?.where).toEqual({ id: { in: ['plan-1'] }, coach_id: COACH, archived_at: null });
++    const prov = fake.nativeReads.find((r) => r.table === 'provenance');
++    expect(prov?.where).toEqual({
++      coach_id: COACH,
++      outcome: { in: ['created', 'already_present'] },
++      OR: [{ native_kind: 'workout_plan', native_id: { in: ['plan-1'] } }],
++    });
++    expect(JSON.stringify(prov?.where)).not.toContain('import_intent_id');
++    expect(fake.readsOutsideTx).toBe(0);
++  });
++
++  it('F02: an already_present outcome qualifies exactly like created', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1', { outcome: 'already_present' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities.map((e) => e.native_id)).toEqual(['plan-1']);
++  });
++
++  itPrograms('F03: a workout_program row resolves to the owned native program', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { family: PROGRAMS_FAMILY });
++    ledger(fake, {
++      entity_type: PROGRAMS_FAMILY,
++      source_id: 'p1',
++      target_id: 'prog-1',
++      target_kind: 'workout_program',
++    });
++    program(fake, 'prog-1', { name: '12-Week Strength' });
++    vouch(fake, 'workout_program', 'prog-1', { entity_type: PROGRAMS_FAMILY });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, PROGRAMS_FAMILY, undefined, undefined);
++    expect(res.entities).toEqual([
++      {
++        id: 'prog-1',
++        target_kind: ENTITY_TARGET_KIND.workout_program,
++        native_id: 'prog-1',
++        source_platform: 'truecoach',
++        entity_type: PROGRAMS_FAMILY,
++        source_id: 'p1',
++        client_source_id: null,
++        label: '12-Week Strength',
++        created_at: T0.toISOString(),
++        updated_at: T1.toISOString(),
++      },
++    ]);
++    expect(fake.nativeReads.find((r) => r.table === 'programs')?.where).toEqual({
++      id: { in: ['prog-1'] },
++      coach_id: COACH,
++      archived_at: null,
++    });
++  });
++
++  it("F04: another tenant's native row is never served, even with that tenant's provenance", async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-x', target_kind: 'workout_plan' });
++    plan(fake, 'plan-x', { coach_id: OTHER });
++    vouch(fake, 'workout_plan', 'plan-x', { coach_id: OTHER });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++    expect(res.page_count).toBe(0);
++    expect(res.next_cursor).toBeNull();
++  });
++
++  it('F04: a same-coach native row vouched only by cross-tenant provenance is dropped', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1', { coach_id: OTHER });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F05: a native row with no provenance is dropped (fail closed)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F05: an unresolved provenance row (NULL native_id) never qualifies a native row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    // S8-C N2: client-linked workouts leave an `unresolved` workout_plan
++    // provenance row with native_id NULL. It vouches for nothing.
++    vouch(fake, 'workout_plan', null, { outcome: 'unresolved' });
++    vouch(fake, 'workout_plan', 'plan-1', { outcome: 'unresolved' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F06: a kind mismatch between the ledger and provenance is dropped', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    // Ledger says plan, provenance says program for the same id: no match.
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_program', 'plan-1');
++    // Ledger says program, but the id is a plan: the program join finds nothing.
++    ledger(fake, { source_id: 'w2', target_id: 'plan-2', target_kind: 'workout_program' });
++    plan(fake, 'plan-2');
++    vouch(fake, 'workout_plan', 'plan-2');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++  });
++
++  it('F06: a typed kind with a NULL target_id is dropped without any native read', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: null, target_kind: 'workout_plan' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities).toEqual([]);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F07: an archived native row is absent while the ledger-anchored cursor advances past it', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    for (const [sid, id] of [
++      ['w1', 'plan-1'],
++      ['w2', 'plan-2'],
++      ['w3', 'plan-3'],
++    ] as const) {
++      ledger(fake, { source_id: sid, target_id: id, target_kind: 'workout_plan' });
++      plan(fake, id, id === 'plan-2' ? { archived_at: T1 } : {});
++      vouch(fake, 'workout_plan', id);
++    }
++    const { service } = await makeService(fake);
++    const page1 = await service.getEntities(COACH, INTENT, FAM, undefined, 2);
++    // Page 1 covers ledger rows w1,w2; the archived plan-2 is dropped but the
++    // cursor is anchored to the LAST LEDGER row (w2), so nothing is re-read.
++    expect(page1.entities.map((e) => e.native_id)).toEqual(['plan-1']);
++    expect(page1.page_count).toBe(1);
++    expect(page1.next_cursor).toBe(expectedV2(COACH, INTENT, FAM, 'w2', 'truecoach'));
++    const page2 = await service.getEntities(COACH, INTENT, FAM, page1.next_cursor ?? undefined, 2);
++    expect(page2.entities.map((e) => e.native_id)).toEqual(['plan-3']);
++    expect(page2.next_cursor).toBeNull();
++  });
++
++  it('F08: a mixed page keeps ledger order across evidence and native rows', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 }); // s000, s001 legacy evidence
++    ledger(fake, { source_id: 'a-native', target_id: 'plan-a', target_kind: 'workout_plan' });
++    plan(fake, 'plan-a');
++    vouch(fake, 'workout_plan', 'plan-a');
++    ledger(fake, { source_id: 's000z', target_id: 'plan-z', target_kind: 'workout_plan' });
++    plan(fake, 'plan-z');
++    vouch(fake, 'workout_plan', 'plan-z');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    // Ledger (source_id, source_platform) order: a-native < s000 < s000z < s001.
++    expect(res.entities.map((e) => [e.target_kind, e.native_id, e.source_id])).toEqual([
++      ['workout_plan', 'plan-a', 'a-native'],
++      ['scout_entity', null, 'truecoach_s000'],
++      ['workout_plan', 'plan-z', 's000z'],
++      ['scout_entity', null, 'truecoach_s001'],
++    ]);
++    expect(res.page_count).toBe(4);
++  });
++
++  it('F09: an unknown or person kind is dropped and never joined anywhere', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    ledger(fake, { source_id: 'u1', target_id: 'e-whatever', target_kind: 'meal_plan' });
++    ledger(fake, { source_id: 'u2', target_id: 'person-1', target_kind: 'person' });
++    // Even if the ids happen to exist somewhere, the unknown kind is not served.
++    plan(fake, 'e-whatever');
++    vouch(fake, 'workout_plan', 'e-whatever');
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(res.entities.map((e) => e.source_id)).toEqual(['truecoach_s000']);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('F11: native rows carry the ledger provenance, the native name and no invented client link', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { sourcePlatform: 'trainerize' });
++    ledger(fake, {
++      source_id: 'tz-77',
++      source_platform: 'trainerize',
++      target_id: 'plan-77',
++      target_kind: 'workout_plan',
++    });
++    plan(fake, 'plan-77', { name: 'Leg Day' });
++    vouch(fake, 'workout_plan', 'plan-77', { source_namespace: 'trainerize' });
++    const { service } = await makeService(fake);
++    const res = await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    const row = res.entities[0];
++    expect(row).toMatchObject({
++      id: 'plan-77',
++      native_id: 'plan-77',
++      source_platform: 'trainerize',
++      source_id: 'tz-77',
++      label: 'Leg Day',
++      client_source_id: null,
++    });
++    expect(Object.keys(row).sort()).toEqual(
++      [
++        'client_source_id',
++        'created_at',
++        'entity_type',
++        'id',
++        'label',
++        'native_id',
++        'source_id',
++        'source_platform',
++        'target_kind',
++        'updated_at',
++      ].sort(),
++    );
++    for (const banned of ['coach_id', 'owner_user_id', 'payload', 'email', 'visibility']) {
++      expect(row).not.toHaveProperty(banned);
++    }
++  });
++
++  it('F11: the settled-intent gate is unchanged — a typed page for an unsettled intent is a uniform 404', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { terminalStatus: null });
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1');
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service } = await makeService(fake);
++    await expect(
++      service.getEntities(COACH, INTENT, FAM, undefined, undefined),
++    ).rejects.toBeInstanceOf(NotFoundException);
++    expect(fake.nativeReads).toEqual([]);
++  });
++
++  it('analytics stays counts-only with native rows (no names, no native ids)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, {});
++    ledger(fake, { source_id: 'w1', target_id: 'plan-1', target_kind: 'workout_plan' });
++    plan(fake, 'plan-1', { name: 'Secret Name' });
++    vouch(fake, 'workout_plan', 'plan-1');
++    const { service, capture } = await makeService(fake);
++    await service.getEntities(COACH, INTENT, FAM, undefined, undefined);
++    expect(capture).toHaveBeenCalledWith(COACH, Events.SCOUT_RECONSTRUCT_ENTITIES_READ, {
++      intent_id: INTENT,
++      entity_type: FAM,
++      returned: 1,
++      has_more: false,
++    });
++    expect(JSON.stringify(capture.mock.calls)).not.toContain('Secret Name');
++    expect(JSON.stringify(capture.mock.calls)).not.toContain('plan-1');
++  });
++});
+diff --git a/test/scout/roster/scout-roster.controller.spec.ts b/test/scout/roster/scout-roster.controller.spec.ts
+index 7ac81129..1c94e4de 100644
+--- a/test/scout/roster/scout-roster.controller.spec.ts
++++ b/test/scout/roster/scout-roster.controller.spec.ts
+@@ -53,6 +53,8 @@ const emptyResult: ScoutRosterResult = {
+   accounting: { staged: 0, reconstructed: 0, skipped: 0, failed: 0 },
+   persons: [],
+   page: { limit: 50, next_cursor: null, has_more: false },
++  // S8-F: response-level interim Person bridge qualifier, present on empty pages too.
++  roster_bridge_pending: true,
+ };
+ 
+ describe('ScoutRosterQueryDto validation', () => {
+diff --git a/test/scout/roster/scout-roster.service.spec.ts b/test/scout/roster/scout-roster.service.spec.ts
+index c9333591..882ad737 100644
+--- a/test/scout/roster/scout-roster.service.spec.ts
++++ b/test/scout/roster/scout-roster.service.spec.ts
+@@ -5,8 +5,10 @@ import { Events } from '../../../src/analytics/events';
+ import { PrismaService } from '../../../src/prisma.service';
+ import { ScoutRosterService } from '../../../src/scout/scout-roster.service';
+ import {
++  ROSTER_BRIDGE_PENDING,
+   ROSTER_DEFAULT_PAGE_SIZE,
+   ROSTER_MAX_PAGE_SIZE,
++  ROSTER_TARGET_KIND,
+ } from '../../../src/scout/scout-roster.dto';
+ import { RECONSTRUCT_ENTITY_TYPE } from '../../../src/scout/scout-reconstruct.dto';
+ import { decodeScoutCursor } from '../../../src/scout/scout-cursor';
+@@ -40,6 +42,8 @@ interface LedgerRow {
+   source_platform: string;
+   status: string;
+   target_id: string | null;
++  /** S8-F: the ledger's nullable kind. Omitted (legacy) reads back as NULL. */
++  target_kind?: string | null;
+ }
+ interface PersonRow {
+   id: string;
+@@ -144,14 +148,19 @@ class FakePrisma {
+         source_id: r.source_id,
+         source_platform: r.source_platform,
+         target_id: r.target_id,
++        target_kind: r.target_kind ?? null,
+       }));
+     },
+   };
+ 
++  /** Every Person findMany, so tests can prove which target ids were (not) looked up. */
++  personReads: Array<{ ids: string[] }> = [];
++
+   person = {
+     findMany: async (args: { where: Where }) => {
+       this.noteRead();
+       const ids = new Set(args.where.id?.in ?? []);
++      this.personReads.push({ ids: [...ids] });
+       return this.persons
+         .filter(
+           (p) =>
+@@ -764,3 +773,111 @@ describe('ScoutRosterService.getRoster', () => {
+     });
+   });
+ });
++
++/**
++ * S8-F — roster qualifier and kind fence (readiness F10). The roster stays the
++ * interim accepted Person bridge: every response says so at the top level
++ * (`roster_bridge_pending: true`, empty pages included), and only NULL-kind
++ * (legacy) or `person`-kind ledger rows are ever joined to Person. A typed
++ * non-person row is dropped while the ledger-anchored cursor still advances.
++ */
++describe('ScoutRosterService S8-F interim bridge qualifier', () => {
++  it('exposes roster_bridge_pending: true on a populated page', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.roster_bridge_pending).toBe(true);
++    expect(ROSTER_BRIDGE_PENDING).toBe(true);
++    expect(Object.keys(res).sort()).toEqual(
++      ['accounting', 'intent_id', 'page', 'persons', 'roster_bridge_pending'].sort(),
++    );
++  });
++
++  it('exposes roster_bridge_pending: true on an EMPTY page too (settled, nothing reconstructed)', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 0, skipped: 1 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons).toEqual([]);
++    expect(res.roster_bridge_pending).toBe(true);
++  });
++
++  it('is response-level only: no per-row flag is added to a roster row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons[0]).not.toHaveProperty('roster_bridge_pending');
++    expect(res.persons[0]).not.toHaveProperty('target_kind');
++    expect(res.persons[0]).not.toHaveProperty('native_id');
++  });
++
++  it('F10: an explicit person kind materializes exactly like a legacy NULL kind', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 2 });
++    fake.ledgerRows[1].target_kind = ROSTER_TARGET_KIND;
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons.map((p) => p.source_person_id)).toEqual(['tc_s000', 'tc_s001']);
++  });
++
++  it('F10: a non-person kind is never joined to Person, even when the id matches a Person row', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 });
++    // A typed native row whose target_id happens to equal an existing Person id
++    // of this coach: it must not be looked up, let alone served as a Person.
++    const decoy = fake.persons[0].id;
++    for (const kind of ['workout_plan', 'workout_program', 'scout_entity', 'meal_plan']) {
++      fake.ledgerRows.push({
++        coach_id: COACH,
++        intent_id: INTENT,
++        entity_type: ET,
++        source_id: `z-${kind}`,
++        source_platform: 'truecoach',
++        status: 'reconstructed',
++        target_id: decoy,
++        target_kind: kind,
++      });
++    }
++    const { service } = makeService(fake);
++    const res = await service.getRoster(COACH, INTENT, undefined, undefined);
++    expect(res.persons.map((p) => p.source_person_id)).toEqual(['tc_s000']);
++    // The Person lookup carried only the legacy row's id — once.
++    expect(fake.personReads).toEqual([{ ids: [decoy] }]);
++    // Accounting is ledger truth and still counts the typed rows as reconstructed.
++    expect(res.accounting.reconstructed).toBe(5);
++  });
++
++  it('F10: a page made only of non-person kinds is empty, and the cursor still advances', async () => {
++    const fake = new FakePrisma();
++    seed(fake, { reconstructed: 1 }); // s000 (legacy person)
++    for (const sid of ['a-typed', 'b-typed']) {
++      fake.ledgerRows.push({
++        coach_id: COACH,
++        intent_id: INTENT,
++        entity_type: ET,
++        source_id: sid,
++        source_platform: 'truecoach',
++        status: 'reconstructed',
++        target_id: `plan-${sid}`,
++        target_kind: 'workout_plan',
++      });
++    }
++    const { service } = makeService(fake);
++    const page1 = await service.getRoster(COACH, INTENT, undefined, 2);
++    expect(page1.persons).toEqual([]);
++    expect(page1.page.has_more).toBe(true);
++    expect(page1.roster_bridge_pending).toBe(true);
++    expect(decodeScoutCursor(page1.page.next_cursor as string, COACH, INTENT, ET)).toEqual({
++      s: 'b-typed',
++      p: 'truecoach',
++    });
++    // No Person read happened at all for the typed-only page.
++    expect(fake.personReads).toEqual([]);
++    const page2 = await service.getRoster(COACH, INTENT, page1.page.next_cursor ?? undefined, 2);
++    expect(page2.persons.map((p) => p.source_person_id)).toEqual(['tc_s000']);
++    expect(page2.page.has_more).toBe(false);
++    expect(page2.roster_bridge_pending).toBe(true);
++  });
++});
