@@ -1,5 +1,9 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-FA72EFB2, 2026-09-26 15:20Z
+
+Owner takeover (session fa72efb2). Read `execution/fa72efb2/TAKEOVER.md` and `execution/fa72efb2/LAST_OPERATOR_STATE.md`; they supersede the sections below, which are preserved as history. Live: integration/importer 6a33df9b (S10-C2 landed 07:31:17Z, reconciled in `execution/fa72efb2/reconcile/`), main 1c10e2a1 untouched. S11-A1 v3 = PR #559 (3db615c0), proof pending in the new runtime (lock inode 686480).
+
 ## CURRENT: EXEC-D3A9F701, 2026-09-26 02:25Z
 
 S9-B CLOSED AND LANDED. backend integration/importer 771db62a -> 5407efae (ordinary FF, PR #545 CI green; land/s9-b-accepted=1e6e5735, land/s9-b=5407efae). main unchanged 1c10e2a1.
