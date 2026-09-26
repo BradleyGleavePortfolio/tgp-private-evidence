@@ -6,6 +6,8 @@
 - Owner-facing: 8 open S8-D owner questions (OQ-1,2,6,7,9,10,12,13) with safe interim defaults; D1/D2 independent. RLS note: WorkoutSession/WeightLog/Habit parent-table RLS exists only in out-of-band rls_fitness_backend.sql (migration-only environment gap; not a verified production exposure; confirm live policies before any person-owned writer goes live).
 
 ## 18:50Z
+
+- LANDED 18:45:20Z: S11-A2 r2 54be96f1 on integration/importer (FF from dda794d7, PR #564). Proof v1 FAILED (class B, preserved s11a2/PROOF_V1_FINDING.md: resetData deleted S10-B insert-only tables directly) → r2 (cascade-only reset, T4 delta GO) → binding v2 T3 GO → END rc=0 127/127 (rls 6, journey 8, readiness 6, redrive 8, induction 4, guard 95); CI green.
 - OFFICIAL OWNER DECISION: D-S8-2 option (a) + D-S8-LINK L1–L8 DECIDED (OWNER_DECISION_S8D_2026-09-26.md "OFFICIAL"; evidence 5a3e9f2).
 - S8-D decision record: draft ded755ab (fa72/s8d) independent T4 NO-GO (s8d/s8d_review.md B1 RLS claim false for CheckIn coach policy; B2 proposal lifecycle; B3 fresh invite on every re-link; B4 D1 create-only/Deleted; B5 D4b+D5 one release gate). Round 2 in progress. Owner questions OQ-1,2,6,7,9,10,12,13 open (safe interim defaults; D1/D2 independent of them).
 - S11-D: J19/J20 spec (T2) review round 1 NO-GO → round 2 GO; re-based onto 54be96f1 as 38d0d366 (fa72-s11d2, standalone) = land/s11d PR #565; binding v1 (bootstrap + full 6 + guard 95) being built.
