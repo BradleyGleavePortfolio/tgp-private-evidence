@@ -1,4 +1,9 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 15:31Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 15:58Z)
+
+- LANDED 15:51:31Z: S11-C 7fdcbc04 on integration/importer (FF from 3db615c0; PR #560). Proof s11c/binding/v1 RC=0. Qualified C: rls-c1-setup live not run (C1 lane).
+- D2: gate GO at 6e3f86ce (d2_gate_summary.md; R75 `as any` closure in the e2e spec = assertion-preserving, parent-verified delta; check-8 (a)/(b) controls reclassified C: gate script unchanged since D1 384035ec where they were proven). Rebased onto 7fdcbc04 as 144269d1 (8 blobs identical, hooks ran, core-diff gate PASS, e2e 16/16) = PR #561 land/s10d2. Binding s10d2/binding/v1 being filled for the new base, then independent review, then the one PG proof.
+- Mobile readiness consumer (UX-03/04 J6 render of S11-C readiness; T2) building in worktrees/fa72-mobile-rdy; lands on mobile main only after review (S11-C now landed).
+- S11-B NEW candidate (T4) still building.
 
 - LANDED 15:29:50Z: S11-A1 v3 3db615c0 on integration/importer (FF from 6a33df9b; PR #559 merged). Proof v3 RC=0 6/6, 8/8, 94/94 (s11a1/binding/v3/run). New S11 base = 3db615c0.
 - D2 independent T4 review GO (s10d2/d2_review.md), C-only; C1 recorded for owner: a production run declaring platform `s10_unseen` could be proven complete with the committed test key, own tenant only, never a real platform (D-S10-1 shape; `conformance_alpha` precedent). Not a landing blocker for integration/importer; relevant before any production enablement.
