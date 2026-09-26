@@ -1,4 +1,8 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 15:58Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 16:15Z)
+
+- D2 real-PG proof v1 FAILED (class B, candidate result; preserved: s10d2/PROOF_V1_FINDING.md, binding/v1/run): 4/8 — SET.base partial/unresolved_identities instead of complete although every row reconstructed. T4 diagnosis/fix in progress (s10d2/D2_DIAGNOSE_FIX_GRANT.md). D2 not landed; PR #561 open.
+- S11-B NEW candidate built (45b4da1d), rebased onto 7fdcbc04 as 4d31616f (blobs identical, hooks incl. tsc passed) = PR #562 land/s11b. Review B (GPT-6 Sol) GO; Review A (Claude Fable 5) pending. Two proof bindings (S11 lane; S10-B lane for R36) being built.
+- Mobile readiness consumer: draft PR #296 (ux/s11-readiness-panel, 89590423). Audit NO-GO (B1 terminal shown with success check; B2 stale single read) + CI red (banned-words test JSON.stringify of React elements). Round 2 in progress with local npm ci + real gates.
 
 - LANDED 15:51:31Z: S11-C 7fdcbc04 on integration/importer (FF from 3db615c0; PR #560). Proof s11c/binding/v1 RC=0. Qualified C: rls-c1-setup live not run (C1 lane).
 - D2: gate GO at 6e3f86ce (d2_gate_summary.md; R75 `as any` closure in the e2e spec = assertion-preserving, parent-verified delta; check-8 (a)/(b) controls reclassified C: gate script unchanged since D1 384035ec where they were proven). Rebased onto 7fdcbc04 as 144269d1 (8 blobs identical, hooks ran, core-diff gate PASS, e2e 16/16) = PR #561 land/s10d2. Binding s10d2/binding/v1 being filled for the new base, then independent review, then the one PG proof.

@@ -1,0 +1,20 @@
+PASS test/scout/lifecycle/s11b-settle-redrive.spec.ts (13.417 s)
+  S11-B completeServerRun: a replayed claim re-drives a lost settle (D-S11-4)
+    ✓ J16: P2002 → a second short transaction whose FIRST statement is the gate → the pending read in the SAME transaction → onTransferSettled once with the gate's re-read epoch (never the first gate's, never the body's) (6 ms)
+    ✓ the replay stores nothing of its own: one refused completion INSERT, no phase CAS, no push, no scout.ingest.completed, no classification (2 ms)
+    ✓ J14 (unit shadow): a replay claiming a different terminal status is only a trigger — the refused INSERT is the only completion statement and the settle is re-driven from DB state (2 ms)
+    ✓ no re-drive when the settle is not pending: the gate opens, the read says no, nothing is settled (3 ms)
+    ✓ J15 (unit shadow): the gate closes between the refused claim and the re-drive → ack, no read, no settle, no 409, no classifyClosed (2 ms)
+    ✓ idempotent: after a re-drive, the next replay meets a closed claim gate and is the existing ack no-op — no second settle, no push (4 ms)
+    ✓ J15 (c): before any claim the closed gate is still 409 run_not_started, and the branch is not reached (2 ms)
+    ✓ the branch is P2002-only: any other claim failure propagates unchanged with no re-drive (16 ms)
+    ✓ first claim unchanged: one transaction, the phase CAS on the claim gate's epoch, one push, one scout.ingest.completed, the settle under that same epoch, no pending read (9 ms)
+  S11-B ScoutLifecycleService.isSettlePending: the ONE read helper
+    ✓ one row → true; zero rows → false (3 ms)
+    ✓ is a tenant-scoped SELECT with no lock and no write, bound to exactly [coach, intent] — no epoch parameter (4 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        13.664 s
+Ran all test suites matching test/scout/lifecycle/s11b-settle-redrive.spec.ts.
