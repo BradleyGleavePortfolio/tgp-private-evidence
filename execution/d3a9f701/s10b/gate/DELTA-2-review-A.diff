@@ -1,0 +1,37 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s10b/gate/pre-delta2/s10b-gate-d3a9.sh	2026-09-26 04:34:46.615187820 +0000
++++ /home/user/workspace/private-evidence/execution/d3a9f701/s10b/gate/s10b-gate-d3a9.sh	2026-09-26 04:43:19.819187820 +0000
+@@ -113,7 +113,7 @@
+ # STARTED or TERMINAL, so a stale pin never consumes the one-shot grant. finish() is redefined after ACQUIRED.
+ STAGE=preflight-prelock
+ LOG=$E/prelock.log; export GIT_OPTIONAL_LOCKS=0   # pre-lock: own log (gate.log stays the run log), no optional git index writes
+-[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }   # early (re-checked before the lock)
++[ ! -e "$E/STARTED" ] && [ ! -L "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }   # early (re-checked before the lock)
+ finish(){ log "REFUSED_PRELOCK stage=$STAGE rc=$1 (no lock taken, STARTED not written; the grant is not consumed)"; exit "$1"; }
+ export NODE_OPTIONS=--max-old-space-size=4096 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false \
+        PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 PRISMA_GENERATE_SKIP_AUTOINSTALL=1
+@@ -183,14 +183,15 @@
+ node --check test/utils/g2-s10b-worker.cjs || { log "PRECONDITION_FAIL worker.cjs syntax"; finish 70; }
+ log "PRECONDITIONS_OK (pre-lock) base=$H base_parent=$S10A_PARENT harness_base=$HARNESS_BASE_HEAD"
+ LOG=$E/gate.log; unset GIT_OPTIONAL_LOCKS
+-[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
++[ ! -e "$E/STARTED" ] && [ ! -L "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
++[ ! -e "$E/TERMINAL" ] && [ ! -L "$E/TERMINAL" ] || { echo "REFUSED: $E/TERMINAL exists (or is a symlink) without STARTED" >&2; exit 76; }
+ # ---- lock: existing canonical file, recorded inode (PINS.env and LOCK_ESTABLISHED.txt must agree), nonblocking flock here
+ [ -e "$LOCK" ] || { log "REFUSED lock file absent"; exit 75; }
+ REC_INODE=$(sed -n 's/.*inode=\([0-9]*\).*/\1/p' "$LOCK_RECORD" | head -1)
+ CUR_INODE=$(stat -c %i "$LOCK")
+ [ -n "$REC_INODE" ] && [ "$CUR_INODE" = "$REC_INODE" ] && [ "$CUR_INODE" = "$LOCK_INODE" ] || { log "REFUSED lock inode $CUR_INODE != recorded $REC_INODE / pinned $LOCK_INODE"; exit 75; }
+ exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
+-date -u +%FT%TZ > "$E/STARTED"
++( set -C; date -u +%FT%TZ > "$E/STARTED" ) 2>/dev/null || { log "REFUSED $E/STARTED appeared (or is a symlink) at lock time; one-shot not consumed here"; exit 76; }   # O_EXCL: refuses any existing path incl. dangling symlink
+ LSL=$(lslocks 2>/dev/null); log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(grep -c test-validation <<<"$LSL") donor=$DONOR prefix=$B base=$H"
+ STAGE=preflight
+ finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
+@@ -198,6 +199,7 @@
+ [ "$(git rev-parse HEAD)" = "$H" ] && [ "$(st_now)" = "$STATUS_EXPECT" ] && [ -z "$(git diff --cached --name-only)" ] || { log "PRECONDITION_FAIL HEAD/status/index moved after the pre-lock checks"; finish 70; }
+ for hk in pre-commit commit-msg; do { [ -e ".git/hooks/$hk" ] || [ -L ".git/hooks/$hk" ]; } && { log "PRECONDITION_FAIL .git/hooks/$hk appeared after the pre-lock checks"; finish 70; }; done
+ [ ! -e node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules appeared after the pre-lock checks"; finish 70; }
++[ "$(git rev-parse --git-path hooks)" = .git/hooks ] && [ -d .git/hooks ] && [ ! -L .git/hooks ] && [ -z "$(git config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL hooks dir changed after the pre-lock checks (not the plain .git/hooks directory, or core.hooksPath set)"; finish 70; }
+ while read -r s m st p; do [ -n "${p:-}" ] || continue; chk "$p" "$s"; done <<< "$OWNED_PINS"
+ HEAVY=$(pgrep -af "jest|tsc|prisma|postgres|prettier|lefthook|eslint" | grep -v -e "^$$ " -e s10b-gate || true)
+ [ -z "$HEAVY" ] || { printf '%s\n' "$HEAVY" >> "$LOG"; log "WARN other heavy processes present (recorded)"; }

@@ -1,0 +1,45 @@
+--- a/scripts/s10-core-diff-gate.sh
++++ b/scripts/s10-core-diff-gate.sh
+@@ -10,7 +10,8 @@
+ # Checks (any failure, or any tool exit >= 2, fails):
+ #   1  B is an ancestor of HEAD
+ #   2  the working tree is clean, untracked files included
+-#   3  `git diff --name-only B HEAD` equals the allowed per-source set exactly (all present)
++#   3  `git diff --name-only B HEAD` equals the allowed per-source set exactly, and every allowed
++#      path is present at HEAD as a regular blob of mode 100644 (no symlink/gitlink/executable)
+ #   4  every other path is byte-identical between B and HEAD
+ #   5  `rg -F -l s10_unseen src --type ts` exits 1 on HEAD's src
+ #   6  the same over B's src exits 1
+@@ -109,13 +110,29 @@
+ $CHANGED_SORTED
+ allowed:
+ $ALLOWED_SORTED"
++# Each allowed path must be a regular, non-executable file at HEAD: mode 100644, type blob. A
++# symlink (120000), gitlink/submodule (160000), executable (100755) or tree is refused.
++TAB="$(printf '\t')"
+ for path in "${ALLOWED[@]}"; do
+   set +e
+-  git cat-file -e "${HEAD_COMMIT}:${path}" 2>/dev/null; rc=$?
++  ENTRY="$(git -c core.quotePath=false ls-tree --full-tree "$HEAD_COMMIT" -- "$path" 2>&1)"; rc=$?
+   set -e
+-  [ "$rc" -eq 0 ] || fail 3 "allowed path missing (deleted?) at HEAD: $path"
++  [ "$rc" -eq 0 ] || fail 3 "git ls-tree exited $rc for $path"
++  [ -n "$ENTRY" ] || fail 3 "allowed path missing (deleted?) at HEAD: $path"
++  case "$ENTRY" in
++    *$'\n'*) fail 3 "more than one tree entry for $path:
++$ENTRY" ;;
++  esac
++  META="${ENTRY%%"$TAB"*}"
++  NAME="${ENTRY#*"$TAB"}"
++  [ "$NAME" = "$path" ] || fail 3 "tree entry name mismatch for $path: $NAME"
++  MODE="${META%% *}"
++  REST="${META#* }"
++  TYPE="${REST%% *}"
++  [ "$MODE" = '100644' ] && [ "$TYPE" = 'blob' ] ||
++    fail 3 "allowed path is not a regular 100644 blob at HEAD (mode $MODE, type $TYPE): $path"
+ done
+-pass 3 "changed paths == allowed set (${#ALLOWED[@]} paths, all present)"
++pass 3 "changed paths == allowed set (${#ALLOWED[@]} paths, all present as 100644 blobs)"
+ 
+ # ── 4: every other path byte-identical ───────────────────────────────────────────────────
+ EXCLUDES=()

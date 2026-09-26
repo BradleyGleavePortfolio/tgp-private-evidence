@@ -1,0 +1,186 @@
+--- gate/pre-review-fix/s10b-gate-d3a9.sh	2026-09-26 04:08:47.347187820 +0000
++++ gate/s10b-gate-d3a9.sh	2026-09-26 04:34:46.615187820 +0000
+@@ -3,7 +3,7 @@
+ # docs/decisions/2026-09-26-s10-induction.md L355). SOURCE ONLY: NOT RUN, NOT GRANTED.
+ # Derived by substitution from the accepted S9-C gate d3a9f701/s9c/gate-3/s9c-gate-d3a9.sh. Differences:
+ #   - worktree /home/user/workspace/worktrees/d3a9-s10b, branch exec-d3a9/s10b, BASE = the S10-A landing commit (one commit
+-#     on a4af8e33 adding exactly the 14 S10-A FREEZE paths, verified against FREEZE.sha256); BASE/BASE_TREE/MIGRATIONS_TREE
++#     on S10A_PARENT = e6f20300 (the S9-C landing merge) adding exactly the 14 S10-A FREEZE paths, verified against FREEZE.sha256); BASE/BASE_TREE/MIGRATIONS_TREE
+ #     are __FILL__ pins (the parent moves the clone onto BASE first: README.md "Parent steps before relay")
+ #   - owned paths: PINS.env OWNED_PINS (1 ` M` prisma/schema.prisma + 15 `??`); no doc, no contract artifact
+ #   - S10-B changes the schema and adds ONE migration: BASE schema = 0eb41f9a (pure +63/-0 addition), BASE migrations 172
+@@ -21,7 +21,8 @@
+ #     set-aside step (README.md); (3) commit-message.txt must exist in this dir; (4) R75 --mode=staged runs twice: early
+ #     (post-format bytes, index restored) and on the final staged set before the commit; (5) forced in-lane generate above
+ #   - targeted jest = the 5 S10-A specs + observation.{service,controller}.spec.ts, then the full default suite once
+-# Steps: relay+sentinel -> lock (flock -n fd9, inode pinned + LOCK_ESTABLISHED.txt) -> preconditions -> cp -a donor ->
++# Steps: relay+pins -> ALL pin/shape preconditions (pre-sentinel, read-only; refusals do not consume) -> sentinel -> lock
++# (flock -n fd9, inode pinned + LOCK_ESTABLISHED.txt) -> re-verify HEAD/status/hooks/owned bytes -> cp -a donor ->
+ # forced in-lane prisma generate + donor-unchanged -> lefthook install (normalized hook shas) -> verified prettier prefix ->
+ # preformat copies -> prettier owned .ts/.cjs -> R75 early (staged, then index restored) -> eslint -> tsc -> contract
+ # no-change (scratch export + contract spec) -> jest targeted (7) -> jest full -> stage -> R75 staged -> one hooked Bradley
+@@ -76,7 +77,7 @@
+ for v in CLIENT_INDEX_DTS CLIENT_SCHEMA; do [ "${!v}" = RECORD ] || is64 "${!v}" || { echo "REFUSED: PINS.env $v must be RECORD or 64-hex (${!v})" >&2; exit 78; }; done
+ for v in SCHEMA_ADDED_LINES BASE_MIGRATION_DIRS MIGRATION_DIRS S10A_FREEZE_COUNT LOCK_INODE; do [[ "${!v}" =~ ^[1-9][0-9]*$ ]] || { echo "REFUSED: PINS.env $v not a positive integer" >&2; exit 78; }; done
+ [ "$MIGRATION_DIRS" = $((BASE_MIGRATION_DIRS + 1)) ] || { echo "REFUSED: MIGRATION_DIRS must be BASE_MIGRATION_DIRS + 1" >&2; exit 78; }
+-[ "$HARNESS_BASE_HEAD" = "$S10A_PARENT" ] || [ "$HARNESS_BASE_HEAD" = "$BASE" ] || { echo "REFUSED: HARNESS_BASE_HEAD must be S10A_PARENT or BASE" >&2; exit 78; }
++# HARNESS_BASE_HEAD (harness BASE_HEAD literal, a4af8e33) is kept as an ANCESTOR of BASE; checked with git merge-base --is-ancestor before the lock (review B2)
+ [ -f "$S10A_FREEZE" ] && [ "$(sha "$S10A_FREEZE")" = "$S10A_FREEZE_SHA" ] || { echo "REFUSED: S10-A FREEZE $S10A_FREEZE absent or sha != $S10A_FREEZE_SHA" >&2; exit 78; }
+ S10A_FILES=$(awk '$1=="POST"{print $3}' "$S10A_FREEZE" | tr '\n' ' ')
+ [ "$(echo $S10A_FILES | wc -w)" = "$S10A_FREEZE_COUNT" ] || { echo "REFUSED: FREEZE lists $(echo $S10A_FILES | wc -w) paths, want $S10A_FREEZE_COUNT" >&2; exit 78; }
+@@ -108,17 +109,12 @@
+ [ -f "$MSG" ] && [ -s "$MSG" ] || { echo "REFUSED: commit message $MSG absent or empty" >&2; exit 78; }
+ MSGTXT=$(cat "$MSG")
+ ! grep -iqE 'claude|anthropic|openai|gpt[- ]|computer[- ]agent|perplexity|co-authored[- ]by|signed-off-by|generated with|🤖|ai assist|\b(ai|agent)\b' <<<"$MSGTXT" || { echo "REFUSED: commit-message.txt carries a banned token or trailer" >&2; exit 78; }
+-[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
+-# ---- lock: existing canonical file, recorded inode (PINS.env and LOCK_ESTABLISHED.txt must agree), nonblocking flock here
+-[ -e "$LOCK" ] || { log "REFUSED lock file absent"; exit 75; }
+-REC_INODE=$(sed -n 's/.*inode=\([0-9]*\).*/\1/p' "$LOCK_RECORD" | head -1)
+-CUR_INODE=$(stat -c %i "$LOCK")
+-[ -n "$REC_INODE" ] && [ "$CUR_INODE" = "$REC_INODE" ] && [ "$CUR_INODE" = "$LOCK_INODE" ] || { log "REFUSED lock inode $CUR_INODE != recorded $REC_INODE / pinned $LOCK_INODE"; exit 75; }
+-exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
+-date -u +%FT%TZ > "$E/STARTED"
+-LSL=$(lslocks 2>/dev/null); log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(grep -c test-validation <<<"$LSL") donor=$DONOR prefix=$B base=$H"
+-STAGE=preflight
+-finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
++# ---- preconditions run BEFORE the sentinel and the lock (review B1): every pin/shape refusal here exits without writing
++# STARTED or TERMINAL, so a stale pin never consumes the one-shot grant. finish() is redefined after ACQUIRED.
++STAGE=preflight-prelock
++LOG=$E/prelock.log; export GIT_OPTIONAL_LOCKS=0   # pre-lock: own log (gate.log stays the run log), no optional git index writes
++[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }   # early (re-checked before the lock)
++finish(){ log "REFUSED_PRELOCK stage=$STAGE rc=$1 (no lock taken, STARTED not written; the grant is not consumed)"; exit "$1"; }
+ export NODE_OPTIONS=--max-old-space-size=4096 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false \
+        PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 PRISMA_GENERATE_SKIP_AUTOINSTALL=1
+ export GIT_AUTHOR_NAME="Bradley Gleave" GIT_AUTHOR_EMAIL=bradley@bradleytgpcoaching.com GIT_COMMITTER_NAME="Bradley Gleave" GIT_COMMITTER_EMAIL=bradley@bradleytgpcoaching.com
+@@ -128,8 +124,9 @@
+ [ "$(git rev-parse HEAD)" = "$H" ] || { log "PRECONDITION_FAIL HEAD $(git rev-parse HEAD) != BASE $H (move the clone onto BASE first: README.md)"; finish 70; }
+ [ "$(git rev-parse 'HEAD^{tree}')" = "$BASE_TREE" ] || { log "PRECONDITION_FAIL BASE tree $(git rev-parse 'HEAD^{tree}') != $BASE_TREE"; finish 70; }
+ [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || { log "PRECONDITION_FAIL branch != $BRANCH"; finish 70; }
+-[ "$(git rev-parse HEAD^)" = "$S10A_PARENT" ] || { log "PRECONDITION_FAIL BASE^ $(git rev-parse HEAD^) != $S10A_PARENT (S10-A must be ONE commit on a4af8e33)"; finish 70; }
+-git merge-base --is-ancestor "$HARNESS_BASE_HEAD" HEAD || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD not an ancestor of BASE"; finish 70; }
++[ "$(git rev-parse HEAD^)" = "$S10A_PARENT" ] || { log "PRECONDITION_FAIL BASE^ $(git rev-parse HEAD^) != $S10A_PARENT (S10-A must be ONE commit on $S10A_PARENT)"; finish 70; }
++git merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$BASE" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD is not an ancestor of BASE $BASE"; finish 78; }
++git merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$S10A_PARENT" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD is not an ancestor of S10A_PARENT $S10A_PARENT"; finish 78; }
+ [ -z "$(git config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath set"; finish 70; }
+ [ -z "$(git diff --cached --name-only)" ] || { log "PRECONDITION_FAIL index not clean vs HEAD (staged or intent-to-add entries): $(git diff --cached --name-only | tr '\n' ' ')"; finish 70; }
+ [ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; finish 70; }
+@@ -140,7 +137,7 @@
+   chk "$p" "$s"
+   [ "$(stat -c %a "$p")" = "$m" ] || { log "PRECONDITION_FAIL $p mode $(stat -c %a "$p") != $m"; finish 70; }
+ done <<< "$OWNED_PINS"
+-# S10-A at BASE: exactly the 14 FREEZE paths over a4af8e33, tracked, committed bytes = FREEZE, clean in the working tree
++# S10-A at BASE: exactly the 14 FREEZE paths over S10A_PARENT, tracked, committed bytes = FREEZE, clean in the working tree
+ S10A_DELTA=$(git diff --name-only "$S10A_PARENT" HEAD | sort | tr '\n' ' ')
+ [ "$S10A_DELTA" = "$(printf '%s\n' $S10A_FILES | sort | tr '\n' ' ')" ] || { log "PRECONDITION_FAIL $S10A_PARENT..BASE delta [$S10A_DELTA] != the $S10A_FREEZE_COUNT FREEZE paths"; finish 70; }
+ while read -r tag s p; do [ "$tag" = POST ] || continue
+@@ -149,7 +146,7 @@
+   chk "$p" "$s"
+ done < "$S10A_FREEZE"
+ [ -z "$(git status --porcelain -- $S10A_FILES)" ] || { log "PRECONDITION_FAIL S10-A files modified in working tree"; finish 70; }
+-[ ! -e node_modules ] || { log "PRECONDITION_FAIL node_modules already present (parent must set the clone's copy aside first: README.md)"; finish 70; }
++[ ! -e node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules already present (parent must set the clone's copy aside first: README.md)"; finish 70; }
+ # schema: BASE bytes pinned; the working schema is BASE + a pure addition of SCHEMA_ADDED_LINES lines
+ [ "$(git rev-parse "HEAD:prisma/schema.prisma")" = "$BASE_SCHEMA_BLOB" ] && [ "$(git show HEAD:prisma/schema.prisma | sha256sum | cut -c1-64)" = "$BASE_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL schema at BASE != $BASE_SCHEMA_BLOB / $BASE_SCHEMA_SHA"; finish 70; }
+ [ "$(git diff --numstat -- prisma/schema.prisma | cut -f1,2)" = "$(printf '%s\t0' "$SCHEMA_ADDED_LINES")" ] || { log "PRECONDITION_FAIL schema delta is not +$SCHEMA_ADDED_LINES/-0: $(git diff --numstat -- prisma/schema.prisma)"; finish 70; }
+@@ -176,9 +173,32 @@
+ # contract: not owned; BASE blob pinned; working file = BASE bytes
+ [ "$(git rev-parse "HEAD:$CONTRACT")" = "$CONTRACT_BLOB" ] && [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { log "PRECONDITION_FAIL $CONTRACT at BASE/working != $CONTRACT_BLOB / $SHA_CONTRACT_JSON"; finish 70; }
+ # hooks: pre-existing hooks are a refusal, never overwritten (lesson 2). Set-aside is a PARENT step, README.md.
+-for hk in pre-commit commit-msg; do [ ! -e ".git/hooks/$hk" ] || { log "PRECONDITION_FAIL .git/hooks/$hk already present (sha256 $(sha ".git/hooks/$hk")); parent must set it aside per README.md 'Hook set-aside' and relay again"; finish 70; }; done
++# symlink-aware (review A B-1): an occupied path is refused whether it is a file, a directory or a symlink (dangling or not);
++# the hooks dir itself must be the plain .git/hooks directory of this clone.
++[ "$(git rev-parse --git-path hooks)" = .git/hooks ] && [ -d .git/hooks ] && [ ! -L .git/hooks ] || { log "PRECONDITION_FAIL hooks dir is not the plain .git/hooks directory ($(git rev-parse --git-path hooks))"; finish 70; }
++for hk in pre-commit commit-msg; do hp=.git/hooks/$hk; if [ -e "$hp" ] || [ -L "$hp" ]; then
++  if [ -L "$hp" ]; then what="symlink -> $(readlink "$hp")"; elif [ -f "$hp" ]; then what="file sha256 $(sha "$hp")"; else what="non-regular path"; fi
++  log "PRECONDITION_FAIL $hp already occupied ($what); parent must set it aside per README.md 'Hook set-aside' and relay again"; finish 70; fi; done
+ bash -n test/utils/g2-s10b-bootstrap.sh || { log "PRECONDITION_FAIL bootstrap.sh syntax"; finish 70; }
+ node --check test/utils/g2-s10b-worker.cjs || { log "PRECONDITION_FAIL worker.cjs syntax"; finish 70; }
++log "PRECONDITIONS_OK (pre-lock) base=$H base_parent=$S10A_PARENT harness_base=$HARNESS_BASE_HEAD"
++LOG=$E/gate.log; unset GIT_OPTIONAL_LOCKS
++[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
++# ---- lock: existing canonical file, recorded inode (PINS.env and LOCK_ESTABLISHED.txt must agree), nonblocking flock here
++[ -e "$LOCK" ] || { log "REFUSED lock file absent"; exit 75; }
++REC_INODE=$(sed -n 's/.*inode=\([0-9]*\).*/\1/p' "$LOCK_RECORD" | head -1)
++CUR_INODE=$(stat -c %i "$LOCK")
++[ -n "$REC_INODE" ] && [ "$CUR_INODE" = "$REC_INODE" ] && [ "$CUR_INODE" = "$LOCK_INODE" ] || { log "REFUSED lock inode $CUR_INODE != recorded $REC_INODE / pinned $LOCK_INODE"; exit 75; }
++exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
++date -u +%FT%TZ > "$E/STARTED"
++LSL=$(lslocks 2>/dev/null); log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(grep -c test-validation <<<"$LSL") donor=$DONOR prefix=$B base=$H"
++STAGE=preflight
++finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
++# re-verify, under the lock, the state that could have moved between the pre-lock checks and ACQUIRED
++[ "$(git rev-parse HEAD)" = "$H" ] && [ "$(st_now)" = "$STATUS_EXPECT" ] && [ -z "$(git diff --cached --name-only)" ] || { log "PRECONDITION_FAIL HEAD/status/index moved after the pre-lock checks"; finish 70; }
++for hk in pre-commit commit-msg; do { [ -e ".git/hooks/$hk" ] || [ -L ".git/hooks/$hk" ]; } && { log "PRECONDITION_FAIL .git/hooks/$hk appeared after the pre-lock checks"; finish 70; }; done
++[ ! -e node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules appeared after the pre-lock checks"; finish 70; }
++while read -r s m st p; do [ -n "${p:-}" ] || continue; chk "$p" "$s"; done <<< "$OWNED_PINS"
+ HEAVY=$(pgrep -af "jest|tsc|prisma|postgres|prettier|lefthook|eslint" | grep -v -e "^$$ " -e s10b-gate || true)
+ [ -z "$HEAVY" ] || { printf '%s\n' "$HEAVY" >> "$LOG"; log "WARN other heavy processes present (recorded)"; }
+ # ---- 1 node_modules: isolated real copy of the relayed donor (donor is read-only here)
+--- gate/pre-review-fix/PINS.env	2026-09-26 04:05:35.163187820 +0000
++++ gate/PINS.env	2026-09-26 04:35:11.727187820 +0000
+@@ -1,38 +1,40 @@
+ # S10-B gate pins (sourced by s10b-gate-d3a9.sh). Every value is a literal; the driver refuses on any malformed or
+ # unfilled value it needs. Update THIS file (and re-hash) if reviews change an owned file; the driver stays fixed.
+ # Fill help: `bash s10b-gate-d3a9.sh --fill-help <S10-A landing sha>` (read-only; prints the values below) or README.md.
+-# ---- base = the S10-A landing commit: exactly ONE commit on a4af8e33 adding the 14 FREEZE paths. Unknown at authoring.
++# ---- base = the S10-A landing commit: exactly ONE commit on S10A_PARENT (e6f20300, the S9-C landing merge) adding the 14
++#      FREEZE paths. Unknown at authoring.
+ BASE=__FILL_BASE__                       # git -C <landing clone> rev-parse HEAD after land-s10a.sh (40-hex)
+ BASE_TREE=__FILL_BASE_TREE__             # git rev-parse "$BASE^{tree}"
+ MIGRATIONS_TREE=__FILL_MIGRATIONS_TREE__ # git rev-parse "$BASE:prisma/migrations" (S10-A touches no prisma -> expected 654550cb99b55473429a9c60ee08319e1b649106)
+-S10A_PARENT=a4af8e330bd4d6f882f0aebd411200b76d651aba   # BASE^ must be this (integration/importer tip the S10-A landing commits on)
+-HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba   # BASE_HEAD literal in test/utils/g2-s10b-{bootstrap.sh,db.ts} (ancestor of BASE; the prisma diff from it is still exactly the S10-B three)
++S10A_PARENT=e6f20300b495fa9eee9539ae58d30e3b60e5a78c   # BASE^ must be this (S9-C landing merge = integration/importer tip after PR #547 fast-forwards)
++HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba   # kept: BASE_HEAD literal in test/utils/g2-s10b-{bootstrap.sh,db.ts}; the gate requires it to be an ANCESTOR of S10A_PARENT and BASE (git merge-base --is-ancestor; review B2 option a). a4af8e33..e6f20300 touches no prisma, so the harness prisma diff is still exactly the S10-B three
+ BRANCH=exec-d3a9/s10b
+ # ---- S10-A freeze (the 14 paths BASE adds over S10A_PARENT, "POST <sha256> <path>"). Read from this file; its sha is pinned.
+ S10A_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10a/land/FREEZE.sha256
+ S10A_FREEZE_SHA=d54aee78dcc35910200a3c8db93ecff7305a95d1c34a65985e998ad1c71c398a
+ S10A_FREEZE_COUNT=14
+ # ---- owned S10-B paths: "<sha256> <mode> <state> <path>", M = tracked+modified (` M`), N = new untracked (`??`).
+-# 16 paths = 1 M + 15 N (s10b_builder_summary.md; re-measured read-only in worktrees/d3a9-s10b 2026-09-26T04:0xZ).
+-# Pre-gate bytes. prettier may reflow the .ts/.cjs at STAGE=prettier (preformat/ + postformat/ copies, POSTFORMAT lines);
++# 16 paths = 1 M + 15 N. Bytes = d3a9f701/s10b/devloop-2/POSTFORMAT.sha256 (after the pinned prettier 3.9.9 reflow and the two
++# devloop test fixes; modes and bytes re-measured read-only in worktrees/d3a9-s10b 2026-09-26). The gate's prettier pass is
++# expected to be a no-op on these bytes but is still run and recorded (preformat/ + postformat/ copies, POSTFORMAT lines);
+ # prisma/schema.prisma (no prettier parser in the hook globs), migrations/** (.prettierignore) and the .sh are never reflowed.
+ OWNED_PINS='d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96 644 M prisma/schema.prisma
+ 345f12de9037d77c12f69abd96286411edfbaae1fb9df3767b1907fbada7aa15 644 N prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql
+ aee7c7351e89c55f4de03b403f731f96cdcc00183635b0ac48252467ca806905 644 N prisma/migrations/20270124000000_scout_run_observation_expand/down.sql
+ c36e1858a1178478918568595203d4947d92aa2ef60e25ed6d58b6c0fb58b06a 644 N src/scout/induction/observation.controller.ts
+-753ec05f646591eede64d0646224bb05402acc29e298bfe64a7aa98a98df1e66 644 N src/scout/induction/observation.dto.ts
++091159364d4ef6125f04658e443a83ad9d9aaf335538caf73914b9cf77e38ed5 644 N src/scout/induction/observation.dto.ts
+ 4d18b5111aa893bdb68dcba4267c199aee5eac2ad2543149a16094ff70b1b5c6 644 N src/scout/induction/observation.module.ts
+-c05832a5f3dcfae9154502f7e7967694b138ef174110d6c3509d7009633c34fc 644 N src/scout/induction/observation.service.ts
+-8ee13036e81b3bfbcd25e7ef9d34bf88f360ffdb2ba3684edc581b13675298c1 644 N test/rls-g2-s10b.spec.ts
+-d667e0b1d01f36342ccb0b1c6a0f22835c3788173105118ffbb66af0c490903b 644 N test/scout/induction/observation.controller.spec.ts
+-0b423ecb317b7f497aa7abcf4de6217b293067821e75c773e8adff781f8271ee 644 N test/scout/induction/observation.service.spec.ts
++aed296c8f26a6683887704cae04424c66a033ded825bd9b416c166d713db41db 644 N src/scout/induction/observation.service.ts
++5f21ef89708f3adb6e7d97b3c580a00192321d0ccc6b0193f48dfd3a39e6c504 644 N test/rls-g2-s10b.spec.ts
++89b2474ee5a4c61da66bbef37f935f02f0a1d90fef2f38852057233daa8c1638 644 N test/scout/induction/observation.controller.spec.ts
++25d28fb83bee3afc0966f37a7cb01836a2a05a224858a69bb2f1794a282d1433 644 N test/scout/induction/observation.service.spec.ts
+ 3fc3f21da01f1748e715c3d0b6ed46dbe635300fffdbd160e2154c138baa80df 755 N test/utils/g2-s10b-bootstrap.sh
+ 03e747a5b6d2237ca763daf3c146ab05c07866381878ffb50378e3bb5b3466bf 644 N test/utils/g2-s10b-db.ts
+-7f59132e33d8829c5d749e794077a83e083dd74dfb59b40b404ab9cac3e20ca7 644 N test/utils/g2-s10b-fixtures.ts
+-c2783eb400ab2aaee61a94a515e44b7f46b1589d7dd939fb07d49a6cdbde3d84 644 N test/utils/g2-s10b-harness.ts
++ad4fa44175b6cf644816cb71cfadcab01c311d46dd9166fe4f878f3719df98ba 644 N test/utils/g2-s10b-fixtures.ts
++603d90c8cf05b93372b1e4471b23bf8908b8eb2db27dcf90b1d0f133ce7224aa 644 N test/utils/g2-s10b-harness.ts
+ e161105556da1b71b53404890a236e32f1a4d7ae6f5bbe88d6fe66d5479bd519 644 N test/utils/g2-s10b-pg-harness.ts
+-f5a59dbf024c4d1ad8be899f4dedfdea10d622fa7a4f7a6ea42e2a1d72d181b7 644 N test/utils/g2-s10b-worker.cjs'
+-# ---- schema: BASE bytes (= a4af8e33, S10-A touches no prisma) must be a pure-addition base of the working schema
++7a061fc47ce87ca82dde7f23a051bd37635ad8aba14da1cc8a84e83bf4862b35 644 N test/utils/g2-s10b-worker.cjs'
++# ---- schema: BASE bytes (= a4af8e33 = e6f20300 for prisma; neither S9-C nor S10-A touches prisma) must be a pure-addition base of the working schema
+ BASE_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
+ BASE_SCHEMA_BLOB=2e328bbcab0c902c6adb55dfb5ee172defc5f698
+ SCHEMA_ADDED_LINES=63                    # git diff --numstat -- prisma/schema.prisma = 63/0 (three models + three ScoutImport back-relations)
+@@ -58,8 +60,8 @@
+ # ---- contract: D-S10-8 S10-B row lists "OpenAPI bytes" as NOT owned; regeneration belongs to S10-C (generator owner).
+ # The artifact is not owned here and must be byte-identical to BASE before, after the scratch re-export, and in the commit.
+ CONTRACT=docs/contracts/importer-openapi.json
+-SHA_CONTRACT_JSON=9eacdd3eda125ab13c0a67bfeaed963a6eeabe0e431ff72e8b1d0cf4c7f74870   # sha256 of a4af8e33:docs/contracts/importer-openapi.json
+-CONTRACT_BLOB=8ebf936a9f12087a807cb37b069592d0c1e96cb2                                 # blob at a4af8e33 (must equal BASE:$CONTRACT)
++SHA_CONTRACT_JSON=2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098   # sha256 of e6f20300:docs/contracts/importer-openapi.json (S9-C changed it; S10-A does not)
++CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                                 # blob at e6f20300 (must equal BASE:$CONTRACT)
+ LOCK_INODE=692282
+ LEFTHOOK_EXPECT=2.1.9
+ PRETTIER_EXPECT=3.9.9

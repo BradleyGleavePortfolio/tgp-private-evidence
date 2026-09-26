@@ -1,0 +1,47 @@
+PASS test/scout/induction/verify.spec.ts (10.056 s)
+FAIL test/scout/induction/observation.service.spec.ts
+  ● ObservationService.declare (D-S10-4 declaration route) › records the whole normalised set in one transaction with ONE server challenge
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 2
+
+    @@ -1,13 +1,13 @@
+      Array [
+        Array [
+          "synthetic-src-a",
+    -     "92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3",
+    +     "4029a168b51a4bd5f95754ef70f23c7c23fb6e1f5f838e361c29f2d0d0003db0",
+        ],
+        Array [
+          "synthetic-src-a",
+    -     "4029a168b51a4bd5f95754ef70f23c7c23fb6e1f5f838e361c29f2d0d0003db0",
+    +     "92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3",
+        ],
+        Array [
+          "synthetic-src-b",
+          "92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3",
+        ],
+
+      162 |     expect(d.declCreate).toHaveBeenCalledTimes(3);
+      163 |     const rows = d.declCreate.mock.calls.map((c: [{ data: Record<string, unknown> }]) => c[0].data);
+    > 164 |     expect(rows.map((r) => [r.source_platform, r.account_scope_id_digest])).toEqual([
+          |                                                                             ^
+      165 |       [PLATFORM_A, SCOPE_1],
+      166 |       [PLATFORM_A, SCOPE_2],
+      167 |       [PLATFORM_B, SCOPE_1],
+
+      at Object.<anonymous> (test/scout/induction/observation.service.spec.ts:164:77)
+
+PASS test/scout/induction/parse.spec.ts
+PASS test/scout/induction/observation.controller.spec.ts
+PASS test/scout/induction/manifest-registry.spec.ts
+PASS test/scout/induction/digest.spec.ts
+PASS test/scout/induction/contract.spec.ts
+
+Test Suites: 1 failed, 6 passed, 7 total
+Tests:       1 failed, 149 passed, 150 total
+Snapshots:   0 total
+Time:        15.175 s
+Ran all test suites within paths "test/scout/induction/observation.service.spec.ts", "test/scout/induction/observation.controller.spec.ts", "test/scout/induction/contract.spec.ts", "test/scout/induction/digest.spec.ts", "test/scout/induction/manifest-registry.spec.ts", "test/scout/induction/parse.spec.ts", "test/scout/induction/verify.spec.ts".

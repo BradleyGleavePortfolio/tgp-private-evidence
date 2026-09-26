@@ -1,0 +1,666 @@
+--- s9c/gate-3/s9c-gate-d3a9.sh	2026-09-26 03:51:00.247187820 +0000
++++ s10b/gate/s10b-gate-d3a9.sh	2026-09-26 04:34:46.615187820 +0000
+@@ -1,176 +1,254 @@
+ #!/usr/bin/env bash
+-# S9-C gate under the canonical slot — EXEC-D3A9F701 (S9-C wiring; D-S9-8 S9-C row + Gen row carried by this slice).
+-# Derived step-for-step from the accepted 1910a060/s9b/gate/s9b-gate-1910.sh (S9-B head 1e6e5735, landed as 5407efae),
+-# INCLUDING the accepted d3a9 narrow fix (no R75 working-tree call: check-r75.js has only --mode=staged|range; R75 is
+-# enforced by --mode=staged at STAGE=stage and by the pre-commit hook). Differences are scope only:
+-#   - worktree /home/user/workspace/worktrees/d3a9-s9c-r2 (standalone clone), branch exec-d3a9/s9c-r2, BASE = 5407efae
+-#     (S9-B landing merge, tree 3e2028e9), pinned in PINS.env (S9C_BASE, if relayed, must equal it)
+-#   - owned paths: PINS.env OWNED_PINS (freeze-1: 11 ` M` incl. docs/contracts/importer-openapi.json from npm run
+-#     contract:importer + 8 `??`) + the S9 decision doc (` M`, append-only Addendum B: +DOC_ADDED_LINES/-0, BASE bytes a
+-#     byte-prefix before and after prettier and in the commit). STATUS_EXPECT / STAGED_EXPECT are derived from that list.
+-#   - the S9-A-tracked checks are replaced by: the 10 other S9-B paths (git diff --name-only 9497ca52 1e6e5735, minus the
+-#     doc) tracked + clean at BASE at the S9-B receipt sha256/blobs and UNCHANGED by S9-C; prisma unchanged; migrations
+-#     172 dirs ending at the pin that test/utils/g2-s9c-pg-harness.ts carries
+-#   - NEW STEP after tsc: `npm run -s contract:importer`, then docs/contracts/importer-openapi.json must be byte-unchanged
+-#     (regen-stable) and test/contracts/importer-contract.spec.ts must pass
+-#   - every owned file is copied to preformat/ BEFORE any prettier write (S9-B lesson); POSTFORMAT recorded after
+-#   - evidence d3a9f701/s9c/gate/** (this dir); PINS.env beside this script carries every hash
+-# Steps: relay+sentinel -> lock (flock -n fd9, inode pinned + LOCK_ESTABLISHED.txt) -> preconditions -> cp -a donor
+-# node_modules -> lefthook install (normalized hook shas) -> verified prettier prefix -> preformat copies -> prettier
+-# check/format OWNED paths only -> eslint (owned .ts/.cjs) -> tsc --noEmit (heap 4096) -> contract regen-stable + contract
+-# spec -> jest --ci targeted -> jest --ci full default once -> stage exactly the owned paths -> R75 staged -> one
+-# genuine hooked Bradley commit -> receipts -> release. No push, no npm install, no PG. Any failure stops and is
+-# preserved; no rerun (STARTED sentinel).
+-# Usage (parent relay only):
+-#   S9C_GATE_RELAY=1 S9C_BASE=5407efae319fd913e973c87f3be0d49786c4a3e0 \
+-#   S9C_DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules \
+-#   S9C_PRETTIER_PREFIX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9 \
+-#   timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/gate/s9c-gate-d3a9.sh
++# S10-B gate under the canonical slot — EXEC-D3A9F701 (S10-B run declaration + observation persistence; D-S10-8 S10-B row,
++# docs/decisions/2026-09-26-s10-induction.md L355). SOURCE ONLY: NOT RUN, NOT GRANTED.
++# Derived by substitution from the accepted S9-C gate d3a9f701/s9c/gate-3/s9c-gate-d3a9.sh. Differences:
++#   - worktree /home/user/workspace/worktrees/d3a9-s10b, branch exec-d3a9/s10b, BASE = the S10-A landing commit (one commit
++#     on S10A_PARENT = e6f20300 (the S9-C landing merge) adding exactly the 14 S10-A FREEZE paths, verified against FREEZE.sha256); BASE/BASE_TREE/MIGRATIONS_TREE
++#     are __FILL__ pins (the parent moves the clone onto BASE first: README.md "Parent steps before relay")
++#   - owned paths: PINS.env OWNED_PINS (1 ` M` prisma/schema.prisma + 15 `??`); no doc, no contract artifact
++#   - S10-B changes the schema and adds ONE migration: BASE schema = 0eb41f9a (pure +63/-0 addition), BASE migrations 172
++#     ending at S7-L, working tree 173 ending at the S10-B dir; the prisma delta is exactly schema + migration.sql + down.sql
++#   - the donor client matches the OLD schema, so `prisma generate` ALWAYS runs, and only in the isolated copy:
++#     `cp -a $DONOR $W/node_modules` (real dir, no symlink), then `$W/node_modules/.bin/prisma generate --schema
++#     prisma/schema.prisma` from cwd $W, which writes $W/node_modules/.prisma/client (the @prisma/client in the copy is a real
++#     directory inside $W, checked). The donor's .prisma tree signature and client shas are measured before the copy and
++#     after the generate and must be unchanged; the in-lane client must carry the three S10-B models and differ from the donor
++#   - contract: S10-B does not own OpenAPI bytes (S10-C regenerates). The re-export goes to a SCRATCH path
++#     (IMPORTER_CONTRACT_OUT=$E/contract-regen.json, supported by scripts/export-importer-contract.ts) and must be
++#     byte-identical to BASE's artifact; the canonical file stays byte-identical to BASE and is never in the delta
++#   - lessons: (1) no `cmd | grep -q` pipelines under pipefail anywhere — outputs are captured, then grepped as here-strings
++#     or files; (2) pre-existing .git/hooks/{pre-commit,commit-msg} refuse with rc 70 and a pointer to the documented
++#     set-aside step (README.md); (3) commit-message.txt must exist in this dir; (4) R75 --mode=staged runs twice: early
++#     (post-format bytes, index restored) and on the final staged set before the commit; (5) forced in-lane generate above
++#   - targeted jest = the 5 S10-A specs + observation.{service,controller}.spec.ts, then the full default suite once
++# Steps: relay+pins -> ALL pin/shape preconditions (pre-sentinel, read-only; refusals do not consume) -> sentinel -> lock
++# (flock -n fd9, inode pinned + LOCK_ESTABLISHED.txt) -> re-verify HEAD/status/hooks/owned bytes -> cp -a donor ->
++# forced in-lane prisma generate + donor-unchanged -> lefthook install (normalized hook shas) -> verified prettier prefix ->
++# preformat copies -> prettier owned .ts/.cjs -> R75 early (staged, then index restored) -> eslint -> tsc -> contract
++# no-change (scratch export + contract spec) -> jest targeted (7) -> jest full -> stage -> R75 staged -> one hooked Bradley
++# commit -> receipts -> release. No push, no npm install, no PG. Any failure stops and is preserved; no rerun (STARTED).
++# Usage (parent relay only; README.md has the pre-relay steps):
++#   S10B_GATE_RELAY=1 S10B_BASE=<S10-A landing sha> \
++#   S10B_DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules \
++#   S10B_PRETTIER_PREFIX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9 \
++#   timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10b/gate/s10b-gate-d3a9.sh
++# Fill help (read-only, no lock, no relay): bash .../s10b-gate-d3a9.sh --fill-help <S10-A landing sha>
+ set -uo pipefail
+-E=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/gate-3
+-W=/home/user/workspace/worktrees/d3a9-s9c-r2
++E=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10b/gate
++W=/home/user/workspace/worktrees/d3a9-s10b
+ LOCK=/home/user/workspace/execution/test-validation.lock
+ LOCK_RECORD=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/runtime/LOCK_ESTABLISHED.txt
+ PREFIX_MANIFEST=/home/user/workspace/tgp-private-evidence/execution/64e33dc7/runtime/formatter/raw/prefix-files.sha256
+ LOG=$E/gate.log
+ # shellcheck source=PINS.env
+ . "$E/PINS.env" || { echo "REFUSED: cannot source $E/PINS.env" >&2; exit 78; }
+-# ---- owned paths come from PINS.env OWNED_PINS ("<sha> <mode> <M|N> <path>"; M = ` M`, N = `??`); DOC (PINS.env) is
+-# always owned as ` M` (append-only Addendum B). The contract artifact and the S9-C harness files must be in the set.
+-CONTRACT=docs/contracts/importer-openapi.json
+-REQUIRED_OWNED="$CONTRACT test/rls-g2-s9c.spec.ts test/utils/g2-s9c-bootstrap.sh test/utils/g2-s9c-db.ts test/utils/g2-s9c-harness.ts test/utils/g2-s9c-pg-harness.ts test/utils/g2-s9c-worker.cjs"
+-S9A_FILES="src/scout/reconciliation/types.ts src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts test/scout/reconciliation/reconcile.spec.ts"
+-# SUITES (targeted jest, explicit paths) = PINS.env SUITES
++S10B_MIG_DIR=prisma/migrations/$LAST_MIGRATION
++REQUIRED_OWNED="prisma/schema.prisma $S10B_MIG_DIR/migration.sql $S10B_MIG_DIR/down.sql test/rls-g2-s10b.spec.ts test/utils/g2-s10b-bootstrap.sh test/utils/g2-s10b-db.ts test/utils/g2-s10b-harness.ts test/utils/g2-s10b-pg-harness.ts test/utils/g2-s10b-worker.cjs test/utils/g2-s10b-fixtures.ts"
+ ts(){ date -u +%FT%TZ; }
+ log(){ echo "$(ts) $*" | tee -a "$LOG"; }
+ sha(){ sha256sum "$1" | cut -c1-64; }
+ is40(){ [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+ is64(){ [[ "$1" =~ ^[0-9a-f]{64}$ ]]; }
+ flat(){ echo "$1" | sed 's|/|__|g'; }
++# ---- --fill-help: read-only git queries only (no lock, no sentinel, no writes). Prints the PINS.env lines to paste.
++if [ "${1:-}" = --fill-help ]; then
++  B_=${2:-}; is40 "$B_" || { echo "usage: $0 --fill-help <40-hex S10-A landing sha>  (git -C <landing clone> rev-parse HEAD after land-s10a.sh; or git ls-remote origin refs/heads/land/s10a)" >&2; exit 2; }
++  export GIT_OPTIONAL_LOCKS=0
++  git -C "$W" cat-file -e "$B_^{commit}" 2>/dev/null || { echo "BASE $B_ not in $W: git -C $W fetch origin refs/heads/land/s10a (or fetch from /home/user/workspace/worktrees/d3a9-s10a)" >&2; exit 3; }
++  echo "BASE=$B_"; echo "BASE_TREE=$(git -C "$W" rev-parse "$B_^{tree}")"; echo "MIGRATIONS_TREE=$(git -C "$W" rev-parse "$B_:prisma/migrations")"
++  echo "# checks: BASE^=$(git -C "$W" rev-parse "$B_^") (want $S10A_PARENT)  schema_blob=$(git -C "$W" rev-parse "$B_:prisma/schema.prisma") (want $BASE_SCHEMA_BLOB)  contract_blob=$(git -C "$W" rev-parse "$B_:$CONTRACT") (want $CONTRACT_BLOB)"
++  echo "# delta $S10A_PARENT..BASE ($(git -C "$W" diff --name-only "$S10A_PARENT" "$B_" | wc -l) paths, want $S10A_FREEZE_COUNT):"
++  while read -r _ s p; do [ -n "${p:-}" ] || continue; got=$(git -C "$W" show "$B_:$p" 2>/dev/null | sha256sum | cut -c1-64); [ "$got" = "$s" ] && echo "#   OK $p" || echo "#   MISMATCH $p committed=$got freeze=$s"; done < "$S10A_FREEZE"
++  echo "# clone: HEAD=$(git -C "$W" rev-parse HEAD) branch=$(git -C "$W" rev-parse --abbrev-ref HEAD) hooks=[$(ls "$W/.git/hooks" 2>/dev/null | grep -v '\.sample$' | tr '\n' ' ')] node_modules=$( [ -e "$W/node_modules" ] && echo PRESENT || echo absent)"
++  exit 0
++fi
+ mkdir -p "$E"
+ # ---- 0 relay + one-shot sentinel (a refusal before ACQUIRED does not consume the grant)
+-[ "${S9C_GATE_RELAY:-}" = 1 ] || { echo "REFUSED: S9C_GATE_RELAY=1 (parent relay) not set" >&2; exit 78; }
+-[ -n "${S9C_DONOR:-}" ] && [ -d "$S9C_DONOR" ] || { echo "REFUSED: S9C_DONOR (node_modules donor dir) not set or absent" >&2; exit 78; }
+-[ -n "${S9C_PRETTIER_PREFIX:-}" ] && [ -d "$S9C_PRETTIER_PREFIX" ] || { echo "REFUSED: S9C_PRETTIER_PREFIX not set or absent" >&2; exit 78; }
+-is40 "$BASE" || { echo "REFUSED: PINS.env BASE is not a 40-hex sha ($BASE)" >&2; exit 78; }
+-if [ -n "${S9C_BASE:-}" ] && [ "$S9C_BASE" != "$BASE" ]; then echo "REFUSED: S9C_BASE=$S9C_BASE differs from PINS.env BASE=$BASE" >&2; exit 78; fi
++[ "${S10B_GATE_RELAY:-}" = 1 ] || { echo "REFUSED: S10B_GATE_RELAY=1 (parent relay) not set" >&2; exit 78; }
++[ -n "${S10B_DONOR:-}" ] && [ -d "$S10B_DONOR" ] || { echo "REFUSED: S10B_DONOR (node_modules donor dir) not set or absent" >&2; exit 78; }
++[ -n "${S10B_PRETTIER_PREFIX:-}" ] && [ -d "$S10B_PRETTIER_PREFIX" ] || { echo "REFUSED: S10B_PRETTIER_PREFIX not set or absent" >&2; exit 78; }
++is40 "$BASE" || { echo "REFUSED: PINS.env BASE is not a 40-hex sha ($BASE); run --fill-help" >&2; exit 78; }
++[ -n "${S10B_BASE:-}" ] && [ "$S10B_BASE" = "$BASE" ] || { echo "REFUSED: S10B_BASE (${S10B_BASE:-unset}) must be relayed and equal PINS.env BASE=$BASE" >&2; exit 78; }
+ H=$BASE
+-is40 "$BASE_TREE" && is40 "$MIGRATIONS_TREE" && is40 "$DOC_LANDED_BLOB" || { echo "REFUSED: PINS.env BASE_TREE/MIGRATIONS_TREE/DOC_LANDED_BLOB not 40-hex" >&2; exit 78; }
+-for v in SHA_CONTRACT_JSON SHA_DOC_LANDED SHA_DOC_ADDENDUM SCHEMA_SHA PKG_LOCK_SHA NM_HIDDEN_LOCK CLIENT_INDEX_DTS CLIENT_SCHEMA; do
++for v in BASE_TREE MIGRATIONS_TREE S10A_PARENT HARNESS_BASE_HEAD BASE_SCHEMA_BLOB CONTRACT_BLOB; do is40 "${!v}" || { echo "REFUSED: PINS.env $v not 40-hex (${!v})" >&2; exit 78; }; done
++for v in S10A_FREEZE_SHA BASE_SCHEMA_SHA PKG_LOCK_SHA PKG_JSON_SHA NM_HIDDEN_LOCK DONOR_CLIENT_INDEX_DTS DONOR_CLIENT_SCHEMA SHA_CONTRACT_JSON; do
+   is64 "${!v}" || { echo "REFUSED: PINS.env $v is not a 64-hex sha256 (${!v})" >&2; exit 78; }
+ done
+-[[ "$DOC_ADDED_LINES" =~ ^[1-9][0-9]*$ ]] && [[ "$DOC_LANDED_BYTES" =~ ^[1-9][0-9]*$ ]] || { echo "REFUSED: PINS.env DOC_ADDED_LINES/DOC_LANDED_BYTES unfilled or not a positive integer" >&2; exit 78; }
+-# OWNED_PINS: every sha filled, mode 644/755, state M/N, no duplicates, DOC not listed, required S9-C paths present
++for v in CLIENT_INDEX_DTS CLIENT_SCHEMA; do [ "${!v}" = RECORD ] || is64 "${!v}" || { echo "REFUSED: PINS.env $v must be RECORD or 64-hex (${!v})" >&2; exit 78; }; done
++for v in SCHEMA_ADDED_LINES BASE_MIGRATION_DIRS MIGRATION_DIRS S10A_FREEZE_COUNT LOCK_INODE; do [[ "${!v}" =~ ^[1-9][0-9]*$ ]] || { echo "REFUSED: PINS.env $v not a positive integer" >&2; exit 78; }; done
++[ "$MIGRATION_DIRS" = $((BASE_MIGRATION_DIRS + 1)) ] || { echo "REFUSED: MIGRATION_DIRS must be BASE_MIGRATION_DIRS + 1" >&2; exit 78; }
++# HARNESS_BASE_HEAD (harness BASE_HEAD literal, a4af8e33) is kept as an ANCESTOR of BASE; checked with git merge-base --is-ancestor before the lock (review B2)
++[ -f "$S10A_FREEZE" ] && [ "$(sha "$S10A_FREEZE")" = "$S10A_FREEZE_SHA" ] || { echo "REFUSED: S10-A FREEZE $S10A_FREEZE absent or sha != $S10A_FREEZE_SHA" >&2; exit 78; }
++S10A_FILES=$(awk '$1=="POST"{print $3}' "$S10A_FREEZE" | tr '\n' ' ')
++[ "$(echo $S10A_FILES | wc -w)" = "$S10A_FREEZE_COUNT" ] || { echo "REFUSED: FREEZE lists $(echo $S10A_FILES | wc -w) paths, want $S10A_FREEZE_COUNT" >&2; exit 78; }
++# OWNED_PINS: every sha filled, mode 644/755, state M/N, no duplicates, required S10-B paths present, nothing forbidden
+ MOD_FILES=""; NEW_FILES=""
+ while read -r s m st p; do [ -n "${p:-}" ] || continue
+   is64 "$s" || { echo "REFUSED: PINS.env OWNED_PINS sha for $p not filled ($s)" >&2; exit 78; }
+   case "$m" in 644|755) ;; *) echo "REFUSED: PINS.env OWNED_PINS mode for $p ($m)" >&2; exit 78;; esac
+   case "$st" in M) MOD_FILES="$MOD_FILES $p";; N) NEW_FILES="$NEW_FILES $p";; *) echo "REFUSED: PINS.env OWNED_PINS state for $p ($st; M or N)" >&2; exit 78;; esac
+-  [ "$p" != "$DOC" ] || { echo "REFUSED: the doc is pinned by SHA_DOC_ADDENDUM, not OWNED_PINS" >&2; exit 78; }
+ done <<< "$OWNED_PINS"
+-[ -z "$(printf '%s\n' $MOD_FILES $NEW_FILES | sort | uniq -d)" ] || { echo "REFUSED: PINS.env OWNED_PINS has duplicate paths" >&2; exit 78; }
+-for p in $REQUIRED_OWNED; do case " $MOD_FILES $NEW_FILES " in *" $p "*) ;; *) echo "REFUSED: PINS.env OWNED_PINS lacks required S9-C path $p" >&2; exit 78;; esac; done
+-for p in $MOD_FILES $NEW_FILES; do for fp in $FORBIDDEN_DELTA_PATHS; do case "$p" in "$fp"|"$fp"/*)
+-  case " $FORBIDDEN_EXCEPTIONS " in *" $p "*) ;; *) echo "REFUSED: owned $p is under forbidden $fp and not in FORBIDDEN_EXCEPTIONS" >&2; exit 78;; esac;; esac; done; done
+-for p in $FORBIDDEN_EXCEPTIONS; do case " $MOD_FILES $NEW_FILES " in *" $p "*) ;; *) echo "REFUSED: FORBIDDEN_EXCEPTIONS entry $p is not an owned path" >&2; exit 78;; esac; done
++DUPS=$(printf '%s\n' $MOD_FILES $NEW_FILES | sort | uniq -d)
++[ -z "$DUPS" ] || { echo "REFUSED: PINS.env OWNED_PINS has duplicate paths: $DUPS" >&2; exit 78; }
++for p in $REQUIRED_OWNED; do case " $MOD_FILES $NEW_FILES " in *" $p "*) ;; *) echo "REFUSED: PINS.env OWNED_PINS lacks required S10-B path $p" >&2; exit 78;; esac; done
++for p in $MOD_FILES $NEW_FILES; do
++  for fp in $FORBIDDEN_DELTA_PATHS $S10A_FILES $CONTRACT; do case "$p" in "$fp"|"$fp"/*) echo "REFUSED: owned $p is under forbidden $fp" >&2; exit 78;; esac; done
++  case "$p" in prisma/*) case "$p" in prisma/schema.prisma|"$S10B_MIG_DIR/migration.sql"|"$S10B_MIG_DIR/down.sql") ;; *) echo "REFUSED: owned prisma path $p is not schema/migration.sql/down.sql" >&2; exit 78;; esac;; esac
++done
+ [ -n "$SUITES" ] || { echo "REFUSED: PINS.env SUITES empty" >&2; exit 78; }
+-[ "$(printf '%s\n' "$OWNED_PINS" | awk -v p="$CONTRACT" '$4==p{print $1}')" = "$SHA_CONTRACT_JSON" ] || { echo "REFUSED: SHA_CONTRACT_JSON != OWNED_PINS sha of $CONTRACT" >&2; exit 78; }
+-[ "$(printf '%s\n' "$S9B_PINS" | awk 'NF' | wc -l)" = 10 ] || { echo "REFUSED: PINS.env S9B_PINS must list the 10 S9-B code/test paths" >&2; exit 78; }
+-S9B_FILES=$(printf '%s\n' "$S9B_PINS" | awk 'NF{print $3}' | tr '\n' ' ')
+-DONOR=$S9C_DONOR; B=$S9C_PRETTIER_PREFIX
+-FILES="$MOD_FILES $NEW_FILES $DOC"; MSG=$E/commit-message.txt
+-# prettier: owned .ts/.cjs/.md; never .sh (no parser) nor the contract artifact (.prettierignore, byte-pinned generator output)
+-PRETTIER_FILES=$(for f in $FILES; do case "$f" in *.sh|"$CONTRACT") ;; *) printf '%s ' "$f";; esac; done)
+-ESLINT_FILES=$(for f in $FILES; do case "$f" in *.ts|*.cjs) printf '%s ' "$f";; esac; done)
++for s in $SUITES; do [ -f "$W/$s" ] || { echo "REFUSED: suite $s absent in $W (S10-A specs arrive with BASE)" >&2; exit 78; }; done
++DONOR=$S10B_DONOR; B=$S10B_PRETTIER_PREFIX
++FILES="$MOD_FILES $NEW_FILES"; MSG=$E/commit-message.txt
++# prettier: owned .ts/.cjs only (the lefthook prettier glob never includes .prisma/.sql/.sh; prisma/migrations is .prettierignored)
++PRETTIER_FILES=$(for f in $FILES; do case "$f" in *.ts|*.cjs) printf '%s ' "$f";; esac; done)
++ESLINT_FILES=$PRETTIER_FILES
++NOFMT_FILES=$(for f in $FILES; do case "$f" in *.ts|*.cjs) ;; *) printf '%s ' "$f";; esac; done)
+ STAGED_EXPECT=$(printf '%s\n' $FILES | sort | tr '\n' ' ')
+-STATUS_EXPECT=$( { for f in $MOD_FILES $DOC; do echo " M $f"; done; for f in $NEW_FILES; do echo "?? $f"; done; } | sort | tr '\n' '|')
++STATUS_EXPECT=$( { for f in $MOD_FILES; do echo " M $f"; done; for f in $NEW_FILES; do echo "?? $f"; done; } | sort | tr '\n' '|')
+ N_SUITES=$(echo $SUITES | wc -w)
+-[ -f "$MSG" ] || { echo "REFUSED: commit message $MSG absent" >&2; exit 78; }
+-[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
+-# ---- lock: existing canonical file, recorded inode (PINS.env and LOCK_ESTABLISHED.txt must agree), nonblocking flock here
+-[ -e "$LOCK" ] || { log "REFUSED lock file absent"; exit 75; }
+-REC_INODE=$(sed -n 's/.*inode=\([0-9]*\).*/\1/p' "$LOCK_RECORD" | head -1)
+-CUR_INODE=$(stat -c %i "$LOCK")
+-[ -n "$REC_INODE" ] && [ "$CUR_INODE" = "$REC_INODE" ] && [ "$CUR_INODE" = "$LOCK_INODE" ] || { log "REFUSED lock inode $CUR_INODE != recorded $REC_INODE / pinned $LOCK_INODE"; exit 75; }
+-exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
+-date -u +%FT%TZ > "$E/STARTED"
+-log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(lslocks 2>/dev/null | grep -c test-validation || true) donor=$DONOR prefix=$B base=$H"
+-STAGE=preflight
+-finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
+-export NODE_OPTIONS=--max-old-space-size=4096 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false PRISMA_HIDE_UPDATE_MESSAGE=1
++[ -f "$MSG" ] && [ -s "$MSG" ] || { echo "REFUSED: commit message $MSG absent or empty" >&2; exit 78; }
++MSGTXT=$(cat "$MSG")
++! grep -iqE 'claude|anthropic|openai|gpt[- ]|computer[- ]agent|perplexity|co-authored[- ]by|signed-off-by|generated with|🤖|ai assist|\b(ai|agent)\b' <<<"$MSGTXT" || { echo "REFUSED: commit-message.txt carries a banned token or trailer" >&2; exit 78; }
++# ---- preconditions run BEFORE the sentinel and the lock (review B1): every pin/shape refusal here exits without writing
++# STARTED or TERMINAL, so a stale pin never consumes the one-shot grant. finish() is redefined after ACQUIRED.
++STAGE=preflight-prelock
++LOG=$E/prelock.log; export GIT_OPTIONAL_LOCKS=0   # pre-lock: own log (gate.log stays the run log), no optional git index writes
++[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }   # early (re-checked before the lock)
++finish(){ log "REFUSED_PRELOCK stage=$STAGE rc=$1 (no lock taken, STARTED not written; the grant is not consumed)"; exit "$1"; }
++export NODE_OPTIONS=--max-old-space-size=4096 npm_config_offline=true npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false \
++       PRISMA_HIDE_UPDATE_MESSAGE=1 CHECKPOINT_DISABLE=1 PRISMA_GENERATE_SKIP_AUTOINSTALL=1
+ export GIT_AUTHOR_NAME="Bradley Gleave" GIT_AUTHOR_EMAIL=bradley@bradleytgpcoaching.com GIT_COMMITTER_NAME="Bradley Gleave" GIT_COMMITTER_EMAIL=bradley@bradleytgpcoaching.com
+ log "node=$(node --version) npm=$(npm --version)"
+ cd "$W" || finish 70
+-[ "$(git rev-parse HEAD)" = "$H" ] || { log "PRECONDITION_FAIL HEAD $(git rev-parse HEAD) != BASE $H"; finish 70; }
++st_now(){ git status --porcelain --untracked-files=all | sort | tr '\n' '|'; }
++[ "$(git rev-parse HEAD)" = "$H" ] || { log "PRECONDITION_FAIL HEAD $(git rev-parse HEAD) != BASE $H (move the clone onto BASE first: README.md)"; finish 70; }
+ [ "$(git rev-parse 'HEAD^{tree}')" = "$BASE_TREE" ] || { log "PRECONDITION_FAIL BASE tree $(git rev-parse 'HEAD^{tree}') != $BASE_TREE"; finish 70; }
+ [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || { log "PRECONDITION_FAIL branch != $BRANCH"; finish 70; }
++[ "$(git rev-parse HEAD^)" = "$S10A_PARENT" ] || { log "PRECONDITION_FAIL BASE^ $(git rev-parse HEAD^) != $S10A_PARENT (S10-A must be ONE commit on $S10A_PARENT)"; finish 70; }
++git merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$BASE" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD is not an ancestor of BASE $BASE"; finish 78; }
++git merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$S10A_PARENT" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD is not an ancestor of S10A_PARENT $S10A_PARENT"; finish 78; }
+ [ -z "$(git config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath set"; finish 70; }
+ [ -z "$(git diff --cached --name-only)" ] || { log "PRECONDITION_FAIL index not clean vs HEAD (staged or intent-to-add entries): $(git diff --cached --name-only | tr '\n' ' ')"; finish 70; }
+-STATUS_NOW=$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')
++[ ! -e "$(git rev-parse --git-path MERGE_HEAD)" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; finish 70; }
++STATUS_NOW=$(st_now)
+ [ "$STATUS_NOW" = "$STATUS_EXPECT" ] || { log "PRECONDITION_FAIL status set: [$STATUS_NOW] expected [$STATUS_EXPECT]"; finish 70; }
+ chk(){ [ "$(sha "$1")" = "$2" ] || { log "PRECONDITION_FAIL $1 sha $(sha "$1") != $2"; finish 70; }; }
+ while read -r s m st p; do [ -n "${p:-}" ] || continue
+   chk "$p" "$s"
+   [ "$(stat -c %a "$p")" = "$m" ] || { log "PRECONDITION_FAIL $p mode $(stat -c %a "$p") != $m"; finish 70; }
+ done <<< "$OWNED_PINS"
+-# S9 decision doc: landed bytes at BASE; working copy = BASE bytes (byte-prefix) + Addendum B, +DOC_ADDED_LINES/-0
+-[ "$(git rev-parse "$H:$DOC")" = "$DOC_LANDED_BLOB" ] && [ "$(git show "$H:$DOC" | sha256sum | cut -c1-64)" = "$SHA_DOC_LANDED" ] || { log "PRECONDITION_FAIL committed doc at BASE != landed bytes $SHA_DOC_LANDED"; finish 70; }
+-chk "$DOC" "$SHA_DOC_ADDENDUM"
+-docprefix(){ [ "$(head -c "$DOC_LANDED_BYTES" "$DOC" | sha256sum | cut -c1-64)" = "$SHA_DOC_LANDED" ]; }
+-docprefix || { log "PRECONDITION_FAIL BASE doc bytes are not a byte-prefix of the working doc"; finish 70; }
+-[ "$(git diff --numstat -- "$DOC" | cut -f1,2)" = "$(printf '%s\t0' "$DOC_ADDED_LINES")" ] || { log "PRECONDITION_FAIL doc delta is not +$DOC_ADDED_LINES/-0: $(git diff --numstat -- "$DOC")"; finish 70; }
+-# the 10 other S9-B paths (and the S9-A four) at BASE: tracked, clean, accepted bytes
+-while read -r s b p; do [ -n "$p" ] || continue
+-  git ls-files --error-unmatch "$p" > /dev/null 2>&1 || { log "PRECONDITION_FAIL S9-B $p not tracked at BASE"; finish 70; }
+-  [ "$(git rev-parse "$H:$p")" = "$b" ] || { log "PRECONDITION_FAIL S9-B $p blob at BASE $(git rev-parse "$H:$p") != $b"; finish 70; }
++# S10-A at BASE: exactly the 14 FREEZE paths over S10A_PARENT, tracked, committed bytes = FREEZE, clean in the working tree
++S10A_DELTA=$(git diff --name-only "$S10A_PARENT" HEAD | sort | tr '\n' ' ')
++[ "$S10A_DELTA" = "$(printf '%s\n' $S10A_FILES | sort | tr '\n' ' ')" ] || { log "PRECONDITION_FAIL $S10A_PARENT..BASE delta [$S10A_DELTA] != the $S10A_FREEZE_COUNT FREEZE paths"; finish 70; }
++while read -r tag s p; do [ "$tag" = POST ] || continue
++  git ls-files --error-unmatch "$p" > /dev/null 2>&1 || { log "PRECONDITION_FAIL S10-A $p not tracked at BASE"; finish 70; }
++  [ "$(git show "HEAD:$p" | sha256sum | cut -c1-64)" = "$s" ] || { log "PRECONDITION_FAIL S10-A $p committed bytes != FREEZE $s"; finish 70; }
+   chk "$p" "$s"
+-done <<< "$S9B_PINS"
+-[ -z "$(git status --porcelain -- $S9B_FILES $S9A_FILES)" ] || { log "PRECONDITION_FAIL S9-B/S9-A files modified in working tree: $(git status --porcelain -- $S9B_FILES $S9A_FILES | tr '\n' ' ')"; finish 70; }
+-[ "$(git diff --name-only "$S9B_RANGE_FROM" "$S9B_RANGE_TO" | sort | tr '\n' ' ')" = "$(printf '%s\n' $S9B_FILES $DOC | sort | tr '\n' ' ')" ] || { log "PRECONDITION_FAIL S9-B range $S9B_RANGE_FROM..$S9B_RANGE_TO != the 11 pinned S9-B paths"; finish 70; }
+-[ ! -e node_modules ] || { log "PRECONDITION_FAIL node_modules already present (parent must set the clone's copy aside first)"; finish 70; }
+-chk prisma/schema.prisma "$SCHEMA_SHA"
+-chk package-lock.json "$PKG_LOCK_SHA"
++done < "$S10A_FREEZE"
++[ -z "$(git status --porcelain -- $S10A_FILES)" ] || { log "PRECONDITION_FAIL S10-A files modified in working tree"; finish 70; }
++[ ! -e node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules already present (parent must set the clone's copy aside first: README.md)"; finish 70; }
++# schema: BASE bytes pinned; the working schema is BASE + a pure addition of SCHEMA_ADDED_LINES lines
++[ "$(git rev-parse "HEAD:prisma/schema.prisma")" = "$BASE_SCHEMA_BLOB" ] && [ "$(git show HEAD:prisma/schema.prisma | sha256sum | cut -c1-64)" = "$BASE_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL schema at BASE != $BASE_SCHEMA_BLOB / $BASE_SCHEMA_SHA"; finish 70; }
++[ "$(git diff --numstat -- prisma/schema.prisma | cut -f1,2)" = "$(printf '%s\t0' "$SCHEMA_ADDED_LINES")" ] || { log "PRECONDITION_FAIL schema delta is not +$SCHEMA_ADDED_LINES/-0: $(git diff --numstat -- prisma/schema.prisma)"; finish 70; }
++SCHEMA_NOW=$(cat prisma/schema.prisma)
++for m_ in $S10B_MODELS; do grep -qE "^model $m_ \{" <<<"$SCHEMA_NOW" || { log "PRECONDITION_FAIL working schema lacks model $m_"; finish 70; }; done
++chk package-lock.json "$PKG_LOCK_SHA"; chk package.json "$PKG_JSON_SHA"
++[ -z "$(git status --porcelain --untracked-files=all -- package.json package-lock.json)" ] || { log "PRECONDITION_FAIL package manifests dirty"; finish 70; }
++PRISMA_ST=$(git status --porcelain --untracked-files=all -- prisma | sort | tr '\n' '|')
++[ "$PRISMA_ST" = "$(printf '%s\n' " M prisma/schema.prisma" "?? $S10B_MIG_DIR/down.sql" "?? $S10B_MIG_DIR/migration.sql" | sort | tr '\n' '|')" ] || { log "PRECONDITION_FAIL prisma status [$PRISMA_ST] != schema M + the S10-B migration.sql/down.sql"; finish 70; }
++# migrations: BASE 172 ending at S7-L (tree pinned); working tree 173 ending at the S10-B dir
+ [ "$(git rev-parse HEAD:prisma/migrations)" = "$MIGRATIONS_TREE" ] || { log "PRECONDITION_FAIL prisma/migrations tree at BASE != $MIGRATIONS_TREE"; finish 70; }
+-[ -z "$(git status --porcelain --untracked-files=all -- prisma package.json package-lock.json)" ] || { log "PRECONDITION_FAIL prisma/package manifests dirty in working tree"; finish 70; }
+-MIG_N=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l); MIG_LAST=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | tail -1)
+-[ "$MIG_N" = "$MIGRATION_DIRS" ] && [ "$MIG_LAST" = "$LAST_MIGRATION" ] || { log "PRECONDITION_FAIL migrations dirs=$MIG_N last=$MIG_LAST (pins $MIGRATION_DIRS/$LAST_MIGRATION; harness constants would need a rebase edit)"; finish 70; }
+-grep -q "export const EXPECTED_MIGRATIONS = $MIGRATION_DIRS;" test/utils/g2-s9c-pg-harness.ts && grep -q "export const S7L_MIGRATION = '$LAST_MIGRATION';" test/utils/g2-s9c-pg-harness.ts || { log "PRECONDITION_FAIL g2-s9c-pg-harness.ts constants != migration pins"; finish 70; }
+-grep -qx "EXPECTED_MIGRATIONS=$MIGRATION_DIRS" test/utils/g2-s9c-bootstrap.sh && grep -qx "S7L_MIGRATION=$LAST_MIGRATION" test/utils/g2-s9c-bootstrap.sh || { log "PRECONDITION_FAIL g2-s9c-bootstrap.sh constants != migration pins"; finish 70; }
+-for hk in pre-commit commit-msg; do [ ! -e ".git/hooks/$hk" ] || { log "PRECONDITION_FAIL .git/hooks/$hk already present"; finish 70; }; done
+-bash -n test/utils/g2-s9c-bootstrap.sh || { log "PRECONDITION_FAIL bootstrap.sh syntax"; finish 70; }
+-node --check test/utils/g2-s9c-worker.cjs || { log "PRECONDITION_FAIL worker.cjs syntax"; finish 70; }
+-pgrep -af "jest|tsc|prisma|postgres|prettier|lefthook|eslint" | grep -v "$$" | grep -v s9c-gate | tee -a "$LOG" | grep -q . && log "WARN other heavy processes present (recorded)"
+-# ---- 1 node_modules from the relayed donor (pinned to BASE's schema + lockfile); donor is read-only here
++BMIG=$(git ls-tree -d --name-only HEAD prisma/migrations/ | sed 's|^prisma/migrations/||' | sort)
++[ "$(wc -l <<<"$BMIG")" = "$BASE_MIGRATION_DIRS" ] && [ "$(tail -1 <<<"$BMIG")" = "$BASE_LAST_MIGRATION" ] || { log "PRECONDITION_FAIL BASE migrations $(wc -l <<<"$BMIG")/$(tail -1 <<<"$BMIG") != $BASE_MIGRATION_DIRS/$BASE_LAST_MIGRATION"; finish 70; }
++WMIG=$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
++[ "$(wc -l <<<"$WMIG")" = "$MIGRATION_DIRS" ] && [ "$(tail -1 <<<"$WMIG")" = "$LAST_MIGRATION" ] || { log "PRECONDITION_FAIL working migrations $(wc -l <<<"$WMIG")/$(tail -1 <<<"$WMIG") != $MIGRATION_DIRS/$LAST_MIGRATION"; finish 70; }
++[ "$(comm -13 <(echo "$BMIG") <(echo "$WMIG"))" = "$LAST_MIGRATION" ] && [ -z "$(comm -23 <(echo "$BMIG") <(echo "$WMIG"))" ] || { log "PRECONDITION_FAIL working migrations are not BASE + exactly $LAST_MIGRATION"; finish 70; }
++[ "$(ls -A "$S10B_MIG_DIR" | sort | tr '\n' ' ')" = "down.sql migration.sql " ] || { log "PRECONDITION_FAIL $S10B_MIG_DIR must hold exactly migration.sql + down.sql"; finish 70; }
++# harness literals (working bytes; the binding re-checks the committed bytes): 173, S10-B dir, base pin
++BOOT=$(cat test/utils/g2-s10b-bootstrap.sh); PGH=$(cat test/utils/g2-s10b-pg-harness.ts); DBTS=$(cat test/utils/g2-s10b-db.ts)
++grep -qx "EXPECTED_MIGRATIONS=$MIGRATION_DIRS" <<<"$BOOT" && grep -qx "S10B_MIGRATION=$LAST_MIGRATION" <<<"$BOOT" && grep -qx "S7L_MIGRATION=$BASE_LAST_MIGRATION" <<<"$BOOT" \
++  && grep -qx "BASE_HEAD=$HARNESS_BASE_HEAD" <<<"$BOOT" || { log "PRECONDITION_FAIL g2-s10b-bootstrap.sh constants != pins"; finish 70; }
++grep -qF "export const EXPECTED_MIGRATIONS = $MIGRATION_DIRS;" <<<"$PGH" && grep -qF "export const S10B_MIGRATION = '$LAST_MIGRATION';" <<<"$PGH" || { log "PRECONDITION_FAIL g2-s10b-pg-harness.ts constants != pins"; finish 70; }
++grep -qF "G2_S10B_BASE_HEAD = '$HARNESS_BASE_HEAD'" <<<"$DBTS" || { log "PRECONDITION_FAIL g2-s10b-db.ts G2_S10B_BASE_HEAD != $HARNESS_BASE_HEAD"; finish 70; }
++# contract: not owned; BASE blob pinned; working file = BASE bytes
++[ "$(git rev-parse "HEAD:$CONTRACT")" = "$CONTRACT_BLOB" ] && [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { log "PRECONDITION_FAIL $CONTRACT at BASE/working != $CONTRACT_BLOB / $SHA_CONTRACT_JSON"; finish 70; }
++# hooks: pre-existing hooks are a refusal, never overwritten (lesson 2). Set-aside is a PARENT step, README.md.
++# symlink-aware (review A B-1): an occupied path is refused whether it is a file, a directory or a symlink (dangling or not);
++# the hooks dir itself must be the plain .git/hooks directory of this clone.
++[ "$(git rev-parse --git-path hooks)" = .git/hooks ] && [ -d .git/hooks ] && [ ! -L .git/hooks ] || { log "PRECONDITION_FAIL hooks dir is not the plain .git/hooks directory ($(git rev-parse --git-path hooks))"; finish 70; }
++for hk in pre-commit commit-msg; do hp=.git/hooks/$hk; if [ -e "$hp" ] || [ -L "$hp" ]; then
++  if [ -L "$hp" ]; then what="symlink -> $(readlink "$hp")"; elif [ -f "$hp" ]; then what="file sha256 $(sha "$hp")"; else what="non-regular path"; fi
++  log "PRECONDITION_FAIL $hp already occupied ($what); parent must set it aside per README.md 'Hook set-aside' and relay again"; finish 70; fi; done
++bash -n test/utils/g2-s10b-bootstrap.sh || { log "PRECONDITION_FAIL bootstrap.sh syntax"; finish 70; }
++node --check test/utils/g2-s10b-worker.cjs || { log "PRECONDITION_FAIL worker.cjs syntax"; finish 70; }
++log "PRECONDITIONS_OK (pre-lock) base=$H base_parent=$S10A_PARENT harness_base=$HARNESS_BASE_HEAD"
++LOG=$E/gate.log; unset GIT_OPTIONAL_LOCKS
++[ ! -e "$E/STARTED" ] || { echo "REFUSED: $E/STARTED exists; this gate is one-shot, do not loop" >&2; exit 76; }
++# ---- lock: existing canonical file, recorded inode (PINS.env and LOCK_ESTABLISHED.txt must agree), nonblocking flock here
++[ -e "$LOCK" ] || { log "REFUSED lock file absent"; exit 75; }
++REC_INODE=$(sed -n 's/.*inode=\([0-9]*\).*/\1/p' "$LOCK_RECORD" | head -1)
++CUR_INODE=$(stat -c %i "$LOCK")
++[ -n "$REC_INODE" ] && [ "$CUR_INODE" = "$REC_INODE" ] && [ "$CUR_INODE" = "$LOCK_INODE" ] || { log "REFUSED lock inode $CUR_INODE != recorded $REC_INODE / pinned $LOCK_INODE"; exit 75; }
++exec 9>>"$LOCK"; flock -n 9 || { log "REFUSED canonical lock busy (live holder); not waiting, not stealing"; exit 75; }
++date -u +%FT%TZ > "$E/STARTED"
++LSL=$(lslocks 2>/dev/null); log "ACQUIRED pid=$$ fd9 inode=$CUR_INODE lslocks=$(grep -c test-validation <<<"$LSL") donor=$DONOR prefix=$B base=$H"
++STAGE=preflight
++finish(){ unset npm_config_prefix; log "RELEASING stage=$STAGE rc=$1 (fd9 closes at exit; lock file preserved)"; printf 'RC=%s STAGE=%s END=%s\n' "$1" "$STAGE" "$(ts)" > "$E/TERMINAL"; exit "$1"; }
++# re-verify, under the lock, the state that could have moved between the pre-lock checks and ACQUIRED
++[ "$(git rev-parse HEAD)" = "$H" ] && [ "$(st_now)" = "$STATUS_EXPECT" ] && [ -z "$(git diff --cached --name-only)" ] || { log "PRECONDITION_FAIL HEAD/status/index moved after the pre-lock checks"; finish 70; }
++for hk in pre-commit commit-msg; do { [ -e ".git/hooks/$hk" ] || [ -L ".git/hooks/$hk" ]; } && { log "PRECONDITION_FAIL .git/hooks/$hk appeared after the pre-lock checks"; finish 70; }; done
++[ ! -e node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules appeared after the pre-lock checks"; finish 70; }
++while read -r s m st p; do [ -n "${p:-}" ] || continue; chk "$p" "$s"; done <<< "$OWNED_PINS"
++HEAVY=$(pgrep -af "jest|tsc|prisma|postgres|prettier|lefthook|eslint" | grep -v -e "^$$ " -e s10b-gate || true)
++[ -z "$HEAVY" ] || { printf '%s\n' "$HEAVY" >> "$LOG"; log "WARN other heavy processes present (recorded)"; }
++# ---- 1 node_modules: isolated real copy of the relayed donor (donor is read-only here)
+ STAGE=node_modules
+ DONOR_REPO=$(dirname "$DONOR")
+-log "DONOR_HEAD=$(git -C "$DONOR_REPO" rev-parse HEAD 2>/dev/null || echo n/a) DONOR_HIDDEN_LOCK=$(sha "$DONOR/.package-lock.json" 2>/dev/null || echo absent) DONOR_CLIENT_INDEX_DTS=$(sha "$DONOR/.prisma/client/index.d.ts" 2>/dev/null || echo absent) DONOR_CLIENT_SCHEMA=$(sha "$DONOR/.prisma/client/schema.prisma" 2>/dev/null || echo absent) DONOR_ENTRIES=$(ls "$DONOR" | wc -l)"
+-[ "$(sha "$DONOR/.package-lock.json")" = "$NM_HIDDEN_LOCK" ] || { log "PRECONDITION_FAIL donor hidden lock != $NM_HIDDEN_LOCK (donor must be npm ci of package-lock $PKG_LOCK_SHA)"; finish 71; }
+-GEN_NEEDED=0
+-if [ "$(sha "$DONOR/.prisma/client/index.d.ts" 2>/dev/null)" != "$CLIENT_INDEX_DTS" ] || [ "$(sha "$DONOR/.prisma/client/schema.prisma" 2>/dev/null)" != "$CLIENT_SCHEMA" ]; then
+-  GEN_NEEDED=1; log "DONOR_CLIENT_MISMATCH donor prisma client is not BASE's; in-lane prisma generate from the committed schema $SCHEMA_SHA will follow the copy (RT-2 S7-L precedent), result must equal $CLIENT_INDEX_DTS / $CLIENT_SCHEMA"
+-fi
+-DSIG_BEFORE=$(find "$DONOR" -maxdepth 1 -printf '%p %T@\n' | sort | sha256sum | cut -c1-64)
++dsig(){ find "$DONOR/.prisma" "$DONOR/@prisma/client" -printf '%P %s %T@ %m\n' 2>/dev/null | sort | sha256sum | cut -c1-64; }
++D_IDX0=$(sha "$DONOR/.prisma/client/index.d.ts" 2>/dev/null || echo absent); D_SCH0=$(sha "$DONOR/.prisma/client/schema.prisma" 2>/dev/null || echo absent); D_SIG0=$(dsig)
++log "DONOR_HEAD=$(git -C "$DONOR_REPO" rev-parse HEAD 2>/dev/null || echo n/a) DONOR_HIDDEN_LOCK=$(sha "$DONOR/.package-lock.json" 2>/dev/null || echo absent) DONOR_CLIENT_INDEX_DTS=$D_IDX0 DONOR_CLIENT_SCHEMA=$D_SCH0 DONOR_PRISMA_SIG=$D_SIG0 DONOR_ENTRIES=$(ls "$DONOR" | wc -l)"
++[ "$(sha "$DONOR/.package-lock.json")" = "$NM_HIDDEN_LOCK" ] || { log "PRECONDITION_FAIL donor hidden lock != $NM_HIDDEN_LOCK"; finish 71; }
++[ "$D_IDX0" = "$DONOR_CLIENT_INDEX_DTS" ] && [ "$D_SCH0" = "$DONOR_CLIENT_SCHEMA" ] || { log "PRECONDITION_FAIL donor client != pinned pre-S10-B client ($DONOR_CLIENT_INDEX_DTS / $DONOR_CLIENT_SCHEMA); not the expected donor"; finish 71; }
+ t0=$(date +%s); cp -a "$DONOR" node_modules; rc=$?
+-log "CP_A rc=$rc secs=$(( $(date +%s)-t0 )) NM_ENTRIES=$(ls node_modules | wc -l) NM_HIDDEN_LOCK=$(sha node_modules/.package-lock.json 2>/dev/null || echo absent) NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent)"
++log "CP_A rc=$rc secs=$(( $(date +%s)-t0 )) NM_ENTRIES=$(ls node_modules | wc -l) NM_HIDDEN_LOCK=$(sha node_modules/.package-lock.json 2>/dev/null || echo absent) df_avail=$(df -Pk . | awk 'NR==2{print $4}')K"
+ [ $rc = 0 ] || finish 71
+-[ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules is a symlink"; finish 71; }
++[ -d node_modules ] && [ ! -L node_modules ] || { log "PRECONDITION_FAIL node_modules is not a real directory"; finish 71; }
+ [ "$(sha node_modules/.package-lock.json)" = "$NM_HIDDEN_LOCK" ] || { log "PRECONDITION_FAIL copied hidden lock"; finish 71; }
+-[ "$(find "$DONOR" -maxdepth 1 -printf '%p %T@\n' | sort | sha256sum | cut -c1-64)" = "$DSIG_BEFORE" ] || log "WARN donor top-level signature changed during copy (recorded)"
+-if [ $GEN_NEEDED = 1 ]; then
+-  STAGE=prisma_generate
+-  timeout --foreground 600 npx --no-install prisma generate > "$E/prisma-generate.log" 2>&1; rc=$?; log "PRISMA_GENERATE_INLANE rc=$rc (writes only $W/node_modules/.prisma, never the donor)"; [ $rc = 0 ] || finish 71
+-  [ "$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')" = "$STATUS_EXPECT" ] || { log "PRECONDITION_FAIL prisma generate changed the status set"; finish 71; }
+-fi
+-log "NM_CLIENT_INDEX_DTS=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent) NM_CLIENT_SCHEMA=$(sha node_modules/.prisma/client/schema.prisma 2>/dev/null || echo absent)"
+-[ "$(sha node_modules/.prisma/client/index.d.ts)" = "$CLIENT_INDEX_DTS" ] && [ "$(sha node_modules/.prisma/client/schema.prisma)" = "$CLIENT_SCHEMA" ] || { log "PRECONDITION_FAIL in-lane prisma client != BASE pins; refusing (no repin)"; finish 71; }
++# the generate target must resolve inside $W: @prisma/client, .prisma and prisma are real dirs in the copy, not links to the donor
++for d in node_modules/@prisma/client node_modules/.prisma node_modules/.prisma/client node_modules/prisma; do
++  [ -d "$d" ] && [ ! -L "$d" ] || { log "PRECONDITION_FAIL $d missing or a symlink"; finish 71; }
++  case "$(readlink -f "$d")" in "$W"/*) ;; *) log "PRECONDITION_FAIL $d resolves outside $W"; finish 71;; esac
++done
++ABS_LINKS=$(find node_modules/.prisma node_modules/@prisma node_modules/prisma -type l -lname '/*' 2>/dev/null)
++[ -z "$ABS_LINKS" ] || { log "PRECONDITION_FAIL absolute symlinks in the copied prisma tree: $(echo $ABS_LINKS)"; finish 71; }
++PV=$(./node_modules/.bin/prisma --version 2>/dev/null); PV=$(awk '/^prisma /{print $3}' <<<"$PV")
++[ "$PV" = "$PRISMA_EXPECT" ] || { log "PRECONDITION_FAIL prisma CLI $PV != $PRISMA_EXPECT"; finish 71; }
++# ---- 1b forced in-lane prisma generate (lesson 5): the donor client is the pre-S10-B client; tsc/jest need the three models
++STAGE=prisma_generate
++timeout --foreground 600 ./node_modules/.bin/prisma generate --schema prisma/schema.prisma > "$E/prisma-generate.log" 2>&1; rc=$?
++log "PRISMA_GENERATE_INLANE rc=$rc cwd=$W cli=$W/node_modules/.bin/prisma out=$W/node_modules/.prisma/client (never the donor)"; [ $rc = 0 ] || { tail -30 "$E/prisma-generate.log" >> "$LOG"; finish 71; }
++D_IDX1=$(sha "$DONOR/.prisma/client/index.d.ts" 2>/dev/null || echo absent); D_SCH1=$(sha "$DONOR/.prisma/client/schema.prisma" 2>/dev/null || echo absent); D_SIG1=$(dsig)
++[ "$D_IDX1" = "$D_IDX0" ] && [ "$D_SCH1" = "$D_SCH0" ] && [ "$D_SIG1" = "$D_SIG0" ] || { log "DONOR_CHANGED donor .prisma/@prisma/client changed during the gate (index $D_IDX0->$D_IDX1 schema $D_SCH0->$D_SCH1 sig $D_SIG0->$D_SIG1); refusing"; finish 71; }
++log "DONOR_UNCHANGED index=$D_IDX1 schema=$D_SCH1 sig=$D_SIG1"
++[ "$(st_now)" = "$STATUS_EXPECT" ] || { log "PRECONDITION_FAIL prisma generate changed the status set"; finish 71; }
++NM_IDX=$(sha node_modules/.prisma/client/index.d.ts 2>/dev/null || echo absent); NM_SCH=$(sha node_modules/.prisma/client/schema.prisma 2>/dev/null || echo absent)
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++NM_ENG=$(sha "node_modules/.prisma/client/$ENGINE" 2>/dev/null || echo absent); PIN_ENG=$(sha "node_modules/@prisma/engines/$ENGINE" 2>/dev/null || echo absent)
++log "NM_CLIENT_INDEX_DTS=$NM_IDX NM_CLIENT_SCHEMA=$NM_SCH NM_CLIENT_ENGINE=$NM_ENG PINNED_ENGINE=$PIN_ENG"
++[ "$NM_IDX" != absent ] && [ "$NM_IDX" != "$DONOR_CLIENT_INDEX_DTS" ] || { log "PRECONDITION_FAIL in-lane client index.d.ts absent or still the donor's pre-S10-B client"; finish 71; }
++[ "$NM_ENG" = "$PIN_ENG" ] && [ "$NM_ENG" != absent ] || { log "PRECONDITION_FAIL in-lane client engine != pinned @prisma/engines copy"; finish 71; }
++CSCH=$(cat node_modules/.prisma/client/schema.prisma 2>/dev/null)
++for m_ in $S10B_MODELS; do grep -qE "^model $m_ \{" <<<"$CSCH" || { log "PRECONDITION_FAIL in-lane client schema lacks model $m_"; finish 71; }; done
++[ "$CLIENT_INDEX_DTS" = RECORD ] || [ "$NM_IDX" = "$CLIENT_INDEX_DTS" ] || { log "PRECONDITION_FAIL in-lane client index.d.ts != pinned $CLIENT_INDEX_DTS"; finish 71; }
++[ "$CLIENT_SCHEMA" = RECORD ] || [ "$NM_SCH" = "$CLIENT_SCHEMA" ] || { log "PRECONDITION_FAIL in-lane client schema.prisma != pinned $CLIENT_SCHEMA"; finish 71; }
++log "POSTGEN_CLIENT index_dts=$NM_IDX schema=$NM_SCH (binding EXPECT_NM_CLIENT_SHA = index_dts)"
+ [ ! -e node_modules/.bin/prettier ] || { log "PRECONDITION_FAIL prettier inside product tree"; finish 71; }
+-for b in tsc jest eslint lefthook ts-node; do [ -x node_modules/.bin/$b ] || { log "PRECONDITION_FAIL node_modules/.bin/$b missing"; finish 71; }; done
+-log "LEFTHOOK_VERSION=$(./node_modules/.bin/lefthook version 2>&1 | head -1)"
++for b in tsc jest eslint lefthook ts-node prisma; do [ -x node_modules/.bin/$b ] || { log "PRECONDITION_FAIL node_modules/.bin/$b missing"; finish 71; }; done
+ # ---- 2 genuine hooks into THIS clone (lefthook from the copied node_modules; nothing shared)
+ STAGE=hooks
+ npx --no-install lefthook install > "$E/lefthook-install.log" 2>&1; rc=$?; log "LEFTHOOK_INSTALL rc=$rc"; [ $rc = 0 ] || finish 71
+ for hk in pre-commit commit-msg; do [ -x ".git/hooks/$hk" ] || { log "HOOK_FAIL .git/hooks/$hk missing or not executable"; finish 71; }; done
+-LHV=$(./node_modules/.bin/lefthook version 2>&1 | head -1 | tr -d '[:space:]'); log "LEFTHOOK_VERSION_CHECK=$LHV expect=$LEFTHOOK_EXPECT"
++LHV=$(./node_modules/.bin/lefthook version 2>&1); LHV=$(head -1 <<<"$LHV" | tr -d '[:space:]'); log "LEFTHOOK_VERSION_CHECK=$LHV expect=$LEFTHOOK_EXPECT"
+ [ "$LHV" = "$LEFTHOOK_EXPECT" ] || { log "HOOK_FAIL lefthook version != $LEFTHOOK_EXPECT"; finish 71; }
+ HP=$(sha .git/hooks/pre-commit); HC=$(sha .git/hooks/commit-msg)
+ normhook(){ sed "s|$2|@CLONE_ROOT@|g" "$1" | sha256sum | cut -c1-64; }
+@@ -194,7 +272,7 @@
+ [ $rc = 0 ] && [ "$(readlink "$B/bin/prettier")" = "../lib/node_modules/prettier/bin/prettier.cjs" ] || finish 71
+ export npm_config_prefix="$B"
+ V=$(npx --no-install prettier --version 2>>"$LOG"); log "NPX_PRETTIER_VERSION=$V"; [ "$V" = "$PRETTIER_EXPECT" ] || finish 71
+-# ---- 4 preformat copies of EVERY owned path (before any write), then prettier on OWNED paths only
++# ---- 4 preformat copies of EVERY owned path (before any write), then prettier on owned .ts/.cjs only
+ STAGE=preformat
+ mkdir -p "$E/preformat"
+ for f in $FILES; do cp -p "$f" "$E/preformat/$(flat "$f")" || { log "PREFORMAT_COPY_FAIL $f"; finish 72; }; log "PREFORMAT $f sha256=$(sha "$f") lines=$(wc -l < "$f")"; done
+@@ -202,7 +280,7 @@
+ log "PRETTIER_FILES=$PRETTIER_FILES"
+ npx --no-install prettier --check $PRETTIER_FILES > "$E/prettier-check-1.log" 2>&1; rc=$?; log "PRETTIER_CHECK_1 rc=$rc"
+ if [ $rc != 0 ]; then
+-  TOFIX=$(grep '^\[warn\] ' "$E/prettier-check-1.log" | sed 's/^\[warn\] //' | grep -v 'Code style issues' | grep -v 'Run Prettier' || true)
++  TOFIX=$(sed -n 's/^\[warn\] //p' "$E/prettier-check-1.log" | grep -v -e 'Code style issues' -e 'Run Prettier' || true)
+   log "PRETTIER_TOFIX=$(echo $TOFIX)"
+   [ -n "$TOFIX" ] || { log "PRETTIER_FAIL check failed without a [warn] list (parser/config error):"; tail -20 "$E/prettier-check-1.log" >> "$LOG"; finish 72; }
+   for f in $TOFIX; do case " $PRETTIER_FILES " in *" $f "*) ;; *) log "PRETTIER_SCOPE_FAIL $f not in owned prettier set"; finish 72;; esac; done
+@@ -211,34 +289,38 @@
+ fi
+ mkdir -p "$E/postformat"
+ for f in $FILES; do log "POSTFORMAT $f sha256=$(sha "$f") lines=$(wc -l < "$f")"; cp -p "$f" "$E/postformat/$(flat "$f")"; done
+-[ "$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by formatting: $(git status --porcelain | tr '\n' ' ')"; finish 72; }
++[ "$(st_now)" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by formatting: $(git status --porcelain | tr '\n' ' ')"; finish 72; }
++for f in $NOFMT_FILES; do [ "$(sha "$f")" = "$(printf '%s\n' "$OWNED_PINS" | awk -v p="$f" '$4==p{print $1}')" ] || { log "SCOPE_FAIL non-prettier owned file $f changed during formatting"; finish 72; }; done
+ [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { log "SCOPE_FAIL contract artifact changed during formatting"; finish 72; }
+-[ "$(sha test/utils/g2-s9c-bootstrap.sh)" = "$(printf '%s\n' "$OWNED_PINS" | awk '$4=="test/utils/g2-s9c-bootstrap.sh"{print $1}')" ] || { log "SCOPE_FAIL bootstrap.sh changed during formatting"; finish 72; }
+-[ "$(git diff --numstat -- "$DOC" | cut -f2)" = 0 ] && docprefix || { log "SCOPE_FAIL prettier touched landed doc text (deletions != 0 or BASE bytes no longer a prefix): $(git diff --numstat -- "$DOC")"; finish 72; }
+-log "DOC_DELTA_POSTFORMAT $(git diff --numstat -- "$DOC" | cut -f1,2 | tr '\t' /) (pre-format $DOC_ADDED_LINES/0; additions may differ only by prettier reflow of Addendum B)"
+-# ---- 5 eslint on owned .ts/.cjs (repo config: no-unused-vars is warn, --max-warnings 0 makes it fatal)
++# ---- 4b R75 early on the post-format bytes (lesson 4: gate-1 of S9-C lost a full jest run to a late R75 stop).
++#      Stage the owned set, run the staged checker, then restore the index to BASE (status set re-verified).
++STAGE=r75_early
++git add -- $FILES || { log "R75_EARLY stage failed"; git reset -q; finish 74; }
++node scripts/check-r75.js --mode=staged > "$E/r75-early.raw.log" 2>&1; rc=$?
++git reset -q || { log "R75_EARLY index restore failed"; finish 74; }
++log "R75_EARLY rc=$rc (index restored)"; [ $rc = 0 ] || { tail -40 "$E/r75-early.raw.log" >> "$LOG"; finish 74; }
++[ -z "$(git diff --cached --name-only)" ] && [ "$(st_now)" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL index/status not restored after R75 early"; finish 74; }
++# ---- 5 eslint on owned .ts/.cjs (repo config: --max-warnings 0)
+ STAGE=eslint
+ npx --no-install eslint --no-warn-ignored --max-warnings 0 $ESLINT_FILES > "$E/eslint.raw.log" 2>&1; rc=$?; log "ESLINT rc=$rc files=$(echo $ESLINT_FILES | wc -w)"; [ $rc = 0 ] || { tail -60 "$E/eslint.raw.log" >> "$LOG"; finish 74; }
+-# ---- 6 tsc (whole repo; tsconfig has no include so test/ is type-checked)
++# ---- 6 tsc (whole repo, against the in-lane regenerated client)
+ STAGE=tsc
+ npx --no-install tsc --noEmit > "$E/tsc.raw.log" 2>&1; rc=$?; log "TSC rc=$rc lines=$(wc -l < "$E/tsc.raw.log")"; [ $rc = 0 ] || { tail -60 "$E/tsc.raw.log" >> "$LOG"; finish 73; }
+-# ---- 7 R75 banned-cast checker: no working-tree mode at BASE (accepted S9-B d3a9 narrow fix); enforced at STAGE=stage + hook
+-STAGE=r75
+-log "R75_WORKTREE not run: scripts/check-r75.js at BASE has only --mode=staged|range (no worktree mode; S9B-GATE-2 rc=2). R75 is enforced by --mode=staged at STAGE=stage and by the pre-commit hook."
+-# ---- 8 contract: re-export must be byte-stable (the committed artifact is generator output, never hand-edited)
++# ---- 7 contract NO-change (D-S10-8: OpenAPI bytes are not S10-B's; S10-C regenerates). Scratch export, canonical untouched.
+ STAGE=contract
+-cp -p "$CONTRACT" "$E/importer-openapi.before.json"
+-timeout --foreground 900 npm run -s contract:importer > "$E/contract-gen.log" 2>&1; rc=$?
+-log "CONTRACT_GEN rc=$rc $(tail -1 "$E/contract-gen.log") sha256=$(sha "$CONTRACT")"
++git show "HEAD:$CONTRACT" > "$E/importer-openapi.base.json"
++IMPORTER_CONTRACT_OUT="$E/contract-regen.json" timeout --foreground 900 npm run -s contract:importer > "$E/contract-gen.log" 2>&1; rc=$?
++log "CONTRACT_GEN rc=$rc out=$E/contract-regen.json sha256=$(sha "$E/contract-regen.json" 2>/dev/null || echo absent)"
+ [ $rc = 0 ] || { tail -40 "$E/contract-gen.log" >> "$LOG"; finish 73; }
+-cmp -s "$CONTRACT" "$E/importer-openapi.before.json" && [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { cp -p "$CONTRACT" "$E/importer-openapi.after.json"; git diff --stat -- "$CONTRACT" >> "$LOG"; log "CONTRACT_DRIFT npm run contract:importer changed $CONTRACT (not regen-stable; after-copy preserved); refusing"; finish 73; }
+-[ "$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by contract export: $(git status --porcelain | tr '\n' ' ')"; finish 73; }
+-log "CONTRACT_STABLE sha256=$SHA_CONTRACT_JSON"
++cmp -s "$E/contract-regen.json" "$E/importer-openapi.base.json" || { log "CONTRACT_CHANGE the S10-B tree regenerates a different importer contract than BASE (S10-B must not change routes in the contract; scratch copy preserved); refusing"; finish 73; }
++[ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] && [ -z "$(git status --porcelain -- "$CONTRACT")" ] || { log "CONTRACT_DRIFT canonical $CONTRACT touched"; finish 73; }
++[ "$(st_now)" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by contract export"; finish 73; }
++log "CONTRACT_NO_CHANGE sha256=$SHA_CONTRACT_JSON (scratch regen byte-identical to BASE)"
+ ./node_modules/.bin/jest --ci --runTestsByPath test/contracts/importer-contract.spec.ts > "$E/jest-contract.raw.log" 2>&1; rc=$?; log "JEST_CONTRACT rc=$rc"
+ grep -E '^(Tests|Test Suites):' "$E/jest-contract.raw.log" | tee -a "$LOG"
+ [ $rc = 0 ] || { grep -E '✕|●' "$E/jest-contract.raw.log" | head -60 >> "$LOG"; finish 73; }
+ [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { log "CONTRACT_DRIFT contract spec changed $CONTRACT"; finish 73; }
+-# ---- 9 jest targeted (default config, no PG), then the full default suite once
++# ---- 8 jest targeted (default config, no PG), then the full default suite once (test/rls-*.spec.ts are ignored there)
+ STAGE=jest
+ ./node_modules/.bin/jest --ci --runTestsByPath $SUITES > "$E/jest.raw.log" 2>&1; rc=$?; log "JEST_TARGETED rc=$rc suites_expected=$N_SUITES"
+ grep -E '^(Tests|Test Suites|Snapshots|Time):' "$E/jest.raw.log" | tee -a "$LOG"
+@@ -248,14 +330,15 @@
+ t0=$(date +%s); timeout --foreground 4200 ./node_modules/.bin/jest --ci > "$E/jest-full.raw.log" 2>&1; rc=$?; log "JEST_FULL rc=$rc secs=$(( $(date +%s)-t0 ))"
+ grep -E '^(Tests|Test Suites|Snapshots|Time):' "$E/jest-full.raw.log" | tee -a "$LOG"
+ [ $rc = 0 ] || { grep -E '✕|●' "$E/jest-full.raw.log" | head -60 >> "$LOG"; finish 73; }
+-[ "$(git status --porcelain --untracked-files=all | sort | tr '\n' '|')" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by tests: $(git status --porcelain | tr '\n' ' ')"; finish 73; }
++[ "$(st_now)" = "$STATUS_EXPECT" ] || { log "SCOPE_FAIL status set changed by tests: $(git status --porcelain | tr '\n' ' ')"; finish 73; }
+ [ "$(sha "$CONTRACT")" = "$SHA_CONTRACT_JSON" ] || { log "CONTRACT_DRIFT tests changed $CONTRACT"; finish 73; }
+-# ---- 10 stage exactly the owned paths + R75 staged + one genuine hooked commit
++[ "$(sha node_modules/.prisma/client/index.d.ts)" = "$NM_IDX" ] || { log "SCOPE_FAIL in-lane client changed during tests"; finish 73; }
++# ---- 9 stage exactly the owned paths + R75 staged + one genuine hooked commit
+ STAGE=stage
+ git add -- $FILES
+ [ "$(git diff --cached --name-only | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] || { log "STAGED_SET_FAIL $(git diff --cached --name-only | tr '\n' ' ')"; finish 70; }
+ while read -r s m st p; do [ -n "${p:-}" ] || continue
+-  [ "$(git ls-files -s -- "$p" | cut -d' ' -f1)" = "100$m" ] || { log "STAGED_MODE_FAIL $p index mode $(git ls-files -s -- "$p" | cut -d' ' -f1) != 100$m"; finish 70; }
++  LS=$(git ls-files -s -- "$p"); [ "${LS%% *}" = "100$m" ] || { log "STAGED_MODE_FAIL $p index mode ${LS%% *} != 100$m"; finish 70; }
+ done <<< "$OWNED_PINS"
+ TREE=$(git write-tree); log "STAGED_TREE=$TREE"
+ for f in $FILES; do log "STAGED_BLOB $f $(git rev-parse ":$f")"; done
+@@ -268,22 +351,30 @@
+ [ "$(git rev-parse HEAD^)" = "$H" ] && [ -z "$(git status --porcelain --untracked-files=all)" ] || { log "LINEAGE_FAIL"; finish 76; }
+ [ "$HTREE" = "$TREE" ] || { log "TREE_FAIL committed tree $HTREE != staged tree $TREE (hook modified the index?)"; finish 76; }
+ [ "$(git diff --name-only "$H" HEAD | sort | tr '\n' ' ')" = "$STAGED_EXPECT" ] || { log "DELTA_FAIL"; finish 76; }
+-FORB=$(git diff --name-only "$H" HEAD -- $FORBIDDEN_DELTA_PATHS $S9B_FILES $S9A_FILES | while read -r p; do case " $FORBIDDEN_EXCEPTIONS " in *" $p "*) ;; *) echo "$p";; esac; done)
++FORB=$(git diff --name-only "$H" HEAD -- $FORBIDDEN_DELTA_PATHS $S10A_FILES "$CONTRACT")
+ [ -z "$FORB" ] || { log "DELTA_FAIL forbidden path in delta: $(echo $FORB)"; finish 76; }
+-[ "$(git diff --numstat "$H" HEAD -- "$DOC" | cut -f2)" = 0 ] && [ "$(git show "HEAD:$DOC" | head -c "$DOC_LANDED_BYTES" | sha256sum | cut -c1-64)" = "$SHA_DOC_LANDED" ] || { log "DELTA_FAIL committed doc is not BASE bytes + appended Addendum B"; finish 76; }
++PD=$(git diff --name-only "$H" HEAD -- prisma | sort | tr '\n' ' ')
++[ "$PD" = "$S10B_MIG_DIR/down.sql $S10B_MIG_DIR/migration.sql prisma/schema.prisma " ] || { log "DELTA_FAIL prisma delta [$PD]"; finish 76; }
++[ -z "$(git diff --name-only --diff-filter=DMR "$H" HEAD -- prisma/migrations)" ] || { log "DELTA_FAIL an accepted migration was modified/renamed/deleted"; finish 76; }
++[ "$(git diff --numstat "$H" HEAD -- prisma/schema.prisma | cut -f1,2)" = "$(printf '%s\t0' "$SCHEMA_ADDED_LINES")" ] || { log "DELTA_FAIL committed schema delta != +$SCHEMA_ADDED_LINES/-0"; finish 76; }
++[ "$(git ls-tree -d --name-only HEAD prisma/migrations/ | wc -l)" = "$MIGRATION_DIRS" ] || { log "DELTA_FAIL committed migrations != $MIGRATION_DIRS"; finish 76; }
++[ "$(git rev-parse "HEAD:$CONTRACT")" = "$CONTRACT_BLOB" ] || { log "DELTA_FAIL committed contract blob != BASE"; finish 76; }
+ [ "$(git log -1 --format='%an <%ae>|%cn <%ce>')" = "Bradley Gleave <bradley@bradleytgpcoaching.com>|Bradley Gleave <bradley@bradleytgpcoaching.com>" ] || { log "IDENTITY_FAIL"; finish 76; }
+ git log -1 --format=%B HEAD > "$E/committed-message.txt"
+-grep -iqE 'co-authored-by|generated' "$E/committed-message.txt" && { log "TRAILER_FAIL"; finish 76; }
+-# ---- 11 receipts
++! grep -iqE 'co-authored-by|signed-off-by|generated' "$E/committed-message.txt" || { log "TRAILER_FAIL"; finish 76; }
++# ---- 10 receipts (the binding fills EXPECT_HEAD / EXPECT_TREE / six blobs / EXPECT_NM_CLIENT_SHA / EXPECT_MIGRATIONS_TREE from here)
+ STAGE=receipts
+-git diff --binary "$H" HEAD > "$E/s9c-${H:0:12}-to-${HEAD:0:12}.patch"
++git diff --binary "$H" HEAD > "$E/s10b-${H:0:12}-to-${HEAD:0:12}.patch"
+ git diff --name-status "$H" HEAD > "$E/MANIFEST-name-status-${H:0:12}-to-${HEAD:0:12}.txt"
+-{ echo "base=$H"; echo "base_tree=$BASE_TREE"; echo "head=$HEAD"; echo "tree=$HTREE"; echo "doc_delta=$(git diff --numstat "$H" HEAD -- "$DOC" | cut -f1,2 | tr '\t' /)"
++{ echo "base=$H"; echo "base_tree=$BASE_TREE"; echo "base_parent=$S10A_PARENT"; echo "head=$HEAD"; echo "tree=$HTREE"
++  echo "migrations_tree=$(git rev-parse HEAD:prisma/migrations) dirs=$MIGRATION_DIRS last=$LAST_MIGRATION"
++  echo "schema_delta=$(git diff --numstat "$H" HEAD -- prisma/schema.prisma | cut -f1,2 | tr '\t' /) schema_sha256=$(sha prisma/schema.prisma)"
+   for f in $FILES; do echo "blob $f $(git rev-parse HEAD:$f) sha256=$(sha "$f")"; done
+-  for f in $S9B_FILES $S9A_FILES; do echo "unchanged $f $(git rev-parse HEAD:$f) sha256=$(sha "$f")"; done
+-  echo "contract_regen_stable sha256=$SHA_CONTRACT_JSON"
++  for f in $S10A_FILES; do echo "unchanged $f $(git rev-parse HEAD:$f) sha256=$(sha "$f")"; done
++  echo "contract_unchanged blob=$CONTRACT_BLOB sha256=$SHA_CONTRACT_JSON scratch_regen=identical"
++  echo "postgen_client index_dts=$NM_IDX schema=$NM_SCH engine=$NM_ENG (in $W/node_modules/.prisma/client; donor unchanged $D_IDX1/$D_SCH1)"
+   echo "branch=$(git rev-parse --abbrev-ref HEAD)"; git log -1 --format='author=%an <%ae>%ncommitter=%cn <%ce>%ndate=%cI'
+   echo "hooks raw pre-commit=$HP commit-msg=$HC normalized pre-commit=$NP commit-msg=$NC ref_root=$HOOK_REF_ROOT lefthook=$LHV"
+-  echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK client_index_dts=$CLIENT_INDEX_DTS"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
++  echo "prettier=$V prefix=$B"; echo "donor=$DONOR hidden_lock=$NM_HIDDEN_LOCK"; echo "lock_inode=$CUR_INODE"; } > "$E/HEAD-${HEAD:0:12}.txt"
+ ( cd "$E" && sha256sum * preformat/* postformat/* > SHA256SUMS ) 2>/dev/null
+ STAGE=done; log "DONE head=$HEAD tree=$HTREE (not pushed; parent owns landing; PG proof is a separate grant via ../binding/v1)"; finish 0
+--- s9c/gate-3/PINS.env	2026-09-26 03:50:50.551187820 +0000
++++ s10b/gate/PINS.env	2026-09-26 04:35:11.727187820 +0000
+@@ -1,86 +1,73 @@
+-# S9-C gate pins (sourced by s9c-gate-d3a9.sh). Every value is a literal; the driver refuses on any malformed value it
+-# needs. Update THIS file (and re-hash) if reviews change an owned file; the driver stays fixed.
+-# ---- base = S9-B landing merge 5407efae (integration/importer; S9-B 1e6e5735 merged onto S8-G merge 771db62a)
+-BASE=5407efae319fd913e973c87f3be0d49786c4a3e0
+-BASE_TREE=3e2028e9fc40c77db72152eb0e5c860d0a3661db
+-BRANCH=exec-d3a9/s9c-r2
+-# ---- owned S9-C paths except the S9 doc (pinned separately below): "<sha256> <mode> <state> <path>", state M = tracked
+-# and modified (` M`), N = new untracked (`??`). The driver derives the owned set, STATUS_EXPECT and STAGED_EXPECT from
+-# THIS list (it hard-codes no path except the doc and the contract artifact), so a fix round that adds/drops a path is
+-# a PINS.env edit only. As written = the freeze-1 19 paths (11 M + 8 N). NOTE: the r2 clone at 02:26Z additionally shows
+-# ` M src/scout/reconstruct/native/native-rules.ts` and `?? src/scout/lifecycle/reason-domains.ts` — add them here if
+-# they are part of the frozen fix round (native-rules.ts also needs FORBIDDEN_EXCEPTIONS, see below). sha256 = __FILL_SHA__ until the parent fills them from the post-fix-round freeze MANIFEST
+-# (pre-gate bytes; freeze-1 values are kept in README.md for reference only). Prettier may reflow the .ts/.cjs/.md at
+-# STAGE=prettier — every owned file is copied to preformat/ first and the post-format bytes are recorded as POSTFORMAT
+-# lines + postformat/ copies. Modes are the freeze-1 MANIFEST modes (bootstrap.sh 755).
+-# docs/contracts/importer-openapi.json is the npm run contract:importer output at devloop-3 (regen-stable there) and is in
+-# .prettierignore; test/utils/g2-s9c-bootstrap.sh has no prettier parser. Both are never reflowed.
+-OWNED_PINS='2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098 644 M docs/contracts/importer-openapi.json
+-15a5c326a3eadf840330330101699d3f984508519309fc5e278bd267e95a2745 644 M src/scout/lifecycle/lifecycle.service.ts
+-74f1962ae412dbf80e938b40ec8954f14954c8980cf6f8b389aca0f8b1b92d14 644 M src/scout/lifecycle/reason-codes.ts
+-1a2bc47cabbb0901975f3e911cf224820154b791dc803fc8b6516c4e3ceecbd5 644 M src/scout/reconstruct/native/native-rules.ts
+-02a52db72bf46ddd36420b08c6d5ad73c6d6c61f7d8dc4873ab027623dab756a 644 M src/scout/scout.dto.ts
+-854e50cf68190031891a7a8139df5592dafb4d7fb4f23810c8356f10780c740c 644 M src/scout/scout.module.ts
+-07e947c8eae76b70bd638569213744c0eddbe447856e47870480108cf395a42a 644 M src/scout/scout.service.spec.ts
+-adff9ab7852d73a305f8f34292593443d2af4168c87920a2d8c49012cec06ac3 644 M src/scout/scout.service.ts
+-594113ec16095be9fee9829054588e04541831edef010704146dea2207fce5fe 644 M test/contracts/importer-contract.spec.ts
+-4957155f8f7ef911437d50718e835c93d7869596fbe46f888c31f3f996ae6c02 644 M test/scout/lifecycle/arbiter.spec.ts
+-8e375e7574aa8606e4355725824b938b9b79e089b5e292235f3a128bbb781b3c 644 M test/scout/lifecycle/lifecycle.service.spec.ts
+-397dcb2f8d889af9c2f4a4b53fc334d576fc9a3d655b3a84cf97cda9de435ca2 644 M test/scout/orchestration/settle-hook.spec.ts
+-1a5e5e1875b14023be43a060ec36497b0362bf22fce7b672b792d0414864140a 644 N src/scout/lifecycle/reason-domains.ts
+-b5558da4f8bb8654b89e1294a745baf05272f31ae28ae9cfb19ce629f834707c 644 N test/rls-g2-s9c.spec.ts
+-6154b2d0a669ec4723fec0144e6edc652ef8fdc06b158db41e3337b25ef84276 644 N test/scout/g2-s9c-db-guard.spec.ts
+-4bc4d12d742796e0d17e91e80d8ab81b17b39c7e9c030fd6ce0066ca8a2d26d4 644 N test/scout/reconciliation/catalogue-parity.spec.ts
+-7981e8e3a20151da25f768dc2b388e2e0dec0964110ccd13bbd885ce0d6b757a 755 N test/utils/g2-s9c-bootstrap.sh
+-d265c9e346b9294def9415f949c41511050cf333ef8eb8f8fa0567091c1aa360 644 N test/utils/g2-s9c-db.ts
+-4c720422b37de1d4352f720fe24745fea4204f221d7dd33b08d06c22bfce07ca 644 N test/utils/g2-s9c-harness.ts
+-ea3e77c6937ff8672041bf5ef226cd0908070bcabd4454200ea12aa503bc3b41 644 N test/utils/g2-s9c-pg-harness.ts
+-4ef2e3b0b015207e9de00828cb410799ef7f87c3a96a707caf2c5ce37b58e9d6 644 N test/utils/g2-s9c-worker.cjs'
+-# contract artifact expected after npm run contract:importer (regen-stable: byte-identical to the owned pre-gate bytes)
+-SHA_CONTRACT_JSON=2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098   # must equal the importer-openapi.json OWNED_PINS sha (the driver cross-checks)
+-# ---- the 11 S9-B paths (git diff --name-only 9497ca52 1e6e5735) at BASE: "<sha256> <blob> <path>" = S9-B receipt
+-# 1910a060/s9b/gate/HEAD-1e6e5735384a.txt (post-format). The 10 code/test paths below must be TRACKED and CLEAN at BASE
+-# and UNCHANGED by S9-C. The 11th S9-B path (the doc) is S9-C-owned as an append-only Addendum B (see DOC pins).
+-S9B_PINS='a760fb6a2a9962a6b2a1decc6df4321ae80b017b9dd8bce0c00d5585eab8e40d 5ecd690182ba882c0a309d180c049c75a7861760 src/scout/reconciliation/facts.service.ts
+-48040a5af6e3598475eb7423cb42a25dee711bbc6bd6c87903e6cec292406e8a 9b88c2279c79ea8def155bb283bb3b8fce97924c src/scout/reconciliation/reconciliation.module.ts
+-f20099a165e5b0b04a10c7919f7844c5822a63bba1b9ad26cbfa39bb9a5883c1 cbde1f538ba88293a0d431f06db19d69825c01e0 test/rls-g2-s9.spec.ts
+-a99cf9c9e9cef10290d63b52fd773dcecfa22669933532fe78a61dd1e66e4fbf 1a719b2208b1f7bebca11bddf4a6b2d195ac735e test/scout/g2-s9-db-guard.spec.ts
+-aa41b3a781597270104f03b8d2f011056ae8f79a7fc676a4699a252c9b92d439 b708ac854023a56414950be117b698b8338f5ce7 test/scout/reconciliation/facts.service.spec.ts
+-8799525798ce64c4133167770d15cb301b8318d096c01c004124f1bb85974386 ce61b5866922c88f3766df888eafda2f00bcac74 test/utils/g2-s9-bootstrap.sh
+-39ba033bea0402483287da1a59e805b778a652286c359e807c363f5d87ba2ae9 02ee7bc8b580889c89ccba448ee288c000b48ea1 test/utils/g2-s9-db.ts
+-0378563b3681bb296a6f528c3492dfccef610d50014f1227d38679ada5a51732 cdbf154313d504d5c45c7b058bd1169b11f81a2f test/utils/g2-s9-harness.ts
+-3a6bd56a555715184d52bc9872c6ceec8ec0a68f8690a203fe24ebaebe871469 88f3d0506b6e1835cd8628d9ff4f465b46d22cc8 test/utils/g2-s9-pg-harness.ts
+-028979e9f44244ce51cf474d367f1c7a23752d3ce8d15add832d7b5cf44a42d6 9fcff4c9f8deb7e800e9db1dd4daf66a4ec45e5b test/utils/g2-s9-worker.cjs'
+-S9B_RANGE_FROM=9497ca5275938c9228c6ec6fa0dfa8c34f39f724
+-S9B_RANGE_TO=1e6e5735384a434804bce223c1599162bc660983
+-# ---- S9 decision doc: S9-C appends Addendum B (+DOC_ADDED_LINES/-0); the BASE bytes (S9-B post-format, blob 2fae1e07,
+-# 632 lines / 55554 bytes) must remain a byte-prefix of the working/committed doc before AND after prettier.
+-DOC=docs/decisions/2026-09-25-s9-reconciliation.md
+-SHA_DOC_LANDED=7c516a6303967e7394a75855d32d3ebfc00b9f37da7359810d6f35cf796ce4a6
+-DOC_LANDED_BLOB=2fae1e07e480e3ac00962c359e608167f42906c1
+-DOC_LANDED_BYTES=55554
+-DOC_ADDED_LINES=87
+-SHA_DOC_ADDENDUM=1e9d724f922ff3c4c2b0142227c7bad04a0d505a3f805a73175645e324bf53ae
+-# ---- environment pins (schema / lockfile / prisma tree identical at 1c5fbb04, 62471b11, 9497ca52, 771db62a and 5407efae:
+-# blobs schema 2e328bbc, package-lock 354de3da, prisma/migrations tree 654550cb), so the S8-F donor node_modules fits BASE.
+-SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
++# S10-B gate pins (sourced by s10b-gate-d3a9.sh). Every value is a literal; the driver refuses on any malformed or
++# unfilled value it needs. Update THIS file (and re-hash) if reviews change an owned file; the driver stays fixed.
++# Fill help: `bash s10b-gate-d3a9.sh --fill-help <S10-A landing sha>` (read-only; prints the values below) or README.md.
++# ---- base = the S10-A landing commit: exactly ONE commit on S10A_PARENT (e6f20300, the S9-C landing merge) adding the 14
++#      FREEZE paths. Unknown at authoring.
++BASE=__FILL_BASE__                       # git -C <landing clone> rev-parse HEAD after land-s10a.sh (40-hex)
++BASE_TREE=__FILL_BASE_TREE__             # git rev-parse "$BASE^{tree}"
++MIGRATIONS_TREE=__FILL_MIGRATIONS_TREE__ # git rev-parse "$BASE:prisma/migrations" (S10-A touches no prisma -> expected 654550cb99b55473429a9c60ee08319e1b649106)
++S10A_PARENT=e6f20300b495fa9eee9539ae58d30e3b60e5a78c   # BASE^ must be this (S9-C landing merge = integration/importer tip after PR #547 fast-forwards)
++HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba   # kept: BASE_HEAD literal in test/utils/g2-s10b-{bootstrap.sh,db.ts}; the gate requires it to be an ANCESTOR of S10A_PARENT and BASE (git merge-base --is-ancestor; review B2 option a). a4af8e33..e6f20300 touches no prisma, so the harness prisma diff is still exactly the S10-B three
++BRANCH=exec-d3a9/s10b
++# ---- S10-A freeze (the 14 paths BASE adds over S10A_PARENT, "POST <sha256> <path>"). Read from this file; its sha is pinned.
++S10A_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10a/land/FREEZE.sha256
++S10A_FREEZE_SHA=d54aee78dcc35910200a3c8db93ecff7305a95d1c34a65985e998ad1c71c398a
++S10A_FREEZE_COUNT=14
++# ---- owned S10-B paths: "<sha256> <mode> <state> <path>", M = tracked+modified (` M`), N = new untracked (`??`).
++# 16 paths = 1 M + 15 N. Bytes = d3a9f701/s10b/devloop-2/POSTFORMAT.sha256 (after the pinned prettier 3.9.9 reflow and the two
++# devloop test fixes; modes and bytes re-measured read-only in worktrees/d3a9-s10b 2026-09-26). The gate's prettier pass is
++# expected to be a no-op on these bytes but is still run and recorded (preformat/ + postformat/ copies, POSTFORMAT lines);
++# prisma/schema.prisma (no prettier parser in the hook globs), migrations/** (.prettierignore) and the .sh are never reflowed.
++OWNED_PINS='d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96 644 M prisma/schema.prisma
++345f12de9037d77c12f69abd96286411edfbaae1fb9df3767b1907fbada7aa15 644 N prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql
++aee7c7351e89c55f4de03b403f731f96cdcc00183635b0ac48252467ca806905 644 N prisma/migrations/20270124000000_scout_run_observation_expand/down.sql
++c36e1858a1178478918568595203d4947d92aa2ef60e25ed6d58b6c0fb58b06a 644 N src/scout/induction/observation.controller.ts
++091159364d4ef6125f04658e443a83ad9d9aaf335538caf73914b9cf77e38ed5 644 N src/scout/induction/observation.dto.ts
++4d18b5111aa893bdb68dcba4267c199aee5eac2ad2543149a16094ff70b1b5c6 644 N src/scout/induction/observation.module.ts
++aed296c8f26a6683887704cae04424c66a033ded825bd9b416c166d713db41db 644 N src/scout/induction/observation.service.ts
++5f21ef89708f3adb6e7d97b3c580a00192321d0ccc6b0193f48dfd3a39e6c504 644 N test/rls-g2-s10b.spec.ts
++89b2474ee5a4c61da66bbef37f935f02f0a1d90fef2f38852057233daa8c1638 644 N test/scout/induction/observation.controller.spec.ts
++25d28fb83bee3afc0966f37a7cb01836a2a05a224858a69bb2f1794a282d1433 644 N test/scout/induction/observation.service.spec.ts
++3fc3f21da01f1748e715c3d0b6ed46dbe635300fffdbd160e2154c138baa80df 755 N test/utils/g2-s10b-bootstrap.sh
++03e747a5b6d2237ca763daf3c146ab05c07866381878ffb50378e3bb5b3466bf 644 N test/utils/g2-s10b-db.ts
++ad4fa44175b6cf644816cb71cfadcab01c311d46dd9166fe4f878f3719df98ba 644 N test/utils/g2-s10b-fixtures.ts
++603d90c8cf05b93372b1e4471b23bf8908b8eb2db27dcf90b1d0f133ce7224aa 644 N test/utils/g2-s10b-harness.ts
++e161105556da1b71b53404890a236e32f1a4d7ae6f5bbe88d6fe66d5479bd519 644 N test/utils/g2-s10b-pg-harness.ts
++7a061fc47ce87ca82dde7f23a051bd37635ad8aba14da1cc8a84e83bf4862b35 644 N test/utils/g2-s10b-worker.cjs'
++# ---- schema: BASE bytes (= a4af8e33 = e6f20300 for prisma; neither S9-C nor S10-A touches prisma) must be a pure-addition base of the working schema
++BASE_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
++BASE_SCHEMA_BLOB=2e328bbcab0c902c6adb55dfb5ee172defc5f698
++SCHEMA_ADDED_LINES=63                    # git diff --numstat -- prisma/schema.prisma = 63/0 (three models + three ScoutImport back-relations)
++S10B_MODELS='ScoutRunDeclaration ScoutRunObservation ScoutRunSettledBasis'
++# ---- migrations: BASE has 172 dirs ending at S7-L; the working tree/commit adds exactly the S10-B dir (173)
++BASE_MIGRATION_DIRS=172
++BASE_LAST_MIGRATION=20270123000000_scout_run_lifecycle_expand
++MIGRATION_DIRS=173
++LAST_MIGRATION=20270124000000_scout_run_observation_expand
++# ---- dependency manifests unchanged since 93389265 (donor node_modules is an npm ci of this lockfile)
+ PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55
+-MIGRATIONS_TREE=654550cb99b55473429a9c60ee08319e1b649106
++PKG_JSON_SHA=afecdb3762df06075723dbe254a80bffe828b028bdb33576030d1ce0f936c5aa
+ NM_HIDDEN_LOCK=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44
+-CLIENT_INDEX_DTS=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
+-CLIENT_SCHEMA=b84392033ab86776533007505c31f57930307a210844067a7407ed20d25abf3e
+-MIGRATION_DIRS=172
+-LAST_MIGRATION=20270123000000_scout_run_lifecycle_expand
++PRISMA_EXPECT=6.19.3
++# donor client = generated from the BASE schema 0eb41f9a (pre-S10-B). It MUST still read these after the gate (donor untouched).
++DONOR_CLIENT_INDEX_DTS=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6
++DONOR_CLIENT_SCHEMA=b84392033ab86776533007505c31f57930307a210844067a7407ed20d25abf3e
++# post-generate client in the ISOLATED copy $W/node_modules/.prisma/client. Unknown before the first generate (no prisma run
++# at authoring). RECORD = record the value + structural checks (three S10-B models present, engine = @prisma/engines copy,
++# index.d.ts != donor). A 64-hex value is ENFORCED (use it if a re-gate must reproduce the first gate's client).
++CLIENT_INDEX_DTS=RECORD
++CLIENT_SCHEMA=RECORD
++# ---- contract: D-S10-8 S10-B row lists "OpenAPI bytes" as NOT owned; regeneration belongs to S10-C (generator owner).
++# The artifact is not owned here and must be byte-identical to BASE before, after the scratch re-export, and in the commit.
++CONTRACT=docs/contracts/importer-openapi.json
++SHA_CONTRACT_JSON=2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098   # sha256 of e6f20300:docs/contracts/importer-openapi.json (S9-C changed it; S10-A does not)
++CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                                 # blob at e6f20300 (must equal BASE:$CONTRACT)
+ LOCK_INODE=692282
+ LEFTHOOK_EXPECT=2.1.9
+ PRETTIER_EXPECT=3.9.9
+ HOOK_REF_ROOT=/home/user/workspace/worktrees/1910a060-s8f
+-# ---- delta scope: no committed path may fall under these (D-S9-8 S9-C "Not owned" + S9-A/S9-B frozen + no schema), except
+-# a path listed in FORBIDDEN_EXCEPTIONS that is ALSO an OWNED_PINS path. Default: no exceptions. An owned path under a
+-# forbidden prefix without an exception is refused at relay (78). src/scout/reconstruct/native/native-rules.ts is under
+-# src/scout/reconstruct (D-S9-8 "Not owned" for S9-C lists reconstruct/orchestration/** and scout-reconstruct.service.ts;
+-# D-S9-8 S9-B row lists native/** as not owned) — a reviewer disposition is needed before listing it here.
+-FORBIDDEN_DELTA_PATHS='prisma package.json package-lock.json src/scout/reconstruct src/scout/reconciliation src/scout/scout-reconstruct.service.ts src/scout/lifecycle/run.controller.ts'
+-FORBIDDEN_EXCEPTIONS='src/scout/reconstruct/native/native-rules.ts'   # parent grant d3a9 02:5xZ: additive NATIVE_RULE_FIELDS export only (Addendum B.3/B.4); review A delta GO
+-# ---- targeted jest suites (explicit paths, run with --runTestsByPath; the driver also requires "Test Suites: N passed, N total")
+-SUITES='test/contracts/importer-contract.spec.ts test/scout/lifecycle/arbiter.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/orchestration/settle-hook.spec.ts src/scout/scout.service.spec.ts test/scout/reconciliation/catalogue-parity.spec.ts test/scout/g2-s9c-db-guard.spec.ts test/scout/reconciliation/facts.service.spec.ts test/scout/reconciliation/reconcile.spec.ts test/scout/g2-s9-db-guard.spec.ts test/scout/g2-s8g-db-guard.spec.ts test/scout/orchestration/reconstruct-run.spec.ts test/scout/orchestration/family-plan.spec.ts test/route-doc-drift.spec.ts test/scout/reconstruct/native/native-families.spec.ts test/scout/reconstruct/mapping-spec.spec.ts'   # +2 native suites: native-rules.ts exception (parent)
++# ---- delta scope: no committed path may fall under these (D-S10-8 S10-B "Not owned": scout.module.ts registration, the
++# settle path, OpenAPI bytes; plus S10-A/S10-C/S10-D surfaces). prisma is checked separately (exactly the three S10-B paths).
++FORBIDDEN_DELTA_PATHS='package.json package-lock.json docs scripts nest-cli.json src/scout/scout.module.ts src/scout/lifecycle src/scout/reconciliation src/scout/reconstruct src/scout/induction/contract.ts src/scout/induction/digest.ts src/scout/induction/manifest-registry.ts src/scout/induction/parse.ts src/scout/induction/verify.ts src/scout/induction/sources test/fixtures test/contracts'
++# ---- targeted jest (explicit paths, --runTestsByPath; driver requires "Test Suites: 7 passed, 7 total"): S10-A 5 + S10-B 2
++SUITES='test/scout/induction/contract.spec.ts test/scout/induction/digest.spec.ts test/scout/induction/manifest-registry.spec.ts test/scout/induction/parse.spec.ts test/scout/induction/verify.spec.ts test/scout/induction/observation.service.spec.ts test/scout/induction/observation.controller.spec.ts'

@@ -1,0 +1,31 @@
+feat(scout): S10-B run declaration and observation persistence
+
+Adds the persistence tier of the S10 unseen-source induction decision
+(D-S10-2, D-S10-4, docs/decisions/2026-09-26-s10-induction.md) on
+top of the S10-A pure contract.
+
+prisma/schema.prisma gains three insert-only models, ScoutRunDeclaration,
+ScoutRunObservation and ScoutRunSettledBasis, plus the three
+ScoutImport back-relations Prisma needs for their foreign keys.
+No existing column changes. The expand migration
+20270124000000_scout_run_observation_expand creates the tables
+with forced RLS, a service_role policy and restrictive denials for
+anon and authenticated, grants service_role SELECT and INSERT only,
+and refuses UPDATE, top-level DELETE and TRUNCATE by trigger. One
+32-byte challenge and one declared_at per run are enforced in the
+database. down.sql checks the exact catalog, refuses while any row
+exists and drops without CASCADE.
+
+src/scout/induction adds the observation service, DTOs, controller
+and module. POST runs/declaration and POST runs/observation run in
+one transaction under FOR NO KEY UPDATE on the open server run.
+Coach, epoch, challenge, received_at and the evidence digest are
+bound on the server and never read from the body. Refusals reuse the
+S10-A conflict codes and the existing run codes. The module is not
+registered yet: ScoutModule wiring, the settle path and the importer
+contract belong to S10-C, so docs/contracts/importer-openapi.json is
+unchanged here.
+
+Unit specs cover the service and controller. test/rls-g2-s10b.spec.ts
+and the test/utils/g2-s10b-* harness are the S10-B real-PG proof on
+a disposable marked PG 17 lane (173 migrations).

@@ -34,18 +34,18 @@ TIP_TREE=82111726a41fb114aecc4095aaa3b6c08b6f6a64   # git rev-parse a4af8e33^{tr
 MB=5407efae319fd913e973c87f3be0d49786c4a3e0   # S9-B landing merge: S9-C sole parent == merge-base(TIP, S9-C)
 MAIN_EXPECT=1c10e2a19b35bbb4fb17fe7c5aab6fa613e74c47
 TIP_NCOMMITS=2                                # ba6c740a, a4af8e33 (both Bradley, doc-only)
-H=__FILL_H__   # exact S9-C gate-2 commit (reused, never rebuilt)
-H_TREE=__FILL_H_TREE__
-CAND_BUNDLE=__FILL_CAND_BUNDLE__   # e.g. $LANDING/bundles/s9c-<H12>.bundle (5407efae..refs/heads/exec-d3a9/s9c-r2)
-CAND_BUNDLE_SHA=__FILL_CAND_BUNDLE_SHA__
+H=2e9f6c054b86b749b58a9232c79153a872d9ec18   # exact S9-C gate-2 commit (reused, never rebuilt)
+H_TREE=02e7b312c7a318e80c1e468854ef2555a10e8873
+CAND_BUNDLE=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing/bundles/s9c-2e9f6c054b86.bundle   # e.g. $LANDING/bundles/s9c-<H12>.bundle (5407efae..refs/heads/exec-d3a9/s9c-r2)
+CAND_BUNDLE_SHA=ff37a0a6cf463d09f11982b38d6d51d36d4a1d58892eff0e9cb7fec56ee02844
 CAND_REF=refs/heads/exec-d3a9/s9c-r2
-CAND_RECEIPT=__FILL_CAND_RECEIPT__   # /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/gate/HEAD-<H12>.txt
-CAND_RECEIPT_SHA=__FILL_CAND_RECEIPT_SHA__   # 22 'blob <path> <blob> sha256=<sha>' lines (21 OWNED_PINS + the S9 doc)
-CAND_RAW_SHA=__FILL_CAND_RAW_SHA__   # sha256 of diff --raw --no-abbrev MB H
+CAND_RECEIPT=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/gate-3/HEAD-2e9f6c054b86.txt   # /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/gate/HEAD-<H12>.txt
+CAND_RECEIPT_SHA=914d2e627a459b43dfc0e2518663c903c2a4de432efba7a7ecef154f13180c7c   # 22 'blob <path> <blob> sha256=<sha>' lines (21 OWNED_PINS + the S9 doc)
+CAND_RAW_SHA=3f6899d22568025d9e2eb3ee5f3dac176fdb0bb64c2869e7f78b90c985857be6   # sha256 of diff --raw --no-abbrev MB H
 CAND_NPATHS=22
 TIPSIDE_PATHS="docs/decisions/2026-09-26-s10-induction.md"
-PRED_TREE=__FILL_PRED_TREE__   # git merge-tree --write-tree TIP H (both orders)
-CONTRACT=docs/contracts/importer-openapi.json; CONTRACT_BLOB=__FILL_CONTRACT_BLOB__   # S9-C contract blob (gate receipt blob line)
+PRED_TREE=944562f61f3f8fcef28a4f0f558fa930322bb388   # git merge-tree --write-tree TIP H (both orders)
+CONTRACT=docs/contracts/importer-openapi.json; CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427   # S9-C contract blob (gate receipt blob line)
 S9_DOC=docs/decisions/2026-09-25-s9-reconciliation.md
 CAND_DOCS_EXPECT="$CONTRACT $S9_DOC"          # git diff --name-only MB H -- docs (sorted), exactly these two
 RECONSTRUCT_DELTA_EXPECT="src/scout/reconstruct/native/native-rules.ts"   # parent-granted additive NATIVE_RULE_FIELDS export only
