@@ -1,0 +1,50 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s9c/binding/v1/s9c-pg-proof.sh	2026-09-26 03:36:39.799187820 +0000
++++ /home/user/workspace/private-evidence/execution/d3a9f701/s9c/binding/v2/s9c-pg-proof.sh	2026-09-26 03:39:14.443187820 +0000
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# S9-C real-PG proof — execution binding v1 (source only; NOT RUN; NOT GRANTED). Derived by substitution from the accepted
++# S9-C real-PG proof — execution binding v2 (= v1 + pipefail/SIGPIPE precondition fix; v1 S9C-PROOF-1 refused rc=70 at preconditions, preserved). Derived by substitution from the accepted
+ # S9-B binding execution/1910a060/s9b/binding/v3/s9b-pg-proof.sh (ran once, 10/10; unchanged there; full diff in
+ # DELTA-from-s9b-v3.diff) with the EXEC-D3A9F701 S9-C deltas: standalone clone worktrees/d3a9-s9c-r2 whose candidate
+ # head descends from BASE = 5407efae (S9-B landing merge; tree 3e2028e9); lane port 55646 / s9c_super /
+@@ -21,7 +21,7 @@
+ # receipt d3a9f701/s9c/gate/HEAD-<12>.txt (post-format blobs); EXPECT_RECONSTRUCT_DELTA only if a reviewer accepts an
+ # S9-C path under src/scout/reconstruct. EXPECT_FIXTURE_SHA is already filled (the fixture is head-independent).
+ set -uo pipefail
+-D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/binding/v1
++D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s9c/binding/v2
+ RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime                     # 1910a060 runtime namespace (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md); the fixture carries the same literal and is cross-checked below
+ W=/home/user/workspace/worktrees/d3a9-s9c-r2
+ R=$D/run; LOG=$R/s9c-pg-proof.log; SENT=$R/s9c-pg-proof.sentinel; JLOG=$R/jest.log
+@@ -105,13 +105,15 @@
+ [ "$(git -C "$W" rev-parse HEAD^)" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL HEAD^ != $BASE_HEAD (the gate makes exactly one commit on BASE)"; fail 70; }
+ git -C "$W" merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+ # harness literals must match this runner (lane identity, base pin, migrations): read from the committed bytes at HEAD
+-git -C "$W" show HEAD:test/utils/g2-s9c-bootstrap.sh | grep -qx "BASE_HEAD=$HARNESS_BASE_HEAD" || { log "PRECONDITION_FAIL bootstrap BASE_HEAD != $HARNESS_BASE_HEAD"; fail 70; }
+-git -C "$W" show HEAD:test/utils/g2-s9c-bootstrap.sh | grep -qx "CLUSTER_MARKER=$MARKER" && git -C "$W" show HEAD:test/utils/g2-s9c-bootstrap.sh | grep -qx "DB_MARKER=$DB_MARKER" \
+-  && git -C "$W" show HEAD:test/utils/g2-s9c-bootstrap.sh | grep -qx "EXPECTED_MIGRATIONS=172" || { log "PRECONDITION_FAIL bootstrap marker/migration literals != runner"; fail 70; }
+-git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qF "G2_S9C_DATABASE = '$DBNAME'" && git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qF "G2_S9C_ROLE = '$ADMIN'" \
+-  && git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qF "G2_S9C_CLUSTER_MARKER = '$MARKER'" && git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qF "'$DB_MARKER'" \
+-  && git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qF "G2_S9C_BASE_HEAD = '$HARNESS_BASE_HEAD'" || { log "PRECONDITION_FAIL g2-s9c-db.ts literals != runner"; fail 70; }
+-! git -C "$W" show HEAD:test/utils/g2-s9c-db.ts | grep -qE "^ +'$PORT',\$" || { log "PRECONDITION_FAIL lane port $PORT is in the S9-C guard's REFUSED_PORTS"; fail 70; }
++BOOT_AT_HEAD=$(git -C "$W" show HEAD:test/utils/g2-s9c-bootstrap.sh) && DBTS_AT_HEAD=$(git -C "$W" show HEAD:test/utils/g2-s9c-db.ts) || { log "PRECONDITION_FAIL cannot read harness bytes at HEAD"; fail 70; }
++# v2: grep captured bytes, never `git show | grep -q` under pipefail (grep -q exits early -> SIGPIPE 141 = false refusal; S9C-PROOF-1 rc=70)
++grep -qx "BASE_HEAD=$HARNESS_BASE_HEAD" <<<"$BOOT_AT_HEAD" || { log "PRECONDITION_FAIL bootstrap BASE_HEAD != $HARNESS_BASE_HEAD"; fail 70; }
++grep -qx "CLUSTER_MARKER=$MARKER" <<<"$BOOT_AT_HEAD" && grep -qx "DB_MARKER=$DB_MARKER" <<<"$BOOT_AT_HEAD" \
++  && grep -qx "EXPECTED_MIGRATIONS=172" <<<"$BOOT_AT_HEAD" || { log "PRECONDITION_FAIL bootstrap marker/migration literals != runner"; fail 70; }
++grep -qF "G2_S9C_DATABASE = '$DBNAME'" <<<"$DBTS_AT_HEAD" && grep -qF "G2_S9C_ROLE = '$ADMIN'" <<<"$DBTS_AT_HEAD" \
++  && grep -qF "G2_S9C_CLUSTER_MARKER = '$MARKER'" <<<"$DBTS_AT_HEAD" && grep -qF "'$DB_MARKER'" <<<"$DBTS_AT_HEAD" \
++  && grep -qF "G2_S9C_BASE_HEAD = '$HARNESS_BASE_HEAD'" <<<"$DBTS_AT_HEAD" || { log "PRECONDITION_FAIL g2-s9c-db.ts literals != runner"; fail 70; }
++! grep -qE "^ +'$PORT',\$" <<<"$DBTS_AT_HEAD" || { log "PRECONDITION_FAIL lane port $PORT is in the S9-C guard's REFUSED_PORTS"; fail 70; }
+ [ "$(git -C "$W" show HEAD:test/rls-g2-s9c.spec.ts | grep -cE '^\s*it\(')" = "$EXPECT_TESTS" ] || { log "PRECONDITION_FAIL it() count in committed test/rls-g2-s9c.spec.ts != $EXPECT_TESTS"; fail 70; }
+ for pin in "test/rls-g2-s9c.spec.ts $EXPECT_SPEC_BLOB" "test/utils/g2-s9c-bootstrap.sh $EXPECT_BOOTSTRAP_BLOB" "test/utils/g2-s9c-db.ts $EXPECT_DB_BLOB" \
+            "test/utils/g2-s9c-pg-harness.ts $EXPECT_PGH_BLOB" "test/utils/g2-s9c-harness.ts $EXPECT_HARNESS_BLOB" "test/utils/g2-s9c-worker.cjs $EXPECT_WORKER_BLOB"; do set -- $pin
+@@ -152,7 +154,7 @@
+   [ "$(git -C "$W" rev-parse "HEAD:$1")" = "$2" ] || { log "PRECONDITION_FAIL frozen S9-A/S9-B file $1 blob != accepted record"; fail 70; }; done
+ [ -z "$(git -C "$W" diff --name-only "$BASE_HEAD" HEAD -- src/scout/reconciliation)" ] || { log "PRECONDITION_FAIL src/scout/reconciliation changed by S9-C"; fail 70; }
+ # the S9-C wiring surface is present at the head (lifecycle wired to the facts service; no report table; no native sidecar)
+-git -C "$W" show HEAD:src/scout/lifecycle/lifecycle.service.ts | grep -q "ReconciliationFactsService" || { log "PRECONDITION_FAIL lifecycle.service.ts at HEAD does not reference ReconciliationFactsService (S9-C wiring absent)"; fail 70; }
++LCS_AT_HEAD=$(git -C "$W" show HEAD:src/scout/lifecycle/lifecycle.service.ts) && grep -q "ReconciliationFactsService" <<<"$LCS_AT_HEAD" || { log "PRECONDITION_FAIL lifecycle.service.ts at HEAD does not reference ReconciliationFactsService (S9-C wiring absent)"; fail 70; }
+ [ ! -e "$W/src/scout/reconstruct/native/sources" ] || { log "PRECONDITION_FAIL native sidecar directory present (none granted for this candidate)"; fail 70; }
+ # dependency tree: an ISOLATED real copy of the runtime donor (not a symlink, not platform node_modules, not a fresh npm ci)
+ [ -d "$W/node_modules" ] && [ ! -L "$W/node_modules" ] || { log "PRECONDITION_FAIL $W/node_modules absent or a symlink (isolated copy required)"; fail 70; }

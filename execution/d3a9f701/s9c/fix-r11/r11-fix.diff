@@ -1,0 +1,29 @@
+diff --git a/test/rls-g2-s9c.spec.ts b/test/rls-g2-s9c.spec.ts
+index 5c9abafb..c4b4458d 100644
+--- a/test/rls-g2-s9c.spec.ts
++++ b/test/rls-g2-s9c.spec.ts
+@@ -560,8 +560,22 @@ describe('R11 — tenant isolation of the S9 reads (no cross-tenant reads or wri
+     expect(programs(COACH)).toHaveLength(1);
+     expect(runRow(OTHER, b)).toMatchObject({ terminal_status: null, execution_epoch: 1 });
+     const rep = await report(a);
+-    expect(rep.result.families.map((f: any) => f.family)).toEqual(['programs']);
+-    expect(rep.result.families[0]).toMatchObject({ staged_unique: 1, native_present_verified: 1 });
++    // D-S9-2: required_families = A's staged families plus every family the staged platform's spec
++    // declares, so A's report also carries zero-row entries for the families A never staged. None of
++    // B's rows (blk-1, blk-2, rt-1) may appear in any count of A's report.
++    expect(rep.result.families.map((f: any) => f.family)).toEqual([
++      'client_history',
++      'clients',
++      'programs',
++      'workouts',
++    ]);
++    for (const fam of rep.result.families) {
++      expect(fam).toMatchObject(
++        fam.family === 'programs'
++          ? { staged_unique: 1, native_present_verified: 1 }
++          : { staged_unique: 0, native_present_verified: 0 },
++      );
++    }
+     const st = await status(a);
+     expect(st.result.families).toHaveLength(1);
+     expect(st.result.families[0]).toMatchObject({

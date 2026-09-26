@@ -1,0 +1,19 @@
+feat(scout): S10-A pure induction contract, parsers and coverage evaluator
+
+Pure tier of the S10 unseen-source induction decision (D-S10-1, D-S10-3,
+docs/decisions/2026-09-26-s10-induction.md). No I/O, no persistence, no wiring:
+
+- contract.ts: induction manifest, declaration and observation evidence types,
+  limits (statement <= 1024 bytes, observation body <= 32 KiB) and rejection codes.
+- parse.ts: total, fail-closed parsers for manifests and signed evidence
+  (strict base64, fatal UTF-8, byte-identical canonical JSON, exact keys) and the
+  pure body-size check.
+- digest.ts: canonical JSON, mapping-spec digest and the length-prefixed
+  identity-set digest.
+- manifest-registry.ts: load-time validated registry of approved verifier keys.
+- verify.ts: coverage evaluator. Every failure yields known:false; a missing or
+  conflicting staged entry never becomes zero; multiscope platforms fail closed.
+
+Tests cover R20-R28 with synthetic fixtures under test/fixtures/scout/s10_pure
+(test-only keys). The production grouping half of R27 and the terminal half of
+R23 are proved in S10-C. Routes, tables and module registration belong to S10-B/C.

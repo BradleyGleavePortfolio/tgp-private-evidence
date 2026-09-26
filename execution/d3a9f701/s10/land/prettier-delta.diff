@@ -1,0 +1,109 @@
+49,53c49,53
+< | Artifact | Path | Required | Grammar |
+< | --- | --- | --- | --- |
+< | Mapping spec | `src/scout/reconstruct/sources/<p>.json` | yes | `SourceMappingSpec` v1, unchanged (`mapping-spec.ts` L114-125, L328-375) |
+< | Native rules | `src/scout/reconstruct/native/sources/<p>.json` | no | `NativeRuleSet` v1, unchanged (`native-rules.ts` L92-100) |
+< | Induction manifest | `src/scout/induction/sources/<p>.json` | no | `InductionManifestV1` (below), new |
+---
+> | Artifact           | Path                                            | Required | Grammar                                                                  |
+> | ------------------ | ----------------------------------------------- | -------- | ------------------------------------------------------------------------ |
+> | Mapping spec       | `src/scout/reconstruct/sources/<p>.json`        | yes      | `SourceMappingSpec` v1, unchanged (`mapping-spec.ts` L114-125, L328-375) |
+> | Native rules       | `src/scout/reconstruct/native/sources/<p>.json` | no       | `NativeRuleSet` v1, unchanged (`native-rules.ts` L92-100)                |
+> | Induction manifest | `src/scout/induction/sources/<p>.json`          | no       | `InductionManifestV1` (below), new                                       |
+58c58
+<   sourcePlatform: string;              // === <p> === mapping spec sourcePlatform
+---
+>   sourcePlatform: string; // === <p> === mapping spec sourcePlatform
+125c125,126
+< interface SourceEnumerationStatementV1 {   // strict canonical JSON (below), signed by the source
+---
+> interface SourceEnumerationStatementV1 {
+>   // strict canonical JSON (below), signed by the source
+127,133c128,137
+<   source_platform: string; account_scope_id_digest: string; family: CanonicalFamily;
+<   challenge_b64: string;                   // the run's declaration challenge (anti-replay)
+<   snapshot_ref_digest: string;             // 64 hex: sha256 of source snapshot/cursor ref
+<   date_window: null;                       // v1: unbounded only
+<   terminal: 'end_of_list';                 // source terminal marker for that snapshot
+<   observed_unique: number; id_set_digest: string;
+<   issued_at: string;                       // ISO; must fall within [accepted_start_at, received_at]
+---
+>   source_platform: string;
+>   account_scope_id_digest: string;
+>   family: CanonicalFamily;
+>   challenge_b64: string; // the run's declaration challenge (anti-replay)
+>   snapshot_ref_digest: string; // 64 hex: sha256 of source snapshot/cursor ref
+>   date_window: null; // v1: unbounded only
+>   terminal: 'end_of_list'; // source terminal marker for that snapshot
+>   observed_unique: number;
+>   id_set_digest: string;
+>   issued_at: string; // ISO; must fall within [accepted_start_at, received_at]
+135c139,140
+< interface ObservationEvidenceV1 {          // what the client uploads, one per (platform, scope, family)
+---
+> interface ObservationEvidenceV1 {
+>   // what the client uploads, one per (platform, scope, family)
+137c142,144
+<   source_platform: string; account_scope_id_digest: string; family: CanonicalFamily;
+---
+>   source_platform: string;
+>   account_scope_id_digest: string;
+>   family: CanonicalFamily;
+139,140c146,149
+<   mapping_spec_digest: string;             // sha256 of the loaded spec's canonical JSON
+<   statement_b64: string; key_id: string; signature_b64: string; // opaque source artifact
+---
+>   mapping_spec_digest: string; // sha256 of the loaded spec's canonical JSON
+>   statement_b64: string;
+>   key_id: string;
+>   signature_b64: string; // opaque source artifact
+231c240
+<   account_scope_id_digest)`; one run's rows share one challenge and `declared_at` (one statement;
+---
+> account_scope_id_digest)`; one run's rows share one challenge and `declared_at` (one statement;
+274c283
+<   account_scope_id_digests[]}]}` → `challenge`: **one atomic transaction under the run lock**
+---
+> account_scope_id_digests[]}]}` → `challenge`: **one atomic transaction under the run lock**
+285,286c294,295
+<   'declaration_missing', 'observation_conflict', 'observation_after_claim',
+<   'observation_not_declared']` in `src/scout/induction/contract.ts`.
+---
+> 'declaration_missing', 'observation_conflict', 'observation_after_claim',
+> 'observation_not_declared']` in `src/scout/induction/contract.ts`.
+300,302c309,311
+<   <B> HEAD`; (2) `git status --porcelain --untracked-files=all` empty; (3) `git diff --name-only
+<   <B> HEAD` equals the allowed set exactly; (4) `git diff --exit-code <B> HEAD -- . ':!<each
+<   allowed path>'` (bytewise for every other path: `src`, `prisma`, `scripts`, `docs/contracts`,
+---
+> <B> HEAD`; (2) `git status --porcelain --untracked-files=all` empty; (3) `git diff --name-only
+> <B> HEAD` equals the allowed set exactly; (4) `git diff --exit-code <B> HEAD -- . ':!<each
+> allowed path>'` (bytewise for every other path: `src`, `prisma`, `scripts`, `docs/contracts`,
+342,348c351,357
+< | Slice | Tier | Owned paths | Depends on | Not owned |
+< | --- | --- | --- | --- | --- |
+< | S10-0 | T0 | `docs/decisions/2026-09-26-s10-induction.md` | none | any code |
+< | S10-A | T1/T2 | `src/scout/induction/{contract,parse,digest,verify,manifest-registry}.ts`; `test/scout/induction/{contract,parse,digest,verify,manifest-registry}.spec.ts`; `test/fixtures/scout/s10_pure/**` | **may start now**; imports only landed types (`types.ts` L207-243; `mapping-spec.ts` L63-69, L114-125; `native-rules.ts` L92-100; `reason-codes.ts` L35-42) and a vetted ed25519 verify (node `crypto`) | routes, `prisma/**`, `lifecycle/**`, `reconciliation/**`, `src/**/sources/*.json`, `nest-cli.json` |
+< | S10-B | T3/T4 | `src/scout/induction/{observation.service,observation.controller,observation.dto,observation.module}.ts`; `prisma/schema.prisma` (three additive models only); `prisma/migrations/<ts>_scout_run_observation_expand/{migration,down}.sql`; `test/scout/induction/observation.{service,controller}.spec.ts`; `test/rls-g2-s10b.spec.ts`; `test/utils/g2-s10b-*` | S10-A landed; PG proof only in the canonical slot; merges after S9-C lands | `scout.module.ts` registration, the settle path, OpenAPI bytes |
+< | S10-C | T4 | `src/scout/reconciliation/facts.service.ts` (export `resolveFamily` as the shared classifier; staged digests from its own grouping; coverage from the evaluator instead of `coverage: null`); `src/scout/lifecycle/lifecycle.service.ts` (settled-basis insert after `writeTerminal`; `readReport` prefers the settled basis; **`projectFamilies`/`projectToken` fill `observed_unique`**, `S9C-draft:` L731-805, per the rule below); `src/scout/reconciliation/types.ts` (`'settled'` literal only); `src/scout/scout.module.ts` (ObservationModule import only); added cases in `test/scout/{reconciliation,lifecycle,induction}/**`; `test/rls-g2-s10c.spec.ts`; Gen in the same change via the **generator owner only** (`scripts/importer-contract.ts`, `docs/contracts/importer-openapi.json`, `test/contracts/importer-contract.spec.ts`) | **after S9-C lands** (it owns those lifecycle hunks until then; `s9c_builder_summary.md` L31-36, L64-72), plus S10-A and S10-B | `reconcile.ts`, `coverage.ts`, `arbiter.ts`, `reason-codes.ts` |
+< | S10-D | D1 T3; D2 T2/T4 | D1: `nest-cli.json` (two asset entries), `scripts/s10-core-diff-gate.sh`. D2: exactly the D-S10-5 allowed set | D1 after S10-C; B = D1 landed; D2 after B | every other path |
+---
+> | Slice | Tier            | Owned paths                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Depends on                                                                                                                                                                                              | Not owned                                                                                          |
+> | ----- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+> | S10-0 | T0              | `docs/decisions/2026-09-26-s10-induction.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | none                                                                                                                                                                                                    | any code                                                                                           |
+> | S10-A | T1/T2           | `src/scout/induction/{contract,parse,digest,verify,manifest-registry}.ts`; `test/scout/induction/{contract,parse,digest,verify,manifest-registry}.spec.ts`; `test/fixtures/scout/s10_pure/**`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **may start now**; imports only landed types (`types.ts` L207-243; `mapping-spec.ts` L63-69, L114-125; `native-rules.ts` L92-100; `reason-codes.ts` L35-42) and a vetted ed25519 verify (node `crypto`) | routes, `prisma/**`, `lifecycle/**`, `reconciliation/**`, `src/**/sources/*.json`, `nest-cli.json` |
+> | S10-B | T3/T4           | `src/scout/induction/{observation.service,observation.controller,observation.dto,observation.module}.ts`; `prisma/schema.prisma` (three additive models only); `prisma/migrations/<ts>_scout_run_observation_expand/{migration,down}.sql`; `test/scout/induction/observation.{service,controller}.spec.ts`; `test/rls-g2-s10b.spec.ts`; `test/utils/g2-s10b-*`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | S10-A landed; PG proof only in the canonical slot; merges after S9-C lands                                                                                                                              | `scout.module.ts` registration, the settle path, OpenAPI bytes                                     |
+> | S10-C | T4              | `src/scout/reconciliation/facts.service.ts` (export `resolveFamily` as the shared classifier; staged digests from its own grouping; coverage from the evaluator instead of `coverage: null`); `src/scout/lifecycle/lifecycle.service.ts` (settled-basis insert after `writeTerminal`; `readReport` prefers the settled basis; **`projectFamilies`/`projectToken` fill `observed_unique`**, `S9C-draft:` L731-805, per the rule below); `src/scout/reconciliation/types.ts` (`'settled'` literal only); `src/scout/scout.module.ts` (ObservationModule import only); added cases in `test/scout/{reconciliation,lifecycle,induction}/**`; `test/rls-g2-s10c.spec.ts`; Gen in the same change via the **generator owner only** (`scripts/importer-contract.ts`, `docs/contracts/importer-openapi.json`, `test/contracts/importer-contract.spec.ts`) | **after S9-C lands** (it owns those lifecycle hunks until then; `s9c_builder_summary.md` L31-36, L64-72), plus S10-A and S10-B                                                                          | `reconcile.ts`, `coverage.ts`, `arbiter.ts`, `reason-codes.ts`                                     |
+> | S10-D | D1 T3; D2 T2/T4 | D1: `nest-cli.json` (two asset entries), `scripts/s10-core-diff-gate.sh`. D2: exactly the D-S10-5 allowed set                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | D1 after S10-C; B = D1 landed; D2 after B                                                                                                                                                               | every other path                                                                                   |
+376c385
+<   `issued_at` not RFC 3339 UTC; a signature over the base64 text rather than decoded bytes.
+---
+>   > `issued_at` not RFC 3339 UTC; a signature over the base64 text rather than decoded bytes.
+379c388
+<   observed_unique: n, covers_staged_identities: true}`.
+---
+> observed_unique: n, covers_staged_identities: true}`.
+384c393
+<   basisKinds[family]`; (c) one altered byte of the decoded statement; (d) challenge ≠ the run's
+---
+> basisKinds[family]`; (c) one altered byte of the decoded statement; (d) challenge ≠ the run's

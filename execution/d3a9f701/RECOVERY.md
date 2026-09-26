@@ -46,3 +46,8 @@ Next: finish exact-file recovery and bounded evidence checks; preserve recovered
 
 ## Update 2026-09-26 02:25Z
 Recovery complete; execution cursor advanced. S8-G landed (771db62a), S9-B landed (5407efae). Active: S9-C fix round/review; S10-0 review. Lock inode 692282 (runtime/LOCK_ESTABLISHED.txt).
+
+## 2026-09-26T03:57:33Z cursor
+- S9-C: gate-2 rc0 → 98133050 (ref exec-d3a9/s9c-r2-gate2). PROOF-1 (binding v1) rc70 preconditions: class B pipefail/SIGPIPE false refusal → binding v2 (A GO, B GO). PROOF-2 9/10 consumed: R11 expectation contradicted D-S9-2 required families (class B, fix-r11/) → A GO, B GO; gate-3 running on the fixed spec (preflight attempt-0 refused on leftover hooks, preserved). Next: binding v3 (pins-only, pre-approved) → PROOF-3 → accept → land.
+- S10-A: review NO-GO → fixes (R25 isolated, R23 composition, R27 allocation, envelope → S10-B, R21 bound restored) → GO; devloops 1-3 (TS2367, spec validity, grouped-family-missing-digest guard = unknown never zero) → devloop-3 green 86/86 → delta GO. land/land-s10a.sh ready; commit when slot frees.
+- S10-B: built (s10b_builder_summary.md); reviews A+B running; dev loop after S10-A lands (imports S10-A).

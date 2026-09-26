@@ -1,0 +1,75 @@
+PASS test/contracts/importer-contract.spec.ts (96.941 s)
+  importer contract (R80 freeze)
+    ✓ redeem advertises 500 for pre-claim session mint failure
+    drift check
+      ✓ the checked-in artifact exists (2 ms)
+      ✓ the checked-in artifact is byte-identical to a fresh regeneration (1 ms)
+      ✓ serialization is deterministic (stable key order across runs) (1 ms)
+    surface completeness
+      ✓ exposes exactly the importer routes, /api-prefixed (1 ms)
+      ✓ carries the bearer security scheme referenced by guarded routes
+      ✓ inlines every schema its paths reference (no dangling $refs) (10 ms)
+    shared error schemas mirror the runtime envelopes
+      ✓ ErrorEnvelope pins the always-present keys and keeps code/request_id optional (1 ms)
+      ✓ RateLimitError models the distinct 429 body (retryAfter, no timestamp/path)
+    read: GET /api/scout/import/status
+      ✓ requires the intent_id query parameter with a 1..128 bounded string schema
+      ✓ documents 400 and 404 without an existence oracle (flag-off ≡ not-found) (1 ms)
+      ✓ returns the ScoutImportStatusResult projection on 200: the five legacy fields plus the S7-L additive lifecycle fields (1 ms)
+      ✓ pins status to the provable states: running, the legacy terminals and the S7-L server terminals — no pending
+      ✓ S7-L lifecycle fields carry the reason-code catalog as enums and nullable server clocks (1 ms)
+      ✓ S9-C: the additive family fields are optional, closed where the doc closes them, and additive only (1 ms)
+      ✓ reports committed counts as proof — the two-field DTO omits total_estimated
+      ✓ pins started_at and completed_at as nullable date-time strings (not object)
+    read: GET /api/scout/reconstruct/entities (IMPORTER-I)
+      ✓ requires a bounded intent_id and a non-person family query param
+      ✓ returns the ScoutEntitiesResult page projection on 200 (1 ms)
+      ✓ advertises a PII-minimal ReconstructedEntityDto row (no email/billing/coach_id)
+      ✓ documents 400 (bad query) and a no-oracle 404 (flag-off ≡ no-evidence)
+      ✓ models the reachable 401/403/404 as the shared envelope and 429 as the rate-limit body (1 ms)
+    auth: POST /api/auth/extension/refresh
+      ✓ returns the rotated Supabase session on 200
+      ✓ returns the shared ErrorEnvelope with a required code enum on 401
+      ✓ advertises ValidationPipe 400 as the shared ErrorEnvelope (no domain code) (1 ms)
+      ✓ advertises the rate-limit status as the RateLimitError body
+    pairing: POST /api/extension/pair/*
+      ✓ init returns code, expiry and server intent on 201
+      ✓ durable session is bearer-only POST with validated UUID and credential-free response
+      ✓ intent echoes remain optional for legacy redeem/status responses (1 ms)
+      ✓ setup recovery is an unfrozen 2.x prerelease, with optional nonce and current lookup (1 ms)
+      ✓ init 400 is the shared envelope; code is OPTIONAL and pinned to `code_mint_failed` when present
+      ✓ init advertises the reachable 429 (global authed throttle)
+      ✓ status returns the pending|paired|expired enum on 200 (4 ms)
+      ✓ status advertises ValidationPipe 400 (same 6-digit code rule as redeem)
+      ✓ status advertises JwtAuth 401 before role 403
+      ✓ init advertises JwtAuth 401 before role 403 (1 ms)
+      ✓ status advertises the reachable 429 (global authed throttle)
+      ✓ redeem returns the token pair + chosen_platform on 200
+      ✓ redeem 400 is the shared envelope; code is OPTIONAL and pinned to `invalid` when present (1 ms)
+      ✓ redeem 410 is the shared envelope with a REQUIRED code from the 410 enum
+      ✓ redeem advertises the dark-route 404 (envelope) and the per-IP 429 (rate-limit) (1 ms)
+    scout: POST /api/scout/*
+      ✓ ingest returns { received, deduped } on 202 (1 ms)
+      ✓ ingest keeps provenance camelCase at the top of a snake_case envelope
+      ✓ ingest pins capturedAt to a strict date-time string (1 ms)
+      ✓ ingest models its 4xx as the shared envelope and 429 as the rate-limit body
+      ✓ progress requires deviceId and returns 204 (1 ms)
+      ✓ progress advertises ValidationPipe 400
+      ✓ progress advertises the reachable 403 (role) and 429 (throttle)
+      ✓ complete acknowledges the settled intent on 200 (1 ms)
+      ✓ complete advertises ValidationPipe 400
+      ✓ complete advertises the reachable 403 (role) and 429 (throttle)
+    S7-L run lifecycle: POST /api/scout/runs/start + /api/scout/runs/cancel
+      ✓ both routes are bearer-guarded POSTs answering 200 with their typed result
+      ✓ start takes only a uuid import_intent_id and returns the server-owned clock once
+      ✓ cancel takes the intent_id and returns { intent_id, status: cancelled, execution_epoch } (5 ms)
+      ✓ 409 bodies pin the D-S7L-5 conflict codes as enums (no free text)
+      ✓ both routes share the uniform FEATURE_SCOUT_INGEST / not-found 404 wording
+    cross-process determinism
+      ✓ a fresh subprocess regeneration is byte-identical to the committed artifact (27707 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       57 passed, 57 total
+Snapshots:   0 total
+Time:        97.186 s
+Ran all test suites within paths "test/contracts/importer-contract.spec.ts".

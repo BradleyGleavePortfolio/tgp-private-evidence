@@ -1,0 +1,858 @@
+diff --git a/docs/decisions/2026-09-25-s9-reconciliation.md b/docs/decisions/2026-09-25-s9-reconciliation.md
+index 2fae1e07..5c52731e 100644
+--- a/docs/decisions/2026-09-25-s9-reconciliation.md
++++ b/docs/decisions/2026-09-25-s9-reconciliation.md
+@@ -630,3 +630,90 @@ source_id)`; attributed to the mapped entry the pair resolves to (creating a zer
+   L174-181 length-prefixed `source_id`.
+ - **Claim.** `ScoutImportCompletion.terminal_status` filtered to `success | partial | failed`; any
+   other value is `null`.
++
++## Addendum B — S9-C closures (session d3a9f701, 2026-09-25)
++
++Appended only; nothing above this heading changed. Records the closures the two independent
++S9-C reviews (A and B, both initially NO-GO) required, and the scope grants the parent issued for
++them. Base for the S9-C candidate: `5407efae` (S9-B landed).
++
++### B.1 C-9 catalogue clause, amended (review A finding 3 / review B B-4 context)
++
++The C-9 sentence "S9-C adds a spec that asserts S9-A's copy of the §3.7 catalogue **equals** S8-C's
++runtime `UNRESOLVED_CODE`" is amended to:
++
++> S9-C adds a spec (`test/scout/reconciliation/catalogue-parity.spec.ts`) that asserts the runtime
++> `UNRESOLVED_CODE` (`native-contract.ts`) is a **subset** of S9-A's `UNRESOLVED_CATALOGUE`
++> (`reconciliation/types.ts`) **with identical qualifier shapes** for every shared code, and that
++> the surplus is **exactly** the pinned set `{date_zone_unknown, no_native_destination,
++unit_unknown}`.
++
++Rationale: the three surplus codes are §3.7 catalogue entries that no landed S8-C writer emits at
++this base (`no_native_destination:<family>` is the S9-A `WRITER_CODE` prefix reserved for the
++facts layer; `unit_unknown` / `date_zone_unknown` are declared for later rule kinds). Literal
++equality would require either widening S8-C's runtime constant with codes nothing emits or
++deleting catalogue entries from frozen S9-A — both outside S9-C's grant. The pinned surplus turns
++any future drift in either list into a red test that names the drifting code, which is the
++property C-9 wanted.
++
++### B.2 C-9 isolation applied on the settle path; timeout; serialization retry (review A A-1, review B B-2 / A-1(B))
++
++- Both S9 snapshot transactions — S8-G's settle tail in `onTransferSettled` and the status-path
++  `readReport` — open with one shared options object, `S9_SNAPSHOT_TX_OPTIONS =
++{ isolationLevel: RepeatableRead, timeout: 20 000 ms, maxWait: 5 000 ms }`
++  (`lifecycle.service.ts`). The timeout replaces Prisma's 5 000 ms interactive default, which
++  sits below R16's proven bound (10 000 ms for a 10k-row intent); 20 000 ms is twice R16 and one
++  fifteenth of `SCOUT_RUN_DEADLINE_MS_DEFAULT`.
++- **Retry rule.** Under REPEATABLE READ, PostgreSQL raises SQLSTATE 40001 (Prisma `P2034`) when
++  the `FOR NO KEY UPDATE` run row was changed by a concurrent committed writer (fence, cancel,
++  revoke) after the snapshot was taken. The settle tail retries the **whole** transaction from a
++  fresh snapshot, at most `SETTLE_ATTEMPTS = 3` times, on `P2034` **only**. Every attempt
++  re-locks and re-checks terminal/epoch first, so a retry is idempotent (the row that changed is
++  seen terminal or epoch-raised and the attempt returns with no write); any other error
++  propagates unchanged after one attempt; exhaustion rethrows the last serialization failure —
++  no terminal is ever fabricated. `readReport` is read-only and is not retried.
++- The live proof asserts the settle tail's statement shape only; PostgreSQL does not echo the
++  isolation level per statement, and adding a `SHOW transaction_isolation` probe would be a new
++  heuristic, so isolation is pinned at unit tier (the options object is asserted by identity on
++  both paths) and not re-asserted live.
++
++### B.3 C-6 implemented as closed-domain membership (review A A-2, review B B-4)
++
++`ScoutLifecycleService.admitReasonCode` no longer accepts a histogram key on grammar alone. A key
++is admitted only if: it is one of the constant S9-A report / writer / rejection codes; or it is
++`unresolved_family:<token>` with `<token>` a staged token of the projection; or it is
++`unsupported_platform:<p>` with `<p>` satisfying the platform-identifier grammar and, when the
++caller supplies the staged platforms, a member of them; or it is `unresolved:<code>` /
++`unresolved:<code>:<qualifier>` where `<code>` is a §3.7 catalogue code of the matching shape and
++`<qualifier>` is a member of the derived domain in `src/scout/lifecycle/reason-domains.ts` —
++canonical families (`RECONSTRUCT_FAMILY`, `NATIVE_FAMILY`, `CHILD_ENTITY_TYPE`), native target
++models (`Prisma.ModelName.{WorkoutProgram, WorkoutPlan, WorkoutPlanExercise, Person}`), their
++columns (`Prisma.<Model>ScalarFieldEnum`) and the native rule field keys (`NATIVE_RULE_FIELDS`,
++an additive export of `native-rules.ts` derived from its grammar tables). Every domain is derived
++from an existing constant, never hand-listed. Anything else folds to
++`unresolved:reason_unrecognised` with its count kept and its text never echoed
++(`unresolved:missing_required_field:Jane` and an unknown bare word are the pinned negatives).
++
++### B.4 Scope deviations recorded for the S9-C landing (review A "C" note, review B scope note)
++
++Relative to the D-S9-8 S9-C row, the landing also touches, by parent grant:
++
++- `test/contracts/importer-contract.spec.ts` and `docs/contracts/importer-openapi.json` — the Gen
++  row, adopted by the parent as generator owner (regenerated with `npm run contract:importer`, no
++  `CONTRACT_VERSION` bump).
++- `test/scout/orchestration/settle-hook.spec.ts` (landed S8-G spec) — facts double injected, call
++  order `pass, lock, facts, terminal`, the now-unreachable `reconciliation_not_performed`
++  expectation replaced by `coverage_basis_unknown`.
++- `test/scout/reconciliation/catalogue-parity.spec.ts` — the C-9 parity spec (B.1).
++- `test/rls-g2-s9c.spec.ts`, `test/scout/g2-s9c-db-guard.spec.ts`,
++  `test/utils/g2-s9c-{bootstrap.sh,db.ts,harness.ts,pg-harness.ts,worker.cjs}` — the S9-C live
++  PG proof lane (`g2_s9c_disposable`, port 55646, role `s9c_super`).
++- Helper additions in `reason-codes.ts` (`FAMILY_QUALIFIERS`, `RELATIONSHIP_CLOSURES` closed
++  enums beside the three appended reason codes),
++  `scout.dto.ts` (`ScoutImportReasonCountDto`), `lifecycle.service.ts` (`readReport`,
++  `reportApplies`, `projectReasons`, `admitReasonCode`, `settleWithSnapshot`,
++  `S9_SNAPSHOT_TX_OPTIONS`, `SETTLE_ATTEMPTS`) and the new `lifecycle/reason-domains.ts`.
++- `native-rules.ts` — the additive `NATIVE_RULE_FIELDS` export only (B.3).
++- The settle-tail isolation / timeout / retry edits in `onTransferSettled` (B.2), beyond "the
++  `reconciliation:` argument", granted by the parent for A-1/B-2.
++- The C-9 subset deviation (B.1).
+diff --git a/src/scout/lifecycle/lifecycle.service.ts b/src/scout/lifecycle/lifecycle.service.ts
+index 5b3a8d18..11f62306 100644
+--- a/src/scout/lifecycle/lifecycle.service.ts
++++ b/src/scout/lifecycle/lifecycle.service.ts
+@@ -44,10 +44,28 @@ import {
+   runConflict,
+   type ServerTerminalStatus,
+ } from './reason-codes';
++import { CONSTANT_REASON_CODES, isAdmissibleUnresolved } from './reason-domains';
+ 
+ /** Prisma transaction client — the interactive-transaction handle passed to $transaction. */
+ export type Tx = Prisma.TransactionClient;
+ 
++/** S9-C: bounded retries of the REPEATABLE READ settle transaction on serialization failure. */
++export const SETTLE_ATTEMPTS = 3;
++
++/**
++ * S9-C (Addendum C-9): the ONE options object every S9 snapshot transaction (settle tail and
++ * status-path `readReport`) opens with. REPEATABLE READ gives the facts collector's claim,
++ * staging, ledger, provenance and native reads a single snapshot. The timeout replaces Prisma's
++ * 5 000 ms interactive default, which sits below R16's proven bound (a 10k-row intent reconciles
++ * within 10 000 ms): 20 000 ms is twice R16 and still one fifteenth of
++ * `SCOUT_RUN_DEADLINE_MS_DEFAULT`; `maxWait` bounds the wait for a pooled connection.
++ */
++export const S9_SNAPSHOT_TX_OPTIONS = {
++  isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
++  timeout: 20_000,
++  maxWait: 5_000,
++} as const;
++
+ /** Parent-frozen default deadline (D-S7L-3: PLAN "five minutes"). */
+ export const SCOUT_RUN_DEADLINE_MS_DEFAULT = 300_000;
+ /** Environment override of the deadline; must be a positive integer number of milliseconds. */
+@@ -108,12 +126,9 @@ export const PROJECTED_RELATIONSHIP_CLOSURES: readonly RelationshipClosure[] =
+   RELATIONSHIP_CLOSURES;
+ 
+ /**
+- * Qualifier grammar S8-C's `unresolved()` writer enforces for `unresolved:<code>:<qualifier>`
+- * (a native column, canonical family or model name — never a source value). Addendum C-6:
+- * S9-C re-validates it before anything reaches a DTO.
++ * A `source_platform` identifier as the `unsupported_platform:<token>` rejection carries it
++ * (Addendum C-6 grammar; membership in the staged platforms is checked when the caller has them).
+  */
+-const NATIVE_NAME_QUALIFIER = /^[a-z_.A-Z]+$/;
+-/** A `source_platform` identifier as the `unsupported_platform:<token>` rejection carries it. */
+ const PLATFORM_QUALIFIER = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
+ 
+ /**
+@@ -405,7 +420,7 @@ export class ScoutLifecycleService {
+     if (pass.stopped === 'gate_closed') {
+       await this.classifyClosed(coachId, intentId);
+     }
+-    const outcome = await this.prisma.$transaction(async (tx) => {
++    const outcome = await this.settleWithSnapshot(async (tx) => {
+       const locked = await this.lockRun(tx, coachId, intentId);
+       if (!locked || locked.terminal_status !== null || locked.execution_epoch !== epoch) {
+         return null;
+@@ -429,6 +444,36 @@ export class ScoutLifecycleService {
+     }
+   }
+ 
++  /**
++   * S9-C (Addendum C-9): the settle tail runs with `S9_SNAPSHOT_TX_OPTIONS` (REPEATABLE READ
++   * plus the R16-sized timeout) so the claim, staging, ledger, provenance and native reads the S9
++   * facts collector performs see ONE database snapshot, and the terminal CAS is decided against
++   * that same snapshot. PostgreSQL raises a serialization failure (SQLSTATE 40001, Prisma P2034)
++   * when the `FOR NO KEY UPDATE` row was changed by a concurrent committed writer (a fence, a
++   * cancel, a revoke) after the snapshot was taken; the whole transaction is then retried from a
++   * fresh snapshot, at most `SETTLE_ATTEMPTS` times. Every attempt re-locks and re-checks
++   * terminal/epoch first, so a retry is idempotent: the row that changed is seen terminal or
++   * epoch-raised and the attempt returns null with no write. Only serialization failures are
++   * retried; anything else propagates unchanged, and exhaustion rethrows the last serialization
++   * failure — a run is never silently left with a fabricated terminal.
++   */
++  private async settleWithSnapshot<T>(body: (tx: Tx) => Promise<T>): Promise<T> {
++    for (let attempt = 1; ; attempt += 1) {
++      try {
++        return await this.prisma.$transaction(body, S9_SNAPSHOT_TX_OPTIONS);
++      } catch (err) {
++        if (!ScoutLifecycleService.isSerializationFailure(err) || attempt >= SETTLE_ATTEMPTS) {
++          throw err;
++        }
++      }
++    }
++  }
++
++  /** Prisma P2034 ("write conflict or a deadlock") wraps PostgreSQL 40001 / 40P01. */
++  static isSerializationFailure(err: unknown): boolean {
++    return err instanceof PrismaClientKnownRequestError && err.code === 'P2034';
++  }
++
+   private async lockRun(tx: Tx, coachId: string, intentId: string): Promise<LockedRow | null> {
+     const rows = await tx.$queryRaw<LockedRow[]>`
+       SELECT execution_epoch, terminal_status, fenced_at, fence_reason, deadline_at
+@@ -666,7 +711,7 @@ export class ScoutLifecycleService {
+     if (!ScoutLifecycleService.reportApplies(row)) return null;
+     return this.prisma.$transaction(
+       async (tx) => reconcile(await this.facts.collect(tx, coachId, intentId)).report,
+-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
++      S9_SNAPSHOT_TX_OPTIONS,
+     );
+   }
+ 
+@@ -797,21 +842,41 @@ export class ScoutLifecycleService {
+     );
+   }
+ 
+-  /** C-6 qualifier-domain check for one D-S9-7 histogram key. */
+-  static admitReasonCode(code: string, stagedTokens: ReadonlySet<string>): boolean {
++  /**
++   * Addendum C-6 — closed-domain admission of one D-S9-7 histogram key (never a grammar check
++   * alone):
++   *  - `unresolved_family:<token>`: `<token>` must be a staged token of THIS projection;
++   *  - `unsupported_platform:<p>`: `<p>` must satisfy the platform-identifier grammar and, when the
++   *    caller knows the staged platforms, be one of them;
++   *  - `unresolved:<code>` / `unresolved:<code>:<qualifier>`: `<code>` must be a §3.7 catalogue
++   *    code (S9-A `UNRESOLVED_CATALOGUE`, of which S8-C's runtime codes are the emitted subset),
++   *    a bare code takes no qualifier and a qualified code's `<qualifier>` must be a member of
++   *    the derived native-name domain (`reason-domains.ts`: canonical families, native target
++   *    models, their columns and rule field keys) — `unresolved:missing_required_field:Jane` is
++   *    not, whatever its shape;
++   *  - otherwise the key must be one of the constant S9-A report / writer / rejection codes.
++   * Anything else folds to `unresolved:reason_unrecognised` (count kept, text never echoed).
++   */
++  static admitReasonCode(
++    code: string,
++    stagedTokens: ReadonlySet<string>,
++    stagedPlatforms?: ReadonlySet<string>,
++  ): boolean {
++    if (CONSTANT_REASON_CODES.has(code)) return true;
+     if (code.startsWith(UNRESOLVED_FAMILY_PREFIX)) {
+       return stagedTokens.has(code.slice(UNRESOLVED_FAMILY_PREFIX.length));
+     }
+     if (code.startsWith(REJECTION_PREFIX_UNSUPPORTED_PLATFORM)) {
+-      return PLATFORM_QUALIFIER.test(code.slice(REJECTION_PREFIX_UNSUPPORTED_PLATFORM.length));
++      const platform = code.slice(REJECTION_PREFIX_UNSUPPORTED_PLATFORM.length);
++      if (!PLATFORM_QUALIFIER.test(platform)) return false;
++      return stagedPlatforms === undefined || stagedPlatforms.has(platform);
+     }
+     if (code.startsWith(UNRESOLVED_PREFIX)) {
+       const parts = code.slice(UNRESOLVED_PREFIX.length).split(':');
+-      if (parts.length === 1) return NATIVE_NAME_QUALIFIER.test(parts[0]);
+-      return parts.length === 2 && parts.every((p) => NATIVE_NAME_QUALIFIER.test(p));
++      if (parts.length > 2 || parts.some((p) => p.length === 0)) return false;
++      return isAdmissibleUnresolved(parts[0], parts[1]);
+     }
+-    // Bare writer codes (`failed`, `missing_source_id`) carry no qualifier.
+-    return NATIVE_NAME_QUALIFIER.test(code);
++    return false;
+   }
+ 
+   /** Narrowed lifecycle columns for the read surface; unknown persisted values project as null. */
+diff --git a/src/scout/lifecycle/reason-domains.ts b/src/scout/lifecycle/reason-domains.ts
+new file mode 100644
+index 00000000..5354128f
+--- /dev/null
++++ b/src/scout/lifecycle/reason-domains.ts
+@@ -0,0 +1,86 @@
++import { Prisma } from '@prisma/client';
++import {
++  REJECTION_MISSING_SOURCE_ID,
++  S9_REPORT_CODE,
++  UNRESOLVED_CATALOGUE,
++  WRITER_CODE,
++} from '../reconciliation/types';
++import { CHILD_ENTITY_TYPE, NATIVE_FAMILY } from '../reconstruct/native/native-contract';
++import { NATIVE_RULE_FIELDS } from '../reconstruct/native/native-rules';
++import { RECONSTRUCT_FAMILY } from '../scout-reconstruct.dto';
++
++/**
++ * S9-C Addendum C-6 — the closed qualifier domains a D-S9-7 histogram key must belong to before
++ * it reaches a DTO. Every set below is DERIVED from an existing code constant (a Prisma-generated
++ * enum, the S8-C native contract/rules, the reconstruct family list or the S9-A catalogue), never
++ * hand-listed, so the allow-list cannot drift from the writers by itself: a writer emitting a new
++ * name must first add it to the constant it already reads from.
++ *
++ * A qualifier is admitted only if it names one of
++ *  - a canonical family (`RECONSTRUCT_FAMILY`, `NATIVE_FAMILY`, the child entity type),
++ *  - a native target model (`Prisma.ModelName` of the S8-B/S8-C native targets), or
++ *  - a native column of one of those models (`Prisma.<Model>ScalarFieldEnum`) or a native rule
++ *    field key the rule grammar accepts (`NATIVE_RULE_FIELDS`).
++ * A person's name, an email, a source value or an unregistered field name is in none of them.
++ */
++
++/** Canonical / native family names and the nested child entity type. */
++export const QUALIFIER_FAMILY_NAMES: ReadonlySet<string> = new Set<string>([
++  ...Object.values(RECONSTRUCT_FAMILY),
++  ...Object.values(NATIVE_FAMILY),
++  ...Object.values(CHILD_ENTITY_TYPE),
++]);
++
++/** Native target models (generated `Prisma.ModelName`; a typo here fails to compile). */
++export const QUALIFIER_MODEL_NAMES: ReadonlySet<string> = new Set<string>([
++  Prisma.ModelName.WorkoutProgram,
++  Prisma.ModelName.WorkoutPlan,
++  Prisma.ModelName.WorkoutPlanExercise,
++  Prisma.ModelName.Person,
++]);
++
++/** Native columns of the target models (generated scalar-field enums) plus rule field keys. */
++export const QUALIFIER_FIELD_NAMES: ReadonlySet<string> = new Set<string>([
++  ...Object.values(Prisma.WorkoutProgramScalarFieldEnum),
++  ...Object.values(Prisma.WorkoutPlanScalarFieldEnum),
++  ...Object.values(Prisma.WorkoutPlanExerciseScalarFieldEnum),
++  ...Object.values(Prisma.PersonScalarFieldEnum),
++  ...NATIVE_RULE_FIELDS,
++]);
++
++/** The union: the only strings admissible as `<qualifier>` of `unresolved:<code>:<qualifier>`. */
++export const UNRESOLVED_QUALIFIER_DOMAIN: ReadonlySet<string> = new Set<string>([
++  ...QUALIFIER_FAMILY_NAMES,
++  ...QUALIFIER_MODEL_NAMES,
++  ...QUALIFIER_FIELD_NAMES,
++]);
++
++/**
++ * Histogram keys that are complete constants (no qualifier): the S9-A report codes (D-S9-7),
++ * the bare writer codes and the `missing_source_id` rejection. `unresolved:<code>` keys whose code
++ * is a bare §3.7 catalogue entry are admitted by `unresolvedCodeShape` instead.
++ */
++export const CONSTANT_REASON_CODES: ReadonlySet<string> = new Set<string>([
++  ...Object.values(S9_REPORT_CODE),
++  WRITER_CODE.no_native_client_principal,
++  WRITER_CODE.native_target_removed,
++  WRITER_CODE.identity_conflict,
++  REJECTION_MISSING_SOURCE_ID,
++]);
++
++/** `qualified` / `bare` for a §3.7 catalogue code — `null` for a non-catalogue code. */
++export function unresolvedCodeShape(code: string): 'qualified' | 'bare' | null {
++  return Object.prototype.hasOwnProperty.call(UNRESOLVED_CATALOGUE, code)
++    ? UNRESOLVED_CATALOGUE[code]
++    : null;
++}
++
++/** Closed-domain membership for one `unresolved:<code>[:<qualifier>]` key. */
++export function isAdmissibleUnresolved(code: string, qualifier: string | undefined): boolean {
++  const shape = unresolvedCodeShape(code);
++  if (shape === 'bare') return qualifier === undefined;
++  if (shape === 'qualified') {
++    return qualifier !== undefined && UNRESOLVED_QUALIFIER_DOMAIN.has(qualifier);
++  }
++  return false;
++}
+diff --git a/src/scout/reconstruct/native/native-rules.ts b/src/scout/reconstruct/native/native-rules.ts
+index 0b9aadec..ac9186a7 100644
+--- a/src/scout/reconstruct/native/native-rules.ts
++++ b/src/scout/reconstruct/native/native-rules.ts
+@@ -620,6 +620,23 @@ const EXERCISE_FIELDS: Readonly<Record<keyof ExerciseItemRules, readonly RuleKin
+   notes: ['text'],
+ };
+ 
++/**
++ * S9-C (Addendum C-6): the closed set of native rule field keys a source may declare — every
++ * `<field>` qualifier the rule interpreters emit (`missing_required_field:<field>`,
++ * `invalid_value:<field>`, `enum_unmapped:<field>`, `prescription_not_integral:<field>`) is either
++ * one of these keys or a native column name. Derived from the grammar tables above; additive
++ * export, nothing else here changes.
++ */
++const WORKOUT_EXERCISES_KEY: keyof WorkoutNativeRules = 'exercises';
++export const NATIVE_RULE_FIELDS: readonly string[] = Array.from(
++  new Set<string>([
++    ...Object.keys(PROGRAM_FIELDS),
++    ...Object.keys(WORKOUT_FIELDS),
++    WORKOUT_EXERCISES_KEY,
++    ...Object.keys(EXERCISE_FIELDS),
++  ]),
++);
++
+ class InvalidNativeRuleSet extends Error {
+   constructor(origin: string, detail: string) {
+     super(`invalid native rule set ${origin}: ${detail}`);
+diff --git a/src/scout/scout.service.spec.ts b/src/scout/scout.service.spec.ts
+index eb596ffb..b58b0f28 100644
+--- a/src/scout/scout.service.spec.ts
++++ b/src/scout/scout.service.spec.ts
+@@ -836,7 +836,7 @@ describe('ScoutService', () => {
+                   unresolved_children: {},
+                 },
+               }
+-            : { status: 'skipped' as const, reason: 'unresolved:missing_required_field:title' },
++            : { status: 'skipped' as const, reason: 'unresolved:missing_required_field:name' },
+         client_linked: false,
+       })),
+       ledger_without_staged: 0,
+@@ -921,7 +921,7 @@ describe('ScoutService', () => {
+         observed_unique: null,
+         completeness_basis: 'none',
+         relationship_closure: 'not_applicable',
+-        reasons: [{ code: 'unresolved:missing_required_field:title', count: 1 }],
++        reasons: [{ code: 'unresolved:missing_required_field:name', count: 1 }],
+         qualifiers: [],
+       });
+       // The top-level key set is unchanged: the S9 fields live inside families[] only.
+@@ -1011,9 +1011,9 @@ describe('ScoutService', () => {
+       const wide = (name: string, token: string): FamilyFacts => {
+         const base = family(name, token, 6, { qualifiers: ['roster_bridge_pending'] });
+         const reasons = [
+-          'unresolved:missing_required_field:title',
+-          'unresolved:invalid_value:minutes',
+-          'unresolved:enum_unmapped:kind',
++          'unresolved:missing_required_field:name',
++          'unresolved:invalid_value:duration_estimate_minutes',
++          'unresolved:enum_unmapped:type',
+           'unresolved:prescription_not_integral:reps',
+           'unresolved:relationship_pending:programs',
+           'unresolved:relationship_missing:programs',
+diff --git a/test/rls-g2-s9c.spec.ts b/test/rls-g2-s9c.spec.ts
+index 3b6d97da..5c9abafb 100644
+--- a/test/rls-g2-s9c.spec.ts
++++ b/test/rls-g2-s9c.spec.ts
+@@ -102,8 +102,15 @@ const isGate = (q: string) => /SET last_observed_at\s*=/.test(q);
+ const isLock = (q: string) => q.includes('FOR NO KEY UPDATE');
+ const isTerminal = (q: string) => q.includes('SET terminal_status = ');
+ const isWrite = (q: string) => /^\s*(INSERT|UPDATE|DELETE)\b/i.test(q);
+-/** The S9-B facts reader's signature statement: the provenance read for the mapped families. */
+-const isS9Read = (q: string) => /"ImportNativeProvenance"/.test(q) && /^\s*SELECT/i.test(q);
++/**
++ * The S9-B facts collector's signature statement (facts.service.ts `readProvenance`): the ONE
++ * provenance read keyed by a `source_namespace IN (…)` list over the mapped families. S8-C's own
++ * writer lookups (`findProvenance` findUnique, `countUnresolvedChildren`, the upsert's select)
++ * address the table by an equality on `source_namespace`, never an IN list, and the entities
++ * service's `findMany` filters by `native_id IN` / `outcome IN` — so none of them matches.
++ */
++const isS9Read = (q: string) =>
++  /^\s*SELECT/i.test(q) && /"ImportNativeProvenance"/.test(q) && /"source_namespace" IN \(/.test(q);
+ const isNoise = (q: string) =>
+   /^\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|SET |DEALLOCATE|SELECT 1\b)/i.test(q);
+ /** Statements of each fixture-marked transaction, in order (noise such as BEGIN/COMMIT removed). */
+diff --git a/test/scout/g2-s9c-db-guard.spec.ts b/test/scout/g2-s9c-db-guard.spec.ts
+index 10709c95..83c08c92 100644
+--- a/test/scout/g2-s9c-db-guard.spec.ts
++++ b/test/scout/g2-s9c-db-guard.spec.ts
+@@ -47,6 +47,8 @@ describe('S9-C PG17 disposable target guard', () => {
+     base.replace('g2_s9c_disposable', 'g2_s7l_disposable'),
+     base.replace('g2_s9c_disposable', 'g2_s8b_disposable'),
+     base.replace('g2_s9c_disposable', 'g2_s8c_disposable'),
++    base.replace('g2_s9c_disposable', 'g2_s8g_disposable'),
++    base.replace('g2_s9c_disposable', 'g2_s9_disposable'),
+     base.replace('s9c_super@', 'b_super@'),
+     base.replace('s9c_super@', 'r_super@'),
+     base.replace('s9c_super@', 'nq1_super@'),
+@@ -54,6 +56,8 @@ describe('S9-C PG17 disposable target guard', () => {
+     base.replace('s9c_super@', 's7l_super@'),
+     base.replace('s9c_super@', 's8b_super@'),
+     base.replace('s9c_super@', 's8c_super@'),
++    base.replace('s9c_super@', 's8g_super@'),
++    base.replace('s9c_super@', 's9_super@'),
+     base.replace('g2_s9c_disposable', 'g2_tq0_disposable'),
+     base.replace('g2_s9c_disposable', 'g2_s5_etq0_disposable'),
+     base.replace('55646', '54325'),
+@@ -138,7 +142,7 @@ describe('S9-C PG17 disposable target guard', () => {
+     expect(() => withFixturePassword(base, 'a@b')).toThrow();
+   });
+   it('pins the base head and migration count identically across bootstrap, harness and repository', () => {
+-    const BASE_HEAD = '771db62aa10dd0065f30d7d8a155d89fd1cfcfc8';
++    const BASE_HEAD = '5407efae319fd913e973c87f3be0d49786c4a3e0';
+     const EXPECTED_MIGRATIONS = 172;
+     const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
+     const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
+@@ -174,7 +178,7 @@ describe('S9-C PG17 disposable target guard', () => {
+     }
+   });
+   it('binds the proof to one attested, clean, non-base candidate head; the worker attests before any client', () => {
+-    const base = '771db62aa10dd0065f30d7d8a155d89fd1cfcfc8';
++    const base = '5407efae319fd913e973c87f3be0d49786c4a3e0';
+     const candidate = 'a'.repeat(40);
+     expect(g2S9cCandidateHead(candidate, `${candidate}\n`, '')).toBe(candidate);
+     expect(() => g2S9cCandidateHead(undefined, candidate, '')).toThrow(/G2_S9C_CANDIDATE_HEAD/);
+diff --git a/test/scout/lifecycle/lifecycle.service.spec.ts b/test/scout/lifecycle/lifecycle.service.spec.ts
+index d16c9919..6a2fce77 100644
+--- a/test/scout/lifecycle/lifecycle.service.spec.ts
++++ b/test/scout/lifecycle/lifecycle.service.spec.ts
+@@ -8,9 +8,18 @@ import {
+   PROJECTED_RELATIONSHIP_CLOSURES,
+   type RunRow,
+   S9_RUN_REASON_CODES,
++  S9_SNAPSHOT_TX_OPTIONS,
+   SCOUT_RUN_DEADLINE_MS_DEFAULT,
+   ScoutLifecycleService,
++  SETTLE_ATTEMPTS,
+ } from '../../../src/scout/lifecycle/lifecycle.service';
++import {
++  CONSTANT_REASON_CODES,
++  QUALIFIER_FAMILY_NAMES,
++  QUALIFIER_FIELD_NAMES,
++  QUALIFIER_MODEL_NAMES,
++  UNRESOLVED_QUALIFIER_DOMAIN,
++} from '../../../src/scout/lifecycle/reason-domains';
+ import {
+   FAMILY_QUALIFIERS,
+   isRunReasonCode,
+@@ -610,7 +619,7 @@ describe('ScoutLifecycleService', () => {
+   const MIXED = facts([
+     family('workouts', [
+       identity('routines', 1, verified),
+-      identity('routines', 2, skipped('unresolved:missing_required_field:title')),
++      identity('routines', 2, skipped('unresolved:missing_required_field:name')),
+     ]),
+   ]);
+   const lockedOpen = {
+@@ -625,6 +634,12 @@ describe('ScoutLifecycleService', () => {
+       (c[0] as string[]).join('?').includes('SET terminal_status = '),
+     );
+   const flatArgs = (call: unknown[]) => call.slice(1);
++  /** What Prisma raises for PostgreSQL 40001 (serialization failure) / 40P01 (deadlock). */
++  const serialization = () =>
++    new PrismaClientKnownRequestError('write conflict or deadlock', {
++      code: 'P2034',
++      clientVersion: '6.0.0',
++    });
+ 
+   describe('S9-C settle wiring (D-S9-1, R09)', () => {
+     it('passes the recomputed S9 verdict to the arbiter: the S9 reason code is the one terminal write', async () => {
+@@ -735,6 +750,103 @@ describe('ScoutLifecycleService', () => {
+       expect(d.capture).not.toHaveBeenCalled();
+     });
+ 
++    it('C-9: the settle tail opens its transaction with the S9 snapshot options (REPEATABLE READ, R16-sized timeout)', async () => {
++      const { service: svc } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(d.transaction).toHaveBeenCalledTimes(1);
++      expect(d.transaction.mock.calls[0][1]).toBe(S9_SNAPSHOT_TX_OPTIONS);
++      expect(S9_SNAPSHOT_TX_OPTIONS).toEqual({
++        isolationLevel: 'RepeatableRead',
++        timeout: 20_000,
++        maxWait: 5_000,
++      });
++      // R16: 10k rows reconcile within 10 000 ms; the timeout sits above that and well inside the
++      // run deadline, so a slow reconcile fails loudly instead of being cut at Prisma's 5 s
++      // default.
++      expect(S9_SNAPSHOT_TX_OPTIONS.timeout).toBeGreaterThanOrEqual(2 * 10_000);
++      expect(S9_SNAPSHOT_TX_OPTIONS.timeout).toBeLessThanOrEqual(
++        SCOUT_RUN_DEADLINE_MS_DEFAULT / 10,
++      );
++    });
++
++    it('C-9: a serialization failure (P2034) retries the WHOLE settle transaction once more; exactly one terminal write lands', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      // PG raises 40001 at the terminal UPDATE of a row a concurrent committed writer changed
++      // after this snapshot was taken; Prisma surfaces it as P2034 and the transaction is aborted.
++      d.executeRaw.mockRejectedValueOnce(serialization()).mockResolvedValueOnce(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(d.transaction).toHaveBeenCalledTimes(2);
++      for (const call of d.transaction.mock.calls) expect(call[1]).toBe(S9_SNAPSHOT_TX_OPTIONS);
++      // Each attempt re-locks and re-reads from its own fresh snapshot.
++      expect(d.queryRaw).toHaveBeenCalledTimes(2);
++      expect(s9.collect).toHaveBeenCalledTimes(2);
++      // Two UPDATE statements were issued, but the first belonged to the aborted attempt (PG
++      // rolled it back with the 40001); exactly one terminal landed and exactly one event fired.
++      expect(terminalWrites(d)).toHaveLength(2);
++      expect(d.capture).toHaveBeenCalledTimes(1);
++      expect(d.capture).toHaveBeenCalledWith(COACH, Events.SCOUT_RUN_SETTLED, {
++        intent_id: INTENT,
++        terminal_status: 'partial',
++        reason_code: 'unresolved_identities',
++      });
++    });
++
++    it('C-9: a retry that re-locks a now-terminal row is a no-op — the concurrent writer won, nothing is written', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      d.queryRaw
++        .mockResolvedValueOnce([lockedOpen])
++        .mockResolvedValueOnce([{ ...lockedOpen, terminal_status: 'cancelled' }]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockRejectedValueOnce(serialization());
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(d.transaction).toHaveBeenCalledTimes(2);
++      expect(d.queryRaw).toHaveBeenCalledTimes(2);
++      expect(s9.collect).toHaveBeenCalledTimes(1); // the retry returned at the terminal check
++      expect(d.executeRaw).toHaveBeenCalledTimes(1); // only the aborted attempt's UPDATE
++      expect(d.capture).not.toHaveBeenCalled();
++    });
++
++    it('C-9: retries are bounded — after SETTLE_ATTEMPTS serialization failures the error propagates, no terminal is fabricated', async () => {
++      const { service: svc } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.transaction.mockImplementation(async () => {
++        throw serialization();
++      });
++      await expect(svc.onTransferSettled(COACH, INTENT, 1)).rejects.toMatchObject({
++        code: 'P2034',
++      });
++      expect(SETTLE_ATTEMPTS).toBe(3);
++      expect(d.transaction).toHaveBeenCalledTimes(SETTLE_ATTEMPTS);
++      expect(d.capture).not.toHaveBeenCalled();
++    });
++
++    it('C-9: non-serialization errors are NOT retried — one attempt, error propagates unchanged', async () => {
++      const { service: svc } = wired(d, MIXED);
++      const dup = new PrismaClientKnownRequestError('dup', {
++        code: 'P2002',
++        clientVersion: '6.0.0',
++      });
++      const plain = new Error('connection reset');
++      d.transaction.mockImplementationOnce(async () => {
++        throw dup;
++      });
++      await expect(svc.onTransferSettled(COACH, INTENT, 1)).rejects.toBe(dup);
++      d.transaction.mockImplementationOnce(async () => {
++        throw plain;
++      });
++      await expect(svc.onTransferSettled(COACH, INTENT, 1)).rejects.toBe(plain);
++      expect(d.transaction).toHaveBeenCalledTimes(2);
++      expect(ScoutLifecycleService.isSerializationFailure(dup)).toBe(false);
++      expect(ScoutLifecycleService.isSerializationFailure(plain)).toBe(false);
++      expect(ScoutLifecycleService.isSerializationFailure(serialization())).toBe(true);
++      expect(d.capture).not.toHaveBeenCalled();
++    });
++
+     it('without an injected facts service the constructor still accepts (prisma, analytics) — R13 callers unchanged', () => {
+       expect(service).toBeInstanceOf(ScoutLifecycleService);
+       expect(S9_RUN_REASON_CODES.every((c) => isRunReasonCode(c))).toBe(true);
+@@ -792,7 +904,12 @@ describe('ScoutLifecycleService', () => {
+       const { service: svc, s9 } = wired(d, MIXED);
+       const report = await svc.readReport(COACH, INTENT, settledServer());
+       expect(d.transaction).toHaveBeenCalledTimes(1);
+-      expect(d.transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'RepeatableRead' });
++      expect(d.transaction.mock.calls[0][1]).toBe(S9_SNAPSHOT_TX_OPTIONS);
++      expect(d.transaction.mock.calls[0][1]).toMatchObject({
++        isolationLevel: 'RepeatableRead',
++        timeout: 20_000,
++        maxWait: 5_000,
++      });
+       expect(s9.collect).toHaveBeenCalledTimes(1);
+       expect(s9.collect.mock.calls[0][0]).toHaveProperty('$queryRaw', d.queryRaw);
+       expect(d.executeRaw).not.toHaveBeenCalled();
+@@ -802,6 +919,57 @@ describe('ScoutLifecycleService', () => {
+     });
+   });
+ 
++  describe('S9-C R10(C) — a replayed intent that converged already_present', () => {
++    /** S8-C replay: the create-only writers find their row and record `already_present` (j). */
++    const replayed: ReconciliationFacts = {
++      ...MIXED,
++      families: MIXED.families.map((f) => ({
++        ...f,
++        identities: f.identities.map((i) =>
++          i.ledger?.status === 'reconstructed' && i.ledger.provenance?.outcome === 'created'
++            ? {
++                ...i,
++                ledger: {
++                  ...i.ledger,
++                  provenance: { ...i.ledger.provenance, outcome: 'already_present' as const },
++                },
++              }
++            : i,
++        ),
++      })),
++    };
++
++    it('gives the same verdict and report as the first pass; created_native / already_present_verified stay null', async () => {
++      // Non-vacuous: the fixture really flipped an outcome.
++      expect(JSON.stringify(replayed)).toContain('already_present');
++      expect(JSON.stringify(MIXED)).not.toContain('already_present');
++      expect(reconcile(replayed)).toEqual(reconcile(MIXED));
++      const first = ScoutLifecycleService.projectFamilies(
++        [{ entity_type: 'routines', _count: { _all: 2 } }],
++        { routines: { reconstructed: 1, skipped: 1, failed: 0 } },
++        reconcile(MIXED).report,
++      );
++      const again = ScoutLifecycleService.projectFamilies(
++        [{ entity_type: 'routines', _count: { _all: 2 } }],
++        { routines: { reconstructed: 1, skipped: 1, failed: 0 } },
++        reconcile(replayed).report,
++      );
++      expect(again).toEqual(first);
++      expect(again[0].native_present_verified).toBe(1);
++      expect(again[0].created_native).toBeNull(); // D-S9-4: the split is unknown, never 0
++      expect(again[0].already_present_verified).toBeNull();
++      // And the settle tail writes the identical terminal for the replayed facts.
++      const { service: svc } = wired(d, replayed);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(flatArgs(terminalWrites(d)[0])).toEqual(
++        expect.arrayContaining(['partial', 'unresolved_identities']),
++      );
++    });
++  });
++
+   describe('S9-C additive projection (D-S9-5, C-6, C-7, C-10, R13, R15)', () => {
+     const STAGED = [
+       { entity_type: 'routines', _count: { _all: 2 } },
+@@ -886,7 +1054,7 @@ describe('ScoutLifecycleService', () => {
+       expect(routines.unresolved).toBe(1);
+       expect(routines.rejected).toBe(0);
+       expect(routines.reasons).toEqual([
+-        { code: 'unresolved:missing_required_field:title', count: 1 },
++        { code: 'unresolved:missing_required_field:name', count: 1 },
+       ]);
+       // The unmapped token: canonical_family null, its own staged token admitted as the qualifier (C-6).
+       expect(out[0]).toMatchObject({
+@@ -916,7 +1084,7 @@ describe('ScoutLifecycleService', () => {
+         facts([
+           family('workouts', [identity('items', 1, verified)]),
+           family('programs', [
+-            identity('items', 2, skipped('unresolved:missing_required_field:title')),
++            identity('items', 2, skipped('unresolved:missing_required_field:name')),
+           ]),
+         ]),
+       ).report;
+@@ -933,7 +1101,7 @@ describe('ScoutLifecycleService', () => {
+         rejected: 0,
+         completeness_basis: 'none',
+         relationship_closure: 'not_applicable',
+-        reasons: [{ code: 'unresolved:missing_required_field:title', count: 1 }],
++        reasons: [{ code: 'unresolved:missing_required_field:name', count: 1 }],
+       });
+     });
+ 
+@@ -946,22 +1114,24 @@ describe('ScoutLifecycleService', () => {
+             { code: 'unresolved_family:Jane Doe <jane@example.com>', count: 1 },
+             { code: 'unsupported_platform:s9c-proof', count: 1 },
+             { code: 'unsupported_platform:Jane Doe', count: 1 },
+-            { code: 'unresolved:missing_required_field:title', count: 1 },
++            { code: 'unresolved:missing_required_field:name', count: 1 },
+             { code: 'unresolved:missing_required_field:jane@example.com', count: 1 },
++            { code: 'unresolved:missing_required_field:Jane', count: 1 }, // well-formed, off-domain
+             { code: 'unresolved:no_native_client_principal', count: 1 },
+             { code: 'unresolved:reason_unrecognised', count: 1 },
+             { code: 'failed', count: 1 },
+             { code: 'missing_source_id', count: 1 },
+             { code: 'free text with spaces', count: 1 },
++            { code: 'frobnicate', count: 1 }, // well-formed bare word, not a known code
+           ],
+           staged,
+         ),
+       ).toEqual([
+         { code: 'failed', count: 1 },
+         { code: 'missing_source_id', count: 1 },
+-        { code: 'unresolved:missing_required_field:title', count: 1 },
++        { code: 'unresolved:missing_required_field:name', count: 1 },
+         { code: 'unresolved:no_native_client_principal', count: 1 },
+-        { code: 'unresolved:reason_unrecognised', count: 5 },
++        { code: 'unresolved:reason_unrecognised', count: 7 },
+         { code: 'unresolved_family:routines', count: 2 },
+         { code: 'unsupported_platform:s9c-proof', count: 1 },
+       ]);
+@@ -975,6 +1145,69 @@ describe('ScoutLifecycleService', () => {
+       expect(text).not.toContain('example.com');
+     });
+ 
++    it('C-6: admission is closed-domain membership, not grammar — every domain is derived from a code constant', () => {
++      const admit = (code: string, platforms?: ReadonlySet<string>) =>
++        ScoutLifecycleService.admitReasonCode(code, new Set(['routines']), platforms);
++      // Qualifier domains: native columns, rule field keys, families, target models.
++      for (const q of ['name', 'days_per_week', 'reps_or_duration_seconds', 'week_index', 'type']) {
++        expect(QUALIFIER_FIELD_NAMES.has(q)).toBe(true);
++      }
++      for (const q of ['daysPerWeek', 'exerciseRef', 'exercises', 'durationEstimateMinutes']) {
++        expect(QUALIFIER_FIELD_NAMES.has(q)).toBe(true);
++      }
++      for (const q of ['clients', 'workouts', 'client_history', 'programs', 'workouts.exercise']) {
++        expect(QUALIFIER_FAMILY_NAMES.has(q)).toBe(true);
++      }
++      for (const q of ['WorkoutProgram', 'WorkoutPlan', 'WorkoutPlanExercise', 'Person']) {
++        expect(QUALIFIER_MODEL_NAMES.has(q)).toBe(true);
++      }
++      for (const q of UNRESOLVED_QUALIFIER_DOMAIN) expect(q).toMatch(/^[A-Za-z_][A-Za-z0-9_.]*$/);
++      const offDomain = [
++        'Jane',
++        'jane',
++        'title',
++        'minutes',
++        'kind',
++        'Jane Doe',
++        'jane@example.com',
++      ];
++      for (const q of offDomain) expect(UNRESOLVED_QUALIFIER_DOMAIN.has(q)).toBe(false);
++      // Admitted: catalogue code + in-domain qualifier, bare catalogue codes, constant codes.
++      expect(admit('unresolved:missing_required_field:name')).toBe(true);
++      expect(admit('unresolved:missing_required_field:daysPerWeek')).toBe(true);
++      expect(admit('unresolved:invalid_value:exercises')).toBe(true);
++      expect(admit('unresolved:relationship_missing:programs')).toBe(true);
++      expect(admit('unresolved:native_uniqueness:WorkoutPlan')).toBe(true);
++      expect(admit('unresolved:no_native_destination:workouts')).toBe(true);
++      expect(admit('unresolved:no_native_client_principal')).toBe(true);
++      expect(admit('unresolved:exercise_reference')).toBe(true);
++      for (const c of CONSTANT_REASON_CODES) expect(admit(c)).toBe(true);
++      expect(admit('unresolved:not_reconstructed')).toBe(true);
++      expect(admit('unresolved:reason_unrecognised')).toBe(true);
++      expect(admit('failed')).toBe(true);
++      expect(admit('missing_source_id')).toBe(true);
++      expect(admit('unresolved_family:routines')).toBe(true);
++      // Folded: off-domain qualifier, unknown code, wrong shape, unknown bare word.
++      expect(admit('unresolved:missing_required_field:Jane')).toBe(false);
++      expect(admit('unresolved:missing_required_field:title')).toBe(false);
++      expect(admit('unresolved:missing_required_field')).toBe(false); // qualified, no qualifier
++      expect(admit('unresolved:no_native_client_principal:programs')).toBe(false); // bare+qual
++      expect(admit('unresolved:frobnicate')).toBe(false); // not a catalogue code
++      expect(admit('unresolved:frobnicate:name')).toBe(false);
++      expect(admit('unresolved:missing_required_field:name:extra')).toBe(false);
++      expect(admit('unresolved:missing_required_field:')).toBe(false);
++      expect(admit('unresolved:')).toBe(false);
++      expect(admit('frobnicate')).toBe(false);
++      expect(admit('Jane')).toBe(false);
++      expect(admit('unresolved_family:Jane')).toBe(false);
++      // unsupported_platform: grammar always; staged-platform membership when the caller has it.
++      expect(admit('unsupported_platform:s9c-proof')).toBe(true);
++      expect(admit('unsupported_platform:s9c-proof', new Set(['s9c-proof']))).toBe(true);
++      expect(admit('unsupported_platform:s9c-proof', new Set(['other']))).toBe(false);
++      expect(admit('unsupported_platform:Jane Doe')).toBe(false);
++      expect(admit('unsupported_platform:Jane Doe', new Set(['Jane Doe']))).toBe(false);
++    });
++
+     it('C-7 / C-10: the DTO enums and the S9-A literals are the same closed sets', () => {
+       expect([...FAMILY_QUALIFIERS]).toEqual(['roster_bridge_pending']);
+       expect([...PROJECTED_FAMILY_QUALIFIERS]).toEqual([...FAMILY_QUALIFIERS]);
+diff --git a/test/utils/g2-s9c-bootstrap.sh b/test/utils/g2-s9c-bootstrap.sh
+index 379b9505..1cf3b0a5 100755
+--- a/test/utils/g2-s9c-bootstrap.sh
++++ b/test/utils/g2-s9c-bootstrap.sh
+@@ -2,7 +2,7 @@
+ # S9-C G2 proof bootstrap, derived by substitution from the accepted S8-C bootstrap
+ # test/utils/g2-s8g-bootstrap.sh (at 771db62a, unchanged) for the S9-C-only disposable
+ # cluster/database. S9-C ships NO migration: the candidate's prisma tree must be byte-identical to
+-# the base 771db62a (S8-G merge; prisma tree identical to 1c5fbb04), so there is no OLD side here. The full accepted history (172 migrations,
++# the base 5407efae (S9-B merge; prisma tree identical to 1c5fbb04), so there is no OLD side here. The full accepted history (172 migrations,
+ # S8-B and S7-L included) is installed from the CANDIDATE root through the real release mechanism
+ # (`prisma migrate deploy`), and the spec then drives the candidate settle path (real ScoutService →
+ # ScoutLifecycleService → ScoutReconstructService) against it.
+@@ -24,7 +24,7 @@ set -euo pipefail
+ 
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ # Base pin (kept identical in test/utils/g2-s9c-pg-harness.ts and test/scout/g2-s9c-db-guard.spec.ts).
+-BASE_HEAD=771db62aa10dd0065f30d7d8a155d89fd1cfcfc8
++BASE_HEAD=5407efae319fd913e973c87f3be0d49786c4a3e0
+ S8B_MIGRATION=20270122000000_scout_native_provenance_expand
+ S7L_MIGRATION=20270123000000_scout_run_lifecycle_expand
+ # 171 accepted migrations through S8-B plus S7-L = 172 tracked by the base; S9-C adds none.
+diff --git a/test/utils/g2-s9c-db.ts b/test/utils/g2-s9c-db.ts
+index 6b4c51b2..ec787d0e 100644
+--- a/test/utils/g2-s9c-db.ts
++++ b/test/utils/g2-s9c-db.ts
+@@ -134,7 +134,7 @@ export function withFixturePassword(
+  * the callers supply `git rev-parse HEAD` and `git status --porcelain` output.
+  */
+ export const G2_S9C_CANDIDATE_HEAD_ENV = 'G2_S9C_CANDIDATE_HEAD';
+-export const G2_S9C_BASE_HEAD = '771db62aa10dd0065f30d7d8a155d89fd1cfcfc8';
++export const G2_S9C_BASE_HEAD = '5407efae319fd913e973c87f3be0d49786c4a3e0';
+ export function g2S9cCandidateHead(
+   declared: string | undefined,
+   checkedOut: string,
+diff --git a/test/utils/g2-s9c-pg-harness.ts b/test/utils/g2-s9c-pg-harness.ts
+index bcd2f9e6..3065b620 100644
+--- a/test/utils/g2-s9c-pg-harness.ts
++++ b/test/utils/g2-s9c-pg-harness.ts
+@@ -7,7 +7,7 @@
+  * or query mocks; bound to the S9-C-only identity guard test/utils/g2-s9c-db.ts and the G2_S9C_*
+  * environment. Only test/rls-g2-s9c.spec.ts (via test/utils/g2-s9c-harness.ts) imports this.
+  *
+- * There is no OLD side: S9-C ships no migration, so the base 771db62a prisma tree (identical to 1c5fbb04, through the
++ * There is no OLD side: S9-C ships no migration, so the base 5407efae prisma tree (S9-B merge; identical to 1c5fbb04, through the
+  * accepted S7-L migration) is the only schema and the accepted S7-L run objects plus the S8-B
+  * native provenance objects are the proof target. No up/down file helpers are carried.
+  */
