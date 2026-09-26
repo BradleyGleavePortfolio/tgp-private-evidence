@@ -268,3 +268,9 @@ The landing census `landing_backlog_census_mufqyitp` (T3, read-only) is active u
 - 01:06Z stage: PR #544. 01:14Z ff: LANDED integration/importer=771db62a.
 - S9-B final review of rebuilt files: s9_b_rebuilt_files_review_a (gpt_6_sol) GO; s9_b_rebuilt_files_review_b (claude_opus_5_5) GO.
 - 01:06Z S9B-GATE-2 rc74 (r75 driver defect, class B). 01:12Z S9B-GATE-3 granted and launched (GATE_GRANT_D3A9-3.md).
+- 01:16Z S9B-GATE-3 RC0 -> commit 1e6e5735. Binding v3 filled; bundle s9b-1e6e5735384a.bundle.
+- 01:31Z s9_b_final_head_binding_review_a (gpt_6_sol) B-gap (pre-format copies of 2 files absent) -> closed by direct review of committed blobs -> GO; review_b (claude_opus_5_5) GO.
+- 02:00Z S9B-PROOF-1 parent executor, binding v3 -> 10/10 RC0. ACCEPT_RECORD-1e6e5735.md.
+- 02:04Z compose RC0 M4=5407efae (53 must-run suites). 02:13Z stage PR #545. 02:20Z ff: LANDED integration/importer=5407efae.
+- S9-C: s9_c_wiring_builder (claude_fable_5) draft; dev loops 1-3 parent under lock; s9_c_review_a (gpt_6_sol) NO-GO (A-1, A-2, B-3, B-4); s9_c_review_b (claude_opus_5_5) running; fix round dispatched to builder in d3a9-s9c-r2; s9_c_gate_and_binding_builder (claude_opus_5_5) deriving gate + binding v1.
+- S10: s10_readiness_scout (gpt_6_sol) done; s10_0_decision_doc_draft (claude_opus_5_5) done (c5f6186e, 400 lines); s10_0_doc_review (gpt_6_sol) running.

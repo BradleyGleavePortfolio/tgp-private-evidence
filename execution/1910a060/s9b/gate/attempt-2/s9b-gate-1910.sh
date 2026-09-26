@@ -200,7 +200,7 @@ STAGE=tsc
 npx --no-install tsc --noEmit > "$E/tsc.raw.log" 2>&1; rc=$?; log "TSC rc=$rc lines=$(wc -l < "$E/tsc.raw.log")"; [ $rc = 0 ] || { tail -60 "$E/tsc.raw.log" >> "$LOG"; finish 73; }
 # ---- 7 R75 banned-cast checker on the working tree (the hook repeats it in staged mode)
 STAGE=r75
-log "R75_WORKTREE not run: scripts/check-r75.js at BASE has only --mode=staged|range (no worktree mode; S9B-GATE-2 rc=2). R75 is enforced by --mode=staged at STAGE=stage and by the pre-commit hook."
+node scripts/check-r75.js > "$E/r75.raw.log" 2>&1; rc=$?; log "R75_WORKTREE rc=$rc"; [ $rc = 0 ] || { tail -40 "$E/r75.raw.log" >> "$LOG"; finish 74; }
 # ---- 8 jest targeted (default config, no PG), then the full default suite once
 STAGE=jest
 ./node_modules/.bin/jest --ci $SUITES > "$E/jest.raw.log" 2>&1; rc=$?; log "JEST_TARGETED rc=$rc"

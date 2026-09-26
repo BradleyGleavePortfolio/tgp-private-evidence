@@ -1,0 +1,3935 @@
+diff --git a/docs/decisions/2026-09-25-s9-reconciliation.md b/docs/decisions/2026-09-25-s9-reconciliation.md
+index c3423725..2fae1e07 100644
+--- a/docs/decisions/2026-09-25-s9-reconciliation.md
++++ b/docs/decisions/2026-09-25-s9-reconciliation.md
+@@ -531,3 +531,102 @@ R18b) would prove local candidate behaviour only. S9-B and S9-C writers, the PG
+ grants are separate parent decisions.
+ Deployment, customer acceptance and any `main` merge or flag change remain owner-reserved (S7L-DOC
+ L284-286).
++
++## Addendum A (S9-B, 2026-09-25): review closures and facts-collection rules
++
++Recorded by the S9-B lane (EXEC-1910A060) against the landed text at `1c5fbb04`. Nothing above
++this heading changes; each item names the line it amends. Sources: `S9_0_REVIEW.md` §8 RC-1..RC-3
++and §6 C-5..C-10 (deferred to "the doc's next opening"); `S9_A_SOURCE_READY.md` deviations 2, 3
++and 5; `S9_A_REVIEW_A.md` B-2.
++
++### A.1 S9-0 review closures
++
++- **RC-1 (D-S9-7 meaning of `coverage_basis_unknown`).** The meaning cell also covers the two
++  D-S9-2 triggers where `required_families` is `null` (undeterminable: zero staged rows, or a
++  staged platform without a registered spec) or empty. D-S9-2 stays the binding definition.
++- **RC-2 (D-S9-5 "pre-S9 terminals").** "Pre-S9 terminals" excludes only
++  `reason_code = reconciliation_not_performed`. A `mode='server'` run fenced before S9-C landed
++  (`cancelled`, `timed_out`) therefore receives a recomputed report on read. That is a truthful
++  account under an unchanged terminal; it is stated here so nobody reads it as a gap.
++- **RC-3 (D-S9-2 declared families).** Own paragraph, moved out of the "cannot be determined"
++  bullet: _A declared family with no staged row gets a report entry with `staged_unique: 0`
++  (`mapped: true`, no tokens). It still needs a known basis before `complete`. Such report-only
++  entries never create a `families[]` projection entry, because there is no staged token for
++  them._
++- **C-5 (E-R2 notation, L140).** Read `#ord:<ordinal>`: the child's `order` equals the ordinal
++  (the 0-based source position, S8-DOC L178), not the length prefix `n` of S8-DOC L176-178. When
++  source ordinals are not positions this yields a false `unverified` (safe direction). For the
++  `#id:<identifier>` form only existence and `workout_plan_id` are compared.
++- **C-6 (qualifier domains).** `unresolved_family:<token>` carries the staged token, which ingest
++  accepts as any 1-128 character string; the token already projects as `families[].family`
++  under the accepted S7-L contract, so no new exposure exists, but R14's PII guarantee does not
++  extend to tokens. The accepted S9-A parser recognises reason codes by their catalogue prefix
++  and does not validate qualifier domains; validating the qualifier against the spec's family,
++  field and model names before anything reaches a DTO is an S9-C obligation, recorded here, not
++  a property of the landed reconciler.
++- **C-7, second half (`qualifiers` enum).** `qualifiers[]` is a closed OpenAPI enum
++  (`roster_bridge_pending` only in v1; append-only), never `string[]`. The 32-family R15 fixture
++  and the CONSUMER_FREEZE L78 note stand as recorded in §3.
++- **C-9 (recompute-on-read).** The S9-B facts service opens no transaction and issues only
++  reads; the caller supplies one `Prisma.TransactionClient` and is responsible for running it
++  at `REPEATABLE READ` so classification sees one snapshot across staging, ledger, provenance
++  and native tables. On the settle path that transaction is S8-G's (which also writes the
++  terminal); on the status path S9-C opens one for the read. S9-C adds a spec that asserts
++  S9-A's copy of the §3.7 catalogue equals S8-C's runtime `UNRESOLVED_CODE`.
++- **C-10 (wording).** `relationship_closure: 'not_applicable'` means "no bucket-j identity of the
++  family carries a declared edge" (see A.2 deviation 5), never "not checked". R12's "`null` only
++  for D-S9-3/D-S9-4 fields" also lists `media_policy`, `pagination_terminal_evidence` and
++  `date_window`. A token that resolves to different families across platforms in one intent
++  projects one `families[]` entry whose counts are the sum over all of that token's rows;
++  `canonical_family` is `null` unless every row resolves to the same family.
++
++### A.2 S9-A deviations accepted into the text
++
++- **Deviation 2 (D-S9-3).** `CoverageFact.known: true` carries `basis_kind: string` and
++  `completeness_basis` is that string (`'none'` ⇔ `known: false`). `COMPLETENESS_BASIS_KINDS` is
++  S10's append-only enum; v1 has only `none` because `coverage` is `null`.
++- **Deviation 3 (D-S9-3).** `observed_unique: number | null` — a number whenever a `CoverageFact`
++  carries one, `null` when there is no fact. v1 is always `null`.
++- **Deviation 5 (D-S9-2 L145).** Edges from identities outside bucket j are ignored, never
++  double-counted; `not_applicable` is emitted when no bucket-j identity of the family carries a
++  declared edge.
++
++### A.3 B-2: one edge per declared relationship (facts-collection rule)
++
++For every staged identity whose canonical family declares E-R1, E-R2 or E-R3, S9-B emits exactly
++one `RelationshipFacts` edge per declared relationship instance. When the parent cannot be
++resolved through provenance or native rows, the edge is still emitted, with the parent's own
++identity as `to_identity` (unresolvable to S9-A because it is not bucket j) and
++`consistent: false`, so that it fails closure. Concretely:
++
++- **E-R1** is declared iff the accepted S8-A/S8-C interpreter (read-only, `mode: 'native'`)
++  derives a `programSourceId` for the staged `workouts` row; the edge targets the `programs`
++  identity `(source_platform, programSourceId)` whether or not that identity was staged, and is
++  `consistent` only when the run's own unarchived plan has `program_id` equal to the parent's
++  verified native id and `(week_index, day_index)` equal to the interpreter's derivation.
++- **E-R2** emits one edge per created or already-present child provenance row under a `workouts`
++  parent (`from_identity = to_identity =` the parent), `consistent` iff the exercise row exists
++  unarchived on the parent's plan and, for `#ord:<ordinal>`, `order` equals the ordinal.
++- **E-R3** emits one edge per staged identity with an interpreted `clientSourceId` (families other
++  than `clients`), `consistent: null`; S9-A closes it only against a bucket-j `clients` identity.
++
++### A.4 S9-B facts rules the text left implicit
++
++- **Grouping.** `resolveStagedFamily` first; a token equal to a canonical family the platform's
++  spec declares maps to that family (S8-C `dispatch` precedent). Anything else is an unmapped
++  entry keyed by the raw token. `resolution_reason` prefers `unresolved_family:<token>` over
++  `unsupported_platform:<platform>` when both occur for the same token.
++- **Ledger without staged (R05).** Counted run-wide over `(entity_type, source_platform,
++source_id)`; attributed to the mapped entry the pair resolves to (creating a zero-identity mapped
++  entry when necessary); never dropped when it resolves to nothing.
++- **Native existence.** Looked up by id without a coach filter, then compared: missing or archived
++  → `removed`; another coach → `foreign_owner`; provenance kind ≠ ledger kind → `kind_mismatch`;
++  provenance id ≠ ledger target → `provenance_mismatch`. `Person` has no `archived_at`; a row
++  that exists is present. No fabricated zero: an identity with no ledger row has `ledger: null`.
++- **Coverage and split.** `coverage` is `null` in v1 (D-S9-3); the created/already-present split
++  is unknown (D-S9-4); the report is never persisted (D-S9-5, no table).
++- **Provenance read.** Coach-wide by `(coach_id, source_namespace ∈ staged platforms, entity_type
++∈ mapped families ∪ {'workouts.exercise'})`; children attach to parents through the S8-DOC
++  L174-181 length-prefixed `source_id`.
++- **Claim.** `ScoutImportCompletion.terminal_status` filtered to `success | partial | failed`; any
++  other value is `null`.
+diff --git a/src/scout/reconciliation/facts.service.ts b/src/scout/reconciliation/facts.service.ts
+new file mode 100644
+index 00000000..5ecd6901
+--- /dev/null
++++ b/src/scout/reconciliation/facts.service.ts
+@@ -0,0 +1,842 @@
++import { Inject, Injectable, Optional } from '@nestjs/common';
++import type { Prisma } from '@prisma/client';
++import { interpretEntity } from '../reconstruct/mapping-spec';
++import {
++  CHILD_ENTITY_TYPE,
++  NATIVE_KIND,
++  PROVENANCE_OUTCOME,
++} from '../reconstruct/native/native-contract';
++import { buildNativeFamilies } from '../reconstruct/native/native-families';
++import {
++  buildNativeRuleRegistry,
++  type NativeRuleRegistry,
++} from '../reconstruct/native/native-rule-registry';
++import { LEDGER_TARGET_KIND } from '../reconstruct/native/persist-outcome';
++import {
++  buildSourceMapperRegistry,
++  resolveStagedFamily,
++  type SourceMapper,
++} from '../reconstruct/source-mapper-registry';
++import {
++  RECONSTRUCT_FAMILY,
++  RECONSTRUCT_MAX_ROWS,
++  RECONSTRUCT_PAGE_SIZE,
++} from '../scout-reconstruct.dto';
++import { SCOUT_TERMINAL_STATUSES, type ScoutTerminalStatus } from '../scout.dto';
++import {
++  NATIVE_TARGET_KINDS,
++  type ClaimStatus,
++  type FamilyFacts,
++  type FamilyQualifier,
++  type IdentityFacts,
++  type LedgerRowFacts,
++  type LedgerTargetKind,
++  type NativeTargetCheck,
++  type NativeTargetKind,
++  type ProvenanceFacts,
++  type ProvenanceOutcome,
++  type ReconciliationFacts,
++  type RelationshipFacts,
++} from './types';
++
++/**
++ * S9-B — the reconciliation facts service (S9-DOC D-S9-1 "a facts service collects its input").
++ *
++ * Collects the `ReconciliationFacts` that the pure S9-A `reconcile(facts)` consumes, for ONE
++ * server run `(coach_id, intent_id)`, from the landed S7-L/S8-A/S8-B/S8-C tables only. This module
++ *
++ *  - never writes: no ledger, provenance, native, run-row or terminal write; reads only;
++ *  - is tenant-scoped: every staged / ledger / provenance / evidence read carries `coach_id`;
++ *    the native-target reads by id follow the S8-C `verifyTarget` precedent (`native-writers.ts`
++ *    L66-89: the native id is the sole join, the owner is compared afterwards) so that a row
++ *    owned by another coach is reported as `foreign_owner` and never as present — nothing about
++ *    that row other than the comparison result leaves this module;
++ *  - preserves native evidence truth: `coverage` is `null` in v1 (D-S9-3), `created` vs
++ *    `already_present` is NOT split (D-S9-4; provenance `import_intent_id` is NULL at S8-C), an
++ *    unknown is never a `0`, and no persistence of the report exists (D-S9-5);
++ *  - is source-agnostic: grouping is the accepted `resolveStagedFamily`, the parent role and the
++ *    client link are read through the accepted S8-A / S8-C interpreters, never through a
++ *    platform-specific branch;
++ *  - is aggregate: O(pages + families + native kinds) queries, never a query per staged row.
++ *
++ * Grouping (D-S9-2). Every staged row is grouped by `resolveStagedFamily(registry,
++ * source_platform, entity_type)`. A row whose token resolves through the spec's `steps` joins the
++ * canonical family's ONE mapped entry. A row whose token IS a canonical family name that the
++ * platform's spec declares joins that family as well — this is the accepted staging convention
++ * the S8-C dispatch honours (`native-families.ts` `dispatch`: the engine selects rows by
++ * `entity_type == family`, so the token equals the family). Any other row forms the unmapped
++ * entry keyed by its raw token with `resolution_reason` `unresolved_family:<token>` or
++ * `unsupported_platform:<p>`. Entries are unique on `(mapped, family)` (S9-A B-1 invariant).
++ *
++ * Joins (D-S9-2). Staged ↔ ledger on the wide identity `(coach_id, intent_id, entity_type,
++ * source_platform, source_id)`. Staged ↔ provenance on the D-S8-3 key `(coach_id,
++ * source_namespace = source_platform, entity_type = canonical family, source_id)`. Children are
++ * provenance rows `entity_type = 'workouts.exercise'` whose `source_id` carries the parent's
++ * `<len>:<parent>#` prefix (`childSourceIdPrefix`).
++ *
++ * Relationship edges (B-2 closure, S9_A_REVIEW_A). For every staged identity whose canonical
++ * family declares a relationship, EXACTLY ONE edge is emitted per declared relationship, whether
++ * or not the parent resolves:
++ *  - E-R1 `program_parent`: a `workouts` row whose accepted interpreter derivation carries a
++ *    `programSourceId` (`interpretWorkout` via `buildNativeFamilies().workouts.map`). Target is
++ *    the `programs` identity `(same platform, programSourceId)`; when no such staged identity or
++ *    provenance exists the edge still exists with that unresolvable `to_identity`, and
++ *    `consistent` is `false` (the native `program_id` / `(week_index, day_index)` comparison did
++ *    not succeed) — it fails closure in S9-A `edgeVerified`.
++ *  - E-R2 `child_order`: one edge per created/already-present child provenance row under a
++ *    `workouts` parent, target = the parent plan identity; `consistent` is `true` only when the
++ *    `WorkoutPlanExercise` row exists unarchived, its `workout_plan_id` is the parent's verified
++ *    native id and, for the `#ord:<n>` identity form, its `order` equals `n`.
++ *  - E-R3 `client_link`: one edge per identity whose S8-A interpretation carries a
++ *    `clientSourceId`, target = the `clients` identity `(same platform, clientSourceId)`;
++ *    `consistent` is `null` (soft link, no native attribute to compare; S8-DOC §3.8).
++ * `consistent` is never `true` by assumption: it is `true` only after a successful comparison.
++ */
++
++/** The transaction (or client) the caller already holds; S9 runs inside S8-G's settle tx (D-S9-1). */
++export type FactsDb = Prisma.TransactionClient;
++
++/** Facts-service options, injectable for tests: registries default to the repository-resident ones. */
++export interface ReconciliationFactsOptions {
++  readonly sourceMappers?: ReadonlyMap<string, SourceMapper>;
++  readonly nativeRules?: NativeRuleRegistry;
++}
++
++/** DI token for {@link ReconciliationFactsOptions}; absent → repository-resident registries. */
++export const RECONCILIATION_FACTS_OPTIONS = Symbol('RECONCILIATION_FACTS_OPTIONS');
++
++/** Opaque identity key `(source_platform, source_id)`; US (0x1F) cannot occur in a canonical platform token. */
++export function identityKey(sourcePlatform: string, sourceId: string): string {
++  return `${sourcePlatform}\u001f${sourceId}`;
++}
++
++/** D-S8-2 interim: the client-owned family list (S8-DOC L72-74). */
++const CLIENT_OWNED_FAMILIES: ReadonlySet<string> = new Set([RECONSTRUCT_FAMILY.client_history]);
++/** `clients` carries `roster_bridge_pending` until S8-D (S8-DOC L372-374). */
++const FAMILY_QUALIFIERS: Readonly<Record<string, readonly FamilyQualifier[]>> = {
++  [RECONSTRUCT_FAMILY.clients]: ['roster_bridge_pending'],
++};
++/** Upper bound of ids per `IN (...)` native lookup; keeps every query bounded without a per-row read. */
++const LOOKUP_CHUNK = 1000;
++/** `#ord:<n>` child identity form (S8-DOC L174-181; C-5 notation). */
++const ORD_SUFFIX = /#ord:(0|[1-9][0-9]*)$/;
++
++interface StagedRow {
++  readonly entity_type: string;
++  readonly source_id: string;
++  readonly source_platform: string;
++  readonly payload: Prisma.JsonValue;
++}
++interface LedgerRow {
++  readonly entity_type: string;
++  readonly source_id: string;
++  readonly source_platform: string;
++  readonly status: string;
++  readonly target_id: string | null;
++  readonly target_kind: string | null;
++  readonly reason: string | null;
++}
++interface ProvenanceRow {
++  readonly source_namespace: string;
++  readonly entity_type: string;
++  readonly source_id: string;
++  readonly native_kind: string;
++  readonly native_id: string | null;
++  readonly outcome: string;
++  readonly reason: string | null;
++}
++interface NativeRow {
++  readonly id: string;
++  readonly coach_id: string;
++  readonly archived_at: Date | null;
++}
++interface PlanRow extends NativeRow {
++  readonly program_id: string | null;
++  readonly week_index: number | null;
++  readonly day_index: number | null;
++}
++interface ExerciseRow {
++  readonly id: string;
++  readonly workout_plan_id: string;
++  readonly order: number;
++  readonly archived_at: Date | null;
++}
++
++/** One grouped staged identity before its ledger/provenance/native facts are attached. */
++interface Grouped {
++  readonly row: StagedRow;
++  readonly identity: string;
++  readonly mapped: boolean;
++  /** Canonical family when mapped, raw token otherwise. */
++  readonly family: string;
++  readonly resolutionReason: string | null;
++  readonly mapper: SourceMapper | null;
++}
++
++/** Mutable accumulator for one `(mapped, family)` entry. */
++interface EntryAcc {
++  readonly family: string;
++  readonly mapped: boolean;
++  resolutionReasons: Set<string>;
++  readonly members: Grouped[];
++  ledgerWithoutStaged: number;
++}
++
++const ledgerKey = (entityType: string, platform: string, sourceId: string) =>
++  `${entityType}\u001f${platform}\u001f${sourceId}`;
++const provenanceKey = (namespace: string, entityType: string, sourceId: string) =>
++  `${namespace}\u001f${entityType}\u001f${sourceId}`;
++
++function isNativeTargetKind(value: string | null): value is NativeTargetKind {
++  return value !== null && (NATIVE_TARGET_KINDS as readonly string[]).includes(value);
++}
++function isLedgerTargetKind(value: string | null): value is LedgerTargetKind {
++  return value !== null && (Object.values(LEDGER_TARGET_KIND) as readonly string[]).includes(value);
++}
++function isProvenanceOutcome(value: string): value is ProvenanceOutcome {
++  return (Object.values(PROVENANCE_OUTCOME) as readonly string[]).includes(value);
++}
++function isLegacyTerminal(value: string | null | undefined): value is ScoutTerminalStatus {
++  return value != null && (SCOUT_TERMINAL_STATUSES as readonly string[]).includes(value);
++}
++
++/** Parse `<len>:<parent>#...` back to the parent source id, or null when the shape is foreign. */
++export function parentSourceIdOf(childSourceId: string): string | null {
++  const colon = childSourceId.indexOf(':');
++  if (colon <= 0) return null;
++  const lengthText = childSourceId.slice(0, colon);
++  if (!/^(0|[1-9][0-9]*)$/.test(lengthText)) return null;
++  const length = Number(lengthText);
++  const parent = childSourceId.slice(colon + 1, colon + 1 + length);
++  if (parent.length !== length) return null;
++  if (childSourceId.charAt(colon + 1 + length) !== '#') return null;
++  return parent;
++}
++
++function chunks<T>(items: readonly T[], size: number): T[][] {
++  const out: T[][] = [];
++  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
++  return out;
++}
++
++const byString = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
++
++/** The accepted S8-C workouts reconstructor; only its read-only `map` is used here. */
++type WorkoutInterpreter = ReturnType<typeof buildNativeFamilies>['workouts'];
++
++@Injectable()
++export class ReconciliationFactsService {
++  private readonly sourceMappers: ReadonlyMap<string, SourceMapper>;
++  private readonly workoutInterpreter: WorkoutInterpreter;
++
++  constructor(
++    @Optional() @Inject(RECONCILIATION_FACTS_OPTIONS) options: ReconciliationFactsOptions = {},
++  ) {
++    this.sourceMappers = options.sourceMappers ?? buildSourceMapperRegistry();
++    const nativeRules: NativeRuleRegistry = options.nativeRules ?? buildNativeRuleRegistry();
++    // The accepted S8-C dispatch + S8-A/S8-C interpreters; only `map` is ever called (read-only).
++    this.workoutInterpreter = buildNativeFamilies({
++      sourceMappers: this.sourceMappers,
++      nativeRules,
++    }).workouts;
++  }
++
++  /** Collect the facts for one run. Reads only; safe inside the caller's transaction. */
++  async collect(db: FactsDb, coachId: string, intentId: string): Promise<ReconciliationFacts> {
++    const [claim, staged, ledger] = await Promise.all([
++      this.readClaim(db, coachId, intentId),
++      this.readStaged(db, coachId, intentId),
++      this.readLedger(db, coachId, intentId),
++    ]);
++
++    // ── 1. Group staged rows into (mapped, family) entries ───────────────────────────────────
++    const entries = new Map<string, EntryAcc>();
++    const entryKey = (mapped: boolean, family: string) => `${mapped ? 'm' : 'u'}\u001f${family}`;
++    const entryFor = (mapped: boolean, family: string): EntryAcc => {
++      const key = entryKey(mapped, family);
++      let acc = entries.get(key);
++      if (acc === undefined) {
++        acc = { family, mapped, resolutionReasons: new Set(), members: [], ledgerWithoutStaged: 0 };
++        entries.set(key, acc);
++      }
++      return acc;
++    };
++    const platforms = new Set<string>();
++    const tokenCounts = new Map<string, number>();
++    for (const row of staged) {
++      platforms.add(row.source_platform);
++      tokenCounts.set(row.entity_type, (tokenCounts.get(row.entity_type) ?? 0) + 1);
++      const grouped = this.group(row);
++      const acc = entryFor(grouped.mapped, grouped.family);
++      if (grouped.resolutionReason !== null) acc.resolutionReasons.add(grouped.resolutionReason);
++      acc.members.push(grouped);
++    }
++
++    // ── 2. Join the ledger on the wide identity; count/attribute orphans ─────────────────────
++    const ledgerByKey = new Map<string, LedgerRow>();
++    for (const row of ledger)
++      ledgerByKey.set(ledgerKey(row.entity_type, row.source_platform, row.source_id), row);
++    const stagedKeys = new Set(
++      staged.map((r) => ledgerKey(r.entity_type, r.source_platform, r.source_id)),
++    );
++    let ledgerWithoutStaged = 0;
++    for (const row of ledger) {
++      if (stagedKeys.has(ledgerKey(row.entity_type, row.source_platform, row.source_id))) continue;
++      ledgerWithoutStaged += 1;
++      // Attributed to a family entry where the ledger row's own (platform, token) resolves.
++      const resolved = this.resolveFamily(row.source_platform, row.entity_type);
++      if (resolved !== null) entryFor(true, resolved).ledgerWithoutStaged += 1;
++    }
++
++    // ── 3. Provenance for the mapped families (+ children), coach-scoped, in memory join ─────
++    const mappedFamilies = Array.from(entries.values())
++      .filter((e) => e.mapped)
++      .map((e) => e.family);
++    const provenance =
++      mappedFamilies.length === 0
++        ? []
++        : await this.readProvenance(db, coachId, Array.from(platforms), mappedFamilies);
++    const provenanceByKey = new Map<string, ProvenanceRow>();
++    const childrenByParent = new Map<string, ProvenanceRow[]>();
++    for (const row of provenance) {
++      if (row.entity_type === CHILD_ENTITY_TYPE.workouts_exercise) {
++        const parent = parentSourceIdOf(row.source_id);
++        if (parent === null) continue;
++        const key = provenanceKey(row.source_namespace, RECONSTRUCT_FAMILY.workouts, parent);
++        const list = childrenByParent.get(key);
++        if (list === undefined) childrenByParent.set(key, [row]);
++        else list.push(row);
++        continue;
++      }
++      provenanceByKey.set(provenanceKey(row.source_namespace, row.entity_type, row.source_id), row);
++    }
++
++    // ── 4. Native target lookups by id, one bounded IN-query set per kind ────────────────────
++    const wanted: Record<NativeTargetKind, Set<string>> = {
++      person: new Set(),
++      workout_program: new Set(),
++      workout_plan: new Set(),
++    };
++    const childIds = new Set<string>();
++    const memberProvenance = new Map<Grouped, ProvenanceRow | null>();
++    for (const acc of entries.values()) {
++      if (!acc.mapped) continue;
++      for (const member of acc.members) {
++        const prov =
++          provenanceByKey.get(
++            provenanceKey(member.row.source_platform, acc.family, member.row.source_id),
++          ) ?? null;
++        memberProvenance.set(member, prov);
++        const led = ledgerByKey.get(
++          ledgerKey(member.row.entity_type, member.row.source_platform, member.row.source_id),
++        );
++        if (
++          prov !== null &&
++          prov.native_id !== null &&
++          isNativeTargetKind(prov.native_kind) &&
++          led !== undefined &&
++          led.target_kind === prov.native_kind &&
++          led.target_id === prov.native_id
++        ) {
++          wanted[prov.native_kind].add(prov.native_id);
++        }
++        if (acc.family === RECONSTRUCT_FAMILY.workouts) {
++          for (const child of childrenByParent.get(
++            provenanceKey(member.row.source_platform, acc.family, member.row.source_id),
++          ) ?? []) {
++            if (
++              child.outcome !== PROVENANCE_OUTCOME.unresolved &&
++              child.native_kind === NATIVE_KIND.workout_plan_exercise &&
++              child.native_id !== null
++            )
++              childIds.add(child.native_id);
++          }
++        }
++      }
++    }
++    const [persons, programs, plans, exercises] = await Promise.all([
++      this.readPersons(db, Array.from(wanted.person)),
++      this.readPrograms(db, Array.from(wanted.workout_program)),
++      this.readPlans(db, Array.from(wanted.workout_plan)),
++      this.readExercises(db, Array.from(childIds)),
++    ]);
++    const native: Record<NativeTargetKind, ReadonlyMap<string, NativeRow>> = {
++      person: persons,
++      workout_program: programs,
++      workout_plan: plans,
++    };
++
++    // ── 5. Per-identity facts and relationship edges ─────────────────────────────────────────
++    const families: FamilyFacts[] = [];
++    const relationships: RelationshipFacts[] = [];
++    // Verified native id of a `programs` identity (for the E-R1 comparison), keyed by identity.
++    const programNativeId = new Map<string, string>();
++    for (const acc of entries.values()) {
++      if (!acc.mapped || acc.family !== RECONSTRUCT_FAMILY.programs) continue;
++      for (const member of acc.members) {
++        const prov = memberProvenance.get(member) ?? null;
++        if (
++          prov !== null &&
++          prov.native_id !== null &&
++          prov.outcome !== PROVENANCE_OUTCOME.unresolved &&
++          prov.native_kind === NATIVE_KIND.workout_program &&
++          this.checkNative(coachId, 'workout_program', prov.native_id, native) === 'present_owned'
++        )
++          programNativeId.set(member.identity, prov.native_id);
++      }
++    }
++
++    const sortedEntries = Array.from(entries.values()).sort(
++      (a, b) => byString(a.family, b.family) || Number(b.mapped) - Number(a.mapped),
++    );
++    for (const acc of sortedEntries) {
++      const identities: IdentityFacts[] = [];
++      for (const member of acc.members) {
++        const led =
++          ledgerByKey.get(
++            ledgerKey(member.row.entity_type, member.row.source_platform, member.row.source_id),
++          ) ?? null;
++        const prov = acc.mapped ? (memberProvenance.get(member) ?? null) : null;
++        const children = acc.mapped
++          ? (childrenByParent.get(
++              provenanceKey(member.row.source_platform, acc.family, member.row.source_id),
++            ) ?? [])
++          : [];
++        const clientSourceId = acc.mapped ? this.clientSourceId(member, acc.family) : null;
++        identities.push({
++          token: member.row.entity_type,
++          identity: member.identity,
++          ledger: this.ledgerFacts(coachId, led, prov, children, native),
++          client_linked: clientSourceId !== null,
++        });
++        if (!acc.mapped) continue;
++        // E-R3: one edge per declared client link (soft link, never compared → null).
++        if (clientSourceId !== null) {
++          relationships.push({
++            edge: 'client_link',
++            from_family: acc.family,
++            from_identity: member.identity,
++            to_family: RECONSTRUCT_FAMILY.clients,
++            to_identity: identityKey(member.row.source_platform, clientSourceId),
++            consistent: null,
++          });
++        }
++        if (acc.family === RECONSTRUCT_FAMILY.workouts) {
++          this.workoutEdges(
++            coachId,
++            member,
++            led,
++            prov,
++            children,
++            plans,
++            exercises,
++            programNativeId,
++            relationships,
++          );
++        }
++      }
++      const reasons = Array.from(acc.resolutionReasons).sort(byString);
++      families.push({
++        family: acc.family,
++        mapped: acc.mapped,
++        // One token may fail for two reasons across platforms; `unresolved_family` (unresolved)
++        // is reported ahead of `unsupported_platform` (rejected): the conservative direction.
++        resolution_reason: acc.mapped
++          ? null
++          : (reasons.find((r) => r.startsWith('unresolved_family:')) ?? reasons[0] ?? null),
++        client_owned: acc.mapped && CLIENT_OWNED_FAMILIES.has(acc.family),
++        // Per-`entity_type` pass ceiling: the engine counts rows with `entity_type == family`.
++        ceiling_exceeded: acc.mapped && (tokenCounts.get(acc.family) ?? 0) > RECONSTRUCT_MAX_ROWS,
++        identities,
++        ledger_without_staged: acc.ledgerWithoutStaged,
++        qualifiers: acc.mapped ? (FAMILY_QUALIFIERS[acc.family] ?? []) : [],
++      });
++    }
++
++    // ── 6. Declared families of every staged platform (D-S9-2 required families) ─────────────
++    let specFamilies: string[] | null = null;
++    if (staged.length > 0) {
++      const union = new Set<string>();
++      let known = true;
++      for (const platform of platforms) {
++        const mapper = this.sourceMappers.get(platform);
++        if (mapper === undefined) {
++          known = false;
++          break;
++        }
++        for (const family of Object.keys(mapper.spec.families)) union.add(family);
++      }
++      specFamilies = known ? Array.from(union).sort(byString) : null;
++    }
++
++    return {
++      claim,
++      families,
++      relationships,
++      spec_families: specFamilies,
++      ledger_without_staged: ledgerWithoutStaged,
++      coverage: null, // D-S9-3: no coverage contract exists in v1; unknown, never 0.
++    };
++  }
++
++  // ── Grouping / interpretation ──────────────────────────────────────────────────────────────
++
++  /** Canonical family for `(platform, token)` under the accepted dispatch, or null. */
++  private resolveFamily(platform: string, token: string): string | null {
++    const step = resolveStagedFamily(this.sourceMappers, platform, token);
++    if (step.ok) return step.family;
++    const mapper = this.sourceMappers.get(platform);
++    // Accepted convention: the token IS the canonical family the spec declares.
++    if (mapper !== undefined && Object.prototype.hasOwnProperty.call(mapper.spec.families, token))
++      return token;
++    return null;
++  }
++
++  private group(row: StagedRow): Grouped {
++    const identity = identityKey(row.source_platform, row.source_id);
++    const mapper = this.sourceMappers.get(row.source_platform) ?? null;
++    const family = this.resolveFamily(row.source_platform, row.entity_type);
++    if (family !== null) {
++      return { row, identity, mapped: true, family, resolutionReason: null, mapper };
++    }
++    const step = resolveStagedFamily(this.sourceMappers, row.source_platform, row.entity_type);
++    return {
++      row,
++      identity,
++      mapped: false,
++      family: row.entity_type,
++      resolutionReason: step.ok ? null : step.reason,
++      mapper,
++    };
++  }
++
++  /** The S8-A interpreter's client link for a mapped identity (S8-DOC L320-323), or null. */
++  private clientSourceId(member: Grouped, family: string): string | null {
++    if (member.mapper === null || family === RECONSTRUCT_FAMILY.clients) return null;
++    const result = interpretEntity(member.mapper.spec, family, member.row);
++    return result.ok ? result.entity.clientSourceId : null;
++  }
++
++  // ── Ledger / provenance / native facts ─────────────────────────────────────────────────────
++
++  private ledgerFacts(
++    coachId: string,
++    led: LedgerRow | null,
++    prov: ProvenanceRow | null,
++    children: readonly ProvenanceRow[],
++    native: Record<NativeTargetKind, ReadonlyMap<string, NativeRow>>,
++  ): LedgerRowFacts | null {
++    if (led === null) return null;
++    switch (led.status) {
++      case 'failed':
++        return { status: 'failed' };
++      case 'skipped':
++        return { status: 'skipped', reason: led.reason };
++      case 'reconstructed':
++        return {
++          status: 'reconstructed',
++          target_kind: isLedgerTargetKind(led.target_kind) ? led.target_kind : null,
++          provenance:
++            prov === null ? null : this.provenanceFacts(coachId, led, prov, children, native),
++        };
++      default: {
++        // Out-of-type status: surfaced as-is so S9-A's catch-all (k) sees it, never re-labelled.
++        // `LedgerRowFacts` is a closed union; the single typed assertion widens `status` only.
++        const passthrough: { status: string } = { status: led.status };
++        return passthrough as LedgerRowFacts;
++      }
++    }
++  }
++
++  private provenanceFacts(
++    coachId: string,
++    led: LedgerRow,
++    prov: ProvenanceRow,
++    children: readonly ProvenanceRow[],
++    native: Record<NativeTargetKind, ReadonlyMap<string, NativeRow>>,
++  ): ProvenanceFacts {
++    const unresolvedChildren: Record<string, number> = {};
++    for (const child of children) {
++      if (child.outcome !== PROVENANCE_OUTCOME.unresolved) continue;
++      if (child.native_kind !== NATIVE_KIND.workout_plan_exercise) continue;
++      const code = child.reason ?? 'unresolved:reason_unrecognised';
++      unresolvedChildren[code] = (unresolvedChildren[code] ?? 0) + 1;
++    }
++    let check: NativeTargetCheck;
++    if (!isNativeTargetKind(prov.native_kind) || prov.native_kind !== led.target_kind) {
++      check = 'kind_mismatch';
++    } else if (prov.native_id === null || prov.native_id !== led.target_id) {
++      check = 'provenance_mismatch';
++    } else {
++      check = this.checkNative(coachId, prov.native_kind, prov.native_id, native);
++    }
++    return {
++      outcome: isProvenanceOutcome(prov.outcome) ? prov.outcome : 'unresolved',
++      native: check,
++      reason: prov.reason,
++      unresolved_children: unresolvedChildren,
++    };
++  }
++
++  /** S8-C `verifyTarget` rule: missing/archived → removed; other coach → foreign_owner. */
++  private checkNative(
++    coachId: string,
++    kind: NativeTargetKind,
++    nativeId: string,
++    native: Record<NativeTargetKind, ReadonlyMap<string, NativeRow>>,
++  ): NativeTargetCheck {
++    const row = native[kind].get(nativeId);
++    if (row === undefined || row.archived_at !== null) return 'removed';
++    if (row.coach_id !== coachId) return 'foreign_owner';
++    return 'present_owned';
++  }
++
++  // ── Relationship edges for a `workouts` identity (E-R1, E-R2) ─────────────────────────────
++
++  private workoutEdges(
++    coachId: string,
++    member: Grouped,
++    led: LedgerRow | null,
++    prov: ProvenanceRow | null,
++    children: readonly ProvenanceRow[],
++    plans: ReadonlyMap<string, PlanRow>,
++    exercises: ReadonlyMap<string, ExerciseRow>,
++    programNativeId: ReadonlyMap<string, string>,
++    out: RelationshipFacts[],
++  ): void {
++    // The verified native plan of this identity, if the ledger + provenance agree and it is ours.
++    const planId =
++      prov !== null &&
++      prov.native_id !== null &&
++      prov.outcome !== PROVENANCE_OUTCOME.unresolved &&
++      prov.native_kind === NATIVE_KIND.workout_plan &&
++      led !== null &&
++      led.target_kind === LEDGER_TARGET_KIND.workout_plan &&
++      led.target_id === prov.native_id
++        ? prov.native_id
++        : null;
++    const plan = planId === null ? undefined : plans.get(planId);
++    const ownPlan =
++      plan !== undefined && plan.coach_id === coachId && plan.archived_at === null ? plan : null;
++
++    // E-R1: declared iff the accepted interpreter derives a parent program for this row.
++    const derived = this.deriveTemplate(member);
++    if (derived !== null && derived.programSourceId !== null) {
++      const parentIdentity = identityKey(member.row.source_platform, derived.programSourceId);
++      const parentNative = programNativeId.get(parentIdentity) ?? null;
++      const consistent =
++        ownPlan !== null &&
++        parentNative !== null &&
++        ownPlan.program_id === parentNative &&
++        ownPlan.week_index === derived.weekIndex &&
++        ownPlan.day_index === derived.dayIndex;
++      out.push({
++        edge: 'program_parent',
++        from_family: RECONSTRUCT_FAMILY.workouts,
++        from_identity: member.identity,
++        to_family: RECONSTRUCT_FAMILY.programs,
++        to_identity: parentIdentity,
++        consistent,
++      });
++    }
++
++    // E-R2: one edge per created child; target is the parent plan identity itself.
++    for (const child of children) {
++      if (child.outcome === PROVENANCE_OUTCOME.unresolved) continue;
++      if (child.native_kind !== NATIVE_KIND.workout_plan_exercise || child.native_id === null)
++        continue;
++      const exercise = exercises.get(child.native_id);
++      const ord = ORD_SUFFIX.exec(child.source_id);
++      const consistent =
++        ownPlan !== null &&
++        exercise !== undefined &&
++        exercise.archived_at === null &&
++        exercise.workout_plan_id === ownPlan.id &&
++        (ord === null || exercise.order === Number(ord[1]));
++      out.push({
++        edge: 'child_order',
++        from_family: RECONSTRUCT_FAMILY.workouts,
++        from_identity: member.identity,
++        to_family: RECONSTRUCT_FAMILY.workouts,
++        to_identity: member.identity,
++        consistent,
++      });
++    }
++  }
++
++  /** Accepted S8-C interpretation of a staged workouts row; null unless it is a native template. */
++  private deriveTemplate(
++    member: Grouped,
++  ): { programSourceId: string | null; weekIndex: number | null; dayIndex: number | null } | null {
++    let mapped: ReturnType<WorkoutInterpreter['map']>;
++    try {
++      mapped = this.workoutInterpreter.map({
++        source_id: member.row.source_id,
++        source_platform: member.row.source_platform,
++        payload: member.row.payload,
++        entity_type: member.row.entity_type,
++      });
++    } catch {
++      return null; // A throwing interpreter declares nothing; the ledger already says `failed`.
++    }
++    if (!mapped.ok) return null;
++    const value = mapped.mapped;
++    if (
++      typeof value !== 'object' ||
++      value === null ||
++      !('mode' in value) ||
++      value.mode !== 'native'
++    )
++      return null;
++    return {
++      programSourceId: value.template.programSourceId,
++      weekIndex: value.template.weekIndex,
++      dayIndex: value.template.dayIndex,
++    };
++  }
++
++  // ── Reads (all tenant-scoped; native lookups follow the S8-C verifyTarget precedent) ──────
++
++  private async readClaim(db: FactsDb, coachId: string, intentId: string): Promise<ClaimStatus> {
++    const completion = await db.scoutImportCompletion.findUnique({
++      where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
++      select: { terminal_status: true },
++    });
++    const claim = completion?.terminal_status ?? null;
++    return isLegacyTerminal(claim) ? claim : null;
++  }
++
++  private async readStaged(db: FactsDb, coachId: string, intentId: string): Promise<StagedRow[]> {
++    const out: StagedRow[] = [];
++    let cursor: string | undefined;
++    for (;;) {
++      const page = await db.scoutIngestEntity.findMany({
++        where: { coach_id: coachId, intent_id: intentId },
++        orderBy: { id: 'asc' },
++        take: RECONSTRUCT_PAGE_SIZE,
++        ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
++        select: {
++          id: true,
++          entity_type: true,
++          source_id: true,
++          source_platform: true,
++          payload: true,
++        },
++      });
++      for (const row of page) out.push(row);
++      if (page.length < RECONSTRUCT_PAGE_SIZE) return out;
++      cursor = page[page.length - 1].id;
++    }
++  }
++
++  private async readLedger(db: FactsDb, coachId: string, intentId: string): Promise<LedgerRow[]> {
++    const out: LedgerRow[] = [];
++    let cursor: string | undefined;
++    for (;;) {
++      const page = await db.scoutReconstructionLedger.findMany({
++        where: { coach_id: coachId, intent_id: intentId },
++        orderBy: { id: 'asc' },
++        take: RECONSTRUCT_PAGE_SIZE,
++        ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
++        select: {
++          id: true,
++          entity_type: true,
++          source_id: true,
++          source_platform: true,
++          status: true,
++          target_id: true,
++          target_kind: true,
++          reason: true,
++        },
++      });
++      for (const row of page) out.push(row);
++      if (page.length < RECONSTRUCT_PAGE_SIZE) return out;
++      cursor = page[page.length - 1].id;
++    }
++  }
++
++  /** Provenance is intent-less at S8-C (`import_intent_id` NULL): coach + namespaces + families. */
++  private async readProvenance(
++    db: FactsDb,
++    coachId: string,
++    platforms: readonly string[],
++    families: readonly string[],
++  ): Promise<ProvenanceRow[]> {
++    return db.importNativeProvenance.findMany({
++      where: {
++        coach_id: coachId,
++        source_namespace: { in: [...platforms] },
++        entity_type: { in: [...families, CHILD_ENTITY_TYPE.workouts_exercise] },
++      },
++      select: {
++        source_namespace: true,
++        entity_type: true,
++        source_id: true,
++        native_kind: true,
++        native_id: true,
++        outcome: true,
++        reason: true,
++      },
++    });
++  }
++
++  private async readPersons(db: FactsDb, ids: readonly string[]): Promise<Map<string, NativeRow>> {
++    const out = new Map<string, NativeRow>();
++    for (const chunk of chunks(ids, LOOKUP_CHUNK)) {
++      const rows = await db.person.findMany({
++        where: { id: { in: chunk } },
++        select: { id: true, coach_id: true },
++      });
++      // Person has no `archived_at` (D-S9-2 bucket i: "where the model has one").
++      for (const row of rows)
++        out.set(row.id, { id: row.id, coach_id: row.coach_id, archived_at: null });
++    }
++    return out;
++  }
++
++  private async readPrograms(db: FactsDb, ids: readonly string[]): Promise<Map<string, NativeRow>> {
++    const out = new Map<string, NativeRow>();
++    for (const chunk of chunks(ids, LOOKUP_CHUNK)) {
++      const rows = await db.workoutProgram.findMany({
++        where: { id: { in: chunk } },
++        select: { id: true, coach_id: true, archived_at: true },
++      });
++      for (const row of rows) out.set(row.id, row);
++    }
++    return out;
++  }
++
++  private async readPlans(db: FactsDb, ids: readonly string[]): Promise<Map<string, PlanRow>> {
++    const out = new Map<string, PlanRow>();
++    for (const chunk of chunks(ids, LOOKUP_CHUNK)) {
++      const rows = await db.workoutPlan.findMany({
++        where: { id: { in: chunk } },
++        select: {
++          id: true,
++          coach_id: true,
++          archived_at: true,
++          program_id: true,
++          week_index: true,
++          day_index: true,
++        },
++      });
++      for (const row of rows) out.set(row.id, row);
++    }
++    return out;
++  }
++
++  private async readExercises(
++    db: FactsDb,
++    ids: readonly string[],
++  ): Promise<Map<string, ExerciseRow>> {
++    const out = new Map<string, ExerciseRow>();
++    for (const chunk of chunks(ids, LOOKUP_CHUNK)) {
++      const rows = await db.workoutPlanExercise.findMany({
++        where: { id: { in: chunk } },
++        select: { id: true, workout_plan_id: true, order: true, archived_at: true },
++      });
++      for (const row of rows) out.set(row.id, row);
++    }
++    return out;
++  }
++}
+diff --git a/src/scout/reconciliation/reconciliation.module.ts b/src/scout/reconciliation/reconciliation.module.ts
+new file mode 100644
+index 00000000..9b88c227
+--- /dev/null
++++ b/src/scout/reconciliation/reconciliation.module.ts
+@@ -0,0 +1,20 @@
++import { Module } from '@nestjs/common';
++import { ReconciliationFactsService } from './facts.service';
++
++/**
++ * S9-B — the reconciliation facts module (S9-DOC D-S9-1 "a facts service collects its input").
++ *
++ * Provides and exports {@link ReconciliationFactsService} only. It is imported by nothing at this
++ * head: S9-C owns the wiring into `ScoutModule` / the S8-G settle transaction and the status read
++ * path (D-S9-8 path list), so `scout.module.ts`, the lifecycle hooks, the status DTO and the
++ * contract generator are untouched by S9-B. The service's registries default to the
++ * repository-resident source-mapping specs and native rule sets; a consumer that needs another
++ * registry provides `RECONCILIATION_FACTS_OPTIONS` (`@Optional()` in the service) alongside this
++ * module — the same seam the unit spec and the G2 proof worker use. No controller, no writer, no
++ * persistence (D-S9-5, no report table).
++ */
++@Module({
++  providers: [ReconciliationFactsService],
++  exports: [ReconciliationFactsService],
++})
++export class ReconciliationModule {}
+diff --git a/test/rls-g2-s9.spec.ts b/test/rls-g2-s9.spec.ts
+new file mode 100644
+index 00000000..cbde1f53
+--- /dev/null
++++ b/test/rls-g2-s9.spec.ts
+@@ -0,0 +1,744 @@
++/**
++ * S9-B G2 live proof — real PostgreSQL 17, real generated Prisma client, real
++ * ReconciliationFactsService (src/scout/reconciliation/facts.service.ts) composed with the frozen
++ * S9-A `reconcile`, in independent OS processes (test/utils/g2-s9-worker.cjs). The rows the facts
++ * classify are produced by the real S8-C ScoutReconstructService (worker `mode: 'reconstruct'`)
++ * with the owned fixture registry injected from the fixture spec + rule set; the contradiction
++ * cases (native drift, cross-tenant pointers, orphan ledger rows, unmapped tokens) are then
++ * applied directly to the tables, exactly the situations D-S9-2's buckets name. No query result,
++ * transaction or table is mocked.
++ *
++ * Guarded: test/utils/g2-s9-db.ts refuses anything but the explicitly acknowledged disposable
++ * lane that test/utils/g2-s9-bootstrap.sh built and identified (cluster marker, database comment
++ * marker, 172 migrations, S7-L/S8-B/S8-C objects); the harness binds the run to one attested
++ * candidate head. Nothing here repairs the lane: an identity mismatch fails the suite.
++ *
++ * Invariants proven (S9-DOC + Addendum A; S9-B SOURCE_READY):
++ *   - tenant isolation: coach B's staging, ledger, provenance and native rows never enter coach
++ *     A's facts, a native row that belongs to another coach is `foreign_owner` (→ identity
++ *     conflict), and the symmetric case holds (R11);
++ *   - unknown never becomes zero: an empty run has `families: []`, `spec_families: null`,
++ *     `claim: null`, `coverage: null`; `created_native` / `already_present_verified` /
++ *     `observed_unique` are `null` and `completeness_basis` is `'none'` (D-S9-3, D-S9-4, R12);
++ *   - no false Complete: a fully verified run is still `partial/coverage_basis_unknown` in v1;
++ *     drift (archived/deleted targets), orphans and unmapped tokens each surface as their own
++ *     condition (R04, R05, RC-3);
++ *   - idempotent, no duplicate identity: replaying the writer leaves the facts byte-identical
++ *     and every (platform, source_id) appears once; collecting twice yields identical facts;
++ *   - read-only and bounded: one REPEATABLE READ transaction (read back from the server),
++ *     SELECT-only, a query count fixed by the schema shape (+1 per extra 500-row page) and every
++ *     watched table's content digest unchanged (C-9, R08).
++ */
++import { execFileSync } from 'child_process';
++import { identityKey } from '../src/scout/reconciliation/facts.service';
++import {
++  BASE_HEAD,
++  EXPECTED_MIGRATIONS,
++  Result,
++  appliedMigrations,
++  candidateHead,
++  directory,
++  expectedVersion,
++  jsonAdmin,
++  quote,
++  root,
++  run,
++  sql,
++  sqlAdmin,
++  target,
++} from './utils/g2-s9-pg-harness';
++import {
++  COMPLETION,
++  LEDGER,
++  PLATFORM,
++  PLATFORM_B,
++  PROVENANCE,
++  REGISTRY,
++  REGISTRY_AB,
++  catalog,
++  childSourceId,
++  claim,
++  count,
++  ledgerRow,
++  ledgerRows,
++  plans,
++  programs,
++  provenanceRows,
++  resetData,
++  settle,
++  snapshot,
++  stage,
++} from './utils/g2-s9-harness';
++
++jest.setTimeout(240000);
++
++const CAT_ID = '11111111-1111-4111-8111-111111111111';
++const CAT_SLUG = 'synthetic-bench-press';
++const CAT_ID_2 = '22222222-2222-4222-8222-222222222222';
++const CAT_SLUG_2 = 'synthetic-row';
++const PROGRAM = { title: 'Base Block', weeks: 4, days: 3, notes: 'synthetic' };
++/** Standalone plan whose two children both resolve (exact catalog id / slug). */
++const STANDALONE = {
++  title: 'Push Day',
++  kind: 'lift',
++  minutes: 45,
++  exercises: [
++    { id: 'e1', exercise: CAT_ID, sets: 3, reps: 8, kg: 100, rest: 90, cue: 'brace' },
++    { id: 'e2', exercise: CAT_SLUG_2, sets: 3, reps: 10, superset: 'A' },
++  ],
++};
++/** Standalone plan with two resolved and two unresolved children (S8-C proof shape). */
++const MIXED = {
++  ...STANDALONE,
++  title: 'Mixed Day',
++  exercises: [
++    ...STANDALONE.exercises,
++    { exercise: 'not-in-catalog', sets: 2, reps: 5 },
++    { id: 'e4', exercise: CAT_SLUG.toUpperCase(), sets: 2, reps: 5 },
++  ],
++};
++const PROGRAM_DAY = {
++  title: 'Block Day 1',
++  block_id: 'blk-1',
++  week: 1,
++  day: 1,
++  exercises: [{ id: 'd1', exercise: CAT_SLUG, sets: 4, reps: 6 }],
++};
++const COACH_B = 'coach-b';
++const COVERAGE_ONLY = { outcome: 'partial', reason_code: 'coverage_basis_unknown' };
++const ALL_FAMILIES = ['client_history', 'clients', 'programs', 'workouts'];
++
++// ── worker drivers ──────────────────────────────────────────────────────────────────────────
++type Facts = Result & { result: { isolation: string; facts: any; verdict: any; report: any } };
++/** One real facts collection + frozen reconcile in a fresh process; a service failure is fatal. */
++async function collect(options: Record<string, unknown> = {}): Promise<Facts> {
++  const outcome = await run({ ...REGISTRY, ...options });
++  if (outcome.failure !== undefined)
++    throw new Error(`facts failed: ${JSON.stringify(outcome.failure)}`);
++  return outcome as Facts;
++}
++/** The real S8-C writer for one family (fixture rows come from production code, never by hand). */
++async function write(family: 'programs' | 'workouts', coach = 'coach'): Promise<Result> {
++  const outcome = await run({ ...REGISTRY, mode: 'reconstruct', family, coach });
++  expect(outcome.failure).toBeUndefined();
++  return outcome;
++}
++/** Stage + write the verified fixture: one program, its program-day plan, one standalone plan. */
++async function verifiedFixture(coach = 'coach') {
++  stage('blk-1', 'programs', PROGRAM, coach);
++  stage('rt-2', 'workouts', PROGRAM_DAY, coach);
++  stage('rt-1', 'workouts', STANDALONE, coach);
++  await write('programs', coach);
++  await write('workouts', coach);
++  const [program] = programs(coach);
++  const byName = (name: string) => plans(coach).find((p) => p.name === name)!;
++  return { program, day: byName('Block Day 1'), standalone: byName('Push Day') };
++}
++// ── facts accessors ─────────────────────────────────────────────────────────────────────────
++const family = (facts: any, name: string, mapped = true) =>
++  facts.families.find((f: any) => f.family === name && f.mapped === mapped);
++const identity = (fam: any, source: string, platform = PLATFORM) =>
++  fam.identities.find((i: any) => i.identity === identityKey(platform, source));
++const edges = (facts: any, edge: string, source: string, platform = PLATFORM) =>
++  facts.relationships.filter(
++    (r: any) => r.edge === edge && r.from_identity === identityKey(platform, source),
++  );
++const reportFamily = (report: any, name: string) =>
++  report.families.find((f: any) => f.family === name);
++/** A ledger fact whose native target is present and owned (provenance reason tags not pinned). */
++const verified = (outcome: string) => ({
++  status: 'reconstructed',
++  provenance: expect.objectContaining({ outcome, native: 'present_owned' }),
++});
++/** Query-log statements the read-only proof accepts and the SELECTs the service itself issued. */
++const statements = (outcome: Result) => outcome.queries.map((q) => q.trim());
++const serviceSelects = (outcome: Result) =>
++  statements(outcome).filter((q) => /^SELECT/i.test(q) && !/current_setting/.test(q));
++
++beforeEach(() => {
++  resetData();
++  settle();
++  catalog([
++    { id: CAT_ID, slug: CAT_SLUG },
++    { id: CAT_ID_2, slug: CAT_SLUG_2 },
++  ]);
++});
++
++describe('lane identity (bootstrap state, never repaired here)', () => {
++  it('is the S9-B disposable PG17 lane with the full accepted history and S7-L/S8-B/S8-C objects present', () => {
++    // `data_directory` is readable only by superusers / pg_read_all_settings: observe the lane
++    // identity over the existing admin connection (the migration role stays unprivileged).
++    const facts =
++      jsonAdmin(`SELECT json_build_object('version',current_setting('server_version_num')::int,
++      'cluster',current_setting('cluster_name'),'directory',current_setting('data_directory'),
++      'port',inet_server_port(),'db',current_database())`);
++    expect(facts).toEqual({
++      version: expectedVersion,
++      cluster: 's9-disposable-pg17',
++      directory,
++      port: target.port,
++      db: 'g2_s9_disposable',
++    });
++    expect(Number(appliedMigrations())).toBe(EXPECTED_MIGRATIONS);
++    // S7-L: the completion claim table and the lifecycle columns the facts service reads around.
++    expect(sql(`SELECT to_regclass('public."${COMPLETION}"') IS NOT NULL`)).toBe('t');
++    expect(
++      sql(
++        `SELECT count(*) FROM information_schema.columns WHERE table_name='ScoutImport' AND column_name IN ('mode','execution_epoch','reason_code')`,
++      ),
++    ).toBe('3');
++    // S8-B / S8-C: provenance table and the typed ledger target.
++    expect(sql(`SELECT to_regclass('public."${PROVENANCE}"') IS NOT NULL`)).toBe('t');
++    expect(
++      sql(
++        `SELECT count(*) FROM information_schema.columns WHERE table_name='${LEDGER}' AND column_name='target_kind'`,
++      ),
++    ).toBe('1');
++    expect(sql(`SELECT to_regclass('public."WorkoutProgram"') IS NOT NULL`)).toBe('t');
++    expect(
++      sqlAdmin(`SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','authenticator')`),
++    ).toBe('0');
++  });
++
++  it('is bound to one attested candidate head that descends from the base', () => {
++    expect(candidateHead).toMatch(/^[0-9a-f]{40}$/);
++    expect(candidateHead).not.toBe(BASE_HEAD);
++    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()).toBe(
++      candidateHead,
++    );
++    expect(
++      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
++    ).toBe('');
++    expect(() =>
++      execFileSync('git', ['merge-base', '--is-ancestor', BASE_HEAD, candidateHead], {
++        cwd: root,
++        stdio: 'ignore',
++      }),
++    ).not.toThrow();
++  });
++});
++
++describe('native evidence → facts → frozen reconcile', () => {
++  it('an empty run: nothing is fabricated (families [], spec null, claim null, coverage null) and it is never Complete (R19, R12)', async () => {
++    const empty = await collect();
++    expect(empty.result.facts).toEqual({
++      claim: null,
++      families: [],
++      relationships: [],
++      spec_families: null,
++      ledger_without_staged: 0,
++      coverage: null,
++    });
++    expect(empty.result.verdict).toEqual(COVERAGE_ONLY);
++    expect(empty.result.report).toMatchObject({
++      report_version: 1,
++      basis: 'recomputed',
++      conditions: ['coverage_basis_unknown'],
++      required_families: null,
++      ledger_without_staged: 0,
++      families: [],
++    });
++    // The legacy claim is read from ScoutImportCompletion and admitted only from the closed set.
++    claim('complete'); // the server vocabulary, stored verbatim by an older client → not a claim
++    expect((await collect()).result.facts.claim).toBeNull();
++    for (const status of ['success', 'partial', 'failed']) {
++      claim(status);
++      const withClaim = await collect();
++      expect(withClaim.result.facts.claim).toBe(status);
++      // A stored claim, on its own, never turns an unknown coverage basis into Complete.
++      expect(withClaim.result.verdict).toEqual(COVERAGE_ONLY);
++    }
++  });
++
++  it('rows the real writer produced classify as present_owned with consistent E-R1/E-R2 edges; verified is still partial/coverage_basis_unknown; replay leaves the facts identical', async () => {
++    const { program, day, standalone } = await verifiedFixture();
++    claim('success');
++    const first = await collect();
++    const facts = first.result.facts;
++    expect(facts.claim).toBe('success');
++    expect(facts.spec_families).toEqual(ALL_FAMILIES);
++    expect(facts.coverage).toBeNull();
++    expect(facts.ledger_without_staged).toBe(0);
++    expect(facts.families.map((f: any) => [f.family, f.mapped, f.identities.length])).toEqual([
++      ['programs', true, 1],
++      ['workouts', true, 2],
++    ]);
++    expect(identity(family(facts, 'programs'), 'blk-1')).toEqual({
++      token: 'programs',
++      identity: identityKey(PLATFORM, 'blk-1'),
++      client_linked: false,
++      ledger: {
++        status: 'reconstructed',
++        target_kind: 'workout_program',
++        provenance: {
++          outcome: 'created',
++          native: 'present_owned',
++          reason: null,
++          unresolved_children: {},
++        },
++      },
++    });
++    expect(identity(family(facts, 'workouts'), 'rt-1').ledger).toEqual({
++      status: 'reconstructed',
++      target_kind: 'workout_plan',
++      provenance: {
++        outcome: 'created',
++        native: 'present_owned',
++        reason: null,
++        unresolved_children: {},
++      },
++    });
++    expect(identity(family(facts, 'workouts'), 'rt-2').ledger).toMatchObject(verified('created'));
++    // E-R1: the program-day plan's program_id is the verified program and (week, day) = (0, 0).
++    expect(day).toMatchObject({ program_id: program.id, week_index: 0, day_index: 0 });
++    expect(edges(facts, 'program_parent', 'rt-2')).toEqual([
++      {
++        edge: 'program_parent',
++        from_family: 'workouts',
++        from_identity: identityKey(PLATFORM, 'rt-2'),
++        to_family: 'programs',
++        to_identity: identityKey(PLATFORM, 'blk-1'),
++        consistent: true,
++      },
++    ]);
++    expect(edges(facts, 'program_parent', 'rt-1')).toEqual([]); // standalone declares no parent
++    // E-R2: one edge per created child (from = to = the parent), consistent against the real rows.
++    expect(standalone.program_id).toBeNull();
++    const children = edges(facts, 'child_order', 'rt-1');
++    expect(children).toHaveLength(2);
++    expect(children.every((e: any) => e.to_identity === identityKey(PLATFORM, 'rt-1'))).toBe(true);
++    expect(children.map((e: any) => e.consistent)).toEqual([true, true]);
++    expect(edges(facts, 'child_order', 'rt-2')).toEqual([
++      expect.objectContaining({ to_identity: identityKey(PLATFORM, 'rt-2'), consistent: true }),
++    ]);
++    expect(facts.relationships.filter((r: any) => r.edge === 'client_link')).toEqual([]);
++    // Frozen reconcile: fully verified, closure verified, and STILL partial in v1 (D-S9-3: no
++    // coverage basis exists) — the one condition held is coverage_basis_unknown.
++    expect(first.result.verdict).toEqual(COVERAGE_ONLY);
++    expect(first.result.report.conditions).toEqual(['coverage_basis_unknown']);
++    expect(first.result.report.required_families).toEqual(ALL_FAMILIES);
++    expect(
++      first.result.report.families.map((f: any) => [
++        f.family,
++        f.staged_unique,
++        f.native_present_verified,
++        f.relationship_closure,
++      ]),
++    ).toEqual([
++      ['client_history', 0, 0, 'not_applicable'],
++      ['clients', 0, 0, 'not_applicable'],
++      ['programs', 1, 1, 'not_applicable'],
++      ['workouts', 2, 2, 'verified'],
++    ]);
++    for (const f of first.result.report.families) {
++      // Unknown never becomes zero (D-S9-4 split, D-S9-3 basis).
++      expect(f).toMatchObject({
++        created_native: null,
++        already_present_verified: null,
++        completeness_basis: 'none',
++        observed_unique: null,
++        pagination_terminal_evidence: null,
++        date_window: null,
++        media_policy: null,
++        unresolved: 0,
++        rejected: 0,
++        failed: 0,
++        unresolved_children: 0,
++        relationship_unverified: 0,
++        reasons: [],
++      });
++    }
++    // Idempotence / no duplicate identity: the writer's byte-identical replay and a second
++    // collection change nothing; every (platform, source_id) is one identity.
++    await write('programs');
++    await write('workouts');
++    const replayed = await collect();
++    expect(replayed.result.facts).toEqual(facts);
++    expect(replayed.result.report).toEqual(first.result.report);
++    const keys = facts.families.flatMap((f: any) => f.identities.map((i: any) => i.identity));
++    expect(new Set(keys).size).toBe(keys.length);
++    expect(count('WorkoutPlan')).toBe(2);
++    expect(count('WorkoutProgram')).toBe(1);
++  });
++
++  it('native drift after the ledger was written is reported as removed, never as present (R04)', async () => {
++    const { program, standalone } = await verifiedFixture();
++    const ledgerBefore = ledgerRows();
++    const provenanceBefore = provenanceRows();
++    // Coach archives the program and deletes the standalone plan (children first, FK order).
++    sql(`UPDATE "WorkoutProgram" SET archived_at = now() WHERE id = ${quote(program.id)};
++      DELETE FROM "WorkoutPlanExercise" WHERE workout_plan_id = ${quote(standalone.id)};
++      DELETE FROM "WorkoutPlan" WHERE id = ${quote(standalone.id)}`);
++    const drifted = await collect();
++    const facts = drifted.result.facts;
++    expect(identity(family(facts, 'programs'), 'blk-1').ledger.provenance).toMatchObject({
++      outcome: 'created',
++      native: 'removed',
++    });
++    expect(identity(family(facts, 'workouts'), 'rt-1').ledger.provenance).toMatchObject({
++      outcome: 'created',
++      native: 'removed',
++    });
++    // The program-day plan itself still exists and is owned, but its parent is no longer verified.
++    expect(identity(family(facts, 'workouts'), 'rt-2').ledger).toMatchObject(verified('created'));
++    expect(edges(facts, 'program_parent', 'rt-2')[0].consistent).toBe(false);
++    // The deleted plan's children are gone: both E-R2 edges are still emitted and fail closure.
++    expect(edges(facts, 'child_order', 'rt-1').map((e: any) => e.consistent)).toEqual([
++      false,
++      false,
++    ]);
++    expect(drifted.result.verdict).toEqual({
++      outcome: 'partial',
++      reason_code: 'unresolved_identities',
++    });
++    expect(drifted.result.report.conditions).toEqual([
++      'unresolved_identities',
++      'relationship_unverified',
++      'coverage_basis_unknown',
++    ]);
++    expect(reportFamily(drifted.result.report, 'programs')).toMatchObject({
++      staged_unique: 1,
++      native_present_verified: 0,
++      unresolved: 1,
++      reasons: [{ code: 'unresolved:native_target_removed', count: 1 }],
++    });
++    expect(reportFamily(drifted.result.report, 'workouts')).toMatchObject({
++      staged_unique: 2,
++      native_present_verified: 1,
++      unresolved: 1,
++      relationship_closure: 'unverified',
++      // Bucket-j identities with a failing edge: rt-2 (E-R1). rt-1 is already unresolved in its
++      // own right, so its failing E-R2 edges are not counted twice (Addendum A deviation 5).
++      relationship_unverified: 1,
++      reasons: [{ code: 'unresolved:native_target_removed', count: 1 }],
++    });
++    // Facts are recomputed from the native tables: the ledger and provenance said (and still say)
++    // "reconstructed / created" — the read did not rewrite them, and did not believe them.
++    expect(ledgerRows()).toEqual(ledgerBefore);
++    expect(provenanceRows()).toEqual(provenanceBefore);
++  });
++
++  it("tenant isolation: coach B's rows never enter coach A's facts and a target owned by B is foreign_owner, symmetrically (R11)", async () => {
++    settle(COACH_B);
++    const a = await verifiedFixture();
++    const b = await verifiedFixture(COACH_B);
++    expect(a.program.id).not.toBe(b.program.id);
++    const factsA = (await collect()).result.facts;
++    const factsB = (await collect({ coach: COACH_B })).result.facts;
++    for (const facts of [factsA, factsB]) {
++      expect(facts.families.map((f: any) => [f.family, f.identities.length])).toEqual([
++        ['programs', 1],
++        ['workouts', 2],
++      ]);
++      expect(identity(family(facts, 'programs'), 'blk-1').ledger).toMatchObject(
++        verified('created'),
++      );
++      expect(identity(family(facts, 'workouts'), 'rt-2').ledger).toMatchObject(verified('created'));
++      expect(edges(facts, 'program_parent', 'rt-2')[0].consistent).toBe(true);
++    }
++    // Same source ids on both tenants, and both are present_owned in their own facts: the
++    // identity is coach-scoped, never shared.
++    expect(factsA).toEqual(factsB);
++    // (1) A's provenance alone points at B's plan → provenance ≠ ledger target: provenance_mismatch.
++    const rowA = `WHERE coach_id='coach' AND entity_type='workouts' AND source_id='rt-2'`;
++    sql(`UPDATE "${PROVENANCE}" SET native_id = ${quote(b.day.id)} ${rowA}`);
++    let repointed = (await collect()).result;
++    expect(identity(family(repointed.facts, 'workouts'), 'rt-2').ledger.provenance.native).toBe(
++      'provenance_mismatch',
++    );
++    expect(reportFamily(repointed.report, 'workouts').reasons).toEqual([
++      { code: 'unresolved:identity_conflict', count: 1 },
++    ]);
++    // (2) A's ledger and provenance both point at B's plan: the row exists, but belongs to B.
++    sql(`UPDATE "${LEDGER}" SET target_id = ${quote(b.day.id)} ${rowA}`);
++    repointed = (await collect()).result;
++    expect(identity(family(repointed.facts, 'workouts'), 'rt-2').ledger.provenance.native).toBe(
++      'foreign_owner',
++    );
++    // B's plan hangs off B's program, which is not A's verified parent: E-R1 fails too.
++    expect(edges(repointed.facts, 'program_parent', 'rt-2')[0].consistent).toBe(false);
++    expect(repointed.verdict).toEqual({ outcome: 'partial', reason_code: 'unresolved_identities' });
++    // rt-2 left bucket j, so its failing edge is subsumed by unresolved_identities (deviation 5).
++    expect(repointed.report.conditions).toEqual([
++      'unresolved_identities',
++      'coverage_basis_unknown',
++    ]);
++    expect(reportFamily(repointed.report, 'workouts')).toMatchObject({
++      native_present_verified: 1,
++      unresolved: 1,
++      reasons: [{ code: 'unresolved:identity_conflict', count: 1 }],
++    });
++    // Nothing of this is visible from B's side: B's facts are exactly what they were.
++    expect((await collect({ coach: COACH_B })).result.facts).toEqual(factsB);
++    // Symmetric: B's program repointed at A's program is foreign_owner for B, invisible to A.
++    sql(`UPDATE "${PROVENANCE}" SET native_id = ${quote(a.program.id)} WHERE coach_id=${quote(COACH_B)} AND entity_type='programs' AND source_id='blk-1';
++      UPDATE "${LEDGER}" SET target_id = ${quote(a.program.id)} WHERE coach_id=${quote(COACH_B)} AND entity_type='programs' AND source_id='blk-1'`);
++    const factsB2 = (await collect({ coach: COACH_B })).result.facts;
++    expect(identity(family(factsB2, 'programs'), 'blk-1').ledger.provenance.native).toBe(
++      'foreign_owner',
++    );
++    expect(edges(factsB2, 'program_parent', 'rt-2')[0].consistent).toBe(false); // parent unverified
++    expect(family(factsB2, 'workouts')).toEqual(family(factsB, 'workouts'));
++    expect((await collect()).result.facts).toEqual(repointed.facts);
++    // Native rows of the other tenant were only referenced, never touched.
++    expect(programs(COACH_B)).toEqual([b.program]);
++    expect(programs()).toEqual([a.program]);
++  });
++});
++
++describe('unaccounted and unmapped input (R05, RC-3)', () => {
++  it('orphan ledger rows, unresolved children and evidence-only rows are accounted, never dropped or zeroed (R05, R08)', async () => {
++    stage('rt-1', 'workouts', STANDALONE);
++    stage('rt-3', 'workouts', MIXED); // two children resolve, two do not
++    stage('rt-c', 'workouts', { ...STANDALONE, title: 'Client Push', client_id: 'c-1' }); // client-linked
++    await write('workouts');
++    expect(count('WorkoutPlan')).toBe(2); // the client-linked row stays generic evidence (S8-C)
++    expect(count('ScoutReconstructedEntity')).toBe(1);
++    // Three orphans: one resolves to a staged family, one to a family nothing staged, one to no family.
++    ledgerRow('ghost-1', 'workouts', 'reconstructed', {
++      target_id: 'no-such-plan',
++      target_kind: 'workout_plan',
++    });
++    ledgerRow('ghost-2', 'blocks', 'skipped', {
++      reason: 'unresolved:relationship_pending:programs',
++    });
++    ledgerRow('ghost-3', 'notes', 'skipped', { reason: 'unresolved_family:notes' });
++    const outcome = await collect();
++    const facts = outcome.result.facts;
++    expect(facts.ledger_without_staged).toBe(3);
++    expect(
++      facts.families.map((f: any) => [
++        f.family,
++        f.mapped,
++        f.identities.length,
++        f.ledger_without_staged,
++      ]),
++    ).toEqual([
++      ['programs', true, 0, 1], // evidenced by the ledger alone (step token `blocks` → programs)
++      ['workouts', true, 3, 1],
++    ]);
++    // The staged identities themselves are still verified; the orphans are additional, not substitutes.
++    const workouts = family(facts, 'workouts');
++    expect(identity(workouts, 'rt-1').ledger).toMatchObject(verified('created'));
++    // R08: unresolved children are a histogram under their bucket-j parent, one edge per created child.
++    expect(identity(workouts, 'rt-3').ledger).toEqual({
++      status: 'reconstructed',
++      target_kind: 'workout_plan',
++      provenance: {
++        outcome: 'created',
++        native: 'present_owned',
++        reason: null,
++        unresolved_children: { 'unresolved:exercise_reference': 2 },
++      },
++    });
++    expect(edges(facts, 'child_order', 'rt-3').map((e: any) => e.consistent)).toEqual([true, true]);
++    expect(count(PROVENANCE, `source_id = ${quote(childSourceId('rt-3', { ordinal: 2 }))}`)).toBe(
++      1,
++    );
++    // E-R3 / evidence only: the client-linked row was never a native target; the writer said why,
++    // the facts carry it verbatim and the edge to the (unstaged) client identity is `null`.
++    expect(identity(workouts, 'rt-c')).toMatchObject({
++      client_linked: true,
++      ledger: {
++        status: 'reconstructed',
++        target_kind: 'scout_entity',
++        provenance: expect.objectContaining({
++          outcome: 'unresolved',
++          reason: 'unresolved:no_native_client_principal',
++        }),
++      },
++    });
++    expect(edges(facts, 'client_link', 'rt-c')).toEqual([
++      {
++        edge: 'client_link',
++        from_family: 'workouts',
++        from_identity: identityKey(PLATFORM, 'rt-c'),
++        to_family: 'clients',
++        to_identity: identityKey(PLATFORM, 'c-1'),
++        consistent: null,
++      },
++    ]);
++    expect(outcome.result.verdict).toEqual({
++      outcome: 'partial',
++      reason_code: 'unresolved_identities',
++    });
++    expect(outcome.result.report).toMatchObject({
++      conditions: ['unresolved_identities', 'coverage_basis_unknown'],
++      ledger_without_staged: 3,
++    });
++    expect(reportFamily(outcome.result.report, 'workouts')).toMatchObject({
++      staged_unique: 3,
++      native_present_verified: 2,
++      unresolved: 1,
++      failed: 0,
++      rejected: 0,
++      ledger_without_staged: 1,
++      unresolved_children: 2,
++      reasons: [{ code: 'unresolved:no_native_client_principal', count: 1 }],
++      child_reasons: [{ code: 'unresolved:exercise_reference', count: 2 }],
++      relationship_closure: 'verified',
++    });
++    expect(reportFamily(outcome.result.report, 'programs')).toMatchObject({
++      staged_unique: 0,
++      native_present_verified: 0,
++      ledger_without_staged: 1,
++    });
++    expect(reportFamily(outcome.result.report, 'notes')).toBeUndefined(); // no staged token, no entry
++  });
++
++  it('unmapped tokens and unregistered platforms are their own condition; the declared-family union follows every registered staged platform (RC-3)', async () => {
++    // Two registered platforms: `s9-proof` (four families) and `s9-proof-b` (workouts only).
++    stage('rt-1', 'workouts', STANDALONE);
++    await write('workouts');
++    // Staged after the writer ran (what a later crawl step leaves behind): no ledger rows exist.
++    stage('w-b', 'workouts', { title: 'B plan' }, 'coach', 'intent', PLATFORM_B);
++    stage('n-1', 'notes', { title: 'a note' }); // a step the spec does not map
++    stage('p-b', 'programs', { title: 'p' }, 'coach', 'intent', PLATFORM_B); // a family SPEC_B lacks
++    const registered = await collect(REGISTRY_AB);
++    let facts = registered.result.facts;
++    expect(registered.families).toEqual([PLATFORM, PLATFORM_B]);
++    expect(facts.spec_families).toEqual(ALL_FAMILIES); // the union, determinable
++    expect(facts.families.map((f: any) => [f.family, f.mapped, f.resolution_reason])).toEqual([
++      ['notes', false, 'unresolved_family:notes'],
++      ['programs', false, 'unresolved_family:programs'],
++      ['workouts', true, null],
++    ]);
++    // Identities follow the staged row order (id cursor), so compare as a set of two.
++    expect(
++      family(facts, 'workouts')
++        .identities.map((i: any) => i.identity)
++        .sort(),
++    ).toEqual([identityKey(PLATFORM, 'rt-1'), identityKey(PLATFORM_B, 'w-b')].sort());
++    expect(identity(family(facts, 'workouts'), 'rt-1').ledger).toMatchObject(verified('created'));
++    // `w-b` is staged on a platform with no native rules and was never written: no ledger row.
++    expect(identity(family(facts, 'workouts'), 'w-b', PLATFORM_B).ledger).toBeNull();
++    expect(registered.result.verdict).toEqual({
++      outcome: 'partial',
++      reason_code: 'unresolved_family',
++    });
++    expect(registered.result.report.conditions).toEqual([
++      'unresolved_family',
++      'unresolved_identities',
++      'coverage_basis_unknown',
++    ]);
++    expect(registered.result.report.required_families).toEqual(ALL_FAMILIES);
++    expect(reportFamily(registered.result.report, 'notes')).toMatchObject({
++      mapped: false,
++      staged_unique: 1,
++      unresolved: 1,
++      reasons: [{ code: 'unresolved_family:notes', count: 1 }],
++    });
++    expect(reportFamily(registered.result.report, 'workouts')).toMatchObject({
++      staged_unique: 2,
++      native_present_verified: 1,
++      unresolved: 1,
++      reasons: [{ code: 'unresolved:not_reconstructed', count: 1 }],
++    });
++    // An unregistered platform makes the declared set undeterminable: null, never [] (RC-1).
++    stage('x-1', 'routines', { title: 'x' }, 'coach', 'intent', 'unregistered');
++    const unregistered = await collect(REGISTRY_AB);
++    facts = unregistered.result.facts;
++    expect(facts.spec_families).toBeNull();
++    expect(family(facts, 'routines', false)).toMatchObject({
++      resolution_reason: 'unsupported_platform:unregistered',
++      identities: [expect.objectContaining({ identity: identityKey('unregistered', 'x-1') })],
++    });
++    expect(unregistered.result.report.required_families).toBeNull();
++    expect(unregistered.result.verdict).toEqual({
++      outcome: 'partial',
++      reason_code: 'unresolved_family',
++    });
++    expect(reportFamily(unregistered.result.report, 'routines')).toMatchObject({
++      mapped: false,
++      rejected: 1,
++      reasons: [{ code: 'unsupported_platform:unregistered', count: 1 }],
++    });
++    // Without the second spec the same rows are not "half known": `s9-proof-b` is unsupported.
++    const single = (await collect()).result.facts;
++    expect(single.spec_families).toBeNull();
++    expect(family(single, 'workouts').identities).toHaveLength(1);
++    expect(family(single, 'workouts', false)).toMatchObject({
++      resolution_reason: 'unsupported_platform:s9-proof-b',
++    });
++  });
++});
++
++describe('bounded, read-only collection in one REPEATABLE READ transaction (C-9, R08)', () => {
++  it('reads only, inside one REPEATABLE READ transaction, and changes nothing in any watched table', async () => {
++    await verifiedFixture();
++    claim('success');
++    const before = snapshot();
++    const outcome = await collect();
++    // The isolation level is read back from PostgreSQL inside the very transaction that collected.
++    expect(outcome.result.isolation).toBe('repeatable read');
++    const log = statements(outcome);
++    const begin = log.findIndex((q) => /^BEGIN/i.test(q));
++    const commit = log.findIndex((q) => /^COMMIT/i.test(q));
++    expect(begin).toBeGreaterThanOrEqual(0);
++    expect(commit).toBeGreaterThan(begin);
++    expect(log.filter((q) => /^(BEGIN|COMMIT)/i.test(q))).toHaveLength(2); // one transaction
++    expect(log.some((q) => /^ROLLBACK/i.test(q))).toBe(false);
++    // Every SELECT sits inside the BEGIN..COMMIT span; nothing else is issued.
++    for (const [n, statement] of log.entries()) {
++      expect(statement).toMatch(/^(SELECT|BEGIN|COMMIT|SET |DEALLOCATE)/i);
++      if (/^SELECT/i.test(statement)) {
++        expect(n).toBeGreaterThan(begin);
++        expect(n).toBeLessThan(commit);
++      }
++    }
++    expect(log.join('\n')).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|CREATE|ALTER|DROP)\b/i);
++    expect(snapshot()).toEqual(before);
++    expect(count('WorkoutPlan')).toBe(2);
++    expect(count(COMPLETION)).toBe(1);
++  });
++
++  it('issues a query count fixed by the schema shape, +1 per additional 500-row staged page', async () => {
++    // Empty run: claim, staged page, ledger page — no provenance or native lookups without families.
++    const empty = await collect();
++    expect(serviceSelects(empty)).toHaveLength(3);
++    // Verified fixture: + provenance, + programs, + plans, + exercises (persons: no ids → no query).
++    await verifiedFixture();
++    const small = await collect();
++    const smallSelects = serviceSelects(small);
++    expect(smallSelects).toHaveLength(7);
++    const tables = (selects: string[]) =>
++      selects.map((q) => /FROM "public"\."([A-Za-z]+)"/.exec(q)?.[1]).sort();
++    expect(tables(smallSelects)).toEqual(
++      [
++        COMPLETION,
++        'ScoutIngestEntity',
++        LEDGER,
++        PROVENANCE,
++        'WorkoutProgram',
++        'WorkoutPlan',
++        'WorkoutPlanExercise',
++      ].sort(),
++    );
++    expect(tables(smallSelects)).not.toContain('Person');
++    // 503 staged rows (RECONSTRUCT_PAGE_SIZE = 500): exactly one more staged page, nothing else grows.
++    const values: string[] = [];
++    for (let n = 0; n < 500; n++) {
++      values.push(
++        `(${quote(`coach-intent-workouts-${PLATFORM}-X${n}`)},'coach','intent','workouts',${quote(`X${n}`)},${quote(PLATFORM)},'{"title":"x"}')`,
++      );
++    }
++    sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++      VALUES ${values.join(',\n')}`);
++    expect(count('ScoutIngestEntity', `coach_id='coach' AND intent_id='intent'`)).toBe(503);
++    const large = await collect();
++    expect(serviceSelects(large)).toHaveLength(smallSelects.length + 1);
++    expect(tables(serviceSelects(large)).filter((t) => t === 'ScoutIngestEntity')).toHaveLength(2);
++    // The 500 never-written rows are unresolved identities, not zeros and not Complete.
++    expect(family(large.result.facts, 'workouts').identities).toHaveLength(502);
++    expect(reportFamily(large.result.report, 'workouts')).toMatchObject({
++      staged_unique: 502,
++      native_present_verified: 2,
++      unresolved: 500,
++      reasons: [{ code: 'unresolved:not_reconstructed', count: 500 }],
++    });
++    expect(large.result.verdict).toEqual({
++      outcome: 'partial',
++      reason_code: 'unresolved_identities',
++    });
++  });
++});
+diff --git a/test/scout/g2-s9-db-guard.spec.ts b/test/scout/g2-s9-db-guard.spec.ts
+new file mode 100644
+index 00000000..1a719b22
+--- /dev/null
++++ b/test/scout/g2-s9-db-guard.spec.ts
+@@ -0,0 +1,189 @@
++import { readdirSync, readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S9_BASE_HEAD,
++  G2_S9_CANDIDATE_HEAD_ENV,
++  g2S9CandidateHead,
++  G2_S9_CLUSTER_MARKER,
++  G2_S9_DATABASE_MARKER,
++  g2S9TestTarget,
++  withFixturePassword,
++} from '../utils/g2-s9-db';
++
++const base = 'postgresql://s9_super@127.0.0.1:55645/g2_s9_disposable';
++const ack = 'g2_s9_disposable:55645';
++
++describe('S9-B PG17 disposable target guard', () => {
++  it('accepts a confirmed loopback target and strips only Prisma options for psql', () => {
++    expect(g2S9TestTarget(`${base}?schema=public&connection_limit=2`, ack)).toEqual({
++      prismaUrl: `${base}?schema=public&connection_limit=2&connect_timeout=5`,
++      psqlUrl: `${base}?connect_timeout=5`,
++      maintenanceUrl: `postgresql://s9_super@127.0.0.1:55645/postgres?connect_timeout=5`,
++      port: 55645,
++    });
++  });
++  it.each([
++    base.replace('127.0.0.1', 'localhost'),
++    base.replace('127.0.0.1', 'db.supabase.co'),
++    base.replace('55645', '5432'),
++    base.replace('55645', '6543'),
++    base.replace('55645', '55439'),
++    base.replace('55645', '70000'),
++    base.replace('55645', '55461'),
++    base.replace('55645', '55471'),
++    base.replace('55645', '55481'),
++    base.replace('55645', '55491'),
++    base.replace('55645', '55501'),
++    base.replace('55645', '55511'),
++    base.replace('55645', '55641'),
++    base.replace('55645', '55642'),
++    base.replace('55645', '55643'),
++    base.replace('55645', '55644'),
++    base.replace('g2_s9_disposable', 'g2_b_drain_disposable'),
++    base.replace('g2_s9_disposable', 'g2_r_ready_disposable'),
++    base.replace('g2_s9_disposable', 'g2_nq1_disposable'),
++    base.replace('g2_s9_disposable', 'g2_c_disposable'),
++    base.replace('g2_s9_disposable', 'g2_s7l_disposable'),
++    base.replace('g2_s9_disposable', 'g2_s8b_disposable'),
++    base.replace('s9_super@', 'b_super@'),
++    base.replace('s9_super@', 'r_super@'),
++    base.replace('s9_super@', 'nq1_super@'),
++    base.replace('s9_super@', 'c_super@'),
++    base.replace('s9_super@', 's7l_super@'),
++    base.replace('s9_super@', 's8b_super@'),
++    base.replace('g2_s9_disposable', 'g2_tq0_disposable'),
++    base.replace('g2_s9_disposable', 'g2_s5_etq0_disposable'),
++    base.replace('55645', '54325'),
++    base.replace('g2_s9_disposable', 'g2_ledger_expand_disposable'),
++    base.replace('g2_s9_disposable', 'postgres'),
++    base.replace('s9_super@', 'service_role@'),
++    base.replace('s9_super@', 's8b_super:secret@'),
++    base.replace('s9_super@', 'postgres@'),
++    base.replace('55645', '54321'),
++    base.replace('postgresql:', 'postgres:'),
++    `${base}?host=remote`,
++    `${base}?sslmode=disable`,
++    `${base}?options=-csearch_path%3Dprivate`,
++    `${base}?schema=private`,
++    `${base}?connection_limit=0`,
++    `${base}?connection_limit=01`,
++    `${base}?connect_timeout=11`,
++    `${base}?schema=public&schema=public`,
++    `${base}#fragment`,
++  ])('refuses unsafe or ambiguous target %s', (url) => {
++    expect(() => g2S9TestTarget(url, ack)).toThrow();
++  });
++  it('refuses absent, mistaken or port-mismatched confirmation', () => {
++    expect(() => g2S9TestTarget(base)).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s9_disposable')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s9_disposable:55646')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_tq0_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_b_drain_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_r_ready_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_nq1_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_c_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s7l_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s8b_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s8c_disposable:55645')).toThrow();
++    expect(() => g2S9TestTarget(base, 'g2_s8g_disposable:55645')).toThrow();
++  });
++  it('pins distinctive, non-blank fixture markers that bootstrap carries verbatim', () => {
++    // Both markers are literals: nothing in process.env can change them, so a blank or foreign
++    // cluster_name / database comment is refused before DROP or bootstrap touches a server.
++    expect(G2_S9_CLUSTER_MARKER).toBe('s9-disposable-pg17');
++    expect(G2_S9_DATABASE_MARKER).toBe(
++      's9-g2-reconciliation-facts-synthetic-disposable-fixture-safe-to-drop',
++    );
++    for (const marker of [G2_S9_CLUSTER_MARKER, G2_S9_DATABASE_MARKER]) {
++      expect(marker).toMatch(/^s9-[a-z0-9-]{8,}$/);
++      expect(marker).toContain('disposable');
++    }
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s9-bootstrap.sh'), 'utf8');
++    expect(bootstrap).toContain(`CLUSTER_MARKER=${G2_S9_CLUSTER_MARKER}\n`);
++    expect(bootstrap).toContain(`DB_MARKER=${G2_S9_DATABASE_MARKER}\n`);
++    expect(bootstrap).not.toMatch(/CLUSTER_MARKER=\$\{|DB_MARKER=\$\{/);
++  });
++  it('attaches the fixture password only from the environment and only in plain form', () => {
++    expect(withFixturePassword(base, 'local_fixture')).toBe(
++      'postgresql://s9_super:local_fixture@127.0.0.1:55645/g2_s9_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'service_role')).toBe(
++      'postgresql://service_role:local_fixture@127.0.0.1:55645/g2_s9_disposable',
++    );
++    expect(withFixturePassword(base, 'local_fixture', 'postgres')).toBe(
++      'postgresql://postgres:local_fixture@127.0.0.1:55645/g2_s9_disposable',
++    );
++    // Only the explicit fixture matrix may log in; API roles and arbitrary names are refused.
++    for (const role of [
++      'anon',
++      'authenticated',
++      'authenticator',
++      'user',
++      'g2_ledger_owner',
++      'b_super',
++      'r_super',
++      'nq1_super',
++      'c_super',
++      's7l_super',
++      's8b_super',
++      's8c_super',
++      's8g_super',
++      '',
++    ]) {
++      expect(() => withFixturePassword(base, 'local_fixture', role)).toThrow();
++    }
++    expect(() => withFixturePassword(base, undefined)).toThrow();
++    expect(() => withFixturePassword(base, '')).toThrow();
++    expect(() => withFixturePassword(base, 'has space')).toThrow();
++    expect(() => withFixturePassword(base, 'a@b')).toThrow();
++  });
++  it('pins the base head and migration count identically across bootstrap, harness and repository', () => {
++    const BASE_HEAD = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++    const EXPECTED_MIGRATIONS = 172;
++    const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++    const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
++    const bootstrap = readFileSync(resolve(__dirname, '../utils/g2-s9-bootstrap.sh'), 'utf8');
++    const harness = readFileSync(resolve(__dirname, '../utils/g2-s9-pg-harness.ts'), 'utf8');
++    expect(bootstrap).toContain(`BASE_HEAD=${BASE_HEAD}\n`);
++    expect(bootstrap).toContain(`EXPECTED_MIGRATIONS=${EXPECTED_MIGRATIONS}\n`);
++    expect(bootstrap).toContain(`S8B_MIGRATION=${S8B_MIGRATION}\n`);
++    expect(bootstrap).toContain(`S7L_MIGRATION=${S7L_MIGRATION}\n`);
++    expect(G2_S9_BASE_HEAD).toBe(BASE_HEAD);
++    expect(harness).toContain(`export const BASE_HEAD: string = G2_S9_BASE_HEAD;`);
++    expect(bootstrap).toContain(`G2_S9_CANDIDATE_HEAD`);
++    expect(G2_S9_CANDIDATE_HEAD_ENV).toBe('G2_S9_CANDIDATE_HEAD');
++    expect(harness).toContain(`export const EXPECTED_MIGRATIONS = ${EXPECTED_MIGRATIONS};`);
++    expect(harness).toContain(`export const S8B_MIGRATION = '${S8B_MIGRATION}';`);
++    expect(harness).toContain(`export const S7L_MIGRATION = '${S7L_MIGRATION}';`);
++    // S9-B ships no migration (D-S9-5): the proof base's 172 directories are present, in order, and
++    // end at the S7-L migration. Lanes landed after the proof base may add later, well-formed migrations.
++    const migrationsDir = resolve(__dirname, '../../prisma/migrations');
++    const migrations = readdirSync(migrationsDir, { withFileTypes: true })
++      .filter((entry) => entry.isDirectory())
++      .map((entry) => entry.name)
++      .sort();
++    const baseMigrations = migrations.slice(0, EXPECTED_MIGRATIONS);
++    expect(baseMigrations).toHaveLength(EXPECTED_MIGRATIONS);
++    expect(baseMigrations[EXPECTED_MIGRATIONS - 1]).toBe(S7L_MIGRATION);
++    expect(baseMigrations).toContain(S8B_MIGRATION);
++    expect(baseMigrations.filter((name) => name > S7L_MIGRATION)).toEqual([]);
++    for (const later of migrations.slice(EXPECTED_MIGRATIONS)) {
++      expect(later > S7L_MIGRATION).toBe(true);
++      expect(later).toMatch(/^\d{14}_[a-z0-9_]+$/);
++      expect(readdirSync(resolve(migrationsDir, later))).toContain('migration.sql');
++    }
++  });
++  it('binds the proof to one attested, clean, non-base candidate head', () => {
++    const base = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++    const candidate = 'a'.repeat(40);
++    expect(g2S9CandidateHead(candidate, `${candidate}\n`, '')).toBe(candidate);
++    expect(() => g2S9CandidateHead(undefined, candidate, '')).toThrow(/G2_S9_CANDIDATE_HEAD/);
++    expect(() => g2S9CandidateHead('abc', candidate, '')).toThrow(/G2_S9_CANDIDATE_HEAD/);
++    expect(() => g2S9CandidateHead(candidate.toUpperCase(), candidate, '')).toThrow();
++    expect(() => g2S9CandidateHead(base, base, '')).toThrow(/not the accepted base/);
++    expect(() => g2S9CandidateHead(candidate, 'b'.repeat(40), '')).toThrow(
++      /not the attested candidate/,
++    );
++    expect(() => g2S9CandidateHead(candidate, candidate, ' M src/x.ts\n')).toThrow(/uncommitted/);
++  });
++});
+diff --git a/test/scout/reconciliation/facts.service.spec.ts b/test/scout/reconciliation/facts.service.spec.ts
+new file mode 100644
+index 00000000..b708ac85
+--- /dev/null
++++ b/test/scout/reconciliation/facts.service.spec.ts
+@@ -0,0 +1,884 @@
++/**
++ * S9-B facts service — unit spec over an in-memory Prisma double. Every query shape the service
++ * issues is served here from plain tables; any write or unknown method throws (S9 never writes).
++ * The fixture platform/spec/rules mirror the S8-C G2 harness shape (`blocks` → programs,
++ * `routines` → workouts) and are injected through the registry seam; the repository specs are
++ * never read. The last group composes the collected facts with the frozen S9-A `reconcile`.
++ */
++import { parseSourceMappingSpec } from '../../../src/scout/reconstruct/mapping-spec';
++import { parseNativeRuleSet } from '../../../src/scout/reconstruct/native/native-rules';
++import { buildNativeRuleRegistry } from '../../../src/scout/reconstruct/native/native-rule-registry';
++import { buildSourceMapperRegistry } from '../../../src/scout/reconstruct/source-mapper-registry';
++import { RECONSTRUCT_MAX_ROWS } from '../../../src/scout/scout-reconstruct.dto';
++import {
++  identityKey,
++  parentSourceIdOf,
++  ReconciliationFactsService,
++  type FactsDb,
++} from '../../../src/scout/reconciliation/facts.service';
++import { reconcile } from '../../../src/scout/reconciliation/reconcile';
++import type {
++  FamilyFacts,
++  ReconciliationFacts,
++  RelationshipFacts,
++} from '../../../src/scout/reconciliation/types';
++
++const PLATFORM = 's9b-proof';
++const COACH = 'coach-a';
++const OTHER = 'coach-b';
++const INTENT = 'intent-1';
++
++const SPEC = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
++  families: {
++    clients: { displayName: { paths: [['name']], coerce: 'string' } },
++    programs: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    workouts: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    client_history: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++  },
++};
++const RULES = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  families: {
++    programs: {
++      weeks: { kind: 'integer', paths: [['weeks']] },
++      daysPerWeek: { kind: 'integer', paths: [['days']] },
++    },
++    workouts: {
++      type: { kind: 'enum', paths: [['kind']], map: { lift: 'strength' }, default: 'strength' },
++      programSourceId: { kind: 'identifier', paths: [['block_id']] },
++      weekIndex: { kind: 'integer', paths: [['week']], base: 1 },
++      dayIndex: { kind: 'integer', paths: [['day']], base: 1 },
++    },
++  },
++};
++/** A second registered platform with NO native rules and no `programs` family. */
++const SPEC_B = {
++  specVersion: 1,
++  sourcePlatform: 'other-proof',
++  steps: { workouts: 'workouts' },
++  families: {
++    workouts: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++  },
++};
++
++// ── In-memory Prisma double ──────────────────────────────────────────────────────────────────
++
++type Row = Record<string, any>;
++const READS = new Set(['findMany', 'findUnique']);
++
++class FakeDb {
++  readonly tables: Record<string, Row[]> = {
++    scoutImportCompletion: [],
++    scoutIngestEntity: [],
++    scoutReconstructionLedger: [],
++    importNativeProvenance: [],
++    person: [],
++    workoutProgram: [],
++    workoutPlan: [],
++    workoutPlanExercise: [],
++  };
++  /** `{ model, method, where }` per call, for the aggregate/tenant assertions. */
++  readonly calls: Array<{ model: string; method: string; where: Row }> = [];
++  private seq = 0;
++
++  add(model: string, row: Row): Row {
++    const withId = { id: row.id ?? `${model}-${String(++this.seq).padStart(6, '0')}`, ...row };
++    this.tables[model].push(withId);
++    return withId;
++  }
++
++  client(): FactsDb {
++    const db: Row = {};
++    for (const model of Object.keys(this.tables)) {
++      db[model] = new Proxy(
++        {},
++        {
++          get: (_target, method: string) => {
++            if (!READS.has(method))
++              throw new Error(`S9 facts must not call ${model}.${method} (reads only)`);
++            return (args: Row) => this.query(model, method, args);
++          },
++        },
++      );
++    }
++    // `Row` is `Record<string, any>`; one typed assertion narrows the double to the service's seam.
++    return db as FactsDb;
++  }
++
++  private matches(row: Row, where: Row): boolean {
++    for (const [key, cond] of Object.entries(where)) {
++      if (key === 'coach_id_intent_id') {
++        if (row.coach_id !== cond.coach_id || row.intent_id !== cond.intent_id) return false;
++      } else if (cond !== null && typeof cond === 'object' && 'in' in cond) {
++        if (!cond.in.includes(row[key])) return false;
++      } else if (row[key] !== cond) return false;
++    }
++    return true;
++  }
++
++  private query(model: string, method: string, args: Row): Promise<any> {
++    this.calls.push({ model, method, where: args.where ?? {} });
++    let rows = this.tables[model].filter((r) => this.matches(r, args.where ?? {}));
++    if (method === 'findUnique') return Promise.resolve(rows[0] ?? null);
++    if (args.orderBy?.id === 'asc') rows = [...rows].sort((a, b) => (a.id < b.id ? -1 : 1));
++    if (args.cursor !== undefined) {
++      const at = rows.findIndex((r) => r.id === args.cursor.id);
++      rows = rows.slice(at + (args.skip ?? 0));
++    }
++    if (args.take !== undefined) rows = rows.slice(0, args.take);
++    const select = args.select as Row | undefined;
++    return Promise.resolve(
++      rows.map((r) =>
++        select === undefined
++          ? { ...r }
++          : Object.fromEntries(Object.keys(select).map((k) => [k, r[k] ?? null])),
++      ),
++    );
++  }
++}
++
++// ── Fixture helpers ──────────────────────────────────────────────────────────────────────────
++
++const service = () =>
++  new ReconciliationFactsService({
++    sourceMappers: buildSourceMapperRegistry([
++      parseSourceMappingSpec(SPEC, 'facts.spec:spec'),
++      parseSourceMappingSpec(SPEC_B, 'facts.spec:spec-b'),
++    ]),
++    nativeRules: buildNativeRuleRegistry([parseNativeRuleSet(RULES, 'facts.spec:rules')]),
++  });
++
++function stage(
++  db: FakeDb,
++  token: string,
++  sourceId: string,
++  payload: Row = {},
++  platform = PLATFORM,
++  coach = COACH,
++  intent = INTENT,
++) {
++  return db.add('scoutIngestEntity', {
++    coach_id: coach,
++    intent_id: intent,
++    entity_type: token,
++    source_id: sourceId,
++    source_platform: platform,
++    payload,
++  });
++}
++function ledger(
++  db: FakeDb,
++  token: string,
++  sourceId: string,
++  status: string,
++  extra: Partial<{
++    target_id: string | null;
++    target_kind: string | null;
++    reason: string | null;
++  }> = {},
++  platform = PLATFORM,
++  coach = COACH,
++  intent = INTENT,
++) {
++  return db.add('scoutReconstructionLedger', {
++    coach_id: coach,
++    intent_id: intent,
++    entity_type: token,
++    source_id: sourceId,
++    source_platform: platform,
++    status,
++    target_id: null,
++    target_kind: null,
++    reason: null,
++    ...extra,
++  });
++}
++function provenance(
++  db: FakeDb,
++  entityType: string,
++  sourceId: string,
++  nativeKind: string,
++  nativeId: string | null,
++  outcome: string,
++  reason: string | null = null,
++  platform = PLATFORM,
++  coach = COACH,
++) {
++  return db.add('importNativeProvenance', {
++    coach_id: coach,
++    import_intent_id: null,
++    source_namespace: platform,
++    entity_type: entityType,
++    source_id: sourceId,
++    native_kind: nativeKind,
++    native_id: nativeId,
++    outcome,
++    reason,
++  });
++}
++const child = (parent: string, tail: string) => `${parent.length}:${parent}#${tail}`;
++
++const family = (facts: ReconciliationFacts, name: string, mapped = true): FamilyFacts => {
++  const found = facts.families.find((f) => f.family === name && f.mapped === mapped);
++  if (found === undefined) throw new Error(`no ${mapped ? 'mapped' : 'unmapped'} entry ${name}`);
++  return found;
++};
++const identity = (f: FamilyFacts, sourceId: string, platform = PLATFORM) => {
++  const found = f.identities.find((i) => i.identity === identityKey(platform, sourceId));
++  if (found === undefined) throw new Error(`no identity ${sourceId} in ${f.family}`);
++  return found;
++};
++const edges = (facts: ReconciliationFacts, edge: RelationshipFacts['edge'], from?: string) =>
++  facts.relationships.filter(
++    (r) =>
++      r.edge === edge && (from === undefined || r.from_identity === identityKey(PLATFORM, from)),
++  );
++
++/** A verified program + program-day plan pair (bucket j on both sides). */
++function verifiedPair(db: FakeDb, coach = COACH) {
++  const program = db.add('workoutProgram', { coach_id: coach, archived_at: null });
++  const plan = db.add('workoutPlan', {
++    coach_id: coach,
++    archived_at: null,
++    program_id: program.id,
++    week_index: 0,
++    day_index: 1,
++  });
++  // Staged under the canonical tokens: the S8-C writer keys its ledger rows by canonical family,
++  // and the D-S9-2 join is on the raw wide identity (token, platform, source_id) — see the
++  // negative case under "ledger join on the wide identity".
++  stage(db, 'programs', 'B1', { title: 'Block', weeks: 4, days: 3 }, PLATFORM, coach);
++  stage(db, 'workouts', 'W1', { title: 'Day', block_id: 'B1', week: 1, day: 2 }, PLATFORM, coach);
++  ledger(
++    db,
++    'programs',
++    'B1',
++    'reconstructed',
++    { target_id: program.id, target_kind: 'workout_program' },
++    PLATFORM,
++    coach,
++  );
++  ledger(
++    db,
++    'workouts',
++    'W1',
++    'reconstructed',
++    { target_id: plan.id, target_kind: 'workout_plan' },
++    PLATFORM,
++    coach,
++  );
++  provenance(db, 'programs', 'B1', 'workout_program', program.id, 'created', null, PLATFORM, coach);
++  provenance(
++    db,
++    'workouts',
++    'W1',
++    'workout_plan',
++    plan.id,
++    'created',
++    'defaulted:type',
++    PLATFORM,
++    coach,
++  );
++  return { program, plan };
++}
++
++// ── Specs ────────────────────────────────────────────────────────────────────────────────────
++
++describe('S9-B ReconciliationFactsService', () => {
++  describe('an empty run', () => {
++    it('reports no families, an undeterminable spec set, coverage null and claim null', async () => {
++      const db = new FakeDb();
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts).toEqual({
++        claim: null,
++        families: [],
++        relationships: [],
++        spec_families: null,
++        ledger_without_staged: 0,
++        coverage: null,
++      });
++    });
++    it('reads the legacy claim only from the closed terminal set', async () => {
++      const db = new FakeDb();
++      db.add('scoutImportCompletion', {
++        coach_id: COACH,
++        intent_id: INTENT,
++        terminal_status: 'success',
++      });
++      expect((await service().collect(db.client(), COACH, INTENT)).claim).toBe('success');
++      db.tables.scoutImportCompletion[0].terminal_status = 'complete';
++      expect((await service().collect(db.client(), COACH, INTENT)).claim).toBeNull();
++    });
++  });
++
++  describe('grouping (D-S9-2)', () => {
++    it('resolves step tokens and canonical-family tokens to ONE mapped entry per family', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      stage(db, 'workouts', 'W2', { title: 'b' });
++      stage(db, 'blocks', 'B1', { title: 'p', weeks: 1, days: 1 });
++      stage(db, 'people', 'C1', { name: 'n' });
++      stage(db, 'log', 'H1', { title: 'h', client_id: 'C1' });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts.families.map((f) => [f.family, f.mapped])).toEqual([
++        ['client_history', true],
++        ['clients', true],
++        ['programs', true],
++        ['workouts', true],
++      ]);
++      const workouts = family(facts, 'workouts');
++      expect(workouts.identities.map((i) => [i.token, i.ledger, i.client_linked])).toEqual([
++        ['routines', null, false],
++        ['workouts', null, false],
++      ]);
++      expect(family(facts, 'clients').qualifiers).toEqual(['roster_bridge_pending']);
++      expect(family(facts, 'clients').client_owned).toBe(false);
++      expect(family(facts, 'client_history').client_owned).toBe(true);
++      expect(family(facts, 'client_history').qualifiers).toEqual([]);
++      expect(family(facts, 'programs').resolution_reason).toBeNull();
++      expect(family(facts, 'programs').ceiling_exceeded).toBe(false);
++    });
++    it('forms unmapped entries keyed by raw token with the accepted resolution reasons', async () => {
++      const db = new FakeDb();
++      stage(db, 'notes', 'N1', {});
++      stage(db, 'routines', 'X1', { title: 'x' }, 'unregistered');
++      stage(db, 'programs', 'P1', { title: 'p' }, 'other-proof'); // token is a family SPEC_B lacks
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(
++        facts.families.filter((f) => !f.mapped).map((f) => [f.family, f.resolution_reason]),
++      ).toEqual([
++        ['notes', 'unresolved_family:notes'],
++        ['programs', 'unresolved_family:programs'],
++        ['routines', 'unsupported_platform:unregistered'],
++      ]);
++      for (const f of facts.families) {
++        expect(f.mapped).toBe(false);
++        expect(f.client_owned).toBe(false);
++        expect(f.ceiling_exceeded).toBe(false);
++        expect(f.qualifiers).toEqual([]);
++        expect(f.identities.every((i) => i.client_linked === false)).toBe(true);
++      }
++      expect(facts.spec_families).toBeNull(); // an unregistered platform → undeterminable
++    });
++    it('keeps (mapped, family) unique when a token is mapped on one platform and not on another', async () => {
++      const db = new FakeDb();
++      stage(db, 'programs', 'P1', { title: 'p', weeks: 1, days: 1 });
++      stage(db, 'programs', 'P2', { title: 'p' }, 'other-proof');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts.families.map((f) => [f.family, f.mapped, f.identities.length])).toEqual([
++        ['programs', true, 1],
++        ['programs', false, 1],
++      ]);
++      const keys = facts.families.map((f) => `${f.mapped}:${f.family}`);
++      expect(new Set(keys).size).toBe(keys.length);
++    });
++    it('unions the declared families of every staged platform', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      stage(db, 'workouts', 'W2', { title: 'b' }, 'other-proof');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts.spec_families).toEqual(['client_history', 'clients', 'programs', 'workouts']);
++    });
++    it('marks the per-token pass ceiling only when the engine would have refused the family', async () => {
++      const db = new FakeDb();
++      for (let n = 0; n <= RECONSTRUCT_MAX_ROWS; n++)
++        stage(db, 'programs', `P${n}`, { title: 'p' });
++      stage(db, 'routines', 'W1', { title: 'w' });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(family(facts, 'programs').ceiling_exceeded).toBe(true);
++      expect(family(facts, 'programs').identities).toHaveLength(RECONSTRUCT_MAX_ROWS + 1);
++      expect(family(facts, 'workouts').ceiling_exceeded).toBe(false);
++    });
++  });
++
++  describe('ledger join on the wide identity', () => {
++    it('attaches failed / skipped / reconstructed facts and leaves the missing row null', async () => {
++      const db = new FakeDb();
++      stage(db, 'workouts', 'W1', { title: 'a' });
++      stage(db, 'workouts', 'W2', { title: 'b' });
++      stage(db, 'workouts', 'W3', { title: 'c' });
++      stage(db, 'workouts', 'W4', { title: 'd' });
++      ledger(db, 'workouts', 'W1', 'failed', { reason: 'error:Error' });
++      ledger(db, 'workouts', 'W2', 'skipped', { reason: 'unresolved:missing_required_field:type' });
++      ledger(db, 'workouts', 'W3', 'reconstructed', { target_id: 'evidence-1', target_kind: null });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      const w = family(facts, 'workouts');
++      expect(identity(w, 'W1').ledger).toEqual({ status: 'failed' });
++      expect(identity(w, 'W2').ledger).toEqual({
++        status: 'skipped',
++        reason: 'unresolved:missing_required_field:type',
++      });
++      expect(identity(w, 'W3').ledger).toEqual({
++        status: 'reconstructed',
++        target_kind: null,
++        provenance: null,
++      });
++      expect(identity(w, 'W4').ledger).toBeNull();
++    });
++    it('joins on token + platform + source_id, never on counts', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      ledger(db, 'routines', 'W2', 'reconstructed', {
++        target_id: 'x',
++        target_kind: 'scout_entity',
++      });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toBeNull();
++      expect(facts.ledger_without_staged).toBe(1);
++      expect(family(facts, 'workouts').ledger_without_staged).toBe(1);
++    });
++    it('does NOT join a step-token staged row to a canonical-token ledger row for the same id', async () => {
++      // D-S9-2 wide identity is raw: `routines/W1` and `workouts/W1` are two identities even though
++      // both resolve to `workouts`. The ledger row is an orphan attributed to the family it evidences.
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      ledger(db, 'workouts', 'W1', 'reconstructed', {
++        target_id: 'p-1',
++        target_kind: 'workout_plan',
++      });
++      provenance(db, 'workouts', 'W1', 'workout_plan', 'p-1', 'created');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      const w = family(facts, 'workouts');
++      expect(w.identities.map((i) => [i.token, i.identity, i.ledger])).toEqual([
++        ['routines', identityKey(PLATFORM, 'W1'), null],
++      ]);
++      expect(w.ledger_without_staged).toBe(1);
++      expect(facts.ledger_without_staged).toBe(1);
++    });
++    it('counts an orphan ledger row run-wide even when its token resolves to no family', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      ledger(db, 'notes', 'N1', 'skipped', { reason: 'unresolved_family:notes' });
++      ledger(db, 'workouts', 'Z9', 'failed', {}, 'unregistered');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts.ledger_without_staged).toBe(2);
++      expect(facts.families.map((f) => [f.family, f.ledger_without_staged])).toEqual([
++        ['workouts', 0],
++      ]);
++    });
++    it('attributes an orphan to a family entry the ledger alone evidences', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a' });
++      ledger(db, 'programs', 'B1', 'skipped', { reason: 'missing_source_id' });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(family(facts, 'programs').identities).toEqual([]);
++      expect(family(facts, 'programs').ledger_without_staged).toBe(1);
++      expect(facts.ledger_without_staged).toBe(1);
++    });
++  });
++
++  describe('provenance and native verification (buckets g–j)', () => {
++    it('reports present_owned with the provenance reason tags and an empty child histogram', async () => {
++      const db = new FakeDb();
++      const { program, plan } = verifiedPair(db);
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'programs'), 'B1').ledger).toEqual({
++        status: 'reconstructed',
++        target_kind: 'workout_program',
++        provenance: {
++          outcome: 'created',
++          native: 'present_owned',
++          reason: null,
++          unresolved_children: {},
++        },
++      });
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toEqual({
++        status: 'reconstructed',
++        target_kind: 'workout_plan',
++        provenance: {
++          outcome: 'created',
++          native: 'present_owned',
++          reason: 'defaulted:type',
++          unresolved_children: {},
++        },
++      });
++      expect(program.id).not.toBe(plan.id);
++    });
++    it('reports removed for an archived or missing native row', async () => {
++      const db = new FakeDb();
++      const { plan } = verifiedPair(db);
++      plan.archived_at = new Date('2026-09-25T00:00:00Z');
++      db.tables.workoutProgram.length = 0; // deleted
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toMatchObject({
++        provenance: { native: 'removed' },
++      });
++      expect(identity(family(facts, 'programs'), 'B1').ledger).toMatchObject({
++        provenance: { native: 'removed' },
++      });
++    });
++    it('reports foreign_owner when the native row belongs to another coach', async () => {
++      const db = new FakeDb();
++      const { plan } = verifiedPair(db);
++      plan.coach_id = OTHER;
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toMatchObject({
++        provenance: { native: 'foreign_owner' },
++      });
++    });
++    it('reports provenance_mismatch / kind_mismatch when provenance and ledger disagree', async () => {
++      const db = new FakeDb();
++      verifiedPair(db);
++      const prov = db.tables.importNativeProvenance;
++      prov.find((p) => p.entity_type === 'workouts')!.native_id = 'someone-else';
++      prov.find((p) => p.entity_type === 'programs')!.native_kind = 'workout_plan';
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toMatchObject({
++        provenance: { native: 'provenance_mismatch' },
++      });
++      expect(identity(family(facts, 'programs'), 'B1').ledger).toMatchObject({
++        provenance: { native: 'kind_mismatch' },
++      });
++    });
++    it('carries an unresolved top-level provenance row verbatim (outcome, reason)', async () => {
++      const db = new FakeDb();
++      stage(db, 'workouts', 'W1', { title: 'a', client_id: 'C7' });
++      ledger(db, 'workouts', 'W1', 'reconstructed', {
++        target_id: 'ev-1',
++        target_kind: 'scout_entity',
++      });
++      provenance(
++        db,
++        'workouts',
++        'W1',
++        'workout_plan',
++        null,
++        'unresolved',
++        'unresolved:no_native_client_principal',
++      );
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      const fact = identity(family(facts, 'workouts'), 'W1');
++      expect(fact.client_linked).toBe(true);
++      expect(fact.ledger).toEqual({
++        status: 'reconstructed',
++        target_kind: 'scout_entity',
++        provenance: {
++          outcome: 'unresolved',
++          native: 'kind_mismatch',
++          reason: 'unresolved:no_native_client_principal',
++          unresolved_children: {},
++        },
++      });
++    });
++    it('histograms unresolved children by reason under their parent only', async () => {
++      const db = new FakeDb();
++      verifiedPair(db);
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'id:e1'),
++        'workout_plan_exercise',
++        null,
++        'unresolved',
++        'unresolved:exercise_reference',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:1'),
++        'workout_plan_exercise',
++        null,
++        'unresolved',
++        'unresolved:exercise_reference',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:2'),
++        'workout_plan_exercise',
++        null,
++        'unresolved',
++        'unresolved:invalid_value:sets',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:3'),
++        'workout_plan_exercise',
++        'x-1',
++        'created',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W10', 'ord:0'),
++        'workout_plan_exercise',
++        null,
++        'unresolved',
++        'unresolved:exercise_reference',
++      );
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(identity(family(facts, 'workouts'), 'W1').ledger).toMatchObject({
++        provenance: {
++          unresolved_children: {
++            'unresolved:exercise_reference': 2,
++            'unresolved:invalid_value:sets': 1,
++          },
++        },
++      });
++    });
++    it('parses the child identity prefix exactly', () => {
++      expect(parentSourceIdOf(child('W1', 'ord:3'))).toBe('W1');
++      expect(parentSourceIdOf(child('a:b#c', 'id:z'))).toBe('a:b#c');
++      expect(parentSourceIdOf('2:W1#ord:3')).toBe('W1');
++      expect(parentSourceIdOf('3:W1#ord:3')).toBeNull();
++      expect(parentSourceIdOf('W1#ord:3')).toBeNull();
++      expect(parentSourceIdOf(':W1#x')).toBeNull();
++    });
++  });
++
++  describe('relationship edges (B-2: one edge per declared relationship)', () => {
++    it('emits program_parent even when the parent is unstaged and unresolvable', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'Day', block_id: 'B-missing', week: 1, day: 1 });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent')).toEqual([
++        {
++          edge: 'program_parent',
++          from_family: 'workouts',
++          from_identity: identityKey(PLATFORM, 'W1'),
++          to_family: 'programs',
++          to_identity: identityKey(PLATFORM, 'B-missing'),
++          consistent: false,
++        },
++      ]);
++    });
++    it('declares no program_parent edge for a standalone plan or a source without native rules', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'Standalone' });
++      stage(db, 'workouts', 'W2', { title: 'Other', block_id: 'B1' }, 'other-proof');
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent')).toEqual([]);
++    });
++    it('is consistent only when program_id and (week_index, day_index) match the derivation', async () => {
++      const db = new FakeDb();
++      const { plan } = verifiedPair(db);
++      let facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent', 'W1')).toEqual([
++        expect.objectContaining({ to_identity: identityKey(PLATFORM, 'B1'), consistent: true }),
++      ]);
++      plan.day_index = 0; // native drift
++      facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent', 'W1')[0].consistent).toBe(false);
++      plan.day_index = 1;
++      plan.program_id = 'another-program';
++      facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent', 'W1')[0].consistent).toBe(false);
++    });
++    it('is inconsistent when the parent program exists but is not verified (removed / unresolved)', async () => {
++      const db = new FakeDb();
++      const { program } = verifiedPair(db);
++      program.archived_at = new Date();
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(edges(facts, 'program_parent', 'W1')).toHaveLength(1);
++      expect(edges(facts, 'program_parent', 'W1')[0].consistent).toBe(false);
++    });
++    it('emits one child_order edge per created child and compares workout_plan_id and #ord', async () => {
++      const db = new FakeDb();
++      const { plan } = verifiedPair(db);
++      const e1 = db.add('workoutPlanExercise', {
++        workout_plan_id: plan.id,
++        order: 0,
++        archived_at: null,
++      });
++      const e2 = db.add('workoutPlanExercise', {
++        workout_plan_id: plan.id,
++        order: 5,
++        archived_at: null,
++      });
++      const e3 = db.add('workoutPlanExercise', {
++        workout_plan_id: 'other-plan',
++        order: 2,
++        archived_at: null,
++      });
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:0'),
++        'workout_plan_exercise',
++        e1.id,
++        'created',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:1'),
++        'workout_plan_exercise',
++        e2.id,
++        'already_present',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'id:abc'),
++        'workout_plan_exercise',
++        e3.id,
++        'created',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'id:gone'),
++        'workout_plan_exercise',
++        'missing',
++        'created',
++      );
++      provenance(
++        db,
++        'workouts.exercise',
++        child('W1', 'ord:9'),
++        'workout_plan_exercise',
++        null,
++        'unresolved',
++        'unresolved:exercise_reference',
++      );
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      const childEdges = edges(facts, 'child_order', 'W1');
++      expect(childEdges).toHaveLength(4); // the unresolved child declares no created relationship
++      for (const edge of childEdges) {
++        expect(edge.to_family).toBe('workouts');
++        expect(edge.to_identity).toBe(identityKey(PLATFORM, 'W1'));
++      }
++      expect(childEdges.map((e) => e.consistent)).toEqual([true, false, false, false]);
++    });
++    it('emits client_link with consistent null for every interpreter-resolved client link', async () => {
++      const db = new FakeDb();
++      stage(db, 'routines', 'W1', { title: 'a', client_id: 42 });
++      stage(db, 'log', 'H1', { title: 'h', client_id: 'C1' });
++      stage(db, 'people', 'C1', { name: 'n' });
++      stage(db, 'blocks', 'B1', { title: 'p', client_id: 'C1' });
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(
++        edges(facts, 'client_link').map((e) => [e.from_family, e.to_identity, e.consistent]),
++      ).toEqual([
++        ['client_history', identityKey(PLATFORM, 'C1'), null],
++        ['programs', identityKey(PLATFORM, 'C1'), null],
++        ['workouts', identityKey(PLATFORM, '42'), null],
++      ]);
++      expect(identity(family(facts, 'clients'), 'C1').client_linked).toBe(false);
++      expect(identity(family(facts, 'workouts'), 'W1').client_linked).toBe(true);
++    });
++  });
++
++  describe('tenancy, aggregation and read-only discipline', () => {
++    it("never lets coach B's staging, ledger, provenance or native rows into coach A's facts", async () => {
++      const db = new FakeDb();
++      verifiedPair(db);
++      verifiedPair(db, OTHER);
++      stage(db, 'notes', 'N-b', {}, PLATFORM, OTHER);
++      const facts = await service().collect(db.client(), COACH, INTENT);
++      expect(facts.families.map((f) => [f.family, f.identities.length])).toEqual([
++        ['programs', 1],
++        ['workouts', 1],
++      ]);
++      expect(facts.ledger_without_staged).toBe(0);
++      for (const call of db.calls) {
++        if (
++          ['person', 'workoutProgram', 'workoutPlan', 'workoutPlanExercise'].includes(call.model)
++        ) {
++          expect(Object.keys(call.where)).toEqual(['id']); // S8-C verifyTarget precedent
++        } else {
++          expect(call.where.coach_id ?? call.where.coach_id_intent_id?.coach_id).toBe(COACH);
++        }
++      }
++    });
++    it('issues a bounded number of queries independent of the staged row count', async () => {
++      const small = new FakeDb();
++      verifiedPair(small);
++      await service().collect(small.client(), COACH, INTENT);
++      const large = new FakeDb();
++      verifiedPair(large);
++      for (let n = 0; n < 499; n++) stage(large, 'routines', `X${n}`, { title: 'x' });
++      await service().collect(large.client(), COACH, INTENT);
++      // Same query count until paging adds one more page (500 rows per page).
++      expect(large.calls.length).toBe(small.calls.length + 1);
++    });
++    it('never invokes a write method', async () => {
++      const db = new FakeDb();
++      verifiedPair(db);
++      await expect(service().collect(db.client(), COACH, INTENT)).resolves.toBeDefined();
++      expect(db.calls.every((c) => c.method === 'findMany' || c.method === 'findUnique')).toBe(
++        true,
++      );
++    });
++  });
++
++  describe('composition with the frozen S9-A reconcile', () => {
++    it('a fully verified program-day pair is partial/coverage_basis_unknown only (v1)', async () => {
++      const db = new FakeDb();
++      verifiedPair(db);
++      db.add('scoutImportCompletion', {
++        coach_id: COACH,
++        intent_id: INTENT,
++        terminal_status: 'success',
++      });
++      const result = reconcile(await service().collect(db.client(), COACH, INTENT));
++      expect(result.verdict).toEqual({ outcome: 'partial', reason_code: 'coverage_basis_unknown' });
++      expect(result.report.conditions).toEqual(['coverage_basis_unknown']);
++      expect(
++        result.report.families.map((f) => [
++          f.family,
++          f.native_present_verified,
++          f.relationship_closure,
++        ]),
++      ).toEqual([
++        ['client_history', 0, 'not_applicable'],
++        ['clients', 0, 'not_applicable'],
++        ['programs', 1, 'not_applicable'],
++        ['workouts', 1, 'verified'],
++      ]);
++      expect(result.report.required_families).toEqual([
++        'client_history',
++        'clients',
++        'programs',
++        'workouts',
++      ]);
++    });
++    it('a missing parent trips relationship_unverified through the emitted edge', async () => {
++      const db = new FakeDb();
++      const { plan } = verifiedPair(db);
++      plan.program_id = null; // the plan was created standalone; the source declares a parent
++      const result = reconcile(await service().collect(db.client(), COACH, INTENT));
++      expect(result.report.conditions).toEqual([
++        'relationship_unverified',
++        'coverage_basis_unknown',
++      ]);
++      expect(result.report.families.find((f) => f.family === 'workouts')).toMatchObject({
++        relationship_closure: 'unverified',
++        relationship_unverified: 1,
++      });
++    });
++    it('an orphan ledger row and a removed native row are unresolved_identities', async () => {
++      const db = new FakeDb();
++      const { program } = verifiedPair(db);
++      program.archived_at = new Date();
++      ledger(db, 'workouts', 'ghost', 'reconstructed', {
++        target_id: 'g',
++        target_kind: 'workout_plan',
++      });
++      const result = reconcile(await service().collect(db.client(), COACH, INTENT));
++      expect(result.report.conditions[0]).toBe('unresolved_identities');
++      expect(result.report.ledger_without_staged).toBe(1);
++      expect(result.report.families.find((f) => f.family === 'programs')).toMatchObject({
++        unresolved: 1,
++        reasons: [{ code: 'unresolved:native_target_removed', count: 1 }],
++      });
++    });
++  });
++});
+diff --git a/test/utils/g2-s9-bootstrap.sh b/test/utils/g2-s9-bootstrap.sh
+new file mode 100755
+index 00000000..ce61b586
+--- /dev/null
++++ b/test/utils/g2-s9-bootstrap.sh
+@@ -0,0 +1,237 @@
++#!/usr/bin/env bash
++# S9-B G2 proof bootstrap, derived by substitution from the accepted S8-C bootstrap
++# test/utils/g2-s8c-bootstrap.sh (at 1c5fbb04, unchanged) for the S9-B-only disposable
++# cluster/database. S9-B ships NO migration (D-S9-5: the report is never persisted): the candidate's
++# prisma tree must be byte-identical to the base 1c5fbb04, so there is no OLD side here. The full
++# accepted history (172 migrations, S8-B and S7-L included) is installed from the CANDIDATE root
++# through the real release mechanism (`prisma migrate deploy`), and the spec then drives the
++# candidate facts service (and the accepted S8-C writer, to produce rows) against it.
++# Validation harness only: it never touches a hosted or application database, never edits
++# schema/migration/generator sources, and stops on the first unexpected state instead of
++# repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_S9_DATABASE_URL   postgresql://s9_super@127.0.0.1:<port>/g2_s9_disposable?schema=public&connection_limit=4
++#   G2_S9_CONFIRM        g2_s9_disposable:<port>
++#   G2_S9_PASSWORD       disposable local fixture password shared by s9_super/postgres/service_role
++#                        (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_S9_PSQL           absolute path of a psql binary compatible with the PG17 server
++#   G2_S9_CANDIDATE_HEAD the attested final candidate head (40 hex); the runtime root must be
++#                        checked out exactly there and clean, and it must not be the base itself
++# Optional:
++#   G2_S9_SERVER_VERSION expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# Base pin (kept identical in test/utils/g2-s9-pg-harness.ts and test/scout/g2-s9-db-guard.spec.ts).
++BASE_HEAD=1c5fbb0441178e0cfe6e9f8d72e955c645c265e9
++S8B_MIGRATION=20270122000000_scout_native_provenance_expand
++S7L_MIGRATION=20270123000000_scout_run_lifecycle_expand
++# 171 accepted migrations through S8-B plus S7-L = 172 tracked by the base; S9-B adds none.
++EXPECTED_MIGRATIONS=172
++EXPECTED_VERSION="${G2_S9_SERVER_VERSION:-170006}"
++# Distinctive S9-B fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-s9-db.ts G2_S9_CLUSTER_MARKER / G2_S9_DATABASE_MARKER, kept identical by
++# test/scout/g2-s9-db-guard.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's9-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s9-disposable-pg17
++DB_MARKER=s9-g2-reconciliation-facts-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_S9_DATABASE_URL G2_S9_CONFIRM G2_S9_PASSWORD G2_S9_PSQL G2_S9_CANDIDATE_HEAD; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++# Candidate binding (mirrors g2S9CandidateHead in test/utils/g2-s9-db.ts): one attested head, clean.
++[[ "$G2_S9_CANDIDATE_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "G2_S9_CANDIDATE_HEAD is not a 40-hex commit id" >&2; exit 2; }
++[[ "$G2_S9_CANDIDATE_HEAD" != "$BASE_HEAD" ]] || { echo "G2_S9_CANDIDATE_HEAD is the accepted base, not a candidate" >&2; exit 2; }
++ACTUAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
++[[ "$ACTUAL_HEAD" == "$G2_S9_CANDIDATE_HEAD" ]] || { echo "runtime root $ROOT is at $ACTUAL_HEAD, not the attested candidate $G2_S9_CANDIDATE_HEAD" >&2; exit 2; }
++[[ -z "$(git -C "$ROOT" status --porcelain)" ]] || { echo "runtime root $ROOT has uncommitted changes; the attested head must be checked out clean" >&2; exit 2; }
++git -C "$ROOT" merge-base --is-ancestor "$BASE_HEAD" "$ACTUAL_HEAD" || { echo "candidate $ACTUAL_HEAD does not descend from base $BASE_HEAD" >&2; exit 2; }
++echo "CANDIDATE_HEAD=$ACTUAL_HEAD"
++[[ -x "$G2_S9_PSQL" ]] || { echo "psql binary not executable: $G2_S9_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: nothing in this harness may auto-install.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2S9TestTarget, withFixturePassword } = require("./test/utils/g2-s9-db");
++  const t = g2S9TestTarget(process.env.G2_S9_DATABASE_URL, process.env.G2_S9_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_S9_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_S9_PASSWORD"
++
++psql_maint() { "$G2_S9_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_S9_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|verify-only) ;; *) echo "usage: g2-s9-bootstrap.sh [bootstrap|verify-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S9-B lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S9-B fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_S9_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_s9_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s9_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_s9_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s9_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s9_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s9_disposable exists without the S9-B disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_s9_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_s9_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. Candidate source: S9-B ships no migration. The prisma tree (schema + migrations) must be
++#    byte-identical to the base and track exactly the accepted 172 directories, S8-B and S7-L included.
++git -C "$ROOT" cat-file -e "$BASE_HEAD^{commit}" || { echo "base $BASE_HEAD unknown in $ROOT" >&2; exit 4; }
++[[ -z "$(git -C "$ROOT" diff --name-only "$BASE_HEAD" HEAD -- prisma)" ]] \
++  || { echo "candidate prisma tree differs from base $BASE_HEAD; S9-B must ship no schema/migration change" >&2; exit 4; }
++git -C "$ROOT" diff --quiet HEAD -- prisma || { echo "candidate has uncommitted prisma changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$BASE_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ from base; the isolated dependency tree is unsafe" >&2; exit 4; }
++COUNT="$(find "$ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "candidate has $COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S8B_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S8-B migration" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S7L_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S7-L migration" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history (S8-B and S7-L included) through the real release mechanism from the
++#    candidate root. Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the
++#    cluster superuser.
++(cd "$ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++for m in "$S8B_MIGRATION" "$S7L_MIGRATION"; do
++  [[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$m' AND finished_at IS NOT NULL")" == "1" ]] \
++    || { echo "$m not recorded as applied" >&2; exit 5; }
++done
++# S7-L objects the facts service reads (the stored claim) and the lifecycle columns must be PRESENT.
++[[ "$(psql_db -c "SELECT to_regclass('public.\"ScoutImportCompletion\"') IS NOT NULL")" == "t" ]] \
++  || { echo "ScoutImportCompletion absent after the accepted history" >&2; exit 5; }
++for col in mode execution_epoch reason_code; do
++  [[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutImport\"'::regclass AND attname='$col' AND NOT attisdropped")" == "1" ]] \
++    || { echo "ScoutImport lacks S7-L's $col" >&2; exit 5; }
++done
++# S8-B objects the facts service joins (provenance, typed ledger target) must be PRESENT.
++[[ "$(psql_db -c "SELECT to_regclass('public.\"ImportNativeProvenance\"') IS NOT NULL")" == "t" ]] \
++  || { echo "ImportNativeProvenance absent after the accepted history" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='target_kind' AND NOT attisdropped")" == "1" ]] \
++  || { echo "ScoutReconstructionLedger lacks S8-B's target_kind" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_constraint WHERE conrelid='public.\"ImportNativeProvenance\"'::regclass AND contype='c'")" -ge "3" ]] \
++  || { echo "ImportNativeProvenance CHECK constraints absent" >&2; exit 5; }
++# S8-C native targets the facts verify by id (and the staging/evidence tables).
++for rel in WorkoutProgram WorkoutPlan WorkoutPlanExercise WorkoutPlanRevision ExerciseCatalogItem ScoutReconstructedEntity ScoutIngestEntity Person; do
++  [[ "$(psql_db -c "SELECT to_regclass('public.\"$rel\"') IS NOT NULL")" == "t" ]] || { echo "$rel absent after the accepted history" >&2; exit 5; }
++done
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative: a missing file is a refusal (exit 6).
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Candidate client in the candidate root: generated once by the runtime setup (the schema is
++#    the base schema, so it is the accepted S8-B/S7-L-composed client) and only VERIFIED here; no
++#    `prisma generate`. Prisma normalizes (re-aligns/reorders attributes in) the schema copy it
++#    emits into the client, so the copy is never byte-equal to prisma/schema.prisma and no
++#    pre-computed digest of it exists for this composition; it is verified STRUCTURALLY instead:
++#    engine bytes identical to the pinned @prisma/engines copy, runtime resolving to the pinned
++#    @prisma/client runtime, and every model/column the facts service reads present in the copy.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++CLIENT_SCHEMA="$ROOT/node_modules/.prisma/client/schema.prisma"
++[[ -f "$CLIENT_SCHEMA" ]] \
++  || { echo "candidate client schema copy missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++model_has() { # <model> <column> <type-regex>: the column line must exist inside the model block of the client copy
++  awk "/^model $1 \\{/,/^\\}/" "$CLIENT_SCHEMA" | grep -Eq "^ +$2 +$3"
++}
++for model in ScoutImportCompletion ScoutIngestEntity ScoutReconstructionLedger ImportNativeProvenance Person WorkoutProgram WorkoutPlan WorkoutPlanExercise; do
++  grep -q "^model $model " "$CLIENT_SCHEMA" || { echo "candidate client lacks model $model (client not generated from the base schema)" >&2; exit 7; }
++done
++model_has ScoutReconstructionLedger target_kind 'String\?' || { echo "candidate client ledger lacks target_kind String? (pre-S8-B client)" >&2; exit 7; }
++model_has ImportNativeProvenance native_kind 'String' || { echo "candidate client provenance lacks native_kind (pre-S8-B client)" >&2; exit 7; }
++model_has ScoutImportCompletion terminal_status 'String' || { echo "candidate client completion lacks terminal_status (pre-S7-L client)" >&2; exit 7; }
++model_has ScoutImport mode 'String' || { echo "candidate client ScoutImport lacks mode (pre-S7-L client)" >&2; exit 7; }
++model_has WorkoutPlan program_id 'String\?' || { echo "candidate client WorkoutPlan lacks program_id (pre-S8-C client)" >&2; exit 7; }
++CLIENT_SCHEMA_SHA="$(sha256sum "$CLIENT_SCHEMA" | cut -c1-64)"
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA schema_copy_sha256=$CLIENT_SCHEMA_SHA"
++
++if [[ "$MODE" == verify-only ]]; then echo "G2_S9_VERIFY_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_S9_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-s9-db.ts b/test/utils/g2-s9-db.ts
+new file mode 100644
+index 00000000..02ee7bc8
+--- /dev/null
++++ b/test/utils/g2-s9-db.ts
+@@ -0,0 +1,157 @@
++/**
++ * S9-B G2 proof target guard: derived by literal substitution from the accepted S8-C guard
++ * test/utils/g2-s8c-db.ts (at 1c5fbb04), which stays byte-identical and keeps governing the
++ * S8-C proof. One dedicated disposable database on an S9-only disposable PostgreSQL 17
++ * cluster; a further identity, separate from the E, T/Q0, S5, B, R, N/Q1, C, S7-L, S8-B, S8-C
++ * and S8-G targets, so no earlier proof state is reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_S9_DATABASE = 'g2_s9_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      s9_super     cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy` and all harness DDL/data (S9-B ships no migration, D-S9-5)
++ *  - runtime    service_role  BYPASSRLS runtime role used by the candidate facts-service reader processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_S9_ROLE = 's9_super';
++export const G2_S9_ADMIN_ROLE = G2_S9_ROLE;
++export const G2_S9_MIGRATION_ROLE = 'postgres';
++export const G2_S9_RUNTIME_ROLE = 'service_role';
++export const G2_S9_LOGIN_ROLES = new Set([
++  G2_S9_ADMIN_ROLE,
++  G2_S9_MIGRATION_ROLE,
++  G2_S9_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_S9_PASSWORD_ENV = 'G2_S9_PASSWORD';
++/**
++ * Distinctive S9 fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's9-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s9_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-s9-bootstrap.sh and the S9-B binding under execution/1910a060/s9b/ must carry the same literals.
++ */
++export const G2_S9_CLUSTER_MARKER = 's9-disposable-pg17';
++export const G2_S9_DATABASE_MARKER =
++  's9-g2-reconciliation-facts-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
++// S7-L lane; 55511 is the accepted S8-B lane; 55641 is the concurrent S7-L (64e33dc7) lane; 55642
++// is the S8-C lane; 55643 is the S8-F lane (64e33dc7/s8f binding v2); 55644 is the S8-G lane
++// (1910a060/s8g). The S9 lane port is chosen by the parent (55645; execution/1910a060),
++// double-entered by the operator, never hard-coded.
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++  '55491',
++  '55501',
++  '55511',
++  '55641',
++  '55642',
++  '55643',
++  '55644',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2S9TestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_S9_DATABASE}` ||
++    url.username !== G2_S9_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_S9_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'S9-B G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('S9-B G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_S9_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('S9-B G2 proof requires a plain fixture password in the environment');
++  if (!G2_S9_LOGIN_ROLES.has(username))
++    throw new Error('S9-B G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
++
++/**
++ * Candidate binding. The one-run S9-B proof is granted against ONE attested final head, so the
++ * driver refuses to run against anything else: the operator double-enters the attested head in
++ * G2_S9_CANDIDATE_HEAD, and it must equal the checked-out HEAD of the runtime root exactly,
++ * that head must not be the base itself (a candidate, not the accepted tree), and the tree must
++ * be clean (an uncommitted edit would make the proof about bytes no attestation covers). Pure:
++ * the callers supply `git rev-parse HEAD` and `git status --porcelain` output.
++ */
++export const G2_S9_CANDIDATE_HEAD_ENV = 'G2_S9_CANDIDATE_HEAD';
++export const G2_S9_BASE_HEAD = '1c5fbb0441178e0cfe6e9f8d72e955c645c265e9';
++export function g2S9CandidateHead(
++  declared: string | undefined,
++  checkedOut: string,
++  porcelain: string,
++): string {
++  if (!declared || !/^[0-9a-f]{40}$/.test(declared))
++    throw new Error(
++      `S9-B G2 proof requires the attested candidate head in ${G2_S9_CANDIDATE_HEAD_ENV}`,
++    );
++  if (declared === G2_S9_BASE_HEAD)
++    throw new Error('S9-B G2 proof target is a candidate head, not the accepted base');
++  if (checkedOut.trim() !== declared)
++    throw new Error(
++      `S9-B G2 proof runtime root is at ${checkedOut.trim()}, not the attested candidate ${declared}`,
++    );
++  if (porcelain.trim() !== '')
++    throw new Error(
++      'S9-B G2 proof runtime root has uncommitted changes; the attested head must be checked out clean',
++    );
++  return declared;
++}
+diff --git a/test/utils/g2-s9-harness.ts b/test/utils/g2-s9-harness.ts
+new file mode 100644
+index 00000000..cdbf1543
+--- /dev/null
++++ b/test/utils/g2-s9-harness.ts
+@@ -0,0 +1,237 @@
++/**
++ * G2-S9-B live-proof observations layered on the S9-only derivative
++ * (test/utils/g2-s9-pg-harness.ts) of the accepted S8-C harness. Adds only what S9-B needs:
++ * synthetic fixture rows (User; ScoutImport settled; ScoutIngestEntity staged programs/workouts;
++ * ExerciseCatalogItem rows the exact-identifier link may resolve against), the explicit fixture
++ * source-mapping spec + native rule set the worker injects (platform `s9-proof`, plus a second
++ * registered platform `s9-proof-b` with a workouts-only spec and no native rules), the legacy
++ * `/complete` claim writer (`ScoutImportCompletion`), direct ledger/provenance fixture writers
++ * for the contradiction cases (orphan ledger rows, repointed provenance), and row snapshots of
++ * the native targets, provenance and ledger. No production reader or writer is emulated here:
++ * the facts run as the real ReconciliationFactsService and the rows are produced by the real
++ * ScoutReconstructService, both in test/utils/g2-s9-worker.cjs. Imported only by the explicitly
++ * guarded test/rls-g2-s9.spec.ts.
++ */
++import { json, quote, sql } from './g2-s9-pg-harness';
++
++export const PROVENANCE = 'ImportNativeProvenance';
++export const LEDGER = 'ScoutReconstructionLedger';
++export const COMPLETION = 'ScoutImportCompletion';
++/** Fixture platform: canonical, synthetic, registered only through the injected spec. */
++export const PLATFORM = 's9-proof';
++/** Second registered fixture platform: spec only (`workouts`), no native rules. */
++export const PLATFORM_B = 's9-proof-b';
++
++/** Fixture S8-A spec: `blocks` is the programs step, `routines` the workouts step. */
++export const SPEC = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  steps: { people: 'clients', blocks: 'programs', routines: 'workouts', log: 'client_history' },
++  families: {
++    clients: { displayName: { paths: [['name']], coerce: 'string' } },
++    programs: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    workouts: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++    client_history: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string_or_finite_number' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++  },
++};
++/** Fixture S8-C native rules for the same platform. */
++export const RULES = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM,
++  families: {
++    programs: {
++      description: { kind: 'text', paths: [['notes']] },
++      weeks: { kind: 'integer', paths: [['weeks']] },
++      daysPerWeek: { kind: 'integer', paths: [['days']] },
++    },
++    workouts: {
++      type: {
++        kind: 'enum',
++        paths: [['kind']],
++        map: { lift: 'strength', run: 'cardio' },
++        default: 'strength',
++      },
++      durationEstimateMinutes: { kind: 'duration', paths: [['minutes']], unit: 'minutes' },
++      programSourceId: { kind: 'identifier', paths: [['block_id']] },
++      weekIndex: { kind: 'integer', paths: [['week']], base: 1 },
++      dayIndex: { kind: 'integer', paths: [['day']], base: 1 },
++      exercises: {
++        paths: [['exercises']],
++        item: {
++          id: { kind: 'identifier', paths: [['id']] },
++          exerciseRef: { kind: 'identifier', paths: [['exercise']] },
++          sets: { kind: 'integer', paths: [['sets']] },
++          reps: { kind: 'integer', paths: [['reps']] },
++          weight: { kind: 'weight', paths: [['kg']], unit: 'kg' },
++          restSeconds: { kind: 'duration', paths: [['rest']], unit: 'seconds' },
++          groupKey: { kind: 'identifier', paths: [['superset']] },
++          notes: { kind: 'text', paths: [['cue']] },
++        },
++      },
++    },
++  },
++};
++/** A second registered platform: `workouts` only, no `programs`, no native rules. */
++export const SPEC_B = {
++  specVersion: 1,
++  sourcePlatform: PLATFORM_B,
++  steps: { workouts: 'workouts' },
++  families: {
++    workouts: {
++      clientSourceId: { paths: [['client_id']], coerce: 'string' },
++      label: { paths: [['title']], coerce: 'string' },
++    },
++  },
++};
++/** Worker options that inject the fixture registry (spread into every `run`). */
++export const REGISTRY = { spec: SPEC, rules: RULES };
++/** Both registered platforms (facts mode: `spec_families` is their declared union). */
++export const REGISTRY_AB = { spec: [SPEC, SPEC_B], rules: RULES };
++
++/** Contract §3.3 child identity: `<n>:<parent>#id:<child>` or `<n>:<parent>#ord:<ordinal>`. */
++export const childSourceId = (parent: string, child: { id: string } | { ordinal: number }) =>
++  `${parent.length}:${parent}#${'id' in child ? `id:${child.id}` : `ord:${child.ordinal}`}`;
++
++/** Synthetic owner row (User is the FK target of ImportIntent/WorkoutPlan/WorkoutProgram coach_id). */
++export function ensureUser(coach: string) {
++  sql(`INSERT INTO "User" (id,supabase_id,email,name,role)
++    VALUES (${quote(coach)},${quote(`sb-${coach}`)},${quote(`${coach}@synthetic.invalid`)},${quote(`Synthetic ${coach}`)},'coach')
++    ON CONFLICT (id) DO NOTHING`);
++}
++/** Settled legacy run row: the post-settle gate the reconstruct writer reads (N/Q1 fixture shape). */
++export function settle(coach = 'coach', intent = 'intent') {
++  ensureUser(coach);
++  sql(`INSERT INTO "ScoutImport" (id,coach_id,intent_id,state,terminal_status)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},'settled','success')
++    ON CONFLICT DO NOTHING`);
++}
++/**
++ * The extension's stored `/complete` claim (S7L-DOC D-S7L-2) the facts service reads as `claim`:
++ * `ScoutImportCompletion.terminal_status`. Any string is storable (the column carries no CHECK);
++ * the service admits only `success | partial | failed` and reports everything else as `null`.
++ */
++export function claim(status: string, coach = 'coach', intent = 'intent') {
++  sql(`INSERT INTO "${COMPLETION}" (id,coach_id,intent_id,terminal_status)
++    VALUES (${quote(`${coach}-${intent}-claim`)},${quote(coach)},${quote(intent)},${quote(status)})
++    ON CONFLICT (coach_id,intent_id) DO UPDATE SET terminal_status = EXCLUDED.terminal_status`);
++}
++/** One staged row (N/Q1 fixture shape); entity_type is the canonical family (accepted convention),
++ *  or any raw token for the unmapped-entry cases (the token is what the facts group by). */
++export function stage(
++  source: string,
++  family: string,
++  payload: Record<string, unknown>,
++  coach = 'coach',
++  intent = 'intent',
++  platform = PLATFORM,
++) {
++  sql(`INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(family)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify(payload))})
++    ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`);
++}
++/**
++ * A ledger row written directly (R05 contradiction fixture: a ledger identity with no staged row,
++ * exactly the shape an earlier pass of a since-deleted staged row leaves behind).
++ */
++export function ledgerRow(
++  source: string,
++  family: string,
++  status: 'reconstructed' | 'skipped' | 'failed',
++  extra: { target_id?: string; target_kind?: string; reason?: string } = {},
++  coach = 'coach',
++  intent = 'intent',
++  platform = PLATFORM,
++) {
++  const v = (s: string | undefined) => (s === undefined ? 'NULL' : quote(s));
++  sql(`INSERT INTO "${LEDGER}" (id,coach_id,intent_id,entity_type,source_id,source_platform,status,target_id,target_kind,reason)
++    VALUES (${quote(`${coach}-${intent}-${family}-${platform}-${source}-ledger`)},${quote(coach)},${quote(intent)},
++    ${quote(family)},${quote(source)},${quote(platform)},${quote(status)},${v(extra.target_id)},${v(extra.target_kind)},${v(extra.reason)})`);
++}
++/**
++ * Synthetic catalog rows the exact-identifier link may resolve against (id and slug).
++ * `updated_at` is `@updatedAt` in the schema: Prisma fills it client-side and the column has no
++ * database default, so this raw INSERT must supply it (every other NOT NULL column of the table
++ * either is listed here or carries a default in migration 20260601000000_add_exercise_catalog_video).
++ */
++export function catalog(items: readonly { id: string; slug: string }[]) {
++  for (const item of items)
++    sql(`INSERT INTO "ExerciseCatalogItem" (id,slug,name,category,primary_muscle,updated_at)
++      VALUES (${quote(item.id)},${quote(item.slug)},${quote(`Synthetic ${item.slug}`)},'strength','full_body',now())
++      ON CONFLICT (id) DO NOTHING`);
++}
++
++export const provenanceRows = (coach = 'coach') =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_id',source_id,
++    'source_namespace',source_namespace,'native_kind',native_kind,'native_id',native_id,'outcome',outcome,
++    'reason',reason,'import_intent_id',import_intent_id) ORDER BY entity_type, source_id),'[]')
++    FROM "${PROVENANCE}" WHERE coach_id=${quote(coach)}`) as Array<Record<string, string | null>>;
++export const ledgerRows = (coach = 'coach', intent = 'intent') =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_id',source_id,
++    'status',status,'target_id',target_id,'target_kind',target_kind,'reason',reason) ORDER BY entity_type, source_id),'[]')
++    FROM "${LEDGER}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`) as Array<
++    Record<string, string | null>
++  >;
++export const plans = (coach = 'coach') =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'name',name,'type',type,'program_id',program_id,
++    'week_index',week_index,'day_index',day_index,'is_template',is_template,'version',version,
++    'head_revision_id',head_revision_id,'duration_estimate_minutes',duration_estimate_minutes) ORDER BY name),'[]')
++    FROM "WorkoutPlan" WHERE coach_id=${quote(coach)}`) as Array<Record<string, any>>;
++export const programs = (coach = 'coach') =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'name',name,'weeks',weeks,'days_per_week',days_per_week,
++    'is_template',is_template,'is_regime',is_regime,'owner_user_id',owner_user_id,'visibility',visibility,'version',version) ORDER BY name),'[]')
++    FROM "WorkoutProgram" WHERE coach_id=${quote(coach)}`) as Array<Record<string, any>>;
++export const exercises = (planId: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('id',id,'exercise_external_id',exercise_external_id,'order',"order",
++    'sets',sets,'reps_or_duration_seconds',reps_or_duration_seconds,'weight_lbs',weight_lbs,'rest_seconds',rest_seconds,
++    'superset_group_id',superset_group_id,'notes',notes) ORDER BY "order"),'[]')
++    FROM "WorkoutPlanExercise" WHERE workout_plan_id=${quote(planId)}`) as Array<
++    Record<string, any>
++  >;
++export const count = (table: string, where = 'true') =>
++  Number(sql(`SELECT count(*) FROM "${table}" WHERE ${where}`));
++export const evidenceRows = (coach = 'coach') =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('entity_type',entity_type,'source_id',source_id,'label',label,
++    'client_source_id',client_source_id) ORDER BY entity_type, source_id),'[]')
++    FROM "ScoutReconstructedEntity" WHERE coach_id=${quote(coach)}`) as Array<
++    Record<string, string | null>
++  >;
++/** Every table the facts service reads, as the read-only proof watches them (counts + a content digest). */
++export const WATCHED_TABLES = [
++  COMPLETION,
++  'ScoutIngestEntity',
++  LEDGER,
++  PROVENANCE,
++  'Person',
++  'WorkoutProgram',
++  'WorkoutPlan',
++  'WorkoutPlanExercise',
++  'ScoutImport',
++  'ScoutReconstructedEntity',
++  'WorkoutPlanRevision',
++] as const;
++/** `{ table: [count, md5 of the sorted row text] }` — proves "no write" as content, not just cardinality. */
++export const snapshot = () =>
++  json(`SELECT jsonb_object_agg(t, v) FROM (VALUES
++    ${WATCHED_TABLES.map(
++      (table) =>
++        `(${quote(table)}, (SELECT jsonb_build_array(count(*), md5(COALESCE(string_agg(x::text, E'\\n' ORDER BY x::text),''))) FROM "${table}" x))`,
++    ).join(',\n    ')}) AS s(t, v)`) as Record<string, [number, string]>;
++
++/** Whole-fixture reset: every table the proof writes, children first. Never touches the catalog schema. */
++export function resetData() {
++  sql(`DELETE FROM "${PROVENANCE}"; DELETE FROM "${LEDGER}"; DELETE FROM "ScoutIngestEntity";
++    DELETE FROM "ScoutReconstructedEntity"; DELETE FROM "${COMPLETION}"; DELETE FROM "ScoutImport";
++    DELETE FROM "WorkoutPlanRevision"; DELETE FROM "WorkoutPlanExercise"; DELETE FROM "WorkoutPlan";
++    DELETE FROM "WorkoutProgram"; DELETE FROM "ExerciseCatalogItem"; DELETE FROM "Person";
++    DELETE FROM "ExtensionPairCode"; DELETE FROM "ImportIntent";`);
++}
+diff --git a/test/utils/g2-s9-pg-harness.ts b/test/utils/g2-s9-pg-harness.ts
+new file mode 100644
+index 00000000..88f3d050
+--- /dev/null
++++ b/test/utils/g2-s9-pg-harness.ts
+@@ -0,0 +1,260 @@
++/**
++ * S9-B G2 live-proof helpers: derived by substitution from the accepted S8-C harness
++ * test/utils/g2-s8c-pg-harness.ts (at 1c5fbb04), which stays byte-identical. Same real psql, same
++ * real generated Prisma client in separate OS processes (test/utils/g2-s9-worker.cjs drives the
++ * real ReconciliationFactsService + the frozen S9-A `reconcile` inside ONE `RepeatableRead`
++ * transaction in `mode: 'facts'`, and the real ScoutReconstructService in `mode: 'reconstruct'`
++ * to produce genuine S8-C rows), no transaction or query mocks; bound to the S9-only identity
++ * guard test/utils/g2-s9-db.ts and the G2_S9_* environment. Only test/rls-g2-s9.spec.ts (via
++ * test/utils/g2-s9-harness.ts) imports this.
++ *
++ * There is no OLD side: S9-B ships no migration (D-S9-5), so the base 1c5fbb04 prisma tree —
++ * 172 migrations, S8-B and S7-L included — is the only schema and the accepted S7-L + S8-B +
++ * S8-C objects are the proof target. The pause/barrier instrumentation of the S8-C harness is
++ * carried unchanged (used by `mode: 'reconstruct'` only) so this stays a literal derivative.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { resolve } from 'path';
++import {
++  G2_S9_ADMIN_ROLE,
++  G2_S9_MIGRATION_ROLE,
++  G2_S9_RUNTIME_ROLE,
++  G2_S9_BASE_HEAD,
++  G2_S9_CANDIDATE_HEAD_ENV,
++  g2S9CandidateHead,
++  g2S9TestTarget,
++  withFixturePassword,
++} from './g2-s9-db';
++
++export const root = resolve(__dirname, '..', '..');
++/** Base pin (kept identical in test/utils/g2-s9-bootstrap.sh and test/scout/g2-s9-db-guard.spec.ts). */
++export const BASE_HEAD: string = G2_S9_BASE_HEAD;
++export const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++export const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
++/** 171 accepted migrations through S8-B plus S7-L = 172 tracked by the base; S9-B adds none. */
++export const EXPECTED_MIGRATIONS = 172;
++
++const raw = process.env.G2_S9_DATABASE_URL;
++const password = process.env.G2_S9_PASSWORD;
++export const psql = process.env.G2_S9_PSQL;
++export const directory = process.env.G2_S9_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_S9_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !directory) {
++  throw new Error('S9-B G2 proof requires explicit database, password, psql and data directory');
++}
++export const target = g2S9TestTarget(raw, process.env.G2_S9_CONFIRM);
++/** The attested candidate head this run is bound to: the runtime root must be exactly there, clean. */
++export const candidateHead = g2S9CandidateHead(
++  process.env[G2_S9_CANDIDATE_HEAD_ENV],
++  execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }),
++  execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
++);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_S9_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_S9_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** The same statement text as another fixture-matrix role (runtime `service_role`, or an API
++ *  role reached through SET ROLE from the owner session in the statement itself). */
++export const sqlAs = (role: string, text: string): string => psqlRun(asRole(role), [], text);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string, role?: string): void {
++  let error: unknown;
++  try {
++    if (role) sqlAs(role, statement);
++    else sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++/** Worker modes: `facts` (default) = real facts service + frozen reconcile, reads only, one
++ *  RepeatableRead transaction; `reconstruct` = the real S8-C writer, used only to produce rows. */
++export type WorkerMode = 'facts' | 'reconstruct';
++export type Result = {
++  result?: any;
++  failure?: any;
++  queries: string[];
++  events: any[];
++  pid: number;
++  families?: string[];
++};
++let sequence = 0;
++/** One real service call in an independent OS process with the candidate generated client.
++ *  `options.spec` / `options.rules` are the raw fixture source-mapping spec(s) and native rule
++ *  set(s) the worker parses through the real S8-A / S8-C parsers and injects as the registries
++ *  (facts mode: `RECONCILIATION_FACTS_OPTIONS`; reconstruct mode: `families`); see
++ *  test/utils/g2-s9-worker.cjs. */
++export function worker(options: Record<string, unknown> = {}) {
++  const name = `g2s9_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_S9_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root,
++    client: resolve(root, 'node_modules/.prisma/client'),
++    head: candidateHead,
++    url: service.toString(),
++    mode: 'facts' as WorkerMode,
++    coach: 'coach',
++    intent: 'intent',
++    family: 'workouts',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-s9-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_S9_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  // Fixture barrier (carried from the N/Q1 harness): `options.pause` names the phase the worker
++  // pauses at; `ready` settles when it has, `resume()` releases it. Reconstruct mode only.
++  let readyResolve: (phase: string) => void = () => undefined;
++  const ready = new Promise<string>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.done) result = message;
++      if (message.ready) readyResolve(message.ready);
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters. In
++      // facts mode the verdict alone is echoed (facts carry synthetic identities; the spec
++      // asserts them, the log does not repeat them).
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          options: { ...options, spec: undefined, rules: undefined },
++          result: config.mode === 'facts' ? result.result?.verdict : result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return { done, ready, resume: () => child.send({}), stop: () => child.kill(), name };
++}
++export const run = (options: Record<string, unknown> = {}) => worker(options).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_S9_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_S9_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
+diff --git a/test/utils/g2-s9-worker.cjs b/test/utils/g2-s9-worker.cjs
+new file mode 100644
+index 00000000..9fcff4c9
+--- /dev/null
++++ b/test/utils/g2-s9-worker.cjs
+@@ -0,0 +1,198 @@
++// S9-B: real ReconciliationFactsService (+ the frozen S9-A `reconcile`) and, to produce genuine
++// rows, the real ScoutReconstructService, each with the real generated Prisma client in an
++// independent OS process. Derived from the accepted test/utils/g2-s8c-worker.cjs (unchanged).
++// The S9-B deltas: `mode: 'facts'` (default) builds the facts registries from the explicit fixture
++// source-mapping spec(s) + native rule set(s) (parsed through the real S8-A/S8-C parsers) and
++// injects them through the service's `RECONCILIATION_FACTS_OPTIONS` seam, then runs
++// `collect(tx, coach, intent)` inside ONE `RepeatableRead` interactive transaction (the isolation
++// the transaction actually runs at is read back from PostgreSQL itself, so the proof does not
++// depend on Prisma's log wording) and feeds the facts to `reconcile`; `mode: 'reconstruct'` is
++// the S8-C writer exactly as g2-s8c-worker.cjs drives it. No query result or transaction semantic
++// is replaced. Used only by the explicitly guarded live proof test/rls-g2-s9.spec.ts.
++const { join } = require('path');
++const { execFileSync } = require('child_process');
++const input = JSON.parse(process.env.G2_S9_WORKER);
++// Candidate binding: the worker loads source from input.root, so that root must be at the attested
++// head the harness was bound to; a mismatch is a hard failure before any client is constructed.
++const workerHead = execFileSync('git', ['rev-parse', 'HEAD'], {
++  cwd: input.root,
++  encoding: 'utf8',
++}).trim();
++if (workerHead !== input.head) {
++  throw new Error(
++    `worker root ${input.root} is at ${workerHead}, not the attested candidate ${input.head}`,
++  );
++}
++const mode = input.mode === undefined ? 'facts' : input.mode;
++if (mode !== 'facts' && mode !== 'reconstruct') {
++  throw new Error(`g2-s9-worker: unknown mode ${String(mode)} (facts | reconstruct)`);
++}
++const Module = require('module');
++const resolveFilename = Module._resolveFilename;
++Module._resolveFilename = function (request, ...args) {
++  return request === '@prisma/client'
++    ? join(input.client, 'index.js')
++    : resolveFilename.call(this, request, ...args);
++};
++const { PrismaClient } = require(input.client);
++const { buildFamilyRegistry } = require(join(input.root, 'src/scout/reconstruct/families'));
++const { parseSourceMappingSpec } = require(join(input.root, 'src/scout/reconstruct/mapping-spec'));
++const { buildSourceMapperRegistry } = require(
++  join(input.root, 'src/scout/reconstruct/source-mapper-registry'),
++);
++const { parseNativeRuleSet } = require(
++  join(input.root, 'src/scout/reconstruct/native/native-rules'),
++);
++const { buildNativeRuleRegistry } = require(
++  join(input.root, 'src/scout/reconstruct/native/native-rule-registry'),
++);
++const db = new PrismaClient({
++  datasources: { db: { url: input.url } },
++  log: [{ emit: 'event', level: 'query' }],
++});
++const queries = [];
++const events = [];
++db.$on('query', (e) => queries.push(e.query)); // Never log query parameters.
++const analytics = { capture: (...args) => events.push(args) };
++// `spec` / `rules` accept one raw document or an array (several fixture platforms in one run).
++const asList = (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
++const injected = input.spec !== undefined || input.rules !== undefined;
++const specs = asList(input.spec).map((raw, n) =>
++  parseSourceMappingSpec(raw, `g2-s9-worker:spec[${n}]`),
++);
++const ruleSets = asList(input.rules).map((raw, n) =>
++  parseNativeRuleSet(raw, `g2-s9-worker:rules[${n}]`),
++);
++const txOptions =
++  Number.isInteger(input.txTimeout) && input.txTimeout > 0 ? { timeout: input.txTimeout } : {};
++let paused = false;
++async function barrier(phase) {
++  if (input.pause !== phase || paused) return;
++  paused = true;
++  process.send({ ready: phase });
++  await new Promise((resolve) => process.once('message', resolve));
++}
++function instrument(target) {
++  return new Proxy(target, {
++    get(object, key) {
++      if (key === '$transaction')
++        return (fn, ...options) =>
++          object.$transaction(
++            (tx) => fn(instrument(tx)),
++            ...(options.length === 0 && txOptions.timeout !== undefined ? [txOptions] : options),
++          );
++      // Pause after the native target INSERT and before its provenance/ledger rows: proves that a
++      // concurrent identical run converges on ONE target (the paused transaction either commits
++      // first or loses the identity race and rolls its target back with the whole transaction).
++      if (key === 'workoutPlan' || key === 'workoutProgram')
++        return new Proxy(object[key], {
++          get(delegate, method) {
++            if (method === 'create')
++              return async (...args) => {
++                const result = await delegate.create(...args);
++                await barrier('after-target');
++                return result;
++              };
++            return typeof delegate[method] === 'function'
++              ? delegate[method].bind(delegate)
++              : delegate[method];
++          },
++        });
++      if (key === 'scoutReconstructionLedger')
++        return new Proxy(object[key], {
++          get(delegate, method) {
++            if (method === 'upsert')
++              return async (...args) => {
++                await barrier('before-ledger');
++                return delegate.upsert(...args);
++              };
++            return typeof delegate[method] === 'function'
++              ? delegate[method].bind(delegate)
++              : delegate[method];
++          },
++        });
++      return typeof object[key] === 'function' ? object[key].bind(object) : object[key];
++    },
++  });
++}
++async function reconstruct() {
++  const { ScoutReconstructService } = require(
++    join(input.root, 'src/scout/scout-reconstruct.service'),
++  );
++  const prisma = instrument(db);
++  const service = new ScoutReconstructService(prisma, analytics);
++  if (injected) {
++    service.families = buildFamilyRegistry({
++      sourceMappers: buildSourceMapperRegistry(specs),
++      nativeRules: buildNativeRuleRegistry(ruleSets),
++    });
++  }
++  const families = [...service.families.keys()];
++  if (input.mapper === 'throw')
++    service.families.get(input.family).map = () => {
++      throw new Error('fixture private payload');
++    };
++  const result = await service.reconstruct(input.coach, input.intent, input.family);
++  return { result, families };
++}
++async function facts() {
++  const { ReconciliationFactsService } = require(
++    join(input.root, 'src/scout/reconciliation/facts.service'),
++  );
++  const { reconcile } = require(join(input.root, 'src/scout/reconciliation/reconcile'));
++  const options = injected
++    ? {
++        sourceMappers: buildSourceMapperRegistry(specs),
++        nativeRules: buildNativeRuleRegistry(ruleSets),
++      }
++    : {};
++  const service = new ReconciliationFactsService(options);
++  // One interactive transaction at REPEATABLE READ (Addendum A C-9: the caller sets the
++  // isolation; the service only reads). The level PostgreSQL reports for THIS transaction is
++  // returned alongside the facts so the spec asserts the snapshot guarantee from the server, not
++  // from the client's log wording.
++  const collected = await db.$transaction(
++    async (tx) => {
++      const probe = await tx.$queryRaw`SELECT current_setting('transaction_isolation') AS level`;
++      const collectedFacts = await service.collect(tx, input.coach, input.intent);
++      return { isolation: probe[0].level, facts: collectedFacts };
++    },
++    { isolationLevel: 'RepeatableRead', ...txOptions },
++  );
++  const reconciled = reconcile(collected.facts);
++  return {
++    result: {
++      isolation: collected.isolation,
++      facts: collected.facts,
++      verdict: reconciled.verdict,
++      report: reconciled.report,
++    },
++    families: injected ? specs.map((spec) => spec.sourcePlatform) : undefined,
++  };
++}
++(async () => {
++  let result;
++  let failure;
++  let families;
++  try {
++    const outcome = mode === 'reconstruct' ? await reconstruct() : await facts();
++    result = outcome.result;
++    families = outcome.families;
++  } catch (e) {
++    // Facts mode reads only and never sees a payload, so its error text is safe to surface.
++    failure = {
++      status: typeof e.getStatus === 'function' ? e.getStatus() : 500,
++      message:
++        typeof e.getStatus === 'function' || mode === 'facts' ? e.message : 'Internal server error',
++      code: e.code,
++    };
++  } finally {
++    await db.$disconnect();
++  }
++  process.send({ done: true, result, failure, queries, events, pid: process.pid, families }, () =>
++    process.disconnect(),
++  );
++})().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

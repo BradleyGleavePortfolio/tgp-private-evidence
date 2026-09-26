@@ -1,0 +1,34 @@
+feat(scout): S9-C reconciliation wiring in settle hook and status read
+
+Wires the accepted S9-A reconciler and the S9-B facts collector into the
+run lifecycle per the D-S9-8 S9-C row. The settle tail of
+ScoutLifecycleService.onTransferSettled now collects the reconciliation
+facts on its own transaction after the row lock and CAS, passes the
+reconcile() verdict to arbitrate() as its reconciliation argument, and
+keeps exactly one terminal write; fence and claim precedence are
+unchanged and complete is never written without an S10 coverage basis.
+The facts service is an @Optional() fourth constructor parameter, so the
+existing two-argument call sites keep working.
+
+reason-codes.ts appends unresolved_identities, relationship_unverified
+and coverage_basis_unknown after the S7-L codes. The status read
+recomputes the report in one read-only RepeatableRead transaction for
+settled server runs only (legacy rows never read it), and
+projectFamilies fills six optional additive keys per staged family.
+scout.dto.ts adds the matching optional ScoutImportFamilyDto properties
+(required set unchanged); scout.module.ts imports ReconciliationModule.
+docs/contracts/importer-openapi.json is refreshed by
+npm run contract:importer (additive only, no CONTRACT_VERSION bump) and
+the importer contract spec pins the new enums and properties.
+
+Added cases only in the arbiter, lifecycle service and scout service
+specs; settle-hook.spec.ts follows the new tail order. New
+catalogue-parity spec, the S9-C db guard spec, and the
+test/utils/g2-s9c-* harness with test/rls-g2-s9c.spec.ts as the S9-C
+real-PG proof (disposable marked PG 17 lane). No schema or migration
+change, no edits to reconstruct/orchestration, run.controller.ts,
+scout-reconstruct.service.ts or the S9-A/S9-B code and test files.
+
+docs/decisions/2026-09-25-s9-reconciliation.md gains Addendum B
+recording the S9-C review closures and wiring decisions; no text above
+the addendum changes.

@@ -1,5 +1,16 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-D3A9F701, 2026-09-26 02:25Z
+
+S9-B CLOSED AND LANDED. backend integration/importer 771db62a -> 5407efae (ordinary FF, PR #545 CI green; land/s9-b-accepted=1e6e5735, land/s9-b=5407efae). main unchanged 1c10e2a1.
+- S9B-GATE-3 RC0 committed 1e6e5735 (11 paths). Final-head + binding v3 reviews A GO (revised) / B GO; C-only.
+- S9B-PROOF-1 (binding/v3, port 55645): real PG17, 10/10, RC=0. Acceptance: execution/1910a060/s9b/ACCEPT_RECORD-1e6e5735.md.
+- Landing: landing/land-s9b-d3a9.sh (+ .delta.diff), compose M4=5407efae tree 3e2028e9 (= predicted union, overlap 0), must-run jest 43 passed / 10 skipped / 0 failed of 53; LAND_GO_S9B.md.
+S9-C: draft (19 paths incl. regenerated OpenAPI) dev-loop green (tsc/eslint/contract-regen stable/targeted 14 suites 551/551; d3a9f701/s9c/devloop-1..3). Frozen as s9c/freeze-1.
+Review A NO-GO (A-1 settle tx lacks REPEATABLE READ per Addendum C-9; A-2 C-6 qualifier domains syntax-only; B-3 C-9 equals-vs-subset; B-4 live proof pending = planned sequence). Fix round in worktrees/d3a9-s9c-r2; review B pending; gate driver + binding v1 being derived.
+S10: readiness (d3a9f701/s10/READINESS.md) and S10-0 decision draft (uncommitted, worktrees/d3a9-s10-0) under independent review.
+Next: S9-C fixes -> delta review -> gate (commit) -> final-head/binding review -> one PG proof (port 55646) -> accept -> land. Then S10-0 land, S10-A.
+
 ## CURRENT: EXEC-D3A9F701, 2026-09-26 01:16Z
 
 S8-G CLOSED AND LANDED. backend integration/importer 9497ca52 -> 771db62a (ordinary FF, PR #544 CI green; land/s8-g-accepted=1279b419, land/s8-g=771db62a). main unchanged 1c10e2a1.

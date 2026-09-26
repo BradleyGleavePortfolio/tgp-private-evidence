@@ -1,0 +1,26 @@
+feat(scout): S9-B reconciliation facts collector and real-PG proof harness
+
+Adds src/scout/reconciliation/facts.service.ts (+ reconciliation.module.ts):
+ReconciliationFactsService.collect(tx, coachId, intentId) reads staging,
+ledger, provenance, completion and native rows for one run inside the
+caller's read-only transaction and returns the ReconciliationFacts the pure
+S9-A reconciler consumes. Tenant-scoped reads, native rows compared for
+owner/kind/provenance agreement, ledger rows without a staged identity
+counted and attributed, one relationship edge per declared E-R1/E-R2/E-R3
+instance (an unresolvable parent still emits its edge as inconsistent),
+coverage null and the created/already-present split left unknown per
+D-S9-3/D-S9-4. No persistence, no schema or migration change (D-S9-5), no
+lifecycle, DTO or writer edits; nothing wires the service yet (S9-C).
+
+test/scout/reconciliation/facts.service.spec.ts is the unit spec over an
+in-memory read-only Prisma double, including composition with the frozen
+reconciler. test/utils/g2-s9-* and test/rls-g2-s9.spec.ts are the S8-C
+pattern real-PG proof (disposable marked PG 17 lane, guarded bootstrap,
+forked worker with the candidate client) for the facts-over-real-writes
+cases; test/scout/g2-s9-db-guard.spec.ts keeps the lane identity in the
+default suite.
+
+docs/decisions/2026-09-25-s9-reconciliation.md gains Addendum A recording
+the S9-0 review closures, the accepted S9-A deviations and the S9-B facts
+rules; no text above the addendum changes.
+

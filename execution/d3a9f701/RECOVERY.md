@@ -43,3 +43,6 @@ This sandbox has no `execution/test-validation.lock`; `lslocks` shows no local h
 Checked remote evidence branches/tags: only main at `3d6ceb4`; checked backend refs expose no S8-G/S9-B candidate branch. Library caption searches for S8 and S9 returned no artifacts. No inaccessible predecessor session has been reopened.
 
 Next: finish exact-file recovery and bounded evidence checks; preserve recovered bytes and the remaining missing inputs. Do not start S10 implementation while unresolved S8-G/S9-B contracts remain.
+
+## Update 2026-09-26 02:25Z
+Recovery complete; execution cursor advanced. S8-G landed (771db62a), S9-B landed (5407efae). Active: S9-C fix round/review; S10-0 review. Lock inode 692282 (runtime/LOCK_ESTABLISHED.txt).

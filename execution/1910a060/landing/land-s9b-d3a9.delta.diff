@@ -1,0 +1,183 @@
+2c2
+< # land-s8g-1910.sh: LAND-PREP-S8G (EXEC-1910A060, Tier T3). Exact nonproduction composition of the S8-G candidate
+---
+> # land-s9b-d3a9.sh (derived from land-s8g-d3a9.sh, session d3a9f701): LAND-PREP-S9B (EXEC-1910A060, Tier T3). Exact nonproduction composition of the S9-B candidate
+14c14
+< #   stage          push land/s8-g-accepted = 820ce85b and land/s8-g = M3 (ordinary, absent-or-equal), open ONE PR.
+---
+> #   stage          push land/s9-b-accepted = 820ce85b and land/s9-b = M3 (ordinary, absent-or-equal), open ONE PR.
+21c21
+< # ---------- fixed identities (observed 2026-09-25 ~22:40Z; see analysis/L2-2-DISPOSITION-S8G.md) ----------
+---
+> # ---------- fixed identities (observed 2026-09-25 ~22:40Z; see analysis/L2-2-DISPOSITION-S9B.md) ----------
+26,28c26,28
+< TIP=9497ca5275938c9228c6ec6fa0dfa8c34f39f724            # M2: S9-A landing merge = integration/importer (PR #543)
+< TIP_TREE=737c34a3b50cb823c9317d13e1b23797127338b9
+< MB=62471b116267fdec6746073c4b4c80a154d09834             # M: S8-G sole parent == merge-base(M2, S8-G)
+---
+> TIP=771db62aa10dd0065f30d7d8a155d89fd1cfcfc8   # M3: S8-G landing merge = integration/importer (PR #544)
+> TIP_TREE=74c06f8ffe26eda1e99251ecf1bbcdface6689ff
+> MB=9497ca5275938c9228c6ec6fa0dfa8c34f39f724   # M2: S9-B sole parent == merge-base(M3, S9-B)
+30,41c30,40
+< H=1279b419ee60b25163c7e6d2809b749dd723fee9              # exact S8-G candidate bytes (reused, never rebuilt)
+< H_TREE=44ece797c9183ee33198b2c43e402f943911369a
+< H0=820ce85be2ebf994112afbb90739eb9469ad628e              # dual-GO product commit; H = its test-only closure (S8G-DIAG-1)
+< CAND_BUNDLE=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing/bundles/s8g-1279b419ee60-full.bundle
+< CAND_BUNDLE_SHA=cf5867b9fb8f648711b713bcf35d654fb7f1a1aa9117fac8f5ea20d91324285d   # 62471b11..refs/heads/exec1910/s8g
+< CAND_REF=refs/heads/exec1910/s8g
+< CAND_RECEIPT=/home/user/workspace/tgp-private-evidence/execution/1910a060/s8g/closure-d3a9/HEAD-1279b419ee60.txt
+< CAND_RECEIPT_SHA=7b37fd81cc75e208355f68e9c420c12442b7efd0dc37e7a7b40501c9f2ecb0a5    # 14 'blob <path> <sha>' lines
+< CAND_RAW_SHA=297d58bdaf36793ba7826e1e8ff86e9e4e0629250f25a1839461b5e2fb4ae732        # sha256 of diff --raw --no-abbrev MB H
+< CAND_NPATHS=14
+< TIPSIDE_PATHS="src/scout/reconciliation/coverage.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/types.ts test/scout/reconciliation/reconcile.spec.ts"
+< PRED_TREE=74c06f8ffe26eda1e99251ecf1bbcdface6689ff      # git merge-tree --write-tree M2 820ce85b (both orders)
+---
+> H=1e6e5735384a434804bce223c1599162bc660983   # exact S9-B gate-3 commit (reused, never rebuilt)
+> H_TREE=db6dde16c212ee1d2cf42da6bc71bacb68452b8e
+> CAND_BUNDLE=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing/bundles/s9b-1e6e5735384a.bundle
+> CAND_BUNDLE_SHA=f81a0ad1452e62f02524403330d71ed9680a9569c2af9d2522e0c35c34cff5ae   # 9497ca52..refs/heads/exec1910/s9b
+> CAND_REF=refs/heads/exec1910/s9b
+> CAND_RECEIPT=/home/user/workspace/tgp-private-evidence/execution/1910a060/s9b/gate/HEAD-1e6e5735384a.txt
+> CAND_RECEIPT_SHA=8c3365162e80e9a7f21aa387e6b4567ab9ff7588271d8b0306f2c3c1abd3b77e   # 11 blob lines (S9B-GATE-3 receipt)
+> CAND_RAW_SHA=850ae83269b0f69f646f0837929596063da1de2c3c402ea6a4121edc36c04c3f   # sha256 of diff --raw --no-abbrev MB H
+> CAND_NPATHS=11
+> TIPSIDE_PATHS="src/scout/lifecycle/lifecycle.service.ts src/scout/reconstruct/orchestration/family-plan.ts src/scout/reconstruct/orchestration/run-context.ts src/scout/scout-reconstruct.service.ts test/rls-g2-s8g.spec.ts test/scout/g2-s8g-db-guard.spec.ts test/scout/orchestration/family-plan.spec.ts test/scout/orchestration/reconstruct-run.spec.ts test/scout/orchestration/settle-hook.spec.ts test/utils/g2-s8g-bootstrap.sh test/utils/g2-s8g-db.ts test/utils/g2-s8g-harness.ts test/utils/g2-s8g-pg-harness.ts test/utils/g2-s8g-worker.cjs"
+> PRED_TREE=3e2028e9fc40c77db72152eb0e5c860d0a3661db   # git merge-tree --write-tree M3 1e6e5735 (both orders)
+45,47c44,47
+< # L2-2 must-run set on the REAL M2 tree x REAL S8-G bytes (analysis/L2-2-DISPOSITION-S8G.md): 5 real-repo src/ walkers
+< # that read both sides' bytes + 6 conservative adds (S9-A's own spec; controller walker; S8-G's 4 default-config specs).
+< SUITES="test/deploy-readiness.spec.ts test/prod-readiness/env-discovery.spec.ts test/prod-readiness/operator-keys-artifact.spec.ts test/route-doc-drift.spec.ts test/scout/reconstruct/mapping-spec.third-source.spec.ts test/scout/reconciliation/reconcile.spec.ts test/dunning-v2-lockout-allowlist-route-table.spec.ts test/scout/orchestration/family-plan.spec.ts test/scout/orchestration/reconstruct-run.spec.ts test/scout/orchestration/settle-hook.spec.ts test/scout/g2-s8g-db-guard.spec.ts"
+---
+> # Must-run set (d3a9): S8-G L2-2 set U S9-B gate targeted set U full classify selector superset (41, both orders) on tree 3e2028e9;
+> # L2-2 must-run set on the REAL M2 tree x REAL S9-B bytes (analysis/L2-2-DISPOSITION-S9B.md): 5 real-repo src/ walkers
+> # that read both sides' bytes + 6 conservative adds (S9-A's own spec; controller walker; S9-B's 4 default-config specs).
+> SUITES="test/deploy-readiness.spec.ts test/prod-readiness/env-discovery.spec.ts test/prod-readiness/operator-keys-artifact.spec.ts test/route-doc-drift.spec.ts test/scout/reconstruct/mapping-spec.third-source.spec.ts test/scout/reconciliation/reconcile.spec.ts test/dunning-v2-lockout-allowlist-route-table.spec.ts test/scout/orchestration/family-plan.spec.ts test/scout/orchestration/reconstruct-run.spec.ts test/scout/orchestration/settle-hook.spec.ts test/scout/g2-s8g-db-guard.spec.ts test/scout/reconciliation/facts.service.spec.ts test/scout/g2-s9-db-guard.spec.ts test/scout/g2-s8c-db-guard.spec.ts test/scout/g2-s7l-db-guard.spec.ts test/scout/g2-s8b-db-guard.spec.ts test/invariants/locked_defaults.spec.ts test/doctrine-cleanup.spec.ts src/roman/voice/__tests__/voice-policy-lint-contract.spec.ts test/ai-credits-stream1.spec.ts test/ci/delivery-artifact.spec.ts test/ci/r100-pathspec.spec.ts test/ci/r75-boundaries.spec.ts test/ci/r75-gate.spec.ts test/ci/r75-wiring.spec.ts test/common/feature-flag-not-found.bootstrap.spec.ts test/community/challenges/community-challenges-progress.live.spec.ts test/community/community-dms.e2e.spec.ts test/community/community-foundation.e2e.spec.ts test/community/community-messages.e2e.spec.ts test/community/community-moderation.e2e.spec.ts test/community/community-plan-context.e2e.spec.ts test/community/community-posts.e2e.spec.ts test/community/community-reactions.e2e.spec.ts test/community/events/community-events.e2e.spec.ts test/community/rls/community-rls.spec.ts test/community/rls/community-v1-emoji-roundtrip.spec.ts test/community/schema/community-schema.spec.ts test/cors-config.spec.ts test/diagnostic-prompt-doctrine.spec.ts test/drop-coach-direct-enabled.spec.ts test/federation-inbound-constant-time.spec.ts test/first-win.controller.spec.ts test/lost-webhook-reconcile.service.spec.ts test/prod-readiness/auto-flipper.spec.ts test/prod-readiness/operator-keys-generator.spec.ts test/prod-readiness/provider-wiring-stripe-mux-sendgrid.spec.ts test/prod-readiness/provider-wiring-twilio-aws-fly-sentry-supabase-openai-cf.spec.ts test/prod-readiness/redactor.spec.ts test/prod-readiness/stub-scanner.spec.ts test/scout/entities/scout-entities.rls.live.spec.ts test/scout/reconstruct/mapping-spec.spec.ts test/scout/reconstruct/native/native-families.spec.ts"
+56,57c56,57
+< W=/home/user/workspace/worktrees/1910a060-land-s8g            # fresh standalone composition clone (created by compose)
+< BR=land1910/s8g
+---
+> W=/home/user/workspace/worktrees/1910a060-land-s9b            # fresh standalone composition clone (created by compose)
+> BR=land1910/s9b
+69c69
+< new_run(){ RUN_DIR=$LANDING/run/s8g-$1-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$RUN_DIR" || exit 70; log "RUN s8g-$1 pid=$$ user=$(id -un) node=$(node -v 2>/dev/null || echo n/a) git=$(git --version)"; }
+---
+> new_run(){ RUN_DIR=$LANDING/run/s9b-$1-$(date -u +%Y%m%dT%H%M%SZ); mkdir -p "$RUN_DIR" || exit 70; log "RUN s9b-$1 pid=$$ user=$(id -un) node=$(node -v 2>/dev/null || echo n/a) git=$(git --version)"; }
+147c147
+< fetch_cand(){ # $1 repo (must already hold MB): fetch exact S8-G from the sha-pinned bundle; verify sha/tree/parent/paths/blobs
+---
+> fetch_cand(){ # $1 repo (must already hold MB): fetch exact S9-B from the sha-pinned bundle; verify sha/tree/parent/paths/blobs
+153,155c153,155
+<     && [ "$(git -C "$1" rev-parse "$H^@")" = "$H0" ] && [ "$(git -C "$1" rev-parse "$H0^@")" = "$MB" ] || refuse 70 "S8-G head/tree/parent mismatch (expect MB -> H0 -> H)"
+<   [ "$(git -C "$1" diff --raw --no-abbrev "$MB" "$H" | sha256sum | cut -c1-64)" = "$CAND_RAW_SHA" ] || refuse 70 "S8-G raw diff != pinned"
+<   [ "$(git -C "$1" diff --name-only "$MB" "$H" | wc -l)" = "$CAND_NPATHS" ] || refuse 70 "S8-G path count != $CAND_NPATHS"
+---
+>     && [ "$(git -C "$1" rev-parse "$H^@")" = "$MB" ] || refuse 70 "S9-B head/tree/parent mismatch"
+>   [ "$(git -C "$1" diff --raw --no-abbrev "$MB" "$H" | sha256sum | cut -c1-64)" = "$CAND_RAW_SHA" ] || refuse 70 "S9-B raw diff != pinned"
+>   [ "$(git -C "$1" diff --name-only "$MB" "$H" | wc -l)" = "$CAND_NPATHS" ] || refuse 70 "S9-B path count != $CAND_NPATHS"
+159,161c159,161
+<   log "S8G exact $H tree=$H_TREE parent=$MB raw=$CAND_RAW_SHA blobs==gate receipt ($n) bundle=$CAND_BUNDLE_SHA"; }
+< scratch(){ # objects only: live tip from origin, S8-G from the pinned bundle
+<   SX=$(mktemp -d /tmp/land1910-s8g-scratch-XXXXXX)/r.git; git init -q --bare "$SX" || refuse 70 "scratch init"
+---
+>   log "S9B exact $H tree=$H_TREE parent=$MB raw=$CAND_RAW_SHA blobs==gate receipt ($n) bundle=$CAND_BUNDLE_SHA"; }
+> scratch(){ # objects only: live tip from origin, S9-B from the pinned bundle
+>   SX=$(mktemp -d /tmp/land1910-s9b-scratch-XXXXXX)/r.git; git init -q --bare "$SX" || refuse 70 "scratch init"
+179c179
+<   log "MERGE_TREE M2,s8g rc=$ra out=[$(echo $A)] s8g,M2 rc=$rb out=[$(echo $B)]"
+---
+>   log "MERGE_TREE M2,s9b rc=$ra out=[$(echo $A)] s9b,M2 rc=$rb out=[$(echo $B)]"
+181,183c181,183
+<   [ "$(git -C "$SX" diff --raw "$TIP" "$PRED_TREE")" = "$(git -C "$SX" diff --raw "$MB" "$H")" ] || refuse 74 "tree-M2 != the 14 S8-G paths byte-identical"
+<   [ "$(git -C "$SX" diff --raw "$H" "$PRED_TREE")" = "$(git -C "$SX" diff --raw "$MB" "$TIP")" ] || refuse 74 "tree-S8G != the 4 S9-A paths byte-identical"
+<   [ "$(git -C "$SX" diff --name-only "$MB" "$TIP" | sort | tr '\n' ' ')" = "$TIPSIDE_PATHS " ] || refuse 74 "tip side != the 4 S9-A paths"
+---
+>   [ "$(git -C "$SX" diff --raw "$TIP" "$PRED_TREE")" = "$(git -C "$SX" diff --raw "$MB" "$H")" ] || refuse 74 "tree-M2 != the 11 S9-B paths byte-identical"
+>   [ "$(git -C "$SX" diff --raw "$H" "$PRED_TREE")" = "$(git -C "$SX" diff --raw "$MB" "$TIP")" ] || refuse 74 "tree-S9B != the 14 S8-G paths byte-identical"
+>   [ "$(git -C "$SX" diff --name-only "$MB" "$TIP" | sort | tr '\n' ' ')" = "$TIPSIDE_PATHS " ] || refuse 74 "tip side != the 14 S8-G paths"
+187c187
+<   log "PREDICT_OK tree=$PRED_TREE = exact union (M2 + 14 S8-G paths; overlap 0); read-only; nothing written remotely"; exit 0 ;;
+---
+>   log "PREDICT_OK tree=$PRED_TREE = exact union (M2 + 11 S9-B paths; overlap 0); read-only; nothing written remotely"; exit 0 ;;
+205c205
+<     X=$(mktemp -d /tmp/land1910-s8g-tree-XXXXXX); git -C "$SX" archive "$(echo "$NTREE" | head -1)" | tar -x -C "$X"
+---
+>     X=$(mktemp -d /tmp/land1910-s9b-tree-XXXXXX); git -C "$SX" archive "$(echo "$NTREE" | head -1)" | tar -x -C "$X"
+218c218
+<   [ ! -e "$LANDING/state/compose-s8g.env" ] || refuse 76 "state/compose-s8g.env exists; one-shot"
+---
+>   [ ! -e "$LANDING/state/compose-s9b.env" ] || refuse 76 "state/compose-s9b.env exists; one-shot"
+220c220
+<   remote_state "$TIP"; land_ref_absent_or land/s8-g-accepted "$H"; land_ref_absent_or land/s8-g "__none__"
+---
+>   remote_state "$TIP"; land_ref_absent_or land/s9-b-accepted "$H"; land_ref_absent_or land/s9-b "__none__"
+234c234,235
+<   git diff --quiet "$MB" "$H" -- prisma docs package.json package-lock.json || refuse 70 "S8-G touches pinned files (unexpected)"
+---
+>   git diff --quiet "$MB" "$H" -- prisma package.json package-lock.json docs/contracts || refuse 70 "S9-B touches pinned files (unexpected)"
+>   [ "$(git diff --name-only "$MB" "$H" -- docs)" = "docs/decisions/2026-09-25-s9-reconciliation.md" ] || refuse 70 "S9-B docs delta != the S9 decision doc only"
+276c277
+<   [ "$(git diff --cached --raw "$TIP")" = "$(git diff --raw "$MB" "$H")" ] || refuse 74 "staged set != the 14 S8-G paths byte-identical"
+---
+>   [ "$(git diff --cached --raw "$TIP")" = "$(git diff --raw "$MB" "$H")" ] || refuse 74 "staged set != the 11 S9-B paths byte-identical"
+292c293
+<   printf 'Merge S8-G run orchestration (%s) into integration/importer\n\nComposes the accepted S8-G candidate %s (tree %s, parent %s) onto the landed S9-A merge\n%s. The merged tree %s is the exact union: the 14 S8-G paths byte for byte on top of\n%s, with no overlapping path. No composition edit and no regeneration.\nNon-production branch. Production promotion stays the separate owner stage.\n' \
+---
+>   printf 'Merge S9-B reconciliation facts (%s) into integration/importer\n\nComposes the accepted S9-B candidate %s (tree %s, parent %s) onto the landed S8-G merge\n%s. The merged tree %s is the exact union: the 11 S9-B paths byte for byte on top of\n%s, with no overlapping path. No composition edit and no regeneration.\nNon-production branch. Production promotion stays the separate owner stage.\n' \
+303,306c304,307
+<   git bundle create "$X/land-s8g-${M3:0:12}.bundle" "$TIP..refs/heads/$BR" >>"$RUN_DIR/run.log" 2>&1 && git bundle verify "$X/land-s8g-${M3:0:12}.bundle" >>"$RUN_DIR/run.log" 2>&1 || refuse 80 "bundle export"
+<   git diff --name-status "$TIP" "$M3" >"$X/name-status-vs-tip.txt"; git diff --name-status "$H" "$M3" >"$X/name-status-vs-s8g.txt"
+<   { echo "tip=$TIP tree=$TIP_TREE"; echo "s8g=$H tree=$H_TREE"; echo "merge=$M3"; echo "tree=$MT"; echo "contract_blob=$CONTRACT_BLOB"
+<     echo "s8g_bundle=$CAND_BUNDLE_SHA s8g_raw=$CAND_RAW_SHA s8g_receipt=$CAND_RECEIPT_SHA"
+---
+>   git bundle create "$X/land-s9b-${M3:0:12}.bundle" "$TIP..refs/heads/$BR" >>"$RUN_DIR/run.log" 2>&1 && git bundle verify "$X/land-s9b-${M3:0:12}.bundle" >>"$RUN_DIR/run.log" 2>&1 || refuse 80 "bundle export"
+>   git diff --name-status "$TIP" "$M3" >"$X/name-status-vs-tip.txt"; git diff --name-status "$H" "$M3" >"$X/name-status-vs-s9b.txt"
+>   { echo "tip=$TIP tree=$TIP_TREE"; echo "s9b=$H tree=$H_TREE"; echo "merge=$M3"; echo "tree=$MT"; echo "contract_blob=$CONTRACT_BLOB"
+>     echo "s9b_bundle=$CAND_BUNDLE_SHA s9b_raw=$CAND_RAW_SHA s9b_receipt=$CAND_RECEIPT_SHA"
+311c312
+<   printf 'TIP=%s\nS8G=%s\nMERGE=%s\nTREE=%s\nWT=%s\nRECEIPT=%s\n' "$TIP" "$H" "$M3" "$MT" "$W" "$X/COMPOSE_RECEIPT.txt" >"$LANDING/state/compose-s8g.env"
+---
+>   printf 'TIP=%s\nS9B=%s\nMERGE=%s\nTREE=%s\nWT=%s\nRECEIPT=%s\n' "$TIP" "$H" "$M3" "$MT" "$W" "$X/COMPOSE_RECEIPT.txt" >"$LANDING/state/compose-s9b.env"
+317c318
+<   S=$LANDING/state/compose-s8g.env; [ -f "$S" ] || refuse 70 "no compose state"
+---
+>   S=$LANDING/state/compose-s9b.env; [ -f "$S" ] || refuse 70 "no compose state"
+319c320
+<   [ ! -e "$LANDING/state/stage-s8g.env" ] || refuse 76 "already staged (one PR, CI once)"
+---
+>   [ ! -e "$LANDING/state/stage-s9b.env" ] || refuse 76 "already staged (one PR, CI once)"
+321,323c322,324
+<   remote_state "$TIP"; land_ref_absent_or land/s8-g-accepted "$H"; land_ref_absent_or land/s8-g "$M3"
+<   push_land_ref "$W" "$H" land/s8-g-accepted
+<   push_land_ref "$W" "$M3" land/s8-g
+---
+>   remote_state "$TIP"; land_ref_absent_or land/s9-b-accepted "$H"; land_ref_absent_or land/s9-b "$M3"
+>   push_land_ref "$W" "$H" land/s9-b-accepted
+>   push_land_ref "$W" "$M3" land/s9-b
+325,327c326,328
+<   printf '%s\n' "Exact composition of the accepted S8-G candidate \`$H\` (tree \`$H_TREE\`) onto integration/importer \`$TIP\` (S9-A landed)." "" \
+<     "- Merge \`$M3\`, parents (\`$TIP\`, \`$H\`), tree \`$PRED_TREE\` = \`$TIP\` plus the 14 S8-G paths byte for byte; no overlapping path." \
+<     "- \`land/s8-g-accepted\` preserves the exact candidate bytes. No migration, contract, schema or module wiring change." \
+---
+>   printf '%s\n' "Exact composition of the accepted S9-B candidate \`$H\` (tree \`$H_TREE\`) onto integration/importer \`$TIP\` (S8-G landed)." "" \
+>     "- Merge \`$M3\`, parents (\`$TIP\`, \`$H\`), tree \`$PRED_TREE\` = \`$TIP\` plus the 11 S9-B paths byte for byte; no overlapping path." \
+>     "- \`land/s9-b-accepted\` preserves the exact candidate bytes. No migration, contract, schema or module wiring change." \
+330c331
+<   URL=$(gh pr create -R "$GH_REPO" --base integration/importer --head land/s8-g --title "Land S8-G run orchestration onto integration/importer" --body-file "$BODY" 2>>"$RUN_DIR/run.log") || refuse 77 "gh pr create failed"
+---
+>   URL=$(gh pr create -R "$GH_REPO" --base integration/importer --head land/s9-b --title "Land S9-B reconciliation facts onto integration/importer" --body-file "$BODY" 2>>"$RUN_DIR/run.log") || refuse 77 "gh pr create failed"
+332c333
+<   printf 'MERGE=%s\nPR=%s\nURL=%s\n' "$M3" "$PR" "$URL" >"$LANDING/state/stage-s8g.env"
+---
+>   printf 'MERGE=%s\nPR=%s\nURL=%s\n' "$M3" "$PR" "$URL" >"$LANDING/state/stage-s9b.env"
+338c339
+<   M3=$(sed -n 's/^MERGE=//p' "$LANDING/state/stage-s8g.env" 2>/dev/null); PR=$(sed -n 's/^PR=//p' "$LANDING/state/stage-s8g.env" 2>/dev/null)
+---
+>   M3=$(sed -n 's/^MERGE=//p' "$LANDING/state/stage-s9b.env" 2>/dev/null); PR=$(sed -n 's/^PR=//p' "$LANDING/state/stage-s9b.env" 2>/dev/null)
+340c341
+<   check_acceptance "${ACCEPT_RECORD:-}" "$H"          # S8-G acceptance record must name 820ce85b (PG proof pending at prep)
+---
+>   check_acceptance "${ACCEPT_RECORD:-}" "$H"          # S9-B acceptance record must name 820ce85b (PG proof pending at prep)
+343c344
+<   [ "$(remote_sha refs/heads/land/s8-g)" = "$M3" ] || refuse 77 "land/s8-g != $M3"
+---
+>   [ "$(remote_sha refs/heads/land/s9-b)" = "$M3" ] || refuse 77 "land/s9-b != $M3"
