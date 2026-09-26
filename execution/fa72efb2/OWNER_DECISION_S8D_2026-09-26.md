@@ -17,3 +17,26 @@ Parent recommendation returned for (1): the client picks the channel, but only a
 person (verifying an arbitrary new contact would let a forwarded invite be claimed). For (3): both sides can unlink within 30
 days; after 30 days the coach cannot unilaterally unlink (client's own data/rights path or admin). Pending Bradley's confirmation
 in the decision record.
+
+## OFFICIAL — Bradley decision D-S8-2 + D-S8-LINK (17:44Z, verbatim): "I like the linking decision - log it as official Bradley decision - EXECUTE"
+DECIDED by Bradley Gleave (owner), 2026-09-26 17:44Z. Supersedes the D-S8-2 interim for its end state.
+D-S8-2 = option (a): client-owned native records may belong to an imported Person (nullable person_id beside the User FK,
+family by family); the coach roster shows imported Person rows as "imported, not yet joined" until they join. No login User is
+minted for an imported person (D2 stands); email is never an identity or linking key (D2 stands).
+D-S8-LINK (linking an imported Person to the account of the human who signs up):
+ L1 Never automatic. No link by email, name, phone or any fuzzy match; suggestions may be shown to the coach, never applied.
+ L2 Main path: coach taps Invite on an imported Person → single-use, expiring, revocable invite bound to exactly that Person,
+    sent to a contact the coach confirms (held on the invite, not as identity).
+ L3 Verified contact: the client chooses email OR phone, but only among the contacts the coach holds for that Person; one-time
+    code verification of that channel is required. A contact typed in by the claimant is never accepted for the claim.
+ L4 Client confirmation ALWAYS required ("Coach X brought over your history: … Is this you?"). "No" leaves it unlinked and
+    notifies the coach.
+ L5 Fallback (client joined another way): coach may approve a suggested match; the client must still confirm (two-sided).
+ L6 Integrity: one Person ↔ at most one account per coach; never across coaches/tenants; every link/unlink audited; records are
+    handed over (re-owned), never copied; replays idempotent.
+ L7 Undo: for 30 days after linking, EITHER the client or the coach can unlink. Only imported records return to the Person;
+    anything logged after joining stays with the client; the other side is notified; re-linking needs a fresh invite + fresh
+    client confirmation. After 30 days the coach cannot unlink alone; client data rights (deletion/export) and admin support apply.
+ L8 Merges (already-a-client, or the same person imported from two platforms): two-sided confirmation, same rails.
+Build rule: graded T4 (identity/security/schema); decision record lands in backend docs/decisions; slices sequenced after
+S11-A2's migration-count pin; production enablement remains owner-reserved.
