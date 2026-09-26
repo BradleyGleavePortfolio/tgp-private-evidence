@@ -1,0 +1,5 @@
+# S11-A1 real-PG proof v2 — RC=1 at jest-rls (5/6), preserved in binding/v2/run
+- Failing assertion: rls-g2-s11 "is bound to one attested candidate head ... adds no migration" — the trailing check `git diff --name-only BASE_HEAD candidate -- src` must be empty, with BASE_HEAD = the harness literal 711c1f8f. Received the landed S10-C src files (observation.module, lifecycle.service, facts.service, reconciliation/types, scout.module). Run-1 sat directly on 711c1f8f, so it passed there.
+- Class B (test anchor defect). Concrete harm: none; the migration/schema check in the same test passed, and the runner's precondition (BASE_HEAD..HEAD == exactly the 8 S11-A1 test paths, lines 140-141, anchored at the real parent) passed, which already proves S11-A1 adds no src.
+- Blocked: S11-A1 acceptance. Also would falsely block S11-B/S11-C, which add src and share this spec through the lane-s11 harness.
+- Minimum fix: remove the redundant src-empty assertion (7 lines); keep the migration check the title claims. Unblocks: S11-A1 v3 proof.
