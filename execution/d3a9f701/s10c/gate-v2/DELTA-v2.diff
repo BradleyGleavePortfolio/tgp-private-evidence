@@ -1,0 +1,33 @@
+--- gate/s10c-gate-d3a9.sh	2026-09-26 05:49:20.267187820 +0000
++++ gate-v2/s10c-gate-d3a9.sh	2026-09-26 06:12:36.023187820 +0000
+@@ -7,7 +7,7 @@
+ #     (__FILL__; today a2c74e90 -> 384035ec (D1) -> 711c1f8f (S11-0 doc)). No parent-shape pin: S10B_HEAD (a2c74e90) and
+ #     HARNESS_BASE_HEAD (a4af8e33) must each be an ANCESTOR of BASE (git merge-base --is-ancestor), BASE..S10B_HEAD touches no
+ #     prisma and none of the owned paths, and the 29 S10-A/S10-B FROZEN paths carry their a2c74e90 bytes at BASE
+-#   - owned paths: PINS.env OWNED_PINS (8 ` M` incl. test/rls-g2-s9c.spec.ts + 3 `??`, filled by --fill-help); no prisma change at all
++#   - owned paths: PINS.env OWNED_PINS (9 ` M` incl. test/rls-g2-s9c.spec.ts + test/scout/orchestration/settle-hook.spec.ts (v2) + 3 `??`, filled by --fill-help); no prisma change at all
+ #     (schema = S10-B bytes, 173 migrations, prisma status and prisma delta empty)
+ #   - donor = the pre-S10-B client, so the in-lane `prisma generate` is still forced; the post-gen client is compared with
+ #     the S10-B gate's post-gen client (same schema bytes) and recorded (POSTGEN_MATCHES_S10B)
+@@ -24,10 +24,10 @@
+ #   S10C_GATE_RELAY=1 S10C_BASE=<integration/importer tip sha> \
+ #   S10C_DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules \
+ #   S10C_PRETTIER_PREFIX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9 \
+-#   timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate/s10c-gate-d3a9.sh
++#   timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate-v2/s10c-gate-d3a9.sh
+ # Fill help (read-only, no lock, no relay): bash .../s10c-gate-d3a9.sh --fill-help <BASE sha>
+ set -uo pipefail
+-E=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate
++E=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate-v2   # v2 run location (run-1 in s10c/gate/ consumed: rc 73 jest_full; left untouched)
+ W=/home/user/workspace/worktrees/d3a9-s10c
+ LOCK=/home/user/workspace/execution/test-validation.lock
+ LOCK_RECORD=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/runtime/LOCK_ESTABLISHED.txt
+@@ -35,7 +35,7 @@
+ LOG=$E/gate.log
+ # shellcheck source=PINS.env
+ . "$E/PINS.env" || { echo "REFUSED: cannot source $E/PINS.env" >&2; exit 78; }
+-REQUIRED_OWNED="src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/lifecycle/lifecycle.service.ts src/scout/scout.module.ts src/scout/induction/observation.module.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/reconciliation/facts.service.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/induction/s10c-wiring.spec.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts"   # 11: parent 22:34 added the S9-C live spec (superseded assertions L289/L297/L444-448 only)
++REQUIRED_OWNED="src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/lifecycle/lifecycle.service.ts src/scout/scout.module.ts src/scout/induction/observation.module.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/reconciliation/facts.service.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/induction/s10c-wiring.spec.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts test/scout/orchestration/settle-hook.spec.ts"   # 12: parent 22:34 added the S9-C live spec (superseded assertions L289/L297/L444-448 only); v2 (parent 23:11) added the S8-G settle-hook unit spec (fake tx gains scoutRunObservation/scoutRunSettledBasis)
+ GEN_OWNER_OPTIONAL="scripts/importer-contract.ts test/contracts/importer-contract.spec.ts"   # D-S10-7 generator owner; allowed only if listed in OWNED_PINS
+ OPTIONAL_OWNED="$GEN_OWNER_OPTIONAL"
+ S10B_SPEC=test/rls-g2-s10b.spec.ts; S10C_SPEC=test/rls-g2-s10c.spec.ts

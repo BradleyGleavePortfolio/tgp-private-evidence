@@ -1,0 +1,3 @@
+# S11-A1 real-PG proof v2 grant (parent d3a9f701) — single run
+- Candidate 53b2f70ae9b9d20e13b15df7e2570b0109d4fdc2 (tree e26c8ca4) on BASE 7746a877 (S10-D P on S10-C 2ec74c56); HARNESS_BASE 711c1f8f. Only change vs v1 candidate c8ee9005: the J07 assertion (PROOF_RUN1_FINDING.md, class B, delta GO). Run-1 preserved in binding/v1/run.
+- Runner e9b87830029d754de6c871f3d8eab09f05ddec7168e2440c3113cc3c4f9b3d20; FREEZE commit-v2/FREEZE.sha256 ee8653b7026309b7ca0b6e570c4680645ac5589bb297493731bc07ec959f872a. SRC d3a9-s11a1 at 53b2f70a clean; LAND_REF refs/remotes/origin/land/s11a1-v2. Lane s11/55648 fresh (run-1 lane set aside). Expects rls 6, journey 8, guard 94. Operator: no runtime lane changes until END. Granted 2026-09-26T06:58:05Z.

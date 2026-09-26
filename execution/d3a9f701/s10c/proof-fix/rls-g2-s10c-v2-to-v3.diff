@@ -1,0 +1,37 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s10c/proof-fix/rls-g2-s10c.v2.ts	2026-09-26 06:39:12.235187820 +0000
++++ test/rls-g2-s10c.spec.ts	2026-09-26 06:42:04.635187820 +0000
+@@ -174,10 +174,15 @@
+   it('a second claim after the terminal is a no-op ack and writes no second basis row (insert-only; one per run)', async () => {
+     const intentId = await readyRun();
+     expect((await complete(intentId)).failure).toBeUndefined();
++    const settled = runRow(COACH, intentId);
+     const again = await complete(intentId);
+     // Landed completeServerRun contract: a duplicate settle on a terminal run is a 200 ack no-op.
+     expect(again.failure).toBeUndefined();
+     expect(again.pushes).toBe(0);
++    expect(again.queries.filter(isTerminalCas)).toHaveLength(0);
++    const after = runRow(COACH, intentId);
++    expect(after.terminal_status).toBe(settled.terminal_status);
++    expect(after.reason_code).toBe(settled.reason_code);
+     expect(count(SETTLED)).toBe(1);
+     expect(again.queries.filter(isBasisInsert)).toHaveLength(0);
+   });
+@@ -230,11 +235,15 @@
+     expect(count(SETTLED)).toBe(0);
+     // analytics.capture(coach, event, props) is recorded as its argument list.
+     expect(done.events.filter((e: unknown[]) => /settled/i.test(String(e[1])))).toHaveLength(0);
+-    // The claim committed before the settle, so a retry is a refused claim (200 ack) until the S11-B
+-    // re-drive; whatever the retry does, terminal and basis stay paired, never one without the other.
++    // The claim committed before the settle, so the retry is a refused claim: a 200 ack no-op that
++    // leaves the run open. S11-B's settle re-drive supersedes exactly this assertion.
+     const retry = await complete(intentId);
+     expect(retry.failure).toBeUndefined();
+-    expect(count(SETTLED)).toBe(runRow(COACH, intentId).terminal_status === null ? 0 : 1);
++    expect(retry.pushes).toBe(0);
++    expect(retry.queries.filter(isTerminalCas)).toHaveLength(0);
++    expect(retry.queries.filter(isBasisInsert)).toHaveLength(0);
++    expect(runRow(COACH, intentId).terminal_status).toBeNull();
++    expect(count(SETTLED)).toBe(0);
+   });
+ 
+   it('two concurrent claims: exactly one terminal write and exactly one basis row (the CAS loser inserts nothing)', async () => {

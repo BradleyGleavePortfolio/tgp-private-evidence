@@ -1,0 +1,49 @@
+--- s10c-pg-proof.sh.template.pre-v2	2026-09-26 06:12:14.367187820 +0000
++++ s10c-pg-proof.sh.template	2026-09-26 06:12:36.023187820 +0000
+@@ -4,7 +4,7 @@
+ # of the reviewed template; it ran rc 0, 24/24). Full diff in DELTA-from-s10b-v1.diff. S10-C deltas:
+ #   * clone worktrees/d3a9-s10c; candidate head = ONE gate commit on BASE = the integration/importer tip at gate time
+ #     (__FILL__ from the S10-C gate PINS.env / receipt). No parent-shape pin on BASE: S10B_HEAD (a2c74e90) and the harness
+-#     base a4af8e33 must be ANCESTORS of BASE; BASE..HEAD = the S10-C receipt delta (11 owned paths, + the contract iff the
++#     base a4af8e33 must be ANCESTORS of BASE; BASE..HEAD = the S10-C receipt delta (12 owned paths, + the contract iff the
+ #     gate recorded contract_state=changed); the 29 S10-A/S10-B FROZEN paths carry their a2c74e90 bytes at HEAD
+ #   * NO prisma change: schema = the S10-B bytes, 173 migrations ending at the S10-B dir, migrations tree 7b6fe0ed at BASE
+ #     and HEAD; the client is the one the S10-C gate regenerated in the clone (EXPECT_NM_CLIENT_SHA from its receipt)
+@@ -27,7 +27,7 @@
+ # Usage (under the separate single-run PG grant, after the gate commit and fill): timeout -k 30 3900 bash .../binding/v1/s10c-pg-proof.sh
+ # Fill (parent, README.md): BASE_HEAD / BASE_TREE (= gate PINS.env BASE/BASE_TREE); EXPECT_HEAD / EXPECT_TREE /
+ # EXPECT_DELTA / EXPECT_CONTRACT_STATE / EXPECT_CONTRACT_BLOB / EXPECT_S10C_SPEC_BLOB / EXPECT_NM_CLIENT_SHA /
+-# EXPECT_NM_CLIENT_SCHEMA_SHA from the S10-C gate receipt d3a9f701/s10c/gate/HEAD-<12>.txt (lines head=, tree=, delta=,
++# EXPECT_NM_CLIENT_SCHEMA_SHA from the S10-C gate-v2 receipt d3a9f701/s10c/gate-v2/HEAD-<12>.txt (lines head=, tree=, delta=,
+ # contract_state=, blob test/rls-g2-s10c.spec.ts, postgen_client). Placeholders are refused pre-lock.
+ set -uo pipefail
+ D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/binding/v1
+@@ -67,8 +67,8 @@
+ FROZEN_SHA=e9c71f09462a25e36baafe0fa90ba012ef6b3f384f04b3951fb1c7bbf1f4be21
+ S10B_MIGRATION=20270124000000_scout_run_observation_expand
+ EXPECT_MIGRATIONS=173
+-# the 11 S10-C owned paths (parent 2026-09-25 22:23 + 22:34); EXPECT_DELTA must be exactly these, plus the contract iff changed
+-S10C_OWNED="src/scout/induction/observation.module.ts src/scout/lifecycle/lifecycle.service.ts src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/scout.module.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts test/scout/induction/s10c-wiring.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/reconciliation/facts.service.spec.ts"
++# the 12 S10-C owned paths (parent 2026-09-25 22:23 + 22:34 + 23:11 settle-hook.spec.ts); EXPECT_DELTA must be exactly these, plus the contract iff changed
++S10C_OWNED="src/scout/induction/observation.module.ts src/scout/lifecycle/lifecycle.service.ts src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/scout.module.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts test/scout/induction/s10c-wiring.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/orchestration/settle-hook.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/reconciliation/facts.service.spec.ts"
+ CONTRACT=docs/contracts/importer-openapi.json
+ # ---- tool pins: from the 1910a060 runtime setup receipt (compare only, never adjusted at run time); identical to S10-B v1.
+ EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+@@ -134,7 +134,7 @@
+   *) log "PRECONDITION_FAIL EXPECT_CONTRACT_STATE must be changed|unchanged ($EXPECT_CONTRACT_STATE)"; fail 70;; esac
+ WANT_DELTA=$(printf '%s\n' $S10C_OWNED $( [ "$EXPECT_CONTRACT_STATE" = changed ] && echo "$CONTRACT") | sort | tr '\n' ' ' | sed 's/ $//')
+ EXPECT_DELTA=$(echo $EXPECT_DELTA)
+-[ "$EXPECT_DELTA" = "$WANT_DELTA" ] || { log "PRECONDITION_FAIL filled EXPECT_DELTA [$EXPECT_DELTA] != the 11 S10-C owned paths (+ contract iff changed) [$WANT_DELTA]"; fail 70; }
++[ "$EXPECT_DELTA" = "$WANT_DELTA" ] || { log "PRECONDITION_FAIL filled EXPECT_DELTA [$EXPECT_DELTA] != the 12 S10-C owned paths (+ contract iff changed) [$WANT_DELTA]"; fail 70; }
+ [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base, not a candidate"; fail 70; }
+ [ "$EXPECT_NM_CLIENT_SHA" != "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL EXPECT_NM_CLIENT_SHA is the pre-S10-B donor client (no in-clone generate recorded)"; fail 70; }
+ [ "$(sha "$FIX")" = "$EXPECT_FIXTURE_SHA" ] || { log "PRECONDITION_FAIL fixture sha256 mismatch"; fail 70; }
+@@ -151,7 +151,7 @@
+ [ "$(git -C "$W" rev-parse HEAD^)" = "$BASE_HEAD" ] || { log "PRECONDITION_FAIL HEAD^ != $BASE_HEAD (the gate makes exactly one commit on BASE)"; fail 70; }
+ git -C "$W" merge-base --is-ancestor "$S10B_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL S10-B landing $S10B_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+ git -C "$W" merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+-# exact delta: BASE..HEAD = the gate receipt delta (11 S10-C paths, + contract iff changed); FROZEN S10-A/S10-B bytes at HEAD
++# exact delta: BASE..HEAD = the gate receipt delta (12 S10-C paths, + contract iff changed); FROZEN S10-A/S10-B bytes at HEAD
+ DELTA=$(git -C "$W" diff --name-only "$BASE_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')
+ [ "$DELTA" = "$EXPECT_DELTA" ] || { log "PRECONDITION_FAIL BASE..HEAD delta [$DELTA] != receipt delta [$EXPECT_DELTA]"; fail 70; }
+ [ -f "$FROZEN" ] && [ ! -L "$FROZEN" ] && [ "$(sha "$FROZEN")" = "$FROZEN_SHA" ] || { log "PRECONDITION_FAIL FROZEN file absent, a symlink or sha mismatch"; fail 70; }

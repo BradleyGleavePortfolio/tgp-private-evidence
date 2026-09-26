@@ -1,0 +1,1 @@
+# S10-C real-PG proof v6 grant — v5 runner, new run dir only (candidate 2ec74c56); runner 1bb4b564abf25c2ccdd5dee0907469ac0a5856dba49169fa8c4ee79deec0483d; granted 2026-09-26T06:53:52Z. Operator: no runtime lane changes until END.

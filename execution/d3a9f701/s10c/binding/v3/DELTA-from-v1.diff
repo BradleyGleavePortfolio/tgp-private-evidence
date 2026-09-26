@@ -1,0 +1,29 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s10c/binding/v1/s10c-pg-proof.sh	2026-09-26 06:33:50.547187820 +0000
++++ /home/user/workspace/private-evidence/execution/d3a9f701/s10c/binding/v3/s10c-pg-proof.sh	2026-09-26 06:43:04.635187820 +0000
+@@ -30,7 +30,7 @@
+ # EXPECT_NM_CLIENT_SCHEMA_SHA from the S10-C gate-v2 receipt d3a9f701/s10c/gate-v2/HEAD-<12>.txt (lines head=, tree=, delta=,
+ # contract_state=, blob test/rls-g2-s10c.spec.ts, postgen_client). Placeholders are refused pre-lock.
+ set -uo pipefail
+-D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/binding/v1
++D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/binding/v3   # v3 (v2 superseded unrun by the review-B R36 delta): run-1 (binding/v1/run, RC=1 28/32) preserved; PROOF_RUN1_FINDING.md
+ RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime                     # 1910a060 runtime namespace (execution/1910a060/runtime/RUNTIME_SETUP_RECEIPT.md); the fixture carries the same literal and is cross-checked below
+ W=/home/user/workspace/worktrees/d3a9-s10c
+ DONOR_NM=/home/user/workspace/worktrees/1910a060-s8f/node_modules                 # read-only: must still hold the pre-S10-B client (the gate generated in the clone copy only)
+@@ -41,14 +41,14 @@
+ BASE_TREE=abc927e47f9e0bb11afa575a4f4c550c1a56c067                                                   # git rev-parse "$BASE_HEAD^{tree}"
+ S10B_HEAD=a2c74e904ff227b16881c77ee5a08bd006972d48                             # S10-B landing commit; ancestor of BASE_HEAD (checked)
+ HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba                     # kept: G2_S10B_BASE_HEAD / bootstrap BASE_HEAD literal; ancestor of BASE_HEAD (checked)
+-EXPECT_HEAD=6674bc596408a2304811c342d4bad6b7a308a84a                                               # gate receipt head=
+-EXPECT_TREE=ffcb77bc994d8d0debceb0b862b764860a70b85f                                               # gate receipt tree=
++EXPECT_HEAD=2ec74c56b76d20489188ed1519fdeb2bbe394f44                                               # gate receipt head=
++EXPECT_TREE=98b705e1a5f4bc7351509b8e80801fd279dcee39                                               # gate receipt tree=
+ EXPECT_DELTA="src/scout/induction/observation.module.ts src/scout/lifecycle/lifecycle.service.ts src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/scout.module.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts test/scout/induction/s10c-wiring.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/orchestration/settle-hook.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/reconciliation/facts.service.spec.ts"                                           # gate receipt delta= (sorted, space-separated; drop the trailing space)
+ EXPECT_CONTRACT_STATE=unchanged                                  # gate receipt contract_state= (changed|unchanged)
+ EXPECT_CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                                    # gate receipt contract_state ... blob= (= 752f9dbe1a6bdee0c20504a35dce60757880d427 iff unchanged)
+ EXPECT_HOOK_PRECOMMIT_SHA=e32f6e028411344acdff9ee787decef9ee49fa4414d0deb9aa8e613f30bede06                          # gate receipt "hooks raw pre-commit=<sha256>" (.git/hooks/pre-commit the gate committed through)
+ EXPECT_HOOK_COMMITMSG_SHA=efb54d65efd525381d95fe70eef76fa6c2eb03ae3829808e69edb8fe622a2f19                          # gate receipt "hooks raw ... commit-msg=<sha256>"
+-EXPECT_S10C_SPEC_BLOB=1788dff2ea3f38a8a40c89a039391d8653ec9b36                                  # gate receipt "blob test/rls-g2-s10c.spec.ts <blob>"
++EXPECT_S10C_SPEC_BLOB=50a0deae0e9eee45ec093e87769949f47efd3d8e                                  # gate receipt "blob test/rls-g2-s10c.spec.ts <blob>"
+ EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                # S10-B migrations tree (173); S10-C changes no prisma, so BASE and HEAD both carry it
+ BASE_CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                    # importer contract blob at a2c74e90 (the gate refuses a BASE that differs)
+ # landed S10-B proof files (s10b/gate/HEAD-a2c74e904ff2.txt); frozen through S10-C (also covered by FROZEN below)

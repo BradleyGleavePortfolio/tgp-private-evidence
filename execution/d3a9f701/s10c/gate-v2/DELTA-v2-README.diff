@@ -1,0 +1,31 @@
+--- gate/README.md	2026-09-26 05:49:33.431187820 +0000
++++ gate-v2/README.md	2026-09-26 06:13:06.203187820 +0000
+@@ -1,4 +1,18 @@
+-# S10-C gate — EXEC-D3A9F701 (SOURCE ONLY: NOT RUN, NOT GRANTED)
++# S10-C gate v2 — EXEC-D3A9F701 (SOURCE ONLY: NOT RUN, NOT GRANTED)
++
++## v2 (parent 2026-09-25 23:11 PDT)
++- **Why v2.** Run-1 (`../gate/`) is consumed: rc 73 at JEST_FULL, with 5 failures, all in `test/scout/orchestration/settle-hook.spec.ts`. The S8-G fake tx lacks `scoutRunObservation`/`scoutRunSettledBasis`, which S10-C's in-transaction settled-basis write now needs. Nothing was committed. Its STARTED, TERMINAL and logs are left untouched.
++- **Owned set.** It grows to **12**: `test/scout/orchestration/settle-hook.spec.ts` is added as ` M`, 644. The parent owns that edit.
++- **What changed from run-1.** Only these:
++  - run location `E=…/s10c/gate-v2`;
++  - REQUIRED_OWNED plus the header/comment counts;
++  - PINS.env comment and `OWNED_PINS` (12 rows, all shas `__FILL__`).
++
++  Everything else in PINS.env is byte-identical to run-1, including BASE/BASE_TREE/MIGRATIONS_TREE. FROZEN still points at `../gate/FROZEN.sha256`, which is unchanged and read-only.
++- **Diffs:** `DELTA-v2.diff` (script) and `DELTA-v2-PINS.diff`.
++- **Fill.** Run `bash gate-v2/s10c-gate-d3a9.sh --fill-help <BASE>` after the settle-hook edit and paste all 12 OWNED_PINS rows. Everything else stays as-is, unless BASE moved (for example, S11-A1 landed); in that case refill BASE/BASE_TREE/MIGRATIONS_TREE too. Re-hash `GATE-v2.sha256` after the fill.
++- **Grant:** `GRANT-TEMPLATE.txt`.
++
+ 
+ Derived from the final S10-B gate (`../../s10b/gate/s10b-gate-d3a9.sh`, with every review fix and DELTA-2 applied; it ran rc 0 and landed a2c74e90).
+ Diffs: `DELTA-from-s10b.diff` (driver) and `DELTA-PINS-from-s10b.diff` (pins). Hashes: `GATE.sha256`.
+@@ -43,7 +57,7 @@
+ S10C_GATE_RELAY=1 S10C_BASE=<tip sha> \
+ S10C_DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules \
+ S10C_PRETTIER_PREFIX=/home/user/workspace/execution/1910a060/runtime/tools/prettier-3.9.9 \
+-timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate/s10c-gate-d3a9.sh
++timeout -k 30 7200 bash /home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate-v2/s10c-gate-d3a9.sh
+ ```
+ Exit codes:
+ - 78: relay/pin refusal. 70: pre-lock or under-lock state refusal. 71: node_modules, generate or hooks. 72: prettier. 73: tsc, contract or jest. 74: R75 or eslint. 76: sentinel or commit. 75: lock busy.

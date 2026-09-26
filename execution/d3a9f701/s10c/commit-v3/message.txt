@@ -1,0 +1,34 @@
+feat(scout): S10-C settle basis, coverage wiring, module registration
+
+Wires the S10 induction tier into the settle path (D-S10-4, D-S10-6,
+D-S10-7 row S10-C, docs/decisions/2026-09-26-s10-induction.md) on top
+of the S10-A contract and the S10-B persistence tier.
+
+src/scout/reconciliation/facts.service.ts exports resolveFamily as the
+one platform and token to family classifier and stagedPlatformFacts
+for the staged digests. collect takes the run binding as a parameter
+and, for an accepted server run, reads the run declaration and the
+current-epoch observations and calls the S10-A coverage evaluator.
+Without a binding the facts are the S9 v1 facts, coverage unknown.
+types.ts adds the 'settled' basis literal only.
+
+src/scout/lifecycle/lifecycle.service.ts inserts one
+ScoutRunSettledBasis row after the terminal CAS in the same
+transaction, with the observation digests of the settled epoch. A CAS
+miss or a fence writes none, and an insert error rolls the terminal
+back with it. readReport returns the settled record verbatim when it
+is present and well formed, and falls back to the S9-C recompute
+otherwise. projectToken fills observed_unique only from a settled,
+single-holder, mapped count; unknown is never shown as zero.
+
+src/scout/scout.module.ts registers ObservationModule, which now uses
+the global PrismaModule instead of a module-local PrismaService.
+
+Unit specs cover the classifier, the coverage wiring, the settle
+write, the status preference and the module wiring.
+test/rls-g2-s10c.spec.ts is the live PG proof on the S10-B lane and
+harness. test/rls-g2-s9c.spec.ts updates the three S9-C assertions
+that D-S10-4 supersedes. No schema or migration change. The importer
+contract regenerates byte-identical, so
+docs/contracts/importer-openapi.json is unchanged.
+

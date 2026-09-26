@@ -1,0 +1,46 @@
+--- gate/PINS.env	2026-09-26 05:51:38.735187820 +0000
++++ gate-v2/PINS.env	2026-09-26 06:12:36.023187820 +0000
+@@ -16,10 +16,11 @@
+ FROZEN_SHA=e9c71f09462a25e36baafe0fa90ba012ef6b3f384f04b3951fb1c7bbf1f4be21
+ FROZEN_COUNT=29
+ # ---- owned S10-C paths: "<sha256> <mode> <state> <path>", M = tracked+modified (` M`), N = new untracked (`??`).
+-# 11 paths = 8 M + 3 N (observation.module.ts is tracked since S10-B, so M: PrismaService provider removed, fix-1).
++# 12 paths = 9 M + 3 N (v2, parent 23:11: + test/scout/orchestration/settle-hook.spec.ts, M: the S8-G unit spec's fake tx
++# gains scoutRunObservation/scoutRunSettledBasis; run-1 rc 73 at jest_full). (observation.module.ts is tracked since S10-B, so M: PrismaService provider removed, fix-1).
+ # test/rls-g2-s9c.spec.ts added by the parent 2026-09-25 22:34 PDT: superseded S9-C assertions L289/L297/L444-448 only;
+ # it cannot run at S10 heads and is NOT in the binding (the binding runs only rls-g2-s10b + rls-g2-s10c).
+-# UNFILLED on purpose: paste the OWNED_PINS block printed by --fill-help at gate time (after any late fix).
++# v2: UNFILLED on purpose (all 12 re-measured by --fill-help after the settle-hook edit): paste the OWNED_PINS block printed by --fill-help at gate time (after any late fix).
+ # Values measured read-only 2026-09-25 ~22:45 PDT, fix-1 bytes in place (reference only, NOT pins; fill-help re-measures):
+ #   756cb44b facts.service.ts  d7815e06 types.ts  55c8f24a lifecycle.service.ts  682bc3af scout.module.ts
+ #   2998b71d observation.module.ts  4b3ae75e lifecycle.service.spec.ts  681e0036 facts.service.spec.ts
+@@ -27,17 +28,18 @@
+ #   078fcb1a rls-g2-s9c.spec.ts (10 it(), unchanged count)
+ # Generator-owner paths (scripts/importer-contract.ts, test/contracts/importer-contract.spec.ts) may be listed if a fix
+ # touches them. docs/contracts/importer-openapi.json must NOT be listed: the gate adds it itself if regeneration changes it.
+-OWNED_PINS='756cb44bf5282341d53556d6df49c8820ae6762f51a9826af704cffefd667ba7 644 M src/scout/reconciliation/facts.service.ts
+-d7815e0679a1de74ea641cecaa53135d00d76e55a278360dca3dd78b1b0c960f 644 M src/scout/reconciliation/types.ts
+-55c8f24aa7c9d377631541548dcecc2682b9089f05111570aa91c7c7de1bc49c 644 M src/scout/lifecycle/lifecycle.service.ts
+-682bc3af86f5ba7e981f80f6111090f8e86dab1b092fde3b7666ec00d1492a3f 644 M src/scout/scout.module.ts
+-2998b71d387e4c53e1f0a694e2b18a2e91116513d98021ef13c057ce80e4934f 644 M src/scout/induction/observation.module.ts
+-4b3ae75e08a195bc0c492742eebfe81b03265deed786364a62c638e66dd4b377 644 M test/scout/lifecycle/lifecycle.service.spec.ts
+-681e00364549705dd2a6222dce6ec960854fe3b6beee738d27c593258ddf0adf 644 M test/scout/reconciliation/facts.service.spec.ts
+-681c90315a8d2e7321010da2ec1d9042c1584c38b0068be70d18c75ada8e2958 644 N test/scout/reconciliation/facts.service.coverage.spec.ts
+-63f3d3de9fbb3f0e7e522684375ecc14809261c10de99073b31e182ab986ed3a 644 N test/scout/induction/s10c-wiring.spec.ts
+-5eeb0fe6a760a07a06beffdb748c16b132d630b45f9e9eacca6032efbcb735f5 644 N test/rls-g2-s10c.spec.ts
+-078fcb1a4226fa2703c66db7cac27046f1c826108a0592f107adad4bc47b9434 644 M test/rls-g2-s9c.spec.ts'
++OWNED_PINS='__FILL__ 644 M src/scout/reconciliation/facts.service.ts
++__FILL__ 644 M src/scout/reconciliation/types.ts
++__FILL__ 644 M src/scout/lifecycle/lifecycle.service.ts
++__FILL__ 644 M src/scout/scout.module.ts
++__FILL__ 644 M src/scout/induction/observation.module.ts
++__FILL__ 644 M test/scout/lifecycle/lifecycle.service.spec.ts
++__FILL__ 644 M test/scout/reconciliation/facts.service.spec.ts
++__FILL__ 644 N test/scout/reconciliation/facts.service.coverage.spec.ts
++__FILL__ 644 N test/scout/induction/s10c-wiring.spec.ts
++__FILL__ 644 N test/rls-g2-s10c.spec.ts
++__FILL__ 644 M test/rls-g2-s9c.spec.ts
++__FILL__ 644 M test/scout/orchestration/settle-hook.spec.ts'
+ # ---- prisma: NO change in S10-C. Schema = the S10-B bytes; 173 migration dirs ending at the S10-B dir (BASE and working).
+ SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96
+ SCHEMA_BLOB=f86c1f5df722e855047899abd483f621b42dabe0

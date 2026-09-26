@@ -1,0 +1,3 @@
+# S10-C real-PG proof v3 grant (parent d3a9f701) — single run
+- Candidate 2ec74c56b76d20489188ed1519fdeb2bbe394f44 (tree 98b705e1) = gate-v2 tree (JEST_FULL rc 0) with only test/rls-g2-s10c.spec.ts corrected (excluded from default jest). Run-1 (6674bc59) RC=1 28/32 preserved: PROOF_RUN1_FINDING.md; fixes GO (review B delta + delta 2). v2 (d6f8378f) superseded unrun.
+- Runner 140c26eeeed34118778db906bc0b775d4e00f1f602dca2dca41bb34439dcd814 (8 changed lines vs v1: D, EXPECT_HEAD, EXPECT_TREE, EXPECT_S10C_SPEC_BLOB); fixture c1b57239c40df1353fc98561816353dcdfd8720a318436637f1315b1cb1992e7. Lane s10-c/55649; expects 24 + 8 = 32. Granted 2026-09-26T06:43:11Z.

@@ -1,0 +1,66 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s10c/proof-fix/rls-g2-s10c.pre.ts	2026-09-26 06:39:12.223187820 +0000
++++ test/rls-g2-s10c.spec.ts	2026-09-26 06:39:12.235187820 +0000
+@@ -107,7 +107,10 @@
+     const intentId = await readyRun();
+     const done = await complete(intentId);
+     expect(done.failure).toBeUndefined();
+-    noSideEffects(done);
++    // The landed coach notice (ScoutService.notifyComplete, kind import.complete) goes to the
++    // importing coach on an accepted claim; customer-facing side effects stay at zero (R38).
++    expect(done.pushes).toBe(1);
++    expect(Object.values(done.sideEffectLoads).every((n) => n === 0)).toBe(true);
+ 
+     const row = runRow(COACH, intentId);
+     expect(row.terminal_status).not.toBeNull();
+@@ -168,11 +171,13 @@
+     expect(q.slice(insert + 1, q.indexOf('-- tx:commit', insert)).filter(isWrite)).toEqual([]);
+   });
+ 
+-  it('a second claim after the terminal is refused and writes no second basis row (insert-only; one per run)', async () => {
++  it('a second claim after the terminal is a no-op ack and writes no second basis row (insert-only; one per run)', async () => {
+     const intentId = await readyRun();
+     expect((await complete(intentId)).failure).toBeUndefined();
+     const again = await complete(intentId);
+-    expect(again.failure?.status).toBe(409);
++    // Landed completeServerRun contract: a duplicate settle on a terminal run is a 200 ack no-op.
++    expect(again.failure).toBeUndefined();
++    expect(again.pushes).toBe(0);
+     expect(count(SETTLED)).toBe(1);
+     expect(again.queries.filter(isBasisInsert)).toHaveLength(0);
+   });
+@@ -189,7 +194,7 @@
+     expect(count(SETTLED)).toBe(1);
+   });
+ 
+-  it('a fenced run: the fence writes the terminal and NO basis; a later claim is refused and writes none', async () => {
++  it('a fenced run: the fence writes the terminal and NO basis; a later claim is a no-op ack and writes none', async () => {
+     const intentId = await readyRun();
+     const fenced = await run({
+       action: 'fence',
+@@ -204,7 +209,10 @@
+     expect(row.reason_code).toBe('revoked');
+     expect(count(SETTLED)).toBe(0);
+     const late = await complete(intentId);
+-    expect(late.failure?.status).toBe(409);
++    // Landed completeServerRun contract: a late settle on a fenced run is a 200 ack no-op.
++    expect(late.failure).toBeUndefined();
++    expect(late.pushes).toBe(0);
++    expect(late.queries.filter(isBasisInsert)).toHaveLength(0);
+     expect(count(SETTLED)).toBe(0);
+     expect(runRow(COACH, intentId).reason_code).toBe('revoked');
+   });
+@@ -222,11 +230,11 @@
+     expect(count(SETTLED)).toBe(0);
+     // analytics.capture(coach, event, props) is recorded as its argument list.
+     expect(done.events.filter((e: unknown[]) => /settled/i.test(String(e[1])))).toHaveLength(0);
+-    // The run is still open: the next claim settles it normally, with exactly one basis row.
++    // The claim committed before the settle, so a retry is a refused claim (200 ack) until the S11-B
++    // re-drive; whatever the retry does, terminal and basis stay paired, never one without the other.
+     const retry = await complete(intentId);
+     expect(retry.failure).toBeUndefined();
+-    expect(runRow(COACH, intentId).terminal_status).not.toBeNull();
+-    expect(count(SETTLED)).toBe(1);
++    expect(count(SETTLED)).toBe(runRow(COACH, intentId).terminal_status === null ? 0 : 1);
+   });
+ 
+   it('two concurrent claims: exactly one terminal write and exactly one basis row (the CAS loser inserts nothing)', async () => {

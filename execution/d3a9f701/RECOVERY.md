@@ -63,3 +63,9 @@ Recovery complete; execution cursor advanced. S8-G landed (771db62a), S9-B lande
 - S10-C: dual review GO (+delta), devloop-2 green, gate running (BASE 711c1f8f; first relay refused at PINS sourcing, not consumed). Binding v1 (lane s10-c/55649, 32) GO.
 - S11-A1: PR #552 (c8ee9005); proof run-1 RC=1 7/8 (J07 class B, PROOF_RUN1_FINDING.md, preserved). J07 fix GO; v2 = rebase onto the S10-C commit + fix; binding/v2 derived (fill after S10-C commit).
 - Split decisions: S10-C2 (contract Gen for observation routes; review GO; no version bump), S10-D P (test-only no-sources-on-disk invariants; review GO) before D2. S11-B dual GO after fix-1. S11-C GO (commits after S11-A1).
+
+## Recovery update (S10-C landed)
+- S10-C landed as 2ec74c56 (v3 candidate; v2 d6f8378f and v1 6674bc59 superseded; branches exec-d3a9/s10c-v1, exec-d3a9/s10c-v2 in worktrees/d3a9-s10c).
+- Stack clone: worktrees/d3a9-s10dp holds P -> S11-A1 v2 -> C2 (HEAD 079fd54b). S11-A1 proof SRC: worktrees/d3a9-s11a1 at 53b2f70a (must stay clean and unmoved until the proof ENDs).
+- Set-aside lanes (preserved): execution/1910a060/runtime/set-aside/s10-c-*-proof-{run1,v4,v5}-*, s11-*-proof-run1-*.
+- If the S11-A1 v2 proof fails: preserve binding/v2/run, classify, fix narrowly, derive binding/v3 with a new run dir; never rerun automatically.

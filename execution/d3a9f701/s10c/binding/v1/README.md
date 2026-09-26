@@ -33,7 +33,7 @@ Diffs: `DELTA-from-s10b-v1.diff` (runner, against the filled S10-B copy) and `DE
 - Tool pins match S10-B v1.
 - **Carried:** symlink-aware sentinel + `run/STARTED` created O_EXCL (`set -C`) right after the flock, nonblocking flock fd 9 with inode 692282, under-lock rechecks, no `cmd | grep -q`, bounded stop, and the data dir retained.
 
-## Fill (parent, from the S10-C gate receipt `../../gate/HEAD-<12>.txt`)
+## Fill (parent, from the S10-C gate receipt `../../gate-v2/HEAD-<12>.txt`)
 Copy `s10c-pg-proof.sh.template` to `s10c-pg-proof.sh`, then replace:
 
 | Placeholder | Receipt line |
@@ -65,3 +65,8 @@ Destroying the lane afterwards needs a separate grant: `S10C_RUNNER_PID` must be
   - the hooks dir must be the plain `$W/.git/hooks` directory, not a symlink;
   - both hook files must be regular files with sha256 equal to the two new `__FILL__` pins from the receipt's `hooks raw` line.
   All of this is re-asserted under the lock.
+
+## v2 owned set (parent 23:11; diff: DELTA-v2.diff)
+- `S10C_OWNED` is now 12 paths, sorted, with `test/scout/orchestration/settle-hook.spec.ts` added. The EXPECT_DELTA check and its messages say 12.
+- Fill from the **gate-v2** receipt (`../../gate-v2/HEAD-<12>.txt`).
+- Nothing else changed. The jest run is still only rls-g2-s10b + rls-g2-s10c (32 tests), and the settle-hook unit spec is proven by the gate's full suite.

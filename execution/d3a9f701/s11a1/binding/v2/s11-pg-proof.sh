@@ -36,17 +36,17 @@ R=$D/run; LOG=$R/s11-pg-proof.log; SENT=$R/s11-pg-proof.sentinel; STARTED_F=$R/S
 JLOG1=$R/jest-rls.log; JLOG2=$R/jest-journey.log; JLOG3=$R/jest-guard.log; GENLOG=$R/prisma-generate.log
 LOCK=/home/user/workspace/execution/test-validation.lock
 # ---- pins (from the clone source at c8ee9005 and its FREEZE; compare only)
-BASE_HEAD=__FILL_BASE_HEAD__                                                 # integration/importer tip after S10-C (= HEAD^)
+BASE_HEAD=7746a8772e7e3729406cceb4665308829dcff454                                                 # integration/importer tip after S10-C (= HEAD^)
 HARNESS_BASE=711c1f8f8b42157bca97f2a721557be7ef006667                            # harness literal (bootstrap BASE_HEAD / G2_S11_BASE_HEAD); must be an ancestor of HEAD
-BASE_TREE=__FILL_BASE_TREE__
-EXPECT_HEAD=__FILL_EXPECT_HEAD__                                             # S11-A1 v2 candidate (J07 fix), one commit on BASE_HEAD
-EXPECT_TREE=__FILL_EXPECT_TREE__
+BASE_TREE=f453534106d5d2c508f431283926a54e3e3e773b
+EXPECT_HEAD=53b2f70ae9b9d20e13b15df7e2570b0109d4fdc2                                             # S11-A1 v2 candidate (J07 fix), one commit on BASE_HEAD
+EXPECT_TREE=e26c8ca45034c1bca4fa24e21b27a8fd44d6bd8f
 LAND_REF=refs/remotes/origin/land/s11a1-v2
 EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                  # HEAD:prisma/migrations == BASE:prisma/migrations (no candidate migration)
 EXPECT_MIGRATIONS=173
 S10B_MIGRATION=20270124000000_scout_run_observation_expand                       # last accepted migration directory
 EXPECT_SPEC_BLOB=50de96084c396916fda940ecf47eedcc29f754cf                         # test/rls-g2-s11.spec.ts
-EXPECT_JOURNEY_BLOB=__FILL_JOURNEY_BLOB__                      # test/scout/s11/journey-core.pg.spec.ts
+EXPECT_JOURNEY_BLOB=95aee484b1f1a0e3aaf2e517476bd6b1c5eb2e75                      # test/scout/s11/journey-core.pg.spec.ts
 EXPECT_GUARD_BLOB=e1ace171738934a209b10f58039db9d86031b831                        # test/utils/g2-s11-db-guard.spec.ts
 EXPECT_BOOTSTRAP_BLOB=0e234b5835bdc060edf080928676c0994525598a                    # test/utils/g2-s11-bootstrap.sh (mode 100755)
 EXPECT_DB_BLOB=3f04f5665c4ecc3f50c029be9d4b29cde0bff3b7                           # test/utils/g2-s11-db.ts
@@ -58,7 +58,7 @@ EXPECT_JEST_BLOB=769a414698125340d6e347160f6ad81122cce863                       
 EXPECT_SCHEMA_BLOB=f86c1f5df722e855047899abd483f621b42dabe0                       # prisma/schema.prisma (== BASE, == S10-B)
 EXPECT_SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96
 S11_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s11a1/commit-v2/FREEZE.sha256
-S11_FREEZE_SHA=__FILL_FREEZE_SHA__
+S11_FREEZE_SHA=ee8653b7026309b7ca0b6e570c4680645ac5589bb297493731bc07ec959f872a
 EXPECT_DELTA="test/rls-g2-s11.spec.ts test/scout/s11/journey-core.pg.spec.ts test/utils/g2-s11-bootstrap.sh test/utils/g2-s11-db-guard.spec.ts test/utils/g2-s11-db.ts test/utils/g2-s11-harness.ts test/utils/g2-s11-pg-harness.ts test/utils/g2-s11-worker.cjs"
 EXPECT_TESTS_RLS=6          # it( in test/rls-g2-s11.spec.ts (no each/skip/only/todo)
 EXPECT_TESTS_JOURNEY=8      # it( in test/scout/s11/journey-core.pg.spec.ts (no each/skip/only/todo; describe.skip only when G2_S11_DATABASE_URL is unset)

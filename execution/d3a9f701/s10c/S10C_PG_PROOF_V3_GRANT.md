@@ -1,0 +1,1 @@
+- v3 run: PREFLIGHT_FAIL rc=71 (clusters/s10-c from run-1 present; fresh init only). No test ran. Parent set the run-1 lane aside intact (set-aside/s10-c-*-proof-run1-20260926T064359Z) and granted v4 = v3 pins with a new run dir. 2026-09-26T06:43:59Z

@@ -1,0 +1,2386 @@
+diff --git a/src/scout/induction/observation.module.ts b/src/scout/induction/observation.module.ts
+index a05ccc6f..fdfbc9db 100644
+--- a/src/scout/induction/observation.module.ts
++++ b/src/scout/induction/observation.module.ts
+@@ -2,27 +2,26 @@ import { Module } from '@nestjs/common';
+ import { JwtAuthGuard } from '../../auth/auth.guard';
+ import { JwksVerifierService } from '../../auth/jwks.service';
+ import { RolesGuard } from '../../auth/roles.guard';
+-import { PrismaService } from '../../prisma.service';
+ import { ScoutLifecycleService } from '../lifecycle/lifecycle.service';
+ import { ObservationController } from './observation.controller';
+ import { ObservationService } from './observation.service';
+ 
+ // S10-B — the induction routes (POST /api/scout/runs/declaration|observation;
+ // docs/decisions/2026-09-26-s10-induction.md D-S10-4). Self-contained like ScoutModule: the
+-// guards and PrismaService are provided locally (the MacrosModule pattern), AnalyticsService is
+-// @Global, and ScoutLifecycleService is provided here for the shared run refusals
+-// (`classifyClosed` / `closedConflict`); it constructs its own reconstruct engine and is never
+-// asked to settle from this module. It imports NO notification, drip, email, messaging,
++// guards are provided locally (the MacrosModule pattern); PrismaService comes from the @Global
++// PrismaModule (S10-C, review B A1: one shared PrismaClient and pool, not a module-local one);
++// AnalyticsService is @Global; ScoutLifecycleService is provided here for the shared run
++// refusals (`classifyClosed` / `closedConflict`); it constructs its own reconstruct engine and
++// is never asked to settle from this module. It imports NO notification, drip, email, messaging,
+ // workout-builder, AI or billing module (D-S10-6 invariant 5, R38).
+ //
+-// Registration: the doc assigns the ScoutModule import of this module to S10-C (D-S10-7), so
+-// S10-B ships it unregistered and the routes stay unmounted until S10-C lands.
++// Registration: the doc assigns the ScoutModule import of this module to S10-C (D-S10-7);
++// S10-C imports it from ScoutModule, which is what mounts the routes.
+ @Module({
+   controllers: [ObservationController],
+   providers: [
+     ObservationService,
+     ScoutLifecycleService,
+-    PrismaService,
+     JwtAuthGuard,
+     RolesGuard,
+     JwksVerifierService,
+diff --git a/src/scout/lifecycle/lifecycle.service.ts b/src/scout/lifecycle/lifecycle.service.ts
+index 11f62306..2be08832 100644
+--- a/src/scout/lifecycle/lifecycle.service.ts
++++ b/src/scout/lifecycle/lifecycle.service.ts
+@@ -4,7 +4,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+ import { AnalyticsService } from '../../analytics/analytics.service';
+ import { Events } from '../../analytics/events';
+ import { PrismaService } from '../../prisma.service';
+-import { ReconciliationFactsService } from '../reconciliation/facts.service';
++import { ReconciliationFactsService, type RunBinding } from '../reconciliation/facts.service';
+ import { reconcile } from '../reconciliation/reconcile';
+ import {
+   type FamilyQualifier,
+@@ -107,6 +107,9 @@ interface LockedRow {
+   fenced_at: Date | null;
+   fence_reason: string | null;
+   deadline_at: Date | null;
++  /** S10-C: the evaluator binding (D-S10-3 E1) handed to the facts collector; `mode` is `server`
++   *  by the lock's WHERE clause. */
++  accepted_start_at: Date | null;
+ }
+ 
+ /**
+@@ -157,6 +160,23 @@ export interface FamilyProjection {
+   qualifiers?: FamilyQualifier[];
+ }
+ 
++/**
++ * The S9 fields `projectToken` fills for one staged token (D-S9-5), plus `observed_unique` when
++ * (and only when) the S10 finding-7 rule supplies it from a settled report.
++ */
++export type TokenFill = Pick<
++  FamilyProjection,
++  | 'rejected'
++  | 'unresolved'
++  | 'canonical_family'
++  | 'native_present_verified'
++  | 'completeness_basis'
++  | 'relationship_closure'
++  | 'reasons'
++  | 'qualifiers'
++> &
++  Partial<Pick<FamilyProjection, 'observed_unique'>>;
++
+ /** The run-row columns that decide whether a reconciliation report applies (D-S9-5, RC-2). */
+ export type ReportScopeRow = Pick<RunRow, 'mode' | 'terminal_status' | 'reason_code'>;
+ 
+@@ -430,10 +450,19 @@ export class ScoutLifecycleService {
+         locked.fenced_at !== null && isFenceReason(locked.fence_reason)
+           ? locked.fence_reason
+           : null;
+-      const reconciliation = await this.reconcileRun(tx, coachId, intentId);
++      const { verdict: reconciliation, report } = await this.reconcileRun(tx, coachId, intentId, {
++        mode: 'server',
++        execution_epoch: locked.execution_epoch,
++        accepted_start_at: locked.accepted_start_at,
++      });
+       const verdict = arbitrate({ fence, reconciliation, ...facts });
+       const written = await this.writeTerminal(tx, coachId, intentId, epoch, verdict);
+-      return written ? verdict : null;
++      if (!written) return null;
++      // S10-C (D-S10-4): the settled basis is a RECORD of the terminal just written, inserted in
++      // the same transaction after the CAS succeeded. A CAS miss returns above and writes
++      // nothing; an insert failure throws and rolls the terminal back with it.
++      await this.writeSettledBasis(tx, coachId, intentId, epoch, report);
++      return verdict;
+     });
+     if (outcome) {
+       this.analytics.capture(coachId, Events.SCOUT_RUN_SETTLED, {
+@@ -476,7 +505,8 @@ export class ScoutLifecycleService {
+ 
+   private async lockRun(tx: Tx, coachId: string, intentId: string): Promise<LockedRow | null> {
+     const rows = await tx.$queryRaw<LockedRow[]>`
+-      SELECT execution_epoch, terminal_status, fenced_at, fence_reason, deadline_at
++      SELECT execution_epoch, terminal_status, fenced_at, fence_reason, deadline_at,
++             accepted_start_at
+         FROM "ScoutImport"
+        WHERE coach_id = ${coachId} AND intent_id = ${intentId} AND mode = 'server'
+        FOR NO KEY UPDATE`;
+@@ -504,6 +534,52 @@ export class ScoutLifecycleService {
+     return written === 1;
+   }
+ 
++  /**
++   * S10-C (D-S10-4 "Settle write"): ONE `ScoutRunSettledBasis` row per run, inserted only after
++   * `writeTerminal` returned true in the same transaction. It records the S9 report the terminal
++   * was decided on (`basis: 'settled'`) and the `evidence_digest`s of the observations stored at
++   * the settle epoch (this coach's run only), so the status read can return the settled report
++   * verbatim instead of recomputing it (R35: archiving a native row later changes nothing). The
++   * insert is not a second terminal writer — the run row is not touched — and the fence and CAS
++   * miss paths never reach it (R36). The table is insert-only and the PK is `(coach_id,
++   * intent_id)`, so a second row for the run is refused by the database, not merged.
++   */
++  private async writeSettledBasis(
++    tx: Tx,
++    coachId: string,
++    intentId: string,
++    epoch: number,
++    report: ReconciliationReportV1,
++  ): Promise<void> {
++    const observations = await tx.scoutRunObservation.findMany({
++      where: { coach_id: coachId, intent_id: intentId, execution_epoch: epoch },
++      select: { evidence_digest: true },
++      orderBy: { evidence_digest: 'asc' },
++    });
++    const settled: ReconciliationReportV1 = { ...report, basis: 'settled' };
++    await tx.scoutRunSettledBasis.create({
++      data: {
++        coach_id: coachId,
++        intent_id: intentId,
++        execution_epoch: epoch,
++        report_version: settled.report_version,
++        report: ScoutLifecycleService.reportToJson(settled),
++        observation_digests: observations.map((o) => o.evidence_digest),
++        settled_at: new Date(),
++      },
++    });
++  }
++
++  /**
++   * The settled report as the jsonb input value: a JSON round trip of a plain-data report (no Date,
++   * no function, no undefined key survives), so the bytes stored are exactly what `JSON.stringify`
++   * of the report says — the same serialisation the status read is compared against (R35).
++   */
++  static reportToJson(report: ReconciliationReportV1): Prisma.InputJsonValue {
++    const value: Prisma.InputJsonValue = JSON.parse(JSON.stringify(report));
++    return value;
++  }
++
+   /** The arbiter's facts for one run: the stored claim, staged rows and ledger tallies per family. */
+   private async collectFacts(tx: Tx, coachId: string, intentId: string) {
+     const [completion, staged, ledger] = await Promise.all([
+@@ -677,10 +753,12 @@ export class ScoutLifecycleService {
+     tx: Tx,
+     coachId: string,
+     intentId: string,
+-  ): Promise<ReconciliationVerdict> {
+-    const facts = await this.facts.collect(tx, coachId, intentId);
+-    const verdict: ReconciliationVerdictV1 = reconcile(facts).verdict;
+-    return { outcome: verdict.outcome, reason_code: verdict.reason_code };
++    run: RunBinding,
++  ): Promise<{ verdict: ReconciliationVerdict; report: ReconciliationReportV1 }> {
++    const facts = await this.facts.collect(tx, coachId, intentId, run);
++    const { verdict, report } = reconcile(facts);
++    const v: ReconciliationVerdictV1 = verdict;
++    return { verdict: { outcome: v.outcome, reason_code: v.reason_code }, report };
+   }
+ 
+   /**
+@@ -698,10 +776,12 @@ export class ScoutLifecycleService {
+   }
+ 
+   /**
+-   * Recompute-on-read (D-S9-5, Addendum C-9): when a report applies, one REPEATABLE READ
+-   * transaction supplies the facts service its snapshot across staging, ledger, provenance and
+-   * native tables; the reconciler's report is returned. No row is written. Returns null when no
+-   * report applies, without opening a transaction.
++   * The report for the status read (D-S9-5; S10-C D-S10-4 "Status"). When a report applies:
++   * the run's settled basis, if one was recorded, is returned verbatim with `basis: 'settled'`
++   * (this coach's `(coach_id, intent_id)` row only; one point read, no transaction); otherwise
++   * the S9-C recompute-on-read — one REPEATABLE READ transaction supplies the facts service its
++   * snapshot and the reconciler's `'recomputed'` report is returned, byte-identical to S9-C. No
++   * row is written on either path. Returns null when no report applies, without any read.
+    */
+   async readReport(
+     coachId: string,
+@@ -709,12 +789,48 @@ export class ScoutLifecycleService {
+     row: ReportScopeRow | null | undefined,
+   ): Promise<ReconciliationReportV1 | null> {
+     if (!ScoutLifecycleService.reportApplies(row)) return null;
++    const settled = await this.readSettledBasis(coachId, intentId);
++    if (settled !== null) return settled;
++    // No settled record (a fence-path or pre-S10 terminal): the S9-C recompute, byte-identical to
++    // S9-C — the collector gets NO run binding, so coverage stays unknown and no S10 evidence is
++    // read. Later or backfilled evidence never changes a report that was never settled on it.
+     return this.prisma.$transaction(
+       async (tx) => reconcile(await this.facts.collect(tx, coachId, intentId)).report,
+       S9_SNAPSHOT_TX_OPTIONS,
+     );
+   }
+ 
++  /**
++   * S10-C: the recorded settled report, or null when none exists OR the stored value is not a
++   * version-1 `'settled'` report (then the S9 recompute answers; a stored record is never
++   * reinterpreted into something it does not say).
++   */
++  private async readSettledBasis(
++    coachId: string,
++    intentId: string,
++  ): Promise<ReconciliationReportV1 | null> {
++    const row = await this.prisma.scoutRunSettledBasis.findUnique({
++      where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
++      select: { report_version: true, report: true },
++    });
++    if (row === null || row.report_version !== 1) return null;
++    return ScoutLifecycleService.isSettledReport(row.report) ? row.report : null;
++  }
++
++  /** Structural check of a stored settled report (the jsonb column is typed `unknown`). */
++  static isSettledReport(value: unknown): value is ReconciliationReportV1 {
++    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
++    const r = value as Record<string, unknown>;
++    return (
++      r.report_version === 1 &&
++      r.basis === 'settled' &&
++      Array.isArray(r.conditions) &&
++      (r.required_families === null || Array.isArray(r.required_families)) &&
++      typeof r.ledger_without_staged === 'number' &&
++      Array.isArray(r.families)
++    );
++  }
++
+   /** Ledger tallies per family for the projection (outside any transaction). */
+   async readLedger(coachId: string, intentId: string): Promise<Record<string, LedgerTally>> {
+     const rows = await this.prisma.scoutReconstructionLedger.groupBy({
+@@ -730,14 +846,19 @@ export class ScoutLifecycleService {
+    * — exactly the staged row count, because the wide identity
+    * (coach_id, intent_id, entity_type, source_platform, source_id) is the table's only key (G2-C).
+    * Native buckets stay null = "not yet known" (never 0) until S8-B provenance / S9;
+-   * `observed_unique` stays null until S10.
++   * `observed_unique` stays null until a settled S10 basis vouches for it (below).
+    *
+    * S9-C (D-S9-5): with a `report`, each entry that has a token row in it is filled from that row
+    * and its family — `rejected` / `unresolved` become counted facts and the additive fields
+-   * appear. `created_native` / `already_present_verified` stay null (D-S9-4), `observed_unique`
+-   * stays null (v1 has no coverage fact). Without a report (or for a token the report does not
+-   * carry) the entry is exactly the S7-L shape — no additive key is present, no bucket becomes 0.
+-   * Report-only entries (declared families without a staged token, RC-3) never create an entry.
++   * appear. `created_native` / `already_present_verified` stay null (D-S9-4). Without a report
++   * (or for a token the report does not carry) the entry is exactly the S7-L shape — no additive
++   * key is present, no bucket becomes 0. Report-only entries (declared families without a staged
++   * token, RC-3) never create an entry.
++   *
++   * S10-C (S10-DOC finding 7): `observed_unique` stays null under a `'recomputed'` report; under
++   * a `'settled'` one `projectToken` fills it only when exactly one report family holds the
++   * token, that family is mapped, the token is its only token and the family's `observed_unique`
++   * is non-null — otherwise null (never a sum, never a 0 for "not observed").
+    */
+   static projectFamilies(
+     staged: readonly { entity_type: string; _count: { _all: number } }[],
+@@ -769,26 +890,18 @@ export class ScoutLifecycleService {
+    * across platforms in one intent: counts are summed over all of its rows, `canonical_family`
+    * is null unless every row resolves to the same mapped family, `reasons` merges the families'
+    * histograms and `qualifiers` their union. Returns null when the report has no row for the token.
++   * `observed_unique` is present only when the finding-7 rule fills it from a settled report.
+    */
+   static projectToken(
+     token: string,
+     report: ReconciliationReportV1,
+     stagedTokens: ReadonlySet<string>,
+-  ): Pick<
+-    FamilyProjection,
+-    | 'rejected'
+-    | 'unresolved'
+-    | 'canonical_family'
+-    | 'native_present_verified'
+-    | 'completeness_basis'
+-    | 'relationship_closure'
+-    | 'reasons'
+-    | 'qualifiers'
+-  > | null {
++  ): TokenFill | null {
+     const holders: ReconciliationFamilyV1[] = report.families.filter((f) =>
+       f.tokens.some((t) => t.token === token),
+     );
+     if (holders.length === 0) return null;
++    const observed = ScoutLifecycleService.observedUniqueFor(token, report, holders);
+     const rows = holders.flatMap((f) => f.tokens.filter((t) => t.token === token));
+     const sum = (pick: (r: (typeof rows)[number]) => number) =>
+       rows.reduce((acc, r) => acc + pick(r), 0);
+@@ -815,9 +928,29 @@ export class ScoutLifecycleService {
+       qualifiers: PROJECTED_FAMILY_QUALIFIERS.filter((q) =>
+         holders.some((f) => f.qualifiers.includes(q)),
+       ),
++      ...(observed === null ? {} : { observed_unique: observed }),
+     };
+   }
+ 
++  /**
++   * S10-DOC finding 7: the verified `observed_unique` a token may carry. A family's observation
++   * counts identities of the FAMILY; the token-shaped `families[]` entry may only show it when
++   * the token and the family are the same set — a settled report, exactly one holder, mapped, the
++   * token its only token, value non-null. Every other case is null (unknown), never a 0.
++   */
++  static observedUniqueFor(
++    token: string,
++    report: ReconciliationReportV1,
++    holders: readonly ReconciliationFamilyV1[],
++  ): number | null {
++    if (report.basis !== 'settled' || holders.length !== 1) return null;
++    const holder = holders[0];
++    if (!holder.mapped || holder.tokens.length !== 1 || holder.tokens[0].token !== token) {
++      return null;
++    }
++    return typeof holder.observed_unique === 'number' ? holder.observed_unique : null;
++  }
++
+   /**
+    * Addendum C-6: validate every histogram key's qualifier against its domain before it reaches a
+    * DTO — `unresolved_family:<token>` must name a staged token of this projection,
+diff --git a/src/scout/reconciliation/facts.service.ts b/src/scout/reconciliation/facts.service.ts
+index 5ecd6901..5e2876bd 100644
+--- a/src/scout/reconciliation/facts.service.ts
++++ b/src/scout/reconciliation/facts.service.ts
+@@ -1,5 +1,17 @@
+ import { Inject, Injectable, Optional } from '@nestjs/common';
+ import type { Prisma } from '@prisma/client';
++import { stagedFamilyDigests } from '../induction/digest';
++import {
++  buildInductionRegistry,
++  loadInductionManifests,
++  type InductionRegistry,
++} from '../induction/manifest-registry';
++import {
++  evaluateCoverage,
++  type RunDeclaration,
++  type StagedPlatformFacts,
++  type StoredObservation,
++} from '../induction/verify';
+ import { interpretEntity } from '../reconstruct/mapping-spec';
+ import {
+   CHILD_ENTITY_TYPE,
+@@ -26,6 +38,7 @@ import { SCOUT_TERMINAL_STATUSES, type ScoutTerminalStatus } from '../scout.dto'
+ import {
+   NATIVE_TARGET_KINDS,
+   type ClaimStatus,
++  type CoverageFact,
+   type FamilyFacts,
+   type FamilyQualifier,
+   type IdentityFacts,
+@@ -51,9 +64,12 @@ import {
+  *    L66-89: the native id is the sole join, the owner is compared afterwards) so that a row
+  *    owned by another coach is reported as `foreign_owner` and never as present — nothing about
+  *    that row other than the comparison result leaves this module;
+- *  - preserves native evidence truth: `coverage` is `null` in v1 (D-S9-3), `created` vs
+- *    `already_present` is NOT split (D-S9-4; provenance `import_intent_id` is NULL at S8-C), an
+- *    unknown is never a `0`, and no persistence of the report exists (D-S9-5);
++ *  - preserves native evidence truth: `coverage` comes only from the S10-A evaluator over the
++ *    run's stored declaration and evidence (D-S10-3; `null` unless the caller's run binding is a
++ *    `server` row with an accepted start),
++ *    `created` vs `already_present` is NOT split (D-S9-4; provenance `import_intent_id` is NULL
++ *    at S8-C), an unknown is never a `0`, and this module persists nothing (the settled basis is
++ *    the lifecycle's record, D-S10-4);
+  *  - is source-agnostic: grouping is the accepted `resolveStagedFamily`, the parent role and the
+  *    client link are read through the accepted S8-A / S8-C interpreters, never through a
+  *    platform-specific branch;
+@@ -91,6 +107,18 @@ import {
+  *    `clientSourceId`, target = the `clients` identity `(same platform, clientSourceId)`;
+  *    `consistent` is `null` (soft link, no native attribute to compare; S8-DOC §3.8).
+  * `consistent` is never `true` by assumption: it is `true` only after a successful comparison.
++ *
++ * Coverage (S10-C; S10-DOC D-S10-3 E6, D-S10-7 row S10-C). The staged side of the evaluator's
++ * identity-set comparison is computed HERE, from the same partition the entries above use:
++ * `resolveFamily` is the one classifier (exported for the evaluator's callers and specs), and
++ * `stagedPlatformFacts` digests every mapped family of every staged platform with
++ * `stagedFamilyDigests` — a declared family with no staged row gets the empty-set digest, never
++ * an absence (absence would be "unknown"). The declaration and the observations of the SETTLE
++ * epoch are read coach-scoped in the caller's transaction; an observation stored under an earlier
++ * epoch is excluded by the query and, independently, refused by the evaluator (E3). The registry
++ * is bound to this service's mapper partition: a manifest or rule set naming a platform this
++ * service has no mapping spec for is dropped (that platform can never be proven here — unknown,
++ * never zero), while the loud artifact cross-check stays with `ObservationService` (S10-B).
+  */
+ 
+ /** The transaction (or client) the caller already holds; S9 runs inside S8-G's settle tx (D-S9-1). */
+@@ -100,6 +128,8 @@ export type FactsDb = Prisma.TransactionClient;
+ export interface ReconciliationFactsOptions {
+   readonly sourceMappers?: ReadonlyMap<string, SourceMapper>;
+   readonly nativeRules?: NativeRuleRegistry;
++  /** S10-C: the induction registry; default: on-disk manifests over this service's mappers. */
++  readonly registry?: InductionRegistry;
+ }
+ 
+ /** DI token for {@link ReconciliationFactsOptions}; absent → repository-resident registries. */
+@@ -224,10 +254,85 @@ const byString = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+ /** The accepted S8-C workouts reconstructor; only its read-only `map` is used here. */
+ type WorkoutInterpreter = ReturnType<typeof buildNativeFamilies>['workouts'];
+ 
++/**
++ * S10-C: the ONE classifier of `(platform, token)` → canonical family shared by the grouping
++ * below and the staged digests the evaluator compares (D-S10-3 E6: one partition). A token that
++ * resolves through the spec's `steps` maps to its family; a token that IS a canonical family the
++ * platform's spec declares maps to itself (the accepted S8-C staging convention); anything else,
++ * including any token of an unregistered platform, is `null`.
++ */
++export function resolveFamily(
++  sourceMappers: ReadonlyMap<string, SourceMapper>,
++  platform: string,
++  token: string,
++): string | null {
++  const step = resolveStagedFamily(sourceMappers, platform, token);
++  if (step.ok) return step.family;
++  const mapper = sourceMappers.get(platform);
++  if (mapper !== undefined && Object.prototype.hasOwnProperty.call(mapper.spec.families, token))
++    return token;
++  return null;
++}
++
++/**
++ * S10-C: the evaluator's staged side for every staged platform, from `resolveFamily`'s partition
++ * (D-S10-3 E6). A registered platform lists every family its spec declares as grouped and
++ * digests each one — the empty set for a family without a staged row (`digest.ts`
++ * `EMPTY_IDENTITY_SET_DIGEST`, count 0), never an absence. An unregistered platform has no
++ * grouped family and no digest: the evaluator can only leave it unknown. Unmapped tokens of a
++ * registered platform belong to no family digest (they surface as `unresolved_family` through
++ * the reconciler instead).
++ */
++export function stagedPlatformFacts(
++  sourceMappers: ReadonlyMap<string, SourceMapper>,
++  rows: Iterable<{ source_platform: string; entity_type: string; source_id: string }>,
++): StagedPlatformFacts[] {
++  const byPlatform = new Map<string, Map<string, string[]>>();
++  for (const row of rows) {
++    let groups = byPlatform.get(row.source_platform);
++    if (groups === undefined) {
++      groups = new Map<string, string[]>();
++      const mapper = sourceMappers.get(row.source_platform);
++      if (mapper !== undefined) {
++        for (const family of Object.keys(mapper.spec.families).sort(byString)) {
++          groups.set(family, []);
++        }
++      }
++      byPlatform.set(row.source_platform, groups);
++    }
++    const family = resolveFamily(sourceMappers, row.source_platform, row.entity_type);
++    if (family === null) continue;
++    // `resolveFamily` only names families the platform's spec declares, so the list exists;
++    // the fallback merely keeps this total should the two ever disagree.
++    const ids = groups.get(family);
++    if (ids === undefined) groups.set(family, [row.source_id]);
++    else ids.push(row.source_id);
++  }
++  return Array.from(byPlatform.entries())
++    .sort(([a], [b]) => byString(a, b))
++    .map(([source_platform, groups]) => ({
++      source_platform,
++      grouped_families: Array.from(groups.keys()),
++      families: stagedFamilyDigests(groups),
++    }));
++}
++
++/**
++ * The run-row columns that bind the evaluator (D-S10-3 E1/E3), supplied by the CALLER from the row
++ * it already holds (the settle tail's locked row; the status read's run row). The collector issues
++ * no run-row read of its own, so the S9-B statement count is unchanged for callers that pass none.
++ */
++export interface RunBinding {
++  mode: string;
++  execution_epoch: number;
++  accepted_start_at: Date | null;
++}
++
+ @Injectable()
+ export class ReconciliationFactsService {
+   private readonly sourceMappers: ReadonlyMap<string, SourceMapper>;
+   private readonly workoutInterpreter: WorkoutInterpreter;
++  private readonly registry: InductionRegistry;
+ 
+   constructor(
+     @Optional() @Inject(RECONCILIATION_FACTS_OPTIONS) options: ReconciliationFactsOptions = {},
+@@ -239,10 +344,41 @@ export class ReconciliationFactsService {
+       sourceMappers: this.sourceMappers,
+       nativeRules,
+     }).workouts;
++    this.registry =
++      options.registry ??
++      ReconciliationFactsService.defaultRegistry(this.sourceMappers, nativeRules);
+   }
+ 
+-  /** Collect the facts for one run. Reads only; safe inside the caller's transaction. */
+-  async collect(db: FactsDb, coachId: string, intentId: string): Promise<ReconciliationFacts> {
++  /**
++   * S10-C: the induction registry over THIS service's mapper partition (fail loud at
++   * construction like the mapper and native registries). Artifacts naming a platform without a
++   * mapping spec here are dropped, not rejected: such a platform is unprovable in this partition
++   * (unknown), and the loud on-disk cross-check is `ObservationService`'s (S10-B).
++   */
++  static defaultRegistry(
++    sourceMappers: ReadonlyMap<string, SourceMapper>,
++    nativeRules: NativeRuleRegistry,
++  ): InductionRegistry {
++    return buildInductionRegistry({
++      manifests: loadInductionManifests().filter((m) => sourceMappers.has(m.sourcePlatform)),
++      specs: Array.from(sourceMappers.values()).map((m) => m.spec),
++      nativeRuleSets: Array.from(nativeRules.values()).filter((s) =>
++        sourceMappers.has(s.sourcePlatform),
++      ),
++    });
++  }
++
++  /**
++   * Collect the facts for one run. Reads only; safe inside the caller's transaction. `run` (S10-C)
++   * is the server run row's binding; without one — or for a non-server / not-yet-accepted row —
++   * `coverage` is `null` (unknown), exactly the S9 v1 facts, and no S10 table is read.
++   */
++  async collect(
++    db: FactsDb,
++    coachId: string,
++    intentId: string,
++    run: RunBinding | null = null,
++  ): Promise<ReconciliationFacts> {
+     const [claim, staged, ledger] = await Promise.all([
+       this.readClaim(db, coachId, intentId),
+       this.readStaged(db, coachId, intentId),
+@@ -284,7 +420,7 @@ export class ReconciliationFactsService {
+       if (stagedKeys.has(ledgerKey(row.entity_type, row.source_platform, row.source_id))) continue;
+       ledgerWithoutStaged += 1;
+       // Attributed to a family entry where the ledger row's own (platform, token) resolves.
+-      const resolved = this.resolveFamily(row.source_platform, row.entity_type);
++      const resolved = resolveFamily(this.sourceMappers, row.source_platform, row.entity_type);
+       if (resolved !== null) entryFor(true, resolved).ledgerWithoutStaged += 1;
+     }
+ 
+@@ -469,33 +605,60 @@ export class ReconciliationFactsService {
+       specFamilies = known ? Array.from(union).sort(byString) : null;
+     }
+ 
++    // ── 7. Coverage (S10-C, D-S10-3): the evaluator over the settle epoch's stored evidence ──
++    const coverage = await this.evaluateRunCoverage(db, coachId, intentId, run, staged);
++
+     return {
+       claim,
+       families,
+       relationships,
+       spec_families: specFamilies,
+       ledger_without_staged: ledgerWithoutStaged,
+-      coverage: null, // D-S9-3: no coverage contract exists in v1; unknown, never 0.
++      coverage,
+     };
+   }
+ 
+-  // ── Grouping / interpretation ──────────────────────────────────────────────────────────────
+-
+-  /** Canonical family for `(platform, token)` under the accepted dispatch, or null. */
+-  private resolveFamily(platform: string, token: string): string | null {
+-    const step = resolveStagedFamily(this.sourceMappers, platform, token);
+-    if (step.ok) return step.family;
+-    const mapper = this.sourceMappers.get(platform);
+-    // Accepted convention: the token IS the canonical family the spec declares.
+-    if (mapper !== undefined && Object.prototype.hasOwnProperty.call(mapper.spec.families, token))
+-      return token;
+-    return null;
++  /**
++   * S10-C: `coverage` for the run. `null` (unknown for every family, exactly the S9 v1 value)
++   * unless a `mode='server'` binding with an accepted start was supplied; otherwise the S10-A
++   * evaluator over the declaration, the observations stored at THIS epoch and the staged digests
++   * of `resolveFamily`'s partition. Nothing here is written and no count is ever derived from a
++   * staged row: `observed_unique` comes only from verified evidence.
++   */
++  private async evaluateRunCoverage(
++    db: FactsDb,
++    coachId: string,
++    intentId: string,
++    run: RunBinding | null,
++    staged: readonly StagedRow[],
++  ): Promise<Readonly<Record<string, CoverageFact>> | null> {
++    if (run === null || run.mode !== 'server' || !(run.accepted_start_at instanceof Date)) {
++      return null;
++    }
++    const [declaration, observations] = await Promise.all([
++      this.readDeclaration(db, coachId, intentId),
++      this.readObservations(db, coachId, intentId, run.execution_epoch),
++    ]);
++    return evaluateCoverage({
++      run: {
++        coach_id: coachId,
++        intent_id: intentId,
++        execution_epoch: run.execution_epoch,
++        accepted_start_at: run.accepted_start_at,
++      },
++      declaration,
++      registry: this.registry,
++      observations,
++      staged: stagedPlatformFacts(this.sourceMappers, staged),
++    });
+   }
+ 
++  // ── Grouping / interpretation ──────────────────────────────────────────────────────────────
++
+   private group(row: StagedRow): Grouped {
+     const identity = identityKey(row.source_platform, row.source_id);
+     const mapper = this.sourceMappers.get(row.source_platform) ?? null;
+-    const family = this.resolveFamily(row.source_platform, row.entity_type);
++    const family = resolveFamily(this.sourceMappers, row.source_platform, row.entity_type);
+     if (family !== null) {
+       return { row, identity, mapped: true, family, resolutionReason: null, mapper };
+     }
+@@ -706,6 +869,63 @@ export class ReconciliationFactsService {
+     return isLegacyTerminal(claim) ? claim : null;
+   }
+ 
++  /**
++   * The run's declaration as ONE `RunDeclaration` (S10-C): the shared challenge (identical in
++   * every row by the S10-B trigger; a disagreement is poisoned to an empty challenge so nothing
++   * verifies) and each platform's scope digests, sorted. `null` when the run declared nothing.
++   */
++  private async readDeclaration(
++    db: FactsDb,
++    coachId: string,
++    intentId: string,
++  ): Promise<RunDeclaration | null> {
++    const rows = await db.scoutRunDeclaration.findMany({
++      where: { coach_id: coachId, intent_id: intentId },
++      select: { source_platform: true, account_scope_id_digest: true, challenge: true },
++      orderBy: [{ source_platform: 'asc' }, { account_scope_id_digest: 'asc' }],
++    });
++    if (rows.length === 0) return null;
++    const first = Buffer.from(rows[0].challenge);
++    const agreed = rows.every((r) => Buffer.from(r.challenge).equals(first));
++    const scopes = new Map<string, string[]>();
++    for (const row of rows) {
++      const list = scopes.get(row.source_platform) ?? [];
++      list.push(row.account_scope_id_digest);
++      scopes.set(row.source_platform, list);
++    }
++    return {
++      challenge: agreed ? first : Buffer.alloc(0),
++      platforms: Array.from(scopes.entries()).map(([source_platform, digests]) => ({
++        source_platform,
++        account_scope_id_digests: digests,
++      })),
++    };
++  }
++
++  /**
++   * Stored evidence of THIS coach's run at the settle epoch only (S10-C; S10-B C-note "old
++   * epoch ignored at settle"): rows written under an earlier `execution_epoch` are excluded here
++   * and would be refused again by the evaluator's E3 binding if they ever reached it.
++   */
++  private async readObservations(
++    db: FactsDb,
++    coachId: string,
++    intentId: string,
++    epoch: number,
++  ): Promise<StoredObservation[]> {
++    return db.scoutRunObservation.findMany({
++      where: { coach_id: coachId, intent_id: intentId, execution_epoch: epoch },
++      select: {
++        coach_id: true,
++        intent_id: true,
++        execution_epoch: true,
++        received_at: true,
++        evidence: true,
++      },
++      orderBy: { received_at: 'asc' },
++    });
++  }
++
+   private async readStaged(db: FactsDb, coachId: string, intentId: string): Promise<StagedRow[]> {
+     const out: StagedRow[] = [];
+     let cursor: string | undefined;
+diff --git a/src/scout/reconciliation/types.ts b/src/scout/reconciliation/types.ts
+index b7599427..bd5ea790 100644
+--- a/src/scout/reconciliation/types.ts
++++ b/src/scout/reconciliation/types.ts
+@@ -300,7 +300,12 @@ export interface ReconciliationFamilyV1 {
+ 
+ export interface ReconciliationReportV1 {
+   readonly report_version: 1;
+-  readonly basis: 'recomputed';
++  /**
++   * `'recomputed'`: the reconciler's report over a fresh snapshot (S9-C read path).
++   * `'settled'` (S10-C, D-S10-4): the report the settling transaction recorded in
++   * `ScoutRunSettledBasis`, returned verbatim by the status read. The one S10 change to this file.
++   */
++  readonly basis: 'recomputed' | 'settled';
+   /** Every D-S9-2 condition that holds, in order; `[]` iff the verdict is `complete`. */
+   readonly conditions: readonly S9ReasonCode[];
+   /**
+diff --git a/src/scout/scout.module.ts b/src/scout/scout.module.ts
+index 5cfff738..1d6110a5 100644
+--- a/src/scout/scout.module.ts
++++ b/src/scout/scout.module.ts
+@@ -17,6 +17,7 @@ import { ScoutEntitiesService } from './scout-entities.service';
+ import { ScoutLifecycleService } from './lifecycle/lifecycle.service';
+ import { ScoutRunController } from './lifecycle/run.controller';
+ import { ReconciliationModule } from './reconciliation/reconciliation.module';
++import { ObservationModule } from './induction/observation.module';
+ 
+ // IMPORTER-E + IMPORTER-B — unified scout module (DESIGN.md v0.3 §10 + §2).
+ //
+@@ -41,8 +42,14 @@ import { ReconciliationModule } from './reconciliation/reconciliation.module';
+ // S9-C: ReconciliationModule provides the read-only ReconciliationFactsService
+ // the lifecycle service reconciles from (settle tail and recompute-on-read);
+ // it is another optional constructor dependency with the same fallback rule.
++//
++// S10-C: ObservationModule mounts the two induction routes (POST
++// /api/scout/runs/declaration|observation; S10-DOC D-S10-4, D-S10-7 row S10-C).
++// It is self-contained (its own guards, PrismaService and lifecycle provider)
++// and imports no notification, drip, email or messaging module (D-S10-6
++// invariant 5); this import is the only S10 change to ScoutModule.
+ @Module({
+-  imports: [NotificationsModule, ReconciliationModule],
++  imports: [NotificationsModule, ReconciliationModule, ObservationModule],
+   controllers: [
+     ScoutController,
+     ScoutIngestController,
+diff --git a/test/rls-g2-s10c.spec.ts b/test/rls-g2-s10c.spec.ts
+new file mode 100644
+index 00000000..1788dff2
+--- /dev/null
++++ b/test/rls-g2-s10c.spec.ts
+@@ -0,0 +1,327 @@
++/**
++ * S10-C — live PostgreSQL proof of the settle write and the status preference
++ * (docs/decisions/2026-09-26-s10-induction.md D-S10-4, D-S10-6, D-S10-7 row S10-C; acceptance
++ * R33 (structural half), R34, R35, R36, R38; R23 terminal half).
++ *
++ * THROUGHPUT RULE: this file forks NO harness. It imports the S10-B lane verbatim
++ * (test/utils/g2-s10b-{db,pg-harness,harness,fixtures}.ts and the S10-B worker) and drives the
++ * S10-C paths by PARAMETER only: the worker's `complete` / `status` / `fence` actions run the real
++ * ScoutService → ScoutLifecycleService settle tail and status read; `failAfter: { model:
++ * 'scoutRunSettledBasis', n: 0 }` is the S10-B injected-create hook aimed at the new model. The
++ * same guards apply (G2_S10B_* env, attested candidate head, clean tree); it runs ONLY where the
++ * S10-B spec runs, on the same disposable cluster, after `prisma generate` at the candidate head.
++ *
++ * Known limit (stated, not hidden; review A finding 2): the landed S10-B worker constructs
++ * ScoutLifecycleService with the two-argument signature, so its facts service builds the DEFAULT
++ * induction registry (on-disk manifests: none at this head) and every family is unknown at
++ * settle. The `complete` terminal therefore exercises the S9 closed set (`partial /
++ * coverage_basis_unknown`, D-S10-8) and the STRUCTURAL D-S10-4 guarantees only. This file is NOT
++ * the R33 live proof of the `complete → complete` verdict half; that half is proven at the unit
++ * tier (facts.service.coverage.spec, lifecycle.service.spec) and its live case needs a worker
++ * registry seam plus a signed-evidence fixture for a production-mapped platform (owner decision;
++ * see s10c_builder_summary.md, open question 1).
++ */
++import {
++  count,
++  DECLARATION,
++  intent,
++  OBSERVATION,
++  observationRows,
++  PLATFORM,
++  PLATFORM_B,
++  REGISTRY,
++  resetData,
++  runRow,
++  SETTLED,
++  stage,
++} from './utils/g2-s10b-harness';
++import { blocked, json, quote, run, worker } from './utils/g2-s10b-pg-harness';
++import { SCOPE_1, SCOPE_2 } from './utils/g2-s10b-fixtures';
++import { RUN_REASON_CODES } from '../src/scout/lifecycle/reason-codes';
++import { S9_REASON_CODES } from '../src/scout/reconciliation/types';
++
++jest.setTimeout(300000);
++
++const COACH = 'coach';
++const OTHER = 'other-coach';
++
++const started = async (coach = COACH) => {
++  const intentId = intent(coach);
++  const start = await run({ action: 'start', coach, intent: intentId });
++  expect(start.failure).toBeUndefined();
++  return intentId;
++};
++const PLATFORMS = [
++  { source_platform: PLATFORM_B, account_scope_id_digests: [SCOPE_1] },
++  { source_platform: PLATFORM, account_scope_id_digests: [SCOPE_2, SCOPE_1] },
++];
++const declare = (intentId: string, platforms: unknown = PLATFORMS, coach = COACH) =>
++  run({ ...REGISTRY, action: 'declare', coach, intent: intentId, body: { platforms } });
++const observe = (intentId: string, evidence: Record<string, unknown>[] = [{}], coach = COACH) =>
++  run({ ...REGISTRY, action: 'observe', coach, intent: intentId, body: { evidence } });
++const complete = (intentId: string, extra: Record<string, unknown> = {}, coach = COACH) =>
++  run({ action: 'complete', coach, intent: intentId, ...extra });
++const status = (intentId: string, coach = COACH) =>
++  run({ action: 'status', coach, intent: intentId });
++
++/** The one settled-basis row of a run, or null. */
++const settledRow = (coach: string, intentId: string) =>
++  json(
++    `SELECT COALESCE((SELECT to_jsonb(s) FROM "${SETTLED}" s
++        WHERE coach_id=${quote(coach)} AND intent_id=${quote(intentId)}),'null')`,
++  );
++
++const isTerminalCas = (q: string) =>
++  /UPDATE "ScoutImport"/.test(q) && /SET terminal_status = /.test(q);
++const isBasisInsert = (q: string) => /INSERT INTO (?:"public"\.)?"ScoutRunSettledBasis"/.test(q);
++const isMarker = (q: string) => q.startsWith('-- tx:');
++const isLock = (q: string) => q.includes('FOR NO KEY UPDATE');
++/** INSERT/UPDATE/DELETE — the S9-C live spec's `isWrite` family. */
++const isWrite = (q: string) => /^\s*(INSERT|UPDATE|DELETE)\b/i.test(q);
++/** The S9-B collector's signature provenance read (the S9-C live spec's `isS9Read`). */
++const isS9Read = (q: string) =>
++  /^\s*SELECT/i.test(q) && /"ImportNativeProvenance"/.test(q) && /"source_namespace" IN \(/.test(q);
++
++/** A declared, staged and observed server run ready to be claimed. */
++async function readyRun(): Promise<string> {
++  const intentId = await started();
++  expect((await declare(intentId)).failure).toBeUndefined();
++  stage(COACH, intentId, 'clients', 'c1');
++  stage(COACH, intentId, 'clients', 'c2');
++  expect((await observe(intentId)).failure).toBeUndefined();
++  expect(count(DECLARATION)).toBe(3);
++  expect(count(OBSERVATION)).toBe(1);
++  return intentId;
++}
++
++/** Zero customer side effects in a worker run (D-S10-6 invariant 5, R38). */
++const noSideEffects = (r: { pushes: number; sideEffectLoads: Record<string, number> }) => {
++  expect(r.pushes).toBe(0);
++  expect(Object.values(r.sideEffectLoads).every((n) => n === 0)).toBe(true);
++};
++
++beforeEach(() => resetData());
++
++describe('R33 STRUCTURAL half only (not the live Complete verdict) — one terminal, one basis row, same transaction, after the CAS', () => {
++  it('complete → terminal from the S9 closed set + ONE ScoutRunSettledBasis row recording the settled report and the epoch digests', async () => {
++    const intentId = await readyRun();
++    const done = await complete(intentId);
++    expect(done.failure).toBeUndefined();
++    noSideEffects(done);
++
++    const row = runRow(COACH, intentId);
++    expect(row.terminal_status).not.toBeNull();
++    expect(row.fenced_at).toBeNull();
++    // D-S10-8: no new reason code. With no induction manifest on disk every basis is unknown, so
++    // the S9 predicate refuses coverage and the arbiter writes the S9 code — never `complete`.
++    expect(RUN_REASON_CODES).toContain(row.reason_code);
++    expect(S9_REASON_CODES).toContain(row.reason_code);
++    expect(row.terminal_status).not.toBe('complete');
++
++    expect(count(SETTLED)).toBe(1);
++    const basis = settledRow(COACH, intentId);
++    expect(basis.coach_id).toBe(COACH);
++    expect(basis.intent_id).toBe(intentId);
++    expect(basis.execution_epoch).toBe(row.execution_epoch);
++    expect(basis.report_version).toBe(1);
++    expect(basis.report.basis).toBe('settled');
++    expect(basis.report.report_version).toBe(1);
++    expect(Array.isArray(basis.report.families)).toBe(true);
++    expect(basis.report.conditions).toContain('coverage_basis_unknown');
++    // Invariant 2 in the record: an unknown basis never becomes a 0 count.
++    expect(basis.report.families.length).toBeGreaterThan(0);
++    for (const family of basis.report.families) {
++      expect(family.completeness_basis).toBe('none');
++      expect(family.observed_unique).toBeNull();
++    }
++    // The digests are exactly the stored observations of this run at the settle epoch.
++    const stored = observationRows(COACH, intentId)
++      .filter((o) => o.execution_epoch === row.execution_epoch)
++      .map((o) => o.evidence_digest)
++      .sort();
++    expect([...basis.observation_digests].sort()).toEqual(stored);
++    expect(stored.length).toBe(1);
++
++    // Same transaction, after the CAS: the INSERT follows the terminal UPDATE with no
++    // transaction marker between them, and the next marker is the commit.
++    const q: string[] = done.queries;
++    const cas = q.findIndex(isTerminalCas);
++    const insert = q.findIndex(isBasisInsert);
++    expect(cas).toBeGreaterThan(-1);
++    expect(insert).toBeGreaterThan(cas);
++    expect(q.slice(cas + 1, insert).some(isMarker)).toBe(false);
++    const nextMarker = q.slice(insert + 1).find(isMarker);
++    expect(nextMarker).toBe('-- tx:commit');
++    // The arbiter's UPDATE is the only terminal write and the only ScoutImport UPDATE after it.
++    expect(q.filter(isTerminalCas)).toHaveLength(1);
++    expect(q.filter(isBasisInsert)).toHaveLength(1);
++    // Invariant 6 live (review B-3; the S9-C tail assertion that survives D-S10-4): from the
++    // `FOR NO KEY UPDATE` lock to the CAS the tail issues NO write — the arbiter's CAS is the
++    // first write of the tail and the basis INSERT the only one after it.
++    const lockIndexes = q.map((x, i) => (isLock(x) ? i : -1)).filter((i) => i >= 0 && i < cas);
++    const lock = lockIndexes[lockIndexes.length - 1] ?? -1; // the tail's lock: the last before CAS
++    expect(lock).toBeGreaterThan(-1);
++    expect(lock).toBeLessThan(cas);
++    expect(q.slice(lock, cas).filter(isWrite)).toEqual([]);
++    expect(q.slice(lock, cas).some(isMarker)).toBe(false); // one tail transaction
++    expect(q.slice(cas + 1, insert).filter(isWrite)).toEqual([]);
++    expect(q.slice(insert + 1, q.indexOf('-- tx:commit', insert)).filter(isWrite)).toEqual([]);
++  });
++
++  it('a second claim after the terminal is refused and writes no second basis row (insert-only; one per run)', async () => {
++    const intentId = await readyRun();
++    expect((await complete(intentId)).failure).toBeUndefined();
++    const again = await complete(intentId);
++    expect(again.failure?.status).toBe(409);
++    expect(count(SETTLED)).toBe(1);
++    expect(again.queries.filter(isBasisInsert)).toHaveLength(0);
++  });
++});
++
++describe('R34 — S9 codes win; a fence wins; nothing else decides the terminal', () => {
++  it('claim partial → partial from the S9 set; still one basis row (a record, not a verdict)', async () => {
++    const intentId = await readyRun();
++    const done = await complete(intentId, { body: { terminal_status: 'partial' } });
++    expect(done.failure).toBeUndefined();
++    const row = runRow(COACH, intentId);
++    expect(row.terminal_status).toBe('partial');
++    expect(S9_REASON_CODES).toContain(row.reason_code);
++    expect(count(SETTLED)).toBe(1);
++  });
++
++  it('a fenced run: the fence writes the terminal and NO basis; a later claim is refused and writes none', async () => {
++    const intentId = await readyRun();
++    const fenced = await run({
++      action: 'fence',
++      coach: COACH,
++      intent: intentId,
++      body: { reason: 'revoked' },
++    });
++    expect(fenced.failure).toBeUndefined();
++    expect(fenced.queries.filter(isBasisInsert)).toHaveLength(0);
++    const row = runRow(COACH, intentId);
++    expect(row.fenced_at).not.toBeNull();
++    expect(row.reason_code).toBe('revoked');
++    expect(count(SETTLED)).toBe(0);
++    const late = await complete(intentId);
++    expect(late.failure?.status).toBe(409);
++    expect(count(SETTLED)).toBe(0);
++    expect(runRow(COACH, intentId).reason_code).toBe('revoked');
++  });
++});
++
++describe('R36 — CAS miss or insert failure: no terminal, no basis', () => {
++  it('an injected ScoutRunSettledBasis insert failure rolls the terminal back: terminal_status NULL, zero basis rows, no settle event', async () => {
++    const intentId = await readyRun();
++    const done = await complete(intentId, { failAfter: { model: 'scoutRunSettledBasis', n: 0 } });
++    expect(done.failure?.injected).toBe(true);
++    expect(done.queries).toContain('-- tx:rollback');
++    const row = runRow(COACH, intentId);
++    expect(row.terminal_status).toBeNull();
++    expect(row.reason_code).toBeNull();
++    expect(count(SETTLED)).toBe(0);
++    // analytics.capture(coach, event, props) is recorded as its argument list.
++    expect(done.events.filter((e: unknown[]) => /settled/i.test(String(e[1])))).toHaveLength(0);
++    // The run is still open: the next claim settles it normally, with exactly one basis row.
++    const retry = await complete(intentId);
++    expect(retry.failure).toBeUndefined();
++    expect(runRow(COACH, intentId).terminal_status).not.toBeNull();
++    expect(count(SETTLED)).toBe(1);
++  });
++
++  it('two concurrent claims: exactly one terminal write and exactly one basis row (the CAS loser inserts nothing)', async () => {
++    const intentId = await readyRun();
++    const a = worker({
++      action: 'complete',
++      coach: COACH,
++      intent: intentId,
++      pause: 'locked',
++      txTimeout: 60000,
++    });
++    await a.ready;
++    const b = worker({ action: 'complete', coach: COACH, intent: intentId });
++    await blocked(b.name);
++    a.resume();
++    const [ar, br] = await Promise.all([a.done, b.done]);
++    expect(String(ar.failure?.message ?? '')).not.toMatch(/deadlock/i);
++    expect(String(br.failure?.message ?? '')).not.toMatch(/deadlock/i);
++    expect(runRow(COACH, intentId).terminal_status).not.toBeNull();
++    expect(count(SETTLED)).toBe(1);
++    const inserts = [...ar.queries, ...br.queries].filter(isBasisInsert);
++    expect(inserts).toHaveLength(1);
++    // Both may attempt the CAS; the database lets exactly one succeed, and only that one inserts
++    // — carried by `count(SETTLED) === 1` and the single INSERT above.
++  });
++});
++
++describe('R35 / R37 — the status read prefers the settled basis and is byte-identical over time', () => {
++  it('R35: status after settle is the settled record — the world drifts between two reads, the report-derived fields do not, they equal the stored basis row, and no transaction or S9 read happens', async () => {
++    const intentId = await readyRun();
++    expect((await complete(intentId)).failure).toBeUndefined();
++    const first = await status(intentId);
++    expect(first.failure).toBeUndefined();
++    noSideEffects(first);
++    const basis = settledRow(COACH, intentId);
++    const clientsHolder = basis.report.families.find((f: any) =>
++      f.tokens.some((t: any) => t.token === 'clients'),
++    );
++    expect(clientsHolder).toBeDefined();
++    const clientsBefore = first.result.families.find((f: any) => f.family === 'clients');
++    expect(clientsBefore).toMatchObject({ staged_unique: 2, rejected: 2 });
++
++    // REAL DRIFT (review B-1): a third staged `clients` row lands after the settle. The live S7-L
++    // `staged_unique` (a groupBy) sees it; a RECOMPUTE would also reject it (`rejected` 3); the
++    // settled record must not move.
++    stage(COACH, intentId, 'clients', 'c3');
++    const again = await status(intentId);
++    expect(again.failure).toBeUndefined();
++    noSideEffects(again);
++    const clientsAfter = again.result.families.find((f: any) => f.family === 'clients');
++    expect(clientsAfter.staged_unique).toBe(3); // the drift is visible to the live half
++    expect(clientsAfter.rejected).toBe(2); // the report half is the settled record
++    expect(clientsAfter.reasons).toEqual(clientsHolder.reasons);
++    expect(clientsAfter.reasons.map((r: any) => r.count)).toEqual([2]);
++
++    // Every report-derived field is unchanged between the reads and equals the stored row.
++    const REPORT_KEYS = [
++      'canonical_family',
++      'completeness_basis',
++      'native_present_verified',
++      'observed_unique',
++      'qualifiers',
++      'reasons',
++      'rejected',
++      'relationship_closure',
++      'unresolved',
++    ];
++    const reportPart = (families: any[]) =>
++      JSON.stringify(
++        families.map((f: any) => Object.fromEntries(REPORT_KEYS.map((k) => [k, f[k] ?? null]))),
++      );
++    expect(reportPart(again.result.families)).toBe(reportPart(first.result.families));
++    for (const key of ['native_present_verified', 'rejected', 'unresolved', 'qualifiers']) {
++      expect(clientsAfter[key]).toEqual(clientsHolder[key]);
++    }
++    expect(clientsAfter.completeness_basis).toBe(clientsHolder.completeness_basis);
++    expect(clientsAfter.observed_unique).toBeNull(); // finding 7: unknown basis → null, never 0
++    expect(clientsHolder.observed_unique).toBeNull();
++
++    // The read path: ONE point read of the basis row; no transaction, no S9 recompute read
++    // (the S9-B collector's signature provenance statement), no write.
++    const basisRead = /FROM (?:"public"\.)?"ScoutRunSettledBasis"/;
++    expect(again.queries.filter((q: string) => basisRead.test(q))).toHaveLength(1);
++    expect(again.queries.filter((q: string) => q === '-- tx:begin')).toHaveLength(0);
++    expect(again.queries.filter(isS9Read)).toHaveLength(0);
++    expect(again.queries.filter(isWrite)).toHaveLength(0);
++    expect(again.queries.filter(isTerminalCas)).toHaveLength(0);
++    expect(again.queries.filter(isBasisInsert)).toHaveLength(0);
++  });
++
++  it('the other coach sees 404 for the run and reads no basis row', async () => {
++    const intentId = await readyRun();
++    expect((await complete(intentId)).failure).toBeUndefined();
++    const foreign = await status(intentId, OTHER);
++    expect(foreign.failure?.status).toBe(404);
++    expect(foreign.queries.some((q: string) => /"ScoutRunSettledBasis"/.test(q))).toBe(false);
++  });
++});
+diff --git a/test/rls-g2-s9c.spec.ts b/test/rls-g2-s9c.spec.ts
+index c4b4458d..d9c1995f 100644
+--- a/test/rls-g2-s9c.spec.ts
++++ b/test/rls-g2-s9c.spec.ts
+@@ -286,15 +286,26 @@ describe('R09 — the settle tail writes the S9 verdict (D-S9-1), never complete
+     const s9At = tail.findIndex(isS9Read);
+     const terminalAt = tail.findIndex(isTerminal);
+     expect(s9At).toBeGreaterThan(0);
+-    expect(terminalAt).toBe(tail.length - 1);
++    // S10-C (D-S10-4 "Settle write"): the terminal UPDATE is the LAST run-row statement of the
++    // tail; the only statements after it are the settled-basis record (one observation SELECT,
++    // one ScoutRunSettledBasis INSERT) in the same transaction. Superseded here: `terminalAt ===
++    // tail.length - 1`.
+     expect(s9At).toBeLessThan(terminalAt);
+     expect(tail.slice(0, terminalAt).filter(isWrite)).toEqual([]);
++    const afterTerminal = tail.slice(terminalAt + 1);
++    expect(afterTerminal.filter((q) => /"ScoutImport"/.test(q))).toEqual([]);
++    expect(afterTerminal.filter(isWrite)).toHaveLength(1);
++    expect(afterTerminal.filter(isWrite)[0]).toMatch(
++      /INSERT INTO (?:"public"\.)?"ScoutRunSettledBasis"/,
++    );
+     // The S9 reader runs on the SAME transaction as the lock: no S9 read outside the tail.
+     expect(done.queries.filter(isS9Read).length).toBe(tail.filter(isS9Read).length);
+-    // The verdict written IS the recomputed report's verdict (D-S9-1 == D-S9-5 basis).
++    // The verdict written IS the report's verdict (D-S9-1 == D-S9-5 basis). S10-C (D-S10-4
++    // "Status"): a run the settle tail recorded answers with its settled record, `basis:
++    // 'settled'` (superseded here: `'recomputed'`); the fence-path terminal below still recomputes.
+     const rep = await report(intentId);
+     expect(rep.failure).toBeUndefined();
+-    expect(rep.result).toMatchObject({ report_version: 1, basis: 'recomputed' });
++    expect(rep.result).toMatchObject({ report_version: 1, basis: 'settled' });
+     expect(rep.result.conditions[0]).toBe(row.reason_code);
+     expect(rep.result.conditions).toContain('coverage_basis_unknown'); // D-S9-3: unknown, never 0
+     expect(rep.result.conditions).not.toContain('unresolved_family'); // every token is mapped
+@@ -439,13 +450,15 @@ describe('R10(C) / R15 — recompute-on-read: the status carries the report addi
+       claimed_status: 'success',
+       reason_code: 'unresolved_identities',
+     });
+-    // One interactive read transaction (the D-S9-5 REPEATABLE READ recompute; the isolation
+-    // option itself is pinned by the unit spec), no lock, no write on the status path.
++    // No lock, no write on the status path. S10-C (D-S10-4 "Status"): the settle tail recorded
++    // this run's basis, so the status read returns it from ONE point read and opens no
++    // transaction (superseded here: one REPEATABLE READ recompute with an S9 read; that path is
++    // still taken, unchanged, by fence-path and pre-S10 terminals — see the RC-2 case above).
+     expect(first.queries.filter(isWrite)).toEqual([]);
+     expect(first.queries.filter(isLock)).toEqual([]);
+-    expect(first.queries.filter((q: string) => q === '-- tx:begin')).toHaveLength(1);
+-    expect(first.queries.filter((q: string) => q === '-- tx:commit')).toHaveLength(1);
+-    expect(segments(first.queries)[0].some(isS9Read)).toBe(true);
++    expect(first.queries.filter((q: string) => q === '-- tx:begin')).toEqual([]);
++    expect(first.queries.filter(isS9Read)).toEqual([]);
++    expect(first.queries.some((q: string) => /"ScoutRunSettledBasis"/.test(q))).toBe(true);
+     const provenanceBefore = provenanceRows(COACH);
+     const rep = await report(intentId);
+     const byToken = new Map<string, any>(first.result.families.map((f: any) => [f.family, f]));
+diff --git a/test/scout/induction/s10c-wiring.spec.ts b/test/scout/induction/s10c-wiring.spec.ts
+new file mode 100644
+index 00000000..4fe87fa3
+--- /dev/null
++++ b/test/scout/induction/s10c-wiring.spec.ts
+@@ -0,0 +1,85 @@
++import 'reflect-metadata';
++import { readdirSync, readFileSync, statSync } from 'fs';
++import { join, relative } from 'path';
++import { MODULE_METADATA } from '@nestjs/common/constants';
++import { ObservationModule } from '../../../src/scout/induction/observation.module';
++import { ObservationService } from '../../../src/scout/induction/observation.service';
++import { PrismaService } from '../../../src/prisma.service';
++import { ScoutModule } from '../../../src/scout/scout.module';
++import { S10_PURE_SPEC_PATH } from '../../fixtures/scout/s10_pure/s10-pure-signer';
++
++/**
++ * S10-C wiring (S10-DOC D-S10-7 row S10-C; D-S10-6 invariant 5 / R38 unit half; D-S10-8).
++ * The routes are mounted by importing the S10-B module into ScoutModule and nothing else; the
++ * settle / status path and the induction modules import no customer-facing side-effect module;
++ * and no source name reaches `src/`.
++ */
++
++const ROOT = join(__dirname, '..', '..', '..');
++const SRC = join(ROOT, 'src');
++
++function walk(dir: string): string[] {
++  return readdirSync(dir).flatMap((name) => {
++    const path = join(dir, name);
++    return statSync(path).isDirectory() ? walk(path) : path.endsWith('.ts') ? [path] : [];
++  });
++}
++
++/** The settle / status path S10-C touched (ScoutModule's pre-S10 NotificationsModule import is the
++ *  S7-L `import.complete` push of ScoutService, outside this path, and is not re-audited here). */
++const S10C_SETTLE_PATH = [
++  'src/scout/reconciliation/facts.service.ts',
++  'src/scout/lifecycle/lifecycle.service.ts',
++  'src/scout/reconciliation/types.ts',
++  'src/scout/reconciliation/reconcile.ts',
++  'src/scout/reconciliation/coverage.ts',
++  'src/scout/lifecycle/arbiter.ts',
++];
++const INDUCTION_DIR = join(SRC, 'scout', 'induction');
++const SIDE_EFFECT_IMPORT = /from\s+'[^']*(notification|drip|email|mail|messag|sms|push)[^']*'/i;
++
++/** The fixture slug lives in test/fixtures only; the mapping spec's own name is the truth. */
++const FIXTURE_SLUG = String(JSON.parse(readFileSync(S10_PURE_SPEC_PATH, 'utf8')).sourcePlatform);
++
++describe('S10-C module registration', () => {
++  it('ScoutModule imports ObservationModule (the routes are mounted), alongside its S9-C imports', () => {
++    const imports: unknown[] = Reflect.getMetadata(MODULE_METADATA.IMPORTS, ScoutModule) ?? [];
++    expect(imports).toContain(ObservationModule);
++    expect(imports.filter((m) => m === ObservationModule)).toHaveLength(1);
++  });
++
++  it('ObservationModule imports no module at all (self-contained; invariant 5)', () => {
++    const imports: unknown[] =
++      Reflect.getMetadata(MODULE_METADATA.IMPORTS, ObservationModule) ?? [];
++    expect(imports).toEqual([]);
++  });
++
++  it('ObservationModule declares no PrismaService provider: it uses the @Global PrismaModule client (review B A1)', () => {
++    const providers: unknown[] =
++      Reflect.getMetadata(MODULE_METADATA.PROVIDERS, ObservationModule) ?? [];
++    expect(providers).not.toContain(PrismaService);
++    expect(providers).toContain(ObservationService);
++    const source = readFileSync(join(SRC, 'scout', 'induction', 'observation.module.ts'), 'utf8');
++    expect(source).not.toMatch(/prisma\.service/);
++  });
++});
++
++describe('S10-C D-S10-6 invariant 5 / R38 (unit half): no customer side-effect import', () => {
++  const files = [...S10C_SETTLE_PATH.map((f) => join(ROOT, f)), ...walk(INDUCTION_DIR)];
++
++  it.each(files.map((f) => [relative(ROOT, f)]))('%s', (file) => {
++    const text = readFileSync(join(ROOT, file), 'utf8');
++    for (const line of text.split('\n')) {
++      if (!line.trimStart().startsWith('import') && !line.includes('require(')) continue;
++      expect(line).not.toMatch(SIDE_EFFECT_IMPORT);
++    }
++  });
++});
++
++describe('S10-C D-S10-8: no source-name literal in src/**/*.ts', () => {
++  it(`the fixture slug appears in no src file`, () => {
++    expect(FIXTURE_SLUG.length).toBeGreaterThan(0);
++    const offenders = walk(SRC).filter((f) => readFileSync(f, 'utf8').includes(FIXTURE_SLUG));
++    expect(offenders.map((f) => relative(ROOT, f))).toEqual([]);
++  });
++});
+diff --git a/test/scout/lifecycle/lifecycle.service.spec.ts b/test/scout/lifecycle/lifecycle.service.spec.ts
+index edbc3aa4..ddc4d2b4 100644
+--- a/test/scout/lifecycle/lifecycle.service.spec.ts
++++ b/test/scout/lifecycle/lifecycle.service.spec.ts
+@@ -55,6 +55,10 @@ interface Doubles {
+   executeRaw: jest.Mock;
+   transaction: jest.Mock;
+   capture: jest.Mock;
++  // S10-C (D-S10-4): the settled-basis record and the evidence digests it carries.
++  observationFindMany: jest.Mock;
++  basisCreate: jest.Mock;
++  basisFindUnique: jest.Mock;
+ }
+ 
+ function makeDoubles(): Doubles {
+@@ -68,6 +72,9 @@ function makeDoubles(): Doubles {
+     executeRaw: jest.fn(),
+     transaction: jest.fn(),
+     capture: jest.fn(),
++    observationFindMany: jest.fn().mockResolvedValue([]),
++    basisCreate: jest.fn().mockResolvedValue({}),
++    basisFindUnique: jest.fn().mockResolvedValue(null),
+   };
+   // Interactive $transaction(fn) hands the callback a tx that shares the raw doubles.
+   d.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+@@ -77,6 +84,8 @@ function makeDoubles(): Doubles {
+       scoutImportCompletion: { findUnique: d.completionFindUnique },
+       scoutIngestEntity: { groupBy: jest.fn().mockResolvedValue([]) },
+       scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++      scoutRunObservation: { findMany: d.observationFindMany },
++      scoutRunSettledBasis: { create: d.basisCreate },
+     }),
+   );
+   return d;
+@@ -88,6 +97,7 @@ function makeService(d: Doubles): ScoutLifecycleService {
+     scoutImport: { findUnique: d.runFindUnique, create: d.runCreate },
+     scoutImportCompletion: { findUnique: d.completionFindUnique },
+     scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++    scoutRunSettledBasis: { findUnique: d.basisFindUnique },
+     $transaction: d.transaction,
+   });
+   const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, {
+@@ -558,6 +568,7 @@ describe('ScoutLifecycleService', () => {
+       scoutImport: { findUnique: d.runFindUnique, create: d.runCreate },
+       scoutImportCompletion: { findUnique: d.completionFindUnique },
+       scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++      scoutRunSettledBasis: { findUnique: d.basisFindUnique },
+       $transaction: d.transaction,
+     });
+     const analytics = Object.assign(Object.create(AnalyticsService.prototype) as AnalyticsService, {
+@@ -633,6 +644,7 @@ describe('ScoutLifecycleService', () => {
+     fenced_at: null,
+     fence_reason: null,
+     deadline_at: null,
++    accepted_start_at: new Date('2026-09-24T10:00:00.000Z'), // S10-C: the evaluator binding
+   };
+   const terminalWrites = (d: Doubles) =>
+     d.executeRaw.mock.calls.filter((c: unknown[]) =>
+@@ -660,7 +672,12 @@ describe('ScoutLifecycleService', () => {
+       });
+       expect(s9.reconstructRun).toHaveBeenCalledTimes(1);
+       expect(s9.collect).toHaveBeenCalledTimes(1);
+-      expect(s9.collect.mock.calls[0].slice(1)).toEqual([COACH, INTENT]);
++      // S10-C: the collector receives the locked row's binding (D-S10-3 E1) — no run-row read of its own.
++      expect(s9.collect.mock.calls[0].slice(1)).toEqual([
++        COACH,
++        INTENT,
++        { mode: 'server', execution_epoch: 1, accepted_start_at: lockedOpen.accepted_start_at },
++      ]);
+       // The facts service reads on the SAME transaction client the tail holds (D-S9-1), not on prisma.
+       expect(s9.collect.mock.calls[0][0]).toHaveProperty('$executeRaw', d.executeRaw);
+       const writes = terminalWrites(d);
+@@ -1242,4 +1259,383 @@ describe('ScoutLifecycleService', () => {
+       expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+     });
+   });
++
++  // ── S10-C (docs/decisions/2026-09-26-s10-induction.md D-S10-4, D-S10-6, D-S10-7 row S10-C) ──
++
++  describe('S10-C settle write: the settled basis is a record after the CAS (D-S10-4, R33, R36)', () => {
++    const settledReport = (f: ReconciliationFacts): ReconciliationReportV1 => ({
++      ...reconcile(f).report,
++      basis: 'settled',
++    });
++
++    it('R33 structural half: one terminal CAS, then ONE basis insert on the SAME transaction, carrying the settled report and the epoch digests', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      d.observationFindMany.mockResolvedValue([
++        { evidence_digest: 'a'.repeat(64) },
++        { evidence_digest: 'b'.repeat(64) },
++      ]);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(terminalWrites(d)).toHaveLength(1);
++      expect(d.basisCreate).toHaveBeenCalledTimes(1);
++      // Order inside the transaction: lock → collect → CAS → basis insert.
++      const cas = d.executeRaw.mock.invocationCallOrder[0];
++      const insert = d.basisCreate.mock.invocationCallOrder[0];
++      expect(insert).toBeGreaterThan(cas);
++      expect(insert).toBeGreaterThan(s9.collect.mock.invocationCallOrder[0]);
++      expect(d.transaction).toHaveBeenCalledTimes(1); // one settle transaction, not a second one
++      const data = d.basisCreate.mock.calls[0][0].data;
++      expect(data).toMatchObject({
++        coach_id: COACH,
++        intent_id: INTENT,
++        execution_epoch: 1,
++        report_version: 1,
++        observation_digests: ['a'.repeat(64), 'b'.repeat(64)],
++      });
++      expect(data.settled_at).toBeInstanceOf(Date);
++      expect(data.report).toEqual(settledReport(MIXED));
++      expect(data.report.basis).toBe('settled');
++      // The digests are THIS coach's rows at THIS epoch only (C-note: old epoch ignored).
++      expect(d.observationFindMany).toHaveBeenCalledTimes(1);
++      expect(d.observationFindMany.mock.calls[0][0].where).toEqual({
++        coach_id: COACH,
++        intent_id: INTENT,
++        execution_epoch: 1,
++      });
++      // The run row is not touched again: the arbiter's UPDATE is the only raw write (invariant 6).
++      expect(d.executeRaw).toHaveBeenCalledTimes(1);
++    });
++
++    it('R36: a CAS miss (0 rows) writes no basis and settles nothing', async () => {
++      const { service: svc } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(0);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(terminalWrites(d)).toHaveLength(1);
++      expect(d.basisCreate).not.toHaveBeenCalled();
++      expect(d.observationFindMany).not.toHaveBeenCalled();
++      expect(d.capture).not.toHaveBeenCalledWith(
++        COACH,
++        Events.SCOUT_RUN_SETTLED,
++        expect.anything(),
++      );
++    });
++
++    it('R36: an already-terminal or foreign-epoch lock row reaches neither the CAS nor the insert', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValueOnce([{ ...lockedOpen, terminal_status: 'partial' }]);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      d.queryRaw.mockResolvedValueOnce([{ ...lockedOpen, execution_epoch: 2 }]);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(s9.collect).not.toHaveBeenCalled();
++      expect(d.executeRaw).not.toHaveBeenCalled();
++      expect(d.basisCreate).not.toHaveBeenCalled();
++    });
++
++    it('R36: an insert failure propagates out of the settle transaction (rolling the terminal back with it), is not retried, and emits no settle event', async () => {
++      const { service: svc } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      const boom = new Error('fixture injected insert failure');
++      d.basisCreate.mockRejectedValue(boom);
++      await expect(svc.onTransferSettled(COACH, INTENT, 1)).rejects.toBe(boom);
++      expect(d.transaction).toHaveBeenCalledTimes(1); // only P2034 is retried (S9-C A-1)
++      expect(d.capture).not.toHaveBeenCalledWith(
++        COACH,
++        Events.SCOUT_RUN_SETTLED,
++        expect.anything(),
++      );
++    });
++
++    it('R34: a fence on the locked row still wins; the basis records the S9 report the fenced terminal was decided beside', async () => {
++      const { service: svc } = wired(d, MIXED);
++      d.queryRaw.mockResolvedValue([
++        { ...lockedOpen, fenced_at: new Date(), fence_reason: 'cancelled' },
++      ]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(flatArgs(terminalWrites(d)[0])).toEqual(
++        expect.arrayContaining(['cancelled', 'cancelled_by_coach']),
++      );
++      expect(d.basisCreate).toHaveBeenCalledTimes(1);
++      expect(d.basisCreate.mock.calls[0][0].data.report).toEqual(settledReport(MIXED));
++    });
++
++    it('R34 / D-S10-8: a claim that is not success settles partial / coverage_basis_unknown from the S9 set — no new code', async () => {
++      const clean = facts([family('workouts', [identity('routines', 1, verified)])], 'partial');
++      const { service: svc } = wired(d, clean);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'partial' });
++      d.executeRaw.mockResolvedValue(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      const args = flatArgs(terminalWrites(d)[0]);
++      expect(args).toEqual(expect.arrayContaining(['partial', 'coverage_basis_unknown']));
++      expect(args).not.toContain('complete');
++      expect(isRunReasonCode('coverage_basis_unknown')).toBe(true);
++      expect(d.basisCreate.mock.calls[0][0].data.report.conditions).toContain(
++        'coverage_basis_unknown',
++      );
++    });
++
++    it('invariant 1: a known, covering basis with a success claim and clean natives is the only way to complete — and then the basis row says so', async () => {
++      const proven: ReconciliationFacts = {
++        ...facts([family('workouts', [identity('routines', 1, verified)])]),
++        coverage: {
++          workouts: {
++            known: true,
++            basis_kind: 'source_signed_enumeration',
++            observed_unique: 1,
++            covers_staged_identities: true,
++          },
++        },
++      };
++      const { service: svc } = wired(d, proven);
++      d.queryRaw.mockResolvedValue([lockedOpen]);
++      d.completionFindUnique.mockResolvedValue({ terminal_status: 'success' });
++      d.executeRaw.mockResolvedValue(1);
++      await svc.onTransferSettled(COACH, INTENT, 1);
++      expect(flatArgs(terminalWrites(d)[0])).toEqual(expect.arrayContaining(['complete', null]));
++      const stored = d.basisCreate.mock.calls[0][0].data.report as ReconciliationReportV1;
++      expect(stored.conditions).toEqual([]);
++      expect(stored.families[0]).toMatchObject({
++        completeness_basis: 'source_signed_enumeration',
++        observed_unique: 1,
++      });
++      // Same facts with `covers: false` (R23 terminal half) → partial / coverage_basis_unknown.
++      const provenWorkouts = proven.coverage!.workouts;
++      if (!provenWorkouts.known) throw new Error('fixture: workouts coverage must be known');
++      const notCovering: ReconciliationFacts = {
++        ...proven,
++        coverage: { workouts: { ...provenWorkouts, covers_staged_identities: false } },
++      };
++      expect(reconcile(notCovering).verdict).toEqual({
++        outcome: 'partial',
++        reason_code: 'coverage_basis_unknown',
++      });
++      expect(reconcile(notCovering).report.families[0]).toMatchObject({
++        completeness_basis: 'none',
++        observed_unique: 1, // the count stays a shown fact; the basis is not trusted
++      });
++    });
++  });
++
++  describe('S10-C status read: settled basis preferred, S9 recompute otherwise (D-S10-4 "Status", R35, R37)', () => {
++    const settledServer = (over: Partial<RunRow> = {}) =>
++      openRun({
++        phase: 'reconciling',
++        terminal_status: 'partial',
++        reason_code: 'unresolved_identities',
++        ...over,
++      });
++    const storedRow = (report: unknown, report_version = 1) => ({ report_version, report });
++
++    it('returns the settled report verbatim with basis settled, on one coach-scoped point read, opening no transaction', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      const recorded = { ...reconcile(MIXED).report, basis: 'settled' as const };
++      d.basisFindUnique.mockResolvedValue(storedRow(recorded));
++      const report = await svc.readReport(COACH, INTENT, settledServer());
++      expect(report).toBe(recorded);
++      expect(report?.basis).toBe('settled');
++      expect(d.basisFindUnique).toHaveBeenCalledTimes(1);
++      expect(d.basisFindUnique.mock.calls[0][0].where).toEqual({
++        coach_id_intent_id: { coach_id: COACH, intent_id: INTENT },
++      });
++      expect(d.transaction).not.toHaveBeenCalled();
++      expect(s9.collect).not.toHaveBeenCalled();
++      expect(d.executeRaw).not.toHaveBeenCalled();
++    });
++
++    it('R35: the settled report does not change when the recompute would (a native row archived later)', async () => {
++      const recorded = { ...reconcile(MIXED).report, basis: 'settled' as const };
++      d.basisFindUnique.mockResolvedValue(storedRow(recorded));
++      // The live facts have drifted: the previously verified identity is now unresolved.
++      const drifted = facts([
++        family('workouts', [
++          identity('routines', 1, skipped('unresolved:native_missing')),
++          identity('routines', 2, skipped('unresolved:missing_required_field:name')),
++        ]),
++      ]);
++      const { service: svc } = wired(d, drifted);
++      const first = await svc.readReport(COACH, INTENT, settledServer());
++      const again = await svc.readReport(COACH, INTENT, settledServer());
++      expect(JSON.stringify(first)).toBe(JSON.stringify(again));
++      expect(JSON.stringify(first)).toBe(JSON.stringify(recorded));
++      expect(JSON.stringify(first)).not.toBe(JSON.stringify(reconcile(drifted).report));
++    });
++
++    it('without a basis row the S9-C recompute answers, byte-identical, with basis recomputed', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      const report = await svc.readReport(COACH, INTENT, settledServer());
++      expect(d.basisFindUnique).toHaveBeenCalledTimes(1);
++      expect(d.transaction).toHaveBeenCalledTimes(1);
++      expect(d.transaction.mock.calls[0][1]).toBe(S9_SNAPSHOT_TX_OPTIONS);
++      expect(s9.collect).toHaveBeenCalledTimes(1);
++      // Review A-1 / D-S10-4 L265-272: the no-basis recompute hands the collector NO run binding
++      // (exactly the S9-C call), so coverage stays unknown and no S10 evidence is read; a report
++      // that was never settled on evidence is never changed by later or backfilled evidence.
++      expect(s9.collect.mock.calls[0]).toHaveLength(3);
++      expect(s9.collect.mock.calls[0].slice(1)).toEqual([COACH, INTENT]);
++      expect(report?.basis).toBe('recomputed');
++      expect(JSON.stringify(report)).toBe(JSON.stringify(reconcile(MIXED).report));
++    });
++
++    it('review A-1: a fence-path terminal (no settled record) keeps the S9-C report — basis recomputed, coverage_basis_unknown, no binding', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      const fencedTerminal = settledServer({
++        terminal_status: 'cancelled',
++        reason_code: 'cancelled_by_coach',
++        fenced_at: new Date('2026-09-24T10:05:00.000Z'),
++        fence_reason: 'cancelled',
++        execution_epoch: 2,
++      });
++      const report = await svc.readReport(COACH, INTENT, fencedTerminal);
++      expect(d.basisFindUnique).toHaveBeenCalledTimes(1);
++      expect(s9.collect.mock.calls[0]).toHaveLength(3);
++      expect(report).toMatchObject({ report_version: 1, basis: 'recomputed' });
++      expect(report?.conditions).toContain('coverage_basis_unknown');
++      for (const fam of report?.families ?? []) {
++        expect(fam.observed_unique).toBeNull();
++        expect(fam.completeness_basis).toBe('none');
++      }
++      expect(d.basisCreate).not.toHaveBeenCalled();
++      expect(d.executeRaw).not.toHaveBeenCalled();
++    });
++
++    it('a stored value that is not a version-1 settled report is never reinterpreted: the recompute answers', async () => {
++      const recorded = reconcile(MIXED).report;
++      for (const row of [
++        storedRow(recorded), // basis 'recomputed' stored: not a settled record
++        storedRow({ ...recorded, basis: 'settled' }, 2),
++        storedRow({ ...recorded, basis: 'settled', families: 'nope' }),
++        storedRow(null),
++        storedRow('settled'),
++      ]) {
++        d = makeDoubles();
++        d.basisFindUnique.mockResolvedValue(row);
++        const { service: svc, s9 } = wired(d, MIXED);
++        const report = await svc.readReport(COACH, INTENT, settledServer());
++        expect(s9.collect).toHaveBeenCalledTimes(1);
++        expect(report?.basis).toBe('recomputed');
++      }
++    });
++
++    it('R37: no report applies → null without a basis read, a transaction or a collect', async () => {
++      const { service: svc, s9 } = wired(d, MIXED);
++      await expect(svc.readReport(COACH, INTENT, openRun())).resolves.toBeNull();
++      await expect(
++        svc.readReport(COACH, INTENT, openRun({ mode: 'legacy', terminal_status: 'success' })),
++      ).resolves.toBeNull();
++      await expect(
++        svc.readReport(
++          COACH,
++          INTENT,
++          settledServer({ reason_code: 'reconciliation_not_performed' }),
++        ),
++      ).resolves.toBeNull();
++      expect(d.basisFindUnique).not.toHaveBeenCalled();
++      expect(d.transaction).not.toHaveBeenCalled();
++      expect(s9.collect).not.toHaveBeenCalled();
++    });
++
++    it('isSettledReport accepts exactly the stored shape', () => {
++      const ok = { ...reconcile(MIXED).report, basis: 'settled' };
++      expect(ScoutLifecycleService.isSettledReport(ok)).toBe(true);
++      expect(ScoutLifecycleService.isSettledReport({ ...ok, required_families: null })).toBe(true);
++      expect(ScoutLifecycleService.isSettledReport({ ...ok, basis: 'recomputed' })).toBe(false);
++      expect(ScoutLifecycleService.isSettledReport({ ...ok, report_version: '1' })).toBe(false);
++      expect(ScoutLifecycleService.isSettledReport({ ...ok, conditions: null })).toBe(false);
++      expect(ScoutLifecycleService.isSettledReport({ ...ok, ledger_without_staged: null })).toBe(
++        false,
++      );
++      expect(ScoutLifecycleService.isSettledReport([ok])).toBe(false);
++      expect(ScoutLifecycleService.isSettledReport(undefined)).toBe(false);
++    });
++  });
++
++  describe('S10-C finding-7 projection rule: observed_unique (R37)', () => {
++    const STAGED = [
++      { entity_type: 'routines', _count: { _all: 2 } },
++      { entity_type: 'sessions', _count: { _all: 1 } },
++    ];
++    /** A report family holding `tokens` with a recorded `observed_unique`. */
++    const holder = (
++      name: string,
++      tokens: readonly string[],
++      observed: number | null,
++      mapped = true,
++    ): ReconciliationFamilyV1 => {
++      const base = reconcile(MIXED).report.families.find((f) => f.family === 'workouts')!;
++      return {
++        ...base,
++        family: name,
++        mapped,
++        observed_unique: observed,
++        completeness_basis: observed === null ? 'none' : 'source_signed_enumeration',
++        tokens: tokens.map((token) => ({ ...base.tokens[0], token })),
++      };
++    };
++    const report = (
++      families: ReconciliationFamilyV1[],
++      basis: 'settled' | 'recomputed' = 'settled',
++    ): ReconciliationReportV1 => ({ ...reconcile(MIXED).report, basis, families });
++    const observedOf = (r: ReconciliationReportV1, token = 'routines') =>
++      ScoutLifecycleService.projectFamilies(STAGED, {}, r).find((f) => f.family === token)!
++        .observed_unique;
++
++    it('fills observed_unique from a settled report when the token IS the family: one mapped holder, its only token, non-null', () => {
++      expect(observedOf(report([holder('workouts', ['routines'], 3)]))).toBe(3);
++      // A verified EMPTY enumeration is a fact of 0, not an unknown (D-S10-3 R26).
++      expect(observedOf(report([holder('workouts', ['routines'], 0)]))).toBe(0);
++    });
++
++    it('stays null under a recomputed report (S9-C behaviour, byte-identical)', () => {
++      const r = report([holder('workouts', ['routines'], 3)], 'recomputed');
++      expect(observedOf(r)).toBeNull();
++      const out = ScoutLifecycleService.projectFamilies(STAGED, {}, r);
++      expect(out.find((f) => f.family === 'routines')).not.toHaveProperty('observed_unique', 3);
++    });
++
++    it('stays null when the family holds more than one token: the family count is not the token count', () => {
++      const r = report([holder('workouts', ['routines', 'sessions'], 3)]);
++      expect(observedOf(r, 'routines')).toBeNull();
++      expect(observedOf(r, 'sessions')).toBeNull();
++      // The other S9 fields are still filled (no regression of the S9-C projection).
++      const routines = ScoutLifecycleService.projectFamilies(STAGED, {}, r)[0];
++      expect(routines).toHaveProperty('canonical_family', 'workouts');
++      expect(routines).toHaveProperty('completeness_basis', 'source_signed_enumeration');
++    });
++
++    it('stays null for an unmapped holder, two holders, or a null observation', () => {
++      expect(observedOf(report([holder('routines', ['routines'], 3, false)]))).toBeNull();
++      expect(
++        observedOf(report([holder('workouts', ['routines'], 3), holder('notes', ['routines'], 1)])),
++      ).toBeNull();
++      expect(observedOf(report([holder('workouts', ['routines'], null)]))).toBeNull();
++    });
++
++    it('a token the report does not carry keeps the S7-L shape: null, no additive key', () => {
++      const [, sessions] = ScoutLifecycleService.projectFamilies(
++        STAGED,
++        {},
++        report([holder('workouts', ['routines'], 3)]),
++      );
++      expect(sessions.family).toBe('sessions');
++      expect(sessions.observed_unique).toBeNull();
++      expect(sessions).not.toHaveProperty('completeness_basis');
++    });
++
++    it('observedUniqueFor is the rule, spelled once', () => {
++      const h = holder('workouts', ['routines'], 2);
++      expect(ScoutLifecycleService.observedUniqueFor('routines', report([h]), [h])).toBe(2);
++      expect(
++        ScoutLifecycleService.observedUniqueFor('routines', report([h], 'recomputed'), [h]),
++      ).toBeNull();
++      expect(ScoutLifecycleService.observedUniqueFor('sessions', report([h]), [h])).toBeNull();
++    });
++  });
+ });
+diff --git a/test/scout/orchestration/settle-hook.spec.ts b/test/scout/orchestration/settle-hook.spec.ts
+index b5bb4b6d..36488beb 100644
+--- a/test/scout/orchestration/settle-hook.spec.ts
++++ b/test/scout/orchestration/settle-hook.spec.ts
+@@ -116,6 +116,9 @@ function make(lockedRow: LockedRow | null) {
+     scoutImportCompletion: { findUnique: d.completionFindUnique },
+     scoutIngestEntity: { groupBy: d.stagedGroupBy },
+     scoutReconstructionLedger: { groupBy: d.ledgerGroupBy },
++    // S10-C: the settle transaction also writes the settled basis (D-S10-6); no observations here.
++    scoutRunObservation: { findMany: jest.fn(async () => []) },
++    scoutRunSettledBasis: { create: jest.fn(async () => ({})) },
+   };
+   const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, {
+     scoutImport: { findUnique: d.runFindUnique },
+@@ -166,6 +169,7 @@ describe('onTransferSettled — S8-G body', () => {
+       expect.objectContaining({ $queryRaw: d.queryRaw }),
+       COACH,
+       INTENT,
++      expect.objectContaining({ mode: 'server', execution_epoch: 1 }), // S10-C run context
+     );
+     expect(terminalCall(d)?.slice(1)).toEqual(
+       expect.arrayContaining(['partial', 'partial', 'coverage_basis_unknown', COACH, INTENT, 1]),
+diff --git a/test/scout/reconciliation/facts.service.coverage.spec.ts b/test/scout/reconciliation/facts.service.coverage.spec.ts
+new file mode 100644
+index 00000000..f904c10d
+--- /dev/null
++++ b/test/scout/reconciliation/facts.service.coverage.spec.ts
+@@ -0,0 +1,651 @@
++import { existsSync, readFileSync } from 'fs';
++import { join } from 'path';
++import {
++  buildInductionRegistry,
++  INDUCTION_MANIFESTS_DIR,
++  loadInductionManifests,
++  type InductionRegistry,
++} from '../../../src/scout/induction/manifest-registry';
++import { EMPTY_IDENTITY_SET_DIGEST, identitySetDigest } from '../../../src/scout/induction/digest';
++import { parseSourceMappingSpec } from '../../../src/scout/reconstruct/mapping-spec';
++import { parseNativeRuleSet } from '../../../src/scout/reconstruct/native/native-rules';
++import { buildNativeRuleRegistry } from '../../../src/scout/reconstruct/native/native-rule-registry';
++import { buildSourceMapperRegistry } from '../../../src/scout/reconstruct/source-mapper-registry';
++import {
++  ReconciliationFactsService,
++  resolveFamily,
++  stagedPlatformFacts,
++  type FactsDb,
++  type RunBinding,
++} from '../../../src/scout/reconciliation/facts.service';
++import { reconcile } from '../../../src/scout/reconciliation/reconcile';
++import { coverageConditionHolds, familyCoverage } from '../../../src/scout/reconciliation/coverage';
++import { S9_REASON_CODES } from '../../../src/scout/reconciliation/types';
++import { RUN_REASON_CODES } from '../../../src/scout/lifecycle/reason-codes';
++import {
++  evidenceFor,
++  referenceIdDigest,
++  S10_PURE_MANIFESTS_DIR,
++  S10_PURE_SPEC_PATH,
++  sha256,
++  type StatementFields,
++} from '../../fixtures/scout/s10_pure/s10-pure-signer';
++
++/**
++ * S10-C — the facts service's coverage half (S10-DOC D-S10-3 E6, D-S10-6 invariants 1–4, 7;
++ * D-S10-7 row S10-C; R23 terminal half, R27 production-grouping half, R30 old epoch, C-notes
++ * "old epoch ignored at settle" and "coach-scoped observation reads"). The synthetic
++ * `s10_unseen` package and signer live under test/fixtures only; `src/` never names them.
++ */
++
++type Family = 'clients' | 'programs' | 'workouts';
++const FAMILIES: readonly Family[] = ['clients', 'programs', 'workouts'];
++const IDS: Record<Family, string[]> = {
++  clients: ['c1', 'c2'],
++  programs: ['p1'],
++  workouts: ['w1', 'w2', 'w3'],
++};
++/** Staged tokens of the fixture spec (`steps`): two tokens share the `workouts` id space. */
++const TOKENS: Record<string, Family> = {
++  members: 'clients',
++  plans: 'programs',
++  routines: 'workouts',
++  sessions: 'workouts',
++};
++
++const SPEC_RAW: Record<string, unknown> = JSON.parse(readFileSync(S10_PURE_SPEC_PATH, 'utf8'));
++const SLUG = String(SPEC_RAW.sourcePlatform);
++const COACH = 'coach-a';
++const OTHER = 'coach-b';
++const INTENT = 'intent-1';
++const EPOCH = 3;
++const SCOPE = sha256('workspace-1');
++const CHALLENGE = Buffer.alloc(32, 9);
++const ACCEPTED = new Date('2026-09-26T09:00:00Z');
++const RECEIVED = new Date('2026-09-26T11:00:00Z');
++
++const SPEC = parseSourceMappingSpec(SPEC_RAW, `${SLUG}.json`);
++const REGISTRY: InductionRegistry = buildInductionRegistry({
++  manifests: loadInductionManifests(S10_PURE_MANIFESTS_DIR),
++  specs: [SPEC],
++  nativeRuleSets: [],
++});
++const SPEC_DIGEST = REGISTRY.packages.get(SLUG)?.specDigest ?? 'missing';
++const MAPPERS = buildSourceMapperRegistry([SPEC]);
++
++// ── In-memory Prisma double (reads only) ─────────────────────────────────────────────────────
++
++type Row = Record<string, any>;
++const READS = new Set(['findMany', 'findUnique']);
++const TABLES = [
++  'scoutImportCompletion',
++  'scoutIngestEntity',
++  'scoutReconstructionLedger',
++  'importNativeProvenance',
++  'person',
++  'workoutProgram',
++  'workoutPlan',
++  'workoutPlanExercise',
++  'scoutRunDeclaration',
++  'scoutRunObservation',
++];
++
++class FakeDb {
++  readonly tables: Record<string, Row[]> = Object.fromEntries(TABLES.map((t) => [t, []]));
++  readonly calls: Array<{ model: string; method: string; where: Row }> = [];
++  private seq = 0;
++
++  add(model: string, row: Row): Row {
++    const withId = { id: row.id ?? `${model}-${String(++this.seq).padStart(6, '0')}`, ...row };
++    this.tables[model].push(withId);
++    return withId;
++  }
++
++  client(): FactsDb {
++    const db: Row = {};
++    for (const model of TABLES) {
++      db[model] = new Proxy(
++        {},
++        {
++          get: (_t, method: string) => {
++            if (!READS.has(method))
++              throw new Error(`S9/S10 facts must not call ${model}.${method} (reads only)`);
++            return (args: Row) => this.query(model, method, args);
++          },
++        },
++      );
++    }
++    return db as FactsDb;
++  }
++
++  private matches(row: Row, where: Row): boolean {
++    for (const [key, cond] of Object.entries(where)) {
++      if (key === 'coach_id_intent_id') {
++        if (row.coach_id !== cond.coach_id || row.intent_id !== cond.intent_id) return false;
++      } else if (cond !== null && typeof cond === 'object' && 'in' in cond) {
++        if (!cond.in.includes(row[key])) return false;
++      } else if (row[key] !== cond) return false;
++    }
++    return true;
++  }
++
++  private query(model: string, method: string, args: Row): Promise<any> {
++    this.calls.push({ model, method, where: args.where ?? {} });
++    let rows = this.tables[model].filter((r) => this.matches(r, args.where ?? {}));
++    if (method === 'findUnique') return Promise.resolve(rows[0] ?? null);
++    if (args.orderBy?.id === 'asc') rows = [...rows].sort((a, b) => (a.id < b.id ? -1 : 1));
++    if (args.cursor !== undefined) {
++      const at = rows.findIndex((r) => r.id === args.cursor.id);
++      rows = rows.slice(at + (args.skip ?? 0));
++    }
++    if (args.take !== undefined) rows = rows.slice(0, args.take);
++    const select = args.select as Row | undefined;
++    return Promise.resolve(
++      rows.map((r) =>
++        select === undefined
++          ? { ...r }
++          : Object.fromEntries(Object.keys(select).map((k) => [k, r[k] ?? null])),
++      ),
++    );
++  }
++}
++
++// ── Fixtures ─────────────────────────────────────────────────────────────────────────────────
++
++/** `'default'` = construct WITHOUT a `registry` option (production wiring); else the given one. */
++const service = (registry: InductionRegistry | 'default' = REGISTRY) =>
++  new ReconciliationFactsService({
++    sourceMappers: MAPPERS,
++    nativeRules: buildNativeRuleRegistry([]),
++    ...(registry === 'default' ? {} : { registry }),
++  });
++
++/** The binding the settle tail / status read hand the collector (D-S10-3 E1): the CALLER's row. */
++const RUN: RunBinding = { mode: 'server', execution_epoch: EPOCH, accepted_start_at: ACCEPTED };
++
++/** `collect` as the callers invoke it: the run binding is a parameter, never a read of its own. */
++const collect = (db: FakeDb, run: RunBinding | null = RUN, svc = service()) =>
++  svc.collect(db.client(), COACH, INTENT, run);
++
++function claim(db: FakeDb, terminal = 'success') {
++  db.add('scoutImportCompletion', {
++    coach_id: COACH,
++    intent_id: INTENT,
++    terminal_status: terminal,
++  });
++}
++
++function declare(db: FakeDb, coach = COACH, scope = SCOPE, challenge: Buffer = CHALLENGE) {
++  db.add('scoutRunDeclaration', {
++    coach_id: coach,
++    intent_id: INTENT,
++    source_platform: SLUG,
++    account_scope_id_digest: scope,
++    challenge,
++    declared_at: ACCEPTED,
++  });
++}
++
++function stage(
++  db: FakeDb,
++  token: string,
++  sourceId: string,
++  platform = SLUG,
++  coach = COACH,
++  payload: Row = { name: sourceId, title: sourceId, member_id: 'c1' },
++) {
++  db.add('scoutIngestEntity', {
++    coach_id: coach,
++    intent_id: INTENT,
++    entity_type: token,
++    source_id: sourceId,
++    source_platform: platform,
++    payload,
++  });
++}
++
++/**
++ * A NATIVE-CLEAN run (review B-2): one `plans` row reconstructed into an owned, live
++ * WorkoutProgram with matching ledger + provenance (S9 bucket j, no client link so no closure
++ * edge); `clients` and `workouts` staged empty. With the evidence below this is the one shape
++ * that may settle `complete` (D-S10-6 invariant 1).
++ */
++function cleanRun(): FakeDb {
++  const db = new FakeDb();
++  claim(db);
++  declare(db);
++  stage(db, 'plans', 'p1', SLUG, COACH, { title: 'p1' });
++  const program = db.add('workoutProgram', { coach_id: COACH, archived_at: null });
++  db.add('scoutReconstructionLedger', {
++    coach_id: COACH,
++    intent_id: INTENT,
++    entity_type: 'plans',
++    source_id: 'p1',
++    source_platform: SLUG,
++    status: 'reconstructed',
++    target_id: program.id,
++    target_kind: 'workout_program',
++    reason: null,
++  });
++  db.add('importNativeProvenance', {
++    coach_id: COACH,
++    import_intent_id: null,
++    source_namespace: SLUG,
++    entity_type: 'programs',
++    source_id: 'p1',
++    native_kind: 'workout_program',
++    native_id: program.id,
++    outcome: 'created',
++    reason: null,
++  });
++  return db;
++}
++
++/** The baseline staged set: every fixture id, `w3` through the shared `sessions` token. */
++function stageBaseline(db: FakeDb) {
++  for (const id of IDS.clients) stage(db, 'members', id);
++  for (const id of IDS.programs) stage(db, 'plans', id);
++  stage(db, 'routines', 'w1');
++  stage(db, 'routines', 'w2');
++  stage(db, 'sessions', 'w3');
++}
++
++function statement(family: Family, ids: readonly string[], over: StatementFields = {}) {
++  return {
++    statement_version: 1,
++    source_platform: SLUG,
++    account_scope_id_digest: SCOPE,
++    family,
++    challenge_b64: CHALLENGE.toString('base64'),
++    snapshot_ref_digest: sha256(`snapshot-${family}`),
++    date_window: null,
++    terminal: 'end_of_list',
++    observed_unique: new Set(ids).size,
++    id_set_digest: referenceIdDigest(ids),
++    issued_at: '2026-09-26T10:00:00Z',
++    ...over,
++  };
++}
++
++function observe(db: FakeDb, family: Family, ids: readonly string[] = IDS[family], over: Row = {}) {
++  const evidence = evidenceFor(statement(family, ids), SPEC_DIGEST);
++  db.add('scoutRunObservation', {
++    coach_id: COACH,
++    intent_id: INTENT,
++    execution_epoch: EPOCH,
++    source_platform: SLUG,
++    account_scope_id_digest: SCOPE,
++    family,
++    basis_kind: 'source_signed_enumeration',
++    evidence,
++    evidence_digest: sha256(JSON.stringify(evidence)),
++    received_at: RECEIVED,
++    ...over,
++  });
++}
++
++function observeAll(db: FakeDb, over: Row = {}) {
++  for (const family of FAMILIES) observe(db, family, IDS[family], over);
++}
++
++const KNOWN = (n: number, covers = true) => ({
++  known: true,
++  basis_kind: 'source_signed_enumeration',
++  observed_unique: n,
++  covers_staged_identities: covers,
++});
++const UNKNOWN = { known: false };
++const BASELINE = { clients: KNOWN(2), programs: KNOWN(1), workouts: KNOWN(3) };
++
++/** A fully declared, staged and observed server run with a `success` claim. */
++function provenRun(): FakeDb {
++  const db = new FakeDb();
++  claim(db);
++  declare(db);
++  stageBaseline(db);
++  observeAll(db);
++  return db;
++}
++
++const s10Calls = (db: FakeDb) => db.calls.filter((c) => c.model.startsWith('scoutRun'));
++
++// ── Specs ────────────────────────────────────────────────────────────────────────────────────
++
++describe('S10-C resolveFamily (the shared classifier, D-S10-3 E6)', () => {
++  it('maps a step token, a canonical family token, and nothing else', () => {
++    for (const [token, family] of Object.entries(TOKENS)) {
++      expect(resolveFamily(MAPPERS, SLUG, token)).toBe(family);
++    }
++    // The accepted S8-C staging convention: the token IS the family the spec declares.
++    expect(resolveFamily(MAPPERS, SLUG, 'workouts')).toBe('workouts');
++    expect(resolveFamily(MAPPERS, SLUG, 'client_history')).toBeNull();
++    expect(resolveFamily(MAPPERS, SLUG, 'unknown-token')).toBeNull();
++    expect(resolveFamily(MAPPERS, 'never-registered', 'members')).toBeNull();
++  });
++});
++
++describe('S10-C stagedPlatformFacts (R27 production-grouping half)', () => {
++  const row = (token: string, id: string, platform = SLUG) => ({
++    source_platform: platform,
++    entity_type: token,
++    source_id: id,
++  });
++
++  it('digests every declared family from the classifier partition; a shared id space merges', () => {
++    const [facts] = stagedPlatformFacts(MAPPERS, [
++      row('members', 'c1'),
++      row('members', 'c2'),
++      row('routines', 'w1'),
++      row('sessions', 'w3'),
++      row('workouts', 'w2'),
++      row('members', 'c1'), // a duplicate identity counts once
++    ]);
++    expect(facts.source_platform).toBe(SLUG);
++    expect(facts.grouped_families).toEqual(['clients', 'programs', 'workouts']);
++    expect(facts.families.get('clients')).toEqual(identitySetDigest(['c1', 'c2']));
++    expect(facts.families.get('workouts')).toEqual(identitySetDigest(['w1', 'w2', 'w3']));
++  });
++
++  it('a declared family with no staged row is the EMPTY digest (count 0), never absent', () => {
++    const [facts] = stagedPlatformFacts(MAPPERS, [row('members', 'c1')]);
++    expect(facts.families.get('programs')).toEqual({ digest: EMPTY_IDENTITY_SET_DIGEST, count: 0 });
++    expect(facts.families.get('workouts')).toEqual({ digest: EMPTY_IDENTITY_SET_DIGEST, count: 0 });
++  });
++
++  it('an unmapped token joins no digest; an unregistered platform groups nothing', () => {
++    const facts = stagedPlatformFacts(MAPPERS, [
++      row('members', 'c1'),
++      row('mystery', 'x1'),
++      row('members', 'z1', 'never-registered'),
++    ]);
++    expect(facts.map((f) => f.source_platform)).toEqual(['never-registered', SLUG]);
++    expect(facts[0]).toEqual({
++      source_platform: 'never-registered',
++      grouped_families: [],
++      families: new Map(),
++    });
++    expect(facts[1].families.get('clients')).toEqual(identitySetDigest(['c1']));
++    expect(Array.from(facts[1].families.keys())).toEqual(['clients', 'programs', 'workouts']);
++  });
++
++  it('is total over a lone-surrogate id: that family digests to null (unknown), no throw', () => {
++    const [facts] = stagedPlatformFacts(MAPPERS, [row('members', '\ud800')]);
++    expect(facts.families.get('clients')).toBeNull();
++  });
++});
++
++describe('S10-C ReconciliationFactsService.collect coverage (D-S10-3, D-S10-6)', () => {
++  it('R33 unit half: declared + verified evidence over the staged digests → every family known and covered', async () => {
++    const db = provenRun();
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual(BASELINE);
++    expect(coverageConditionHolds(facts)).toBe(false);
++    const { verdict, report } = reconcile(facts);
++    expect(report.conditions).not.toContain('coverage_basis_unknown');
++    const workouts = report.families.find((f) => f.family === 'workouts');
++    expect(workouts?.completeness_basis).toBe('source_signed_enumeration');
++    expect(workouts?.observed_unique).toBe(3);
++    // This fixture's identities have no ledger rows, so it is NOT native-clean: the S9 identity
++    // condition, not coverage, keeps it from `complete` (the clean shape is the next case).
++    expect(verdict).toEqual({ outcome: 'partial', reason_code: 'unresolved_identities' });
++  });
++
++  it('R33 (real composition, review B-2): a native-clean run with a success claim and verified covering evidence settles complete / null through collector → evaluator → familyCoverage → reconcile', async () => {
++    const db = cleanRun();
++    observe(db, 'programs', ['p1']);
++    observe(db, 'clients', []);
++    observe(db, 'workouts', []);
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({ clients: KNOWN(0), programs: KNOWN(1), workouts: KNOWN(0) });
++    const { verdict, report } = reconcile(facts);
++    expect(verdict).toEqual({ outcome: 'complete', reason_code: null });
++    expect(report.conditions).toEqual([]);
++    expect(report.required_families).toEqual(['clients', 'programs', 'workouts']);
++    const programs = report.families.find((f) => f.family === 'programs');
++    expect(programs).toMatchObject({
++      native_present_verified: 1,
++      unresolved: 0,
++      rejected: 0,
++      completeness_basis: 'source_signed_enumeration',
++      observed_unique: 1,
++    });
++    // A verified EMPTY family is a fact of 0 with a basis, never an unknown (invariant 2).
++    for (const empty of ['clients', 'workouts']) {
++      expect(report.families.find((f) => f.family === empty)).toMatchObject({
++        staged_unique: 0,
++        completeness_basis: 'source_signed_enumeration',
++        observed_unique: 0,
++      });
++    }
++  });
++
++  it('R23 terminal half (exact, review B-2): the same native-clean run whose evidence does not cover the staged identities settles EXACTLY partial / coverage_basis_unknown', async () => {
++    const db = cleanRun();
++    observe(db, 'programs', ['p1', 'p9']); // the source enumerates one more id than was staged
++    observe(db, 'clients', []);
++    observe(db, 'workouts', []);
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({
++      clients: KNOWN(0),
++      programs: KNOWN(2, false),
++      workouts: KNOWN(0),
++    });
++    // The S9 predicate turns "known, not covering" into no basis; the count stays a shown fact.
++    expect(familyCoverage(facts.coverage?.programs, 'success')).toEqual({
++      known: false,
++      completeness_basis: 'none',
++      observed_unique: 2,
++    });
++    const { verdict, report } = reconcile(facts);
++    expect(verdict).toEqual({ outcome: 'partial', reason_code: 'coverage_basis_unknown' });
++    expect(report.conditions).toEqual(['coverage_basis_unknown']);
++    // D-S10-8: drawn from the closed S9 set, every member an S7-L run reason code — no new code.
++    expect(S9_REASON_CODES).toContain('coverage_basis_unknown');
++    expect(RUN_REASON_CODES).toContain('coverage_basis_unknown');
++  });
++
++  it('R23 terminal half on the baseline fixture: digest ≠ staged → known but not covering → coverage_basis_unknown holds', async () => {
++    const db = provenRun();
++    stage(db, 'routines', 'w4'); // staged, never observed
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({ ...BASELINE, workouts: KNOWN(3, false) });
++    const { verdict, report } = reconcile(facts);
++    expect(verdict.outcome).toBe('partial');
++    expect(report.conditions).toContain('coverage_basis_unknown');
++  });
++
++  it('R34: a claim other than success leaves every basis unknown even with verified evidence', async () => {
++    const db = provenRun();
++    db.tables.scoutImportCompletion[0].terminal_status = 'partial';
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual(BASELINE); // the evaluator's fact is unchanged…
++    expect(coverageConditionHolds(facts)).toBe(true); // …the S9 predicate refuses it (F1)
++    expect(reconcile(facts).report.conditions).toContain('coverage_basis_unknown');
++  });
++
++  it('invariant 2 (unknown never zero): nothing staged, nothing observed → known:false without any count', async () => {
++    const db = new FakeDb();
++    claim(db);
++    declare(db);
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++    for (const fact of Object.values(facts.coverage ?? {})) {
++      expect(fact).not.toHaveProperty('observed_unique');
++    }
++    const { report } = reconcile(facts);
++    expect(report.conditions).toContain('coverage_basis_unknown');
++    for (const family of report.families) {
++      expect(family.observed_unique).toBeNull();
++      expect(family.completeness_basis).toBe('none');
++    }
++  });
++
++  it('a verified statement of the EMPTY set over zero staged rows is known and covered (R26 evaluator tier); S9 still refuses an empty run', async () => {
++    const db = new FakeDb();
++    claim(db);
++    declare(db);
++    for (const family of FAMILIES) observe(db, family, []);
++    const facts = await collect(db);
++    // A platform with no staged row at all is genuinely the empty identity set (E6).
++    expect(facts.coverage).toEqual({ clients: KNOWN(0), programs: KNOWN(0), workouts: KNOWN(0) });
++    // …but S9's required set is undeterminable for an empty run (R18): C-COV still holds.
++    expect(coverageConditionHolds(facts)).toBe(true);
++    expect(reconcile(facts).report.conditions).toContain('coverage_basis_unknown');
++  });
++
++  it('R30 / C-note: observations stored under an earlier epoch are excluded by the query and never counted', async () => {
++    const db = new FakeDb();
++    claim(db);
++    declare(db);
++    stageBaseline(db);
++    observeAll(db, { execution_epoch: EPOCH - 1 });
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++    const reads = db.calls.filter((c) => c.model === 'scoutRunObservation');
++    expect(reads.length).toBe(1);
++    expect(reads[0].where).toEqual({ coach_id: COACH, intent_id: INTENT, execution_epoch: EPOCH });
++  });
++
++  it("R30: the current epoch's evidence is used even when an older epoch left rows behind", async () => {
++    const db = provenRun();
++    observeAll(db, { execution_epoch: EPOCH - 1, received_at: new Date('2026-09-25T00:00:00Z') });
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual(BASELINE);
++  });
++
++  it("C-note / invariant 4: declaration and observation reads carry this coach; another coach's rows for the same intent id are invisible", async () => {
++    const db = new FakeDb();
++    claim(db);
++    declare(db, OTHER);
++    stageBaseline(db);
++    for (const family of FAMILIES) observe(db, family, IDS[family], { coach_id: OTHER });
++    const facts = await collect(db);
++    // No declaration for THIS coach: the staged platform is undeclared → all unknown.
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++    const reads = s10Calls(db);
++    expect(reads.length).toBeGreaterThan(0);
++    for (const call of reads) expect(call.where.coach_id).toBe(COACH);
++  });
++
++  it('a declaration whose rows disagree on the challenge verifies nothing (poisoned, not merged)', async () => {
++    const db = provenRun();
++    declare(db, COACH, sha256('workspace-2'), Buffer.alloc(32, 1));
++    const facts = await collect(db);
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++  });
++
++  it('binding: a server binding without accepted_start_at, a legacy binding, or none at all yields coverage null (S9 v1) and no S10 read', async () => {
++    for (const run of [
++      { ...RUN, accepted_start_at: null },
++      { ...RUN, mode: 'legacy' },
++      null,
++      undefined,
++    ]) {
++      const db = provenRun();
++      const facts =
++        run === undefined
++          ? await service().collect(db.client(), COACH, INTENT) // the S9-B call shape
++          : await collect(db, run);
++      expect(facts.coverage).toBeNull();
++      expect(s10Calls(db)).toEqual([]);
++      expect(facts.families.map((f) => f.family)).toEqual(['clients', 'programs', 'workouts']);
++    }
++  });
++
++  it('the settle epoch binds: the same run at another epoch sees none of this evidence', async () => {
++    const db = provenRun();
++    const facts = await collect(db, { ...RUN, execution_epoch: EPOCH + 1 });
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++    expect(s10Calls(db).find((c) => c.model === 'scoutRunObservation')?.where).toMatchObject({
++      execution_epoch: EPOCH + 1,
++    });
++  });
++
++  it('invariant 5/6: collect issues reads only, a bounded number of them, and never reads the run row itself', async () => {
++    const db = provenRun();
++    await collect(db);
++    expect(db.calls.every((c) => c.method === 'findMany' || c.method === 'findUnique')).toBe(true);
++    const models = db.calls.map((c) => c.model);
++    expect(models.filter((m) => m === 'scoutRunDeclaration').length).toBe(1);
++    expect(models.filter((m) => m === 'scoutRunObservation').length).toBe(1);
++    expect(models).not.toContain('scoutImport'); // the S9-B statement count is unchanged
++  });
++
++  it('review A-1 (D-S10-4 L265-272): the no-basis status recompute — a valid declaration and signed observation exist, but with no binding the report stays S9-C: coverage_basis_unknown, observed_unique null, no S10 read', async () => {
++    const db = provenRun(); // declaration + verified observation for every family, success claim
++    const facts = await service().collect(db.client(), COACH, INTENT); // the readReport call shape
++    expect(facts.coverage).toBeNull();
++    expect(s10Calls(db)).toEqual([]);
++    const { verdict, report } = reconcile(facts);
++    expect(report.basis).toBe('recomputed');
++    expect(report.conditions).toContain('coverage_basis_unknown');
++    expect(verdict.outcome).not.toBe('complete');
++    for (const fam of report.families) {
++      expect(fam.observed_unique).toBeNull();
++      expect(fam.completeness_basis).toBe('none');
++    }
++    // The same run WITH the settle tail's binding would have been known — the difference is the
++    // binding the settle tail alone supplies, never later evidence on a read.
++    const settled = await collect(provenRun());
++    expect(settled.coverage).toEqual(BASELINE);
++  });
++});
++
++describe("S10-C default induction registry (over this service's mapper partition)", () => {
++  it('without a registry option, manifests come from disk (none here) → unknown, never a throw', async () => {
++    const db = provenRun();
++    // (devloop-1: `service(undefined)` hit the parameter DEFAULT — the fixture registry — so
++    // this test was proving the fixture, not the disk. `'default'` is an explicit sentinel.)
++    const facts = await collect(db, RUN, service('default'));
++    expect(existsSync(INDUCTION_MANIFESTS_DIR)).toBe(false); // the premise: no manifest on disk
++    expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
++  });
++
++  it('drops a native rule set whose platform has no mapping spec here instead of failing construction', () => {
++    const foreignRules = parseNativeRuleSet(
++      {
++        specVersion: 1,
++        sourcePlatform: 'elsewhere',
++        families: {
++          programs: {
++            weeks: { kind: 'integer', paths: [['weeks']] },
++            daysPerWeek: { kind: 'integer', paths: [['days']] },
++          },
++          workouts: {
++            type: {
++              kind: 'enum',
++              paths: [['kind']],
++              map: { lift: 'strength' },
++              default: 'strength',
++            },
++            programSourceId: { kind: 'identifier', paths: [['block_id']] },
++            weekIndex: { kind: 'integer', paths: [['week']], base: 1 },
++            dayIndex: { kind: 'integer', paths: [['day']], base: 1 },
++          },
++        },
++      },
++      'coverage.spec:foreign',
++    );
++    const registry = ReconciliationFactsService.defaultRegistry(
++      MAPPERS,
++      buildNativeRuleRegistry([foreignRules]),
++    );
++    expect(Array.from(registry.specFamilies.keys())).toEqual([SLUG]);
++    expect(registry.packages.size).toBe(0);
++  });
++});
++
++describe('S10-C D-S10-8: no source name in src', () => {
++  it('the fixture slug appears nowhere under src/**/*.ts', () => {
++    // A cheap, in-process proxy for `rg -F <slug> src`: the modules S10-C touched.
++    const files = [
++      'src/scout/reconciliation/facts.service.ts',
++      'src/scout/lifecycle/lifecycle.service.ts',
++      'src/scout/reconciliation/types.ts',
++      'src/scout/scout.module.ts',
++    ];
++    for (const file of files) {
++      expect(readFileSync(join(__dirname, '..', '..', '..', file), 'utf8')).not.toContain(SLUG);
++    }
++  });
++});
+diff --git a/test/scout/reconciliation/facts.service.spec.ts b/test/scout/reconciliation/facts.service.spec.ts
+index b708ac85..8c4c5275 100644
+--- a/test/scout/reconciliation/facts.service.spec.ts
++++ b/test/scout/reconciliation/facts.service.spec.ts
+@@ -92,6 +92,11 @@ class FakeDb {
+     workoutProgram: [],
+     workoutPlan: [],
+     workoutPlanExercise: [],
++    // S10-C: the run row and the S10-B tables the coverage evaluator is fed from. Left empty
++    // here (no server run row ⇒ `coverage: null`, the S9 v1 value); facts.service.coverage.spec
++    // exercises them.
++    scoutRunDeclaration: [],
++    scoutRunObservation: [],
+   };
+   /** `{ model, method, where }` per call, for the aggregate/tenant assertions. */
+   readonly calls: Array<{ model: string; method: string; where: Row }> = [];
+@@ -314,6 +319,19 @@ describe('S9-B ReconciliationFactsService', () => {
+         coverage: null,
+       });
+     });
++    it('S10-C: without a run binding, or with a legacy one, coverage stays null and no S10 table is read', async () => {
++      const db = new FakeDb();
++      const bare = await service().collect(db.client(), COACH, INTENT);
++      expect(bare.coverage).toBeNull();
++      const legacy = await service().collect(db.client(), COACH, INTENT, {
++        mode: 'legacy',
++        execution_epoch: 1,
++        accepted_start_at: null,
++      });
++      expect(legacy.coverage).toBeNull();
++      expect(db.calls.some((c) => c.model.startsWith('scoutRun'))).toBe(false);
++      expect(db.calls.some((c) => c.model === 'scoutImport')).toBe(false);
++    });
+     it('reads the legacy claim only from the closed terminal set', async () => {
+       const db = new FakeDb();
+       db.add('scoutImportCompletion', {

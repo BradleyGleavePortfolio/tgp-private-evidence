@@ -5,3 +5,4 @@
 - Blocked: S11-A1 acceptance only.
 - Minimum fix: J07 asserts mode='legacy', null phase/clocks, empty counts, execution_epoch=1 (J07-fix.diff, 23 lines; test-only).
 - Unblocks: S11-A1 proof v2 (new binding version and run dir; run-1 stays preserved).
+- 2026-09-26T06:15:49Z parent removed worktrees/d3a9-s11a1-pg/node_modules (donor copy; run-1 evidence preserved in binding/v1/run; clone source tree kept)

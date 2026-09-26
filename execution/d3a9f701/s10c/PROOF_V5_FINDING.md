@@ -1,0 +1,3 @@
+# S10-C real-PG proof v5 — RC=74 at POST (tests 32/32, JEST_COUNT_OK, STOP_STATE_OK), preserved
+- POST_FAIL other lanes changed: the only difference is clusters/s11:ABSENT:ABSENT (an empty run-1 S11 lane directory, no pg-data) present before and absent after; every real lane hash (s10-b, s8-g, s9-b, s9-c) is identical.
+- Cause (class B, operator): the parent moved the S11 run-1 lane directory to set-aside at ~06:51Z, during the live v5 run, to prepare the S11-A1 v2 proof. Concrete harm: none. Blocked: an RC=0 S10-C receipt. Minimum fix: none to the binding; operator rule — never touch runtime/clusters or runtime/run while a proof holds the slot. Unblocks: v6 (v5 runner with a new run dir; v5 lane set aside intact before start).
