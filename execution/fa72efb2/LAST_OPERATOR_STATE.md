@@ -1,4 +1,8 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 16:15Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 17:10Z)
+
+- LANDED 17:04:56Z: S10-D D2 275e458c on integration/importer (FF from 7fdcbc04; PR #561 merged). r2 = one-file pg-spec reshape after proof v1 failed (class B; spec expected `complete` with staged legacy `clients` rows). Proof v2 RC=0 9/9. PRODUCT FINDING (owner, B): no source can settle `complete` while it stages `clients` rows until S8-D typed `person` handoff (D-S8-2, owner-reserved); roster runs settle partial/unresolved_identities (pinned live in case (h)).
+- S11-B: S11-lane proof v1 FAILED (preserved, s11b/PROOF_A_V1_FINDING.md, class B): J13 race → 500 because isSerializationFailure missed P2010/40001 from the raw FOR NO KEY UPDATE (landed S9-C defect). r2 fix 9149f823 (T4 delta GO, GPT-6 Sol). Rebased onto 275e458c as 645fb6db → dda794d7 (blobs identical, hooks ran) = land/s11b-r2, PR #563 (#562 closed superseded, not force-pushed). Bindings v2 (both lanes) building.
+- Mobile readiness round 2 (audit B1/B2 + CI red fix) in progress.
 
 - D2 real-PG proof v1 FAILED (class B, candidate result; preserved: s10d2/PROOF_V1_FINDING.md, binding/v1/run): 4/8 — SET.base partial/unresolved_identities instead of complete although every row reconstructed. T4 diagnosis/fix in progress (s10d2/D2_DIAGNOSE_FIX_GRANT.md). D2 not landed; PR #561 open.
 - S11-B NEW candidate built (45b4da1d), rebased onto 7fdcbc04 as 4d31616f (blobs identical, hooks incl. tsc passed) = PR #562 land/s11b. Review B (GPT-6 Sol) GO; Review A (Claude Fable 5) pending. Two proof bindings (S11 lane; S10-B lane for R36) being built.

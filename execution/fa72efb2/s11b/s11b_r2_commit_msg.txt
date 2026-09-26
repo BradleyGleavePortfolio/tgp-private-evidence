@@ -1,0 +1,11 @@
+fix(scout): retry raw-query serialization failures in the settle tail (S11-B r2)
+
+The settle retry recognised only Prisma P2034. A PostgreSQL 40001 raised by
+the raw FOR NO KEY UPDATE lock (or the raw terminal CAS) inside the
+REPEATABLE READ settle transaction surfaces as P2010 with the SQLSTATE in
+meta.code, so the loser of a concurrent settle returned HTTP 500 instead of
+retrying, seeing the terminal and acking (s11-lane-v1 J13).
+
+isSerializationFailure now also accepts P2010 whose meta.code is 40001 or
+40P01; every other P2010 still propagates. Unit tests cover the raw shapes
+and a raw 40001 on attempt 1 being retried with attempt 2's result returned.

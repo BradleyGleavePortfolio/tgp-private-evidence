@@ -1,0 +1,132 @@
+FAIL test/scout/lifecycle/lifecycle.service.spec.ts (10.321 s)
+  ScoutLifecycleService
+    deadline configuration (D-S7L-3)
+      ○ skipped defaults to five minutes and accepts only a positive integer override
+    resolve (§3.1 resolution precedes the gate)
+      ○ skipped a non-UUID string is legacy without touching the database
+      ○ skipped a UUID that is not an owned ImportIntent is legacy (foreign or unknown)
+      ○ skipped an owned intent whose run row is already legacy stays legacy (§7: never re-owned)
+      ○ skipped an owned intent with no legacy row resolves to server
+    start guard order (§3)
+      ○ skipped 404 for an intent the caller does not own
+      ○ skipped 409 intent_not_paired before any run lookup
+      ○ skipped 409 intent_superseded
+      ○ skipped 409 run_terminal when the run already settled
+      ○ skipped 409 legacy_run when the intent id names a legacy row
+      ○ skipped creates ONE server row with the server-owned clock and epoch 1, then emits scout.run.started
+      ○ skipped a duplicate Start on an open run returns the same body and does not insert
+      ○ skipped a Start race (P2002) re-reads and answers like the duplicate
+      ○ skipped an open run past its deadline is fenced timed_out first, then 409 run_terminal
+    cancel
+      ○ skipped 404 when no run exists for the caller
+      ○ skipped 409 legacy_run for a legacy row
+      ○ skipped is idempotent on an already cancelled run
+      ○ skipped 409 run_terminal when another terminal holds
+      ○ skipped fences an open run (epoch + 1, terminal cancelled / cancelled_by_coach) in one transaction
+      ○ skipped a CAS miss inside the fence (row already fenced) yields no writes and 409 run_terminal
+    closed-gate classification (§3.1)
+      ○ skipped no row → run_not_started
+      ○ skipped fenced row → run_fenced with its fence_reason
+      ○ skipped an open row that failed the gate is past its deadline → fenced timed_out lazily
+      ○ skipped an open row with a FUTURE deadline (Start committed after the gate) → run_not_started, no fence, no write
+    projections (§5)
+      ○ skipped a null / legacy row projects the legacy constants
+      ○ skipped a server row projects its clocks, phase, epoch and reason code; unknown values fall to null
+      ○ skipped families: staged_unique is the staged row count, ledger tallies fold, native buckets are null
+      ○ skipped server terminal guard admits only the server vocabulary (never `success`)
+      ○ skipped isUuid accepts RFC 4122 text and rejects legacy strings
+    S9-C settle wiring (D-S9-1, R09)
+      ✕ S11-B r2: a raw-query serialization failure (P2010, meta.code 40001) IS a serialization failure; other P2010s are not (9 ms)
+      ✕ S11-B r2: a raw 40001 on the lock (attempt 1) is retried like P2034 — attempt 2 re-locks and its result is returned (2 ms)
+      ✓ S11-B r2: a raw failure with another SQLSTATE is NOT retried — one attempt, the P2010 propagates unchanged (2 ms)
+      ○ skipped passes the recomputed S9 verdict to the arbiter: the S9 reason code is the one terminal write
+      ○ skipped never yields complete in v1: a fully verified run still reconciles partial / coverage_basis_unknown
+      ○ skipped R09: a fence on the locked row wins over the S9 verdict
+      ○ skipped R09: claim failed with zero staged rows → failed / transfer_failed regardless of the S9 verdict
+      ○ skipped R09: a CAS miss (epoch moved or terminal set) is a no-op — no S9 read, no write, no event
+      ○ skipped S9 writes nothing of its own: the only statement after the lock and the reads is the terminal CAS
+      ○ skipped a failed terminal CAS after the S9 read emits nothing (exactly-once terminal)
+      ○ skipped C-9: the settle tail opens its transaction with the S9 snapshot options (REPEATABLE READ, R16-sized timeout)
+      ○ skipped C-9: a serialization failure (P2034) retries the WHOLE settle transaction once more; exactly one terminal write lands
+      ○ skipped C-9: a retry that re-locks a now-terminal row is a no-op — the concurrent writer won, nothing is written
+      ○ skipped C-9: retries are bounded — after SETTLE_ATTEMPTS serialization failures the error propagates, no terminal is fabricated
+      ○ skipped C-9: non-serialization errors are NOT retried — one attempt, error propagates unchanged
+      ○ skipped without an injected facts service the constructor still accepts (prisma, analytics) — R13 callers unchanged
+    S9-C recompute-on-read (D-S9-5, RC-2, C-9)
+      ○ skipped reportApplies: server + terminal + not reconciliation_not_performed; fenced terminals included (RC-2)
+      ○ skipped readReport returns null without opening a transaction when no report applies (R13, R15)
+      ○ skipped readReport opens ONE REPEATABLE READ transaction, reads on it, writes nothing, and returns the recomputed report
+    S9-C R10(C) — a replayed intent that converged already_present
+      ○ skipped gives the same verdict and report as the first pass; created_native / already_present_verified stay null
+    S9-C additive projection (D-S9-5, C-6, C-7, C-10, R13, R15)
+      ○ skipped R13/R15: the two-argument call and an explicit null report are the S7-L shape — no additive key, no zero
+      ○ skipped R15: with a report the entries equal the recomputed report for the same facts; D-S9-4 buckets stay null
+      ○ skipped RC-3 / partial coverage: a report entry with no staged token never creates an entry; a token without a report row keeps the S7-L shape
+      ○ skipped C-10: a token resolving to two families sums its rows and projects canonical_family null
+      ○ skipped C-6: qualifiers outside their domain fold into unresolved:reason_unrecognised; counts merge; sorted
+      ○ skipped C-6: admission is closed-domain membership, not grammar — every domain is derived from a code constant
+      ○ skipped C-7 / C-10: the DTO enums and the S9-A literals are the same closed sets
+      ○ skipped R10: the projection is deterministic — identical facts give identical entries
+    S10-C settle write: the settled basis is a record after the CAS (D-S10-4, R33, R36)
+      ○ skipped R33 structural half: one terminal CAS, then ONE basis insert on the SAME transaction, carrying the settled report and the epoch digests
+      ○ skipped R36: a CAS miss (0 rows) writes no basis and settles nothing
+      ○ skipped R36: an already-terminal or foreign-epoch lock row reaches neither the CAS nor the insert
+      ○ skipped R36: an insert failure propagates out of the settle transaction (rolling the terminal back with it), is not retried, and emits no settle event
+      ○ skipped R34: a fence on the locked row still wins; the basis records the S9 report the fenced terminal was decided beside
+      ○ skipped R34 / D-S10-8: a claim that is not success settles partial / coverage_basis_unknown from the S9 set — no new code
+      ○ skipped invariant 1: a known, covering basis with a success claim and clean natives is the only way to complete — and then the basis row says so
+    S10-C status read: settled basis preferred, S9 recompute otherwise (D-S10-4 "Status", R35, R37)
+      ○ skipped returns the settled report verbatim with basis settled, on one coach-scoped point read, opening no transaction
+      ○ skipped R35: the settled report does not change when the recompute would (a native row archived later)
+      ○ skipped without a basis row the S9-C recompute answers, byte-identical, with basis recomputed
+      ○ skipped review A-1: a fence-path terminal (no settled record) keeps the S9-C report — basis recomputed, coverage_basis_unknown, no binding
+      ○ skipped a stored value that is not a version-1 settled report is never reinterpreted: the recompute answers
+      ○ skipped R37: no report applies → null without a basis read, a transaction or a collect
+      ○ skipped isSettledReport accepts exactly the stored shape
+    S10-C finding-7 projection rule: observed_unique (R37)
+      ○ skipped fills observed_unique from a settled report when the token IS the family: one mapped holder, its only token, non-null
+      ○ skipped stays null under a recomputed report (S9-C behaviour, byte-identical)
+      ○ skipped stays null when the family holds more than one token: the family count is not the token count
+      ○ skipped stays null for an unmapped holder, two holders, or a null observation
+      ○ skipped a token the report does not carry keeps the S7-L shape: null, no additive key
+      ○ skipped observedUniqueFor is the rule, spelled once
+
+  ● ScoutLifecycleService › S9-C settle wiring (D-S9-1, R09) › S11-B r2: a raw-query serialization failure (P2010, meta.code 40001) IS a serialization failure; other P2010s are not
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      886 |     it('S11-B r2: a raw-query serialization failure (P2010, meta.code 40001) IS a serialization failure; other P2010s are not', () => {
+      887 |       const is = ScoutLifecycleService.isSerializationFailure;
+    > 888 |       expect(is(rawSerialization())).toBe(true);
+          |                                      ^
+      889 |       expect(is(rawFailure({ code: '40P01', message: 'deadlock detected' }))).toBe(true);
+      890 |       // Any other SQLSTATE on the raw path stays a plain failure: not retried.
+      891 |       expect(is(rawFailure({ code: '23505', message: 'duplicate key value' }))).toBe(false);
+
+      at Object.<anonymous> (test/scout/lifecycle/lifecycle.service.spec.ts:888:38)
+
+  ● ScoutLifecycleService › S9-C settle wiring (D-S9-1, R09) › S11-B r2: a raw 40001 on the lock (attempt 1) is retried like P2034 — attempt 2 re-locks and its result is returned
+
+    PrismaClientKnownRequestError: Raw query failed. Code: `40001`. Message: `could not serialize access due to concurrent update`
+
+      877 |      */
+      878 |     const rawFailure = (meta: Record<string, unknown> | undefined) =>
+    > 879 |       new PrismaClientKnownRequestError(
+          |       ^
+      880 |         `Raw query failed. Code: \`${String(meta?.code)}\`. Message: \`${String(meta?.message)}\``,
+      881 |         { code: 'P2010', clientVersion: '6.19.3', meta },
+      882 |       );
+
+      at rawFailure (test/scout/lifecycle/lifecycle.service.spec.ts:879:7)
+      at rawSerialization (test/scout/lifecycle/lifecycle.service.spec.ts:884:7)
+      at Object.<anonymous> (test/scout/lifecycle/lifecycle.service.spec.ts:914:40)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 74 skipped, 1 passed, 77 total
+Snapshots:   0 total
+Time:        10.584 s, estimated 12 s
+Ran all test suites matching test/scout/lifecycle/lifecycle.service.spec.ts with tests matching "S11-B r2".
+JEST_MUTANT_RC=1
