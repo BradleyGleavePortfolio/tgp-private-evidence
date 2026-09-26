@@ -158,3 +158,95 @@ No A findings.
 - A python3 read-only comparison of fixture versus artifact (paths, schemas, $ref closure, C1 delta).
 
 I did not read the DTO file at 7fdcbc04; the OpenAPI schema and the service were sufficient. Nothing was written outside this review file and /tmp/aud_s11c.json.
+
+---
+
+# Round 2 delta (HEAD a876268c07ceaec5ae56b489466922dfbcda1a05, parent 89590423)
+
+Scope: a delta audit of the one new commit, read-only under the same rules. The Round 1 bytes that are unchanged are not re-audited.
+The commit's author and committer are both `Bradley Gleave <bradley@bradleytgpcoaching.com>`, with no trailers. Parent 89590423 was not amended.
+
+## Verdict: GO (no A, no B). CI on PR #296 (node 22.13) remains the build/test gate, and the parent checks it.
+
+I did not run tsc, lint or jest. The builder's reported local RCs (node v20) are their claim, not something I verified.
+
+## Delta bytes
+
+| File | +/- | sha256 @a876268c |
+|---|---|---|
+| src/components/coach/ExtensionPairingPanel.tsx | +22/-4 | 9f2dced85961a634db4de58f0f69e891631a26a7cfce6e4a9cafd5dbe9dfc775 |
+| src/hooks/useExtensionPairing.ts | +51/-11 | fd38a64881793512e727c28446b86ef01ba15dae24e186fcc92cb242754bca19 |
+| src/types/extensionImport.ts | +21/-9 | ce06daf89b77b08e58284c89749c9ee9c70c9c2aea1539c1e6bfc9252b0070af |
+| src/components/coach/__tests__/ExtensionPairingPanel.test.tsx | +176/-13 | e30f09646b366d3eeba7c115891f9956ef692dc6d5d6fd4acd6fa54cfabc9340 |
+| src/hooks/__tests__/useExtensionPairing.test.tsx | +152/-0 | d4845e7071399207e1c437bbc1cc0d291ac7a91a1d96b3fe4384dc136a6ed3dd |
+| src/types/__tests__/extensionImport.contract.test.ts | +30/-0 | c48f20de675b64149eded5e731f7376ae22624cceeecb596525b85f11adeb5a7 |
+
+The fixture is unchanged, so the Round 1 byte-equality result against 7fdcbc04 still holds.
+
+## B1: CLOSED
+
+- The readiness row now passes bare `pending` for every `run` value (ExtensionPairingPanel.tsx:249).
+- `ChecklistRow` therefore takes only the `ellipse-outline` / `textMuted` branch and the `''` suffix branch; no "✓" is emitted. The row has no accessibilityLabel override, so its accessible name is the plain text, which carries no success marker.
+- The terminal copy is now "Ended — check your import status for details" (:373).
+- Tests:
+  - A terminal-specific test (Panel test:535) asserts no "✓", no "checkmark", the muted colour present and the primary colour absent. The theme mock values `#999`/`#2c4a36` match the constants (test:26-27 vs :32-33).
+  - A parametrized test covers none/open/terminal (:554).
+  - These discriminate: reverting to `pending={run !== 'terminal'}` turns the icon primary-coloured and adds " ✓", which would fail both tests.
+
+## B2: CLOSED
+
+- **Foreground re-read.** The AppState `active` handler calls `fetchReadiness()` when `statusRef.current === 'paired'` (useExtensionPairing.ts:843), in addition to the existing `waiting` poll resume.
+- **Single-flight, per epoch.** `readinessInFlightEpochRef` returns early when a read in the same epoch is outstanding (:417-418), and is released in `finally` only by its own epoch (:446). Because it is scoped by epoch, a stale read in flight cannot block a new epoch's read after a re-pair.
+- **No retry loop.** There is no timer; a failure is swallowed, and only an OS foreground event or a new paired transition triggers another read. The number of reads is bounded by user app switches.
+- **Late responses discarded.** The mounted/status/epoch guard is unchanged (:426), and the C5 intent check was added (:434-438).
+- **Cleared on every exit from `paired`.** `go()` clears the reading and bumps the epoch (:373-375), and so does the identity-retire path (:747-749, the C4 closure).
+- **Copy.** The present-tense strings ("Not started yet" and the others) are now refreshed whenever the coach returns to the app, which is the moment the card is looked at again after "Continue on your computer". That is sufficient for point-in-time honesty.
+- **Tests** (hook test:1942-2010):
+  - foreground while paired produces a second call and an updated reading;
+  - a foreground overlapping an in-flight read produces no second call, and a new call follows once the first settles;
+  - a foreground while waiting produces no `current()` call.
+
+## C closures: all verified
+
+- **C1 CLOSED.**
+  - The decoder now requires a non-negative integer (extensionImport.ts:168), `null` exactly when `run === 'none'` (:171), and `source_declared === (declared_platforms ?? 0) > 0` (:173). Any violation yields `undefined`.
+  - The panel's `?? 0` is gone. The `as number` at Panel:382 is sound: `sourceDeclared === true` means count > 0, which implies non-null.
+  - `effectiveCount = declared ?? 0` (:172) is used only in the cross-check and never rendered, so it is not an unknown→zero leak.
+  - Six fail-closed cases plus the valid `open/false/0` case are in the contract test (:633ff). Round 1 test inputs all still satisfy the new rules.
+  - This matches the server exactly (7fdcbc04 service.ts:238-244).
+- **C2 CLOSED.** The fixture sha `889d25c6…` is asserted inline (contract test:567).
+- **C4 CLOSED.** See :747-749 above.
+- **C5 CLOSED.**
+  - The reading is attached only when `!thisIntent || !readIntent || thisIntent === readIntent` (:434-438).
+  - `readIntent` is null only on `UNKNOWN_PAIR_CURRENT`, which never carries readiness, so the effective relaxation is only for a legacy pairing with no intent id. That is acceptable.
+  - `importIntentIdRef` is fed by the pair/status echo (:468), which the tests rely on. Mismatch and match tests are at hook test:2013ff.
+- **C6 CLOSED.**
+  - The hook test at :2052 runs: paired → cancel → retry → paired again (new epoch), then resolves the first-epoch read.
+  - At that point status is `paired`, so only the epoch check can reject the stale read.
+  - It discriminates: removing `readinessEpochRef.current !== epoch` would attach the stale `open/1` reading and fail the final expectation.
+- **C7 CLOSED.**
+  - The per-row and a11y sweeps now walk string leaves of `toJSON()` (`collectText`, Panel test:395), not `JSON.stringify` of React elements, so there is no circular-Fiber risk.
+  - The unqualified banned-word regexes (`\b(authorized|ready|connected|verified)\b`) now apply to the row's own text in every state, which makes them actually discriminating on the row.
+  - The full-card sweep keeps the narrow "source … X" form because of the pre-existing, out-of-scope "Connected to your computer" and "Connected to TGP as" strings.
+
+## Overclaim sweep of the delta
+
+- The only new user-visible string is "Ended — check your import status for details".
+- New non-comment lines containing authoriz/ready/connect/verif are only the test assertions that forbid them.
+- The new code carries no platform names. `truecoach` appears only as the existing test `platformId` prop.
+- Nothing new asserts server state beyond what the server returned.
+
+## Round 2 C record (qualify and continue)
+
+- **C10.** A failed foreground re-read keeps the previously read value (hook :398-446 doc, catch/omit paths). The same applies to an omitted block or an intent mismatch. The row can therefore show the last reading from an earlier foreground rather than going back to "unknown".
+  - Impact: limited, since it is still a real server reading for this intent, and the next foreground retries.
+  - Optional: clear to `undefined` when a successful response omits the block. The server itself treats omission as "read failed, unknown".
+- **C11.** A phone left open on the card with no background/foreground cycle gets no refresh. Screen lock and unlock does produce an `active` event. This is acceptable under B2's minimum closure; no timer poll is wanted.
+- **C12.** In the B1 tests, the `'checkmark'` substring assertions are inert because the Ionicons glyph is not literal text in this environment, as the test itself documents. The colour and "✓" assertions carry the check.
+- **C13.** The builder's local gate RCs are unverified by me; CI on PR #296 decides.
+
+## Commands run (Round 2; all read-only; all RC 0)
+
+- `git log --oneline -3`, `git status --short`, `git diff 89590423 a876268c --stat|--numstat|-- <files>`, `git show a876268c -s --format=…`, `git rev-parse HEAD`.
+- `git show a876268c:<file> | sha256sum` for each changed file.
+- `grep -n` / `sed -n` on HEAD files, and on builder_summary.md from its Round 2 section.

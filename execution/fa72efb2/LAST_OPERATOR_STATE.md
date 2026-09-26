@@ -1,4 +1,11 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 17:10Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 17:45Z)
+
+- LANDED 17:42:43Z: S11-B r2 dda794d7 on integration/importer (FF from 275e458c, PR #563). LANDED 17:42:45Z: mobile readiness panel a876268c on mobile main (FF from affc2818, PR #296).
+- OWNER DECISION: D-S8-2 option (a) direction approved (OWNER_DECISION_S8D_2026-09-26.md) + linking answers (email OR phone chosen by client among coach-held contacts; client confirmation always; 30-day undo — both sides recommended, pending confirmation). Next: linking decision record draft + independent T4 security review → Bradley sign-off before S8-D/E claim build.
+- IN FLIGHT: S11-A2 (J09–J11 + harness declare/observe) building on dda794d7 (T4, Claude Fable 5).
+- NEXT: S11-A2 review/binding/proof → S11-D (J19 roster-read vs S8-D gap to resolve) → S12 prep to owner boundary.
+
+## 17:10Z
 
 - LANDED 17:04:56Z: S10-D D2 275e458c on integration/importer (FF from 7fdcbc04; PR #561 merged). r2 = one-file pg-spec reshape after proof v1 failed (class B; spec expected `complete` with staged legacy `clients` rows). Proof v2 RC=0 9/9. PRODUCT FINDING (owner, B): no source can settle `complete` while it stages `clients` rows until S8-D typed `person` handoff (D-S8-2, owner-reserved); roster runs settle partial/unresolved_identities (pinned live in case (h)).
 - S11-B: S11-lane proof v1 FAILED (preserved, s11b/PROOF_A_V1_FINDING.md, class B): J13 race → 500 because isSerializationFailure missed P2010/40001 from the raw FOR NO KEY UPDATE (landed S9-C defect). r2 fix 9149f823 (T4 delta GO, GPT-6 Sol). Rebased onto 275e458c as 645fb6db → dda794d7 (blobs identical, hooks ran) = land/s11b-r2, PR #563 (#562 closed superseded, not force-pushed). Bindings v2 (both lanes) building.

@@ -1,0 +1,163 @@
+--- s10b-lane-v1/s10b-lane-pg-proof.sh	2026-09-26 16:18:28.952556904 +0000
++++ s10b-lane-v2/s10b-lane-pg-proof.sh	2026-09-26 17:11:38.228556904 +0000
+@@ -1,4 +1,12 @@
+ #!/usr/bin/env bash
++# EXEC-FA72EFB2 S11-B S10-B-lane binding v2 (the R36 flip in test/rls-g2-s10c.spec.ts). SOURCE ONLY: NOT RUN.
++# Minimum substitution of the reviewed-GO s10b-lane-v1 runner (sha256 2a5c5d19…2a3b; never ran) to the r2 candidate REBASED
++# onto the D2 landing (parent redirect 17:07Z): base 275e458c (= integration/importer after S10-D D2 landed), chain
++# 275e458c -> 645fb6db (= 4d31616f re-applied) -> dda794d7 (= 9149f823 re-applied; 6 delta blobs byte-identical), branch
++# fa72/s11b-r2, land ref land/s11b-r2 (PR #563). Changes: two-commit chain check (HEAD^ = R1_HEAD, HEAD^^ = BASE, count 2) +
++# r1->r2 diff check (exactly lifecycle.service.ts + lifecycle.service.spec.ts), delta/S11B_OWNED 6 paths (+ test/scout/lifecycle/
++# lifecycle.service.spec.ts), FREEZE-s11b regenerated for the 6 paths. Fixture byte-identical to v1; lane, W (fa72-s11b-pg2),
++# jest command, 32 / 2 suites and bounds (outer 4500) unchanged. Full delta: DELTA-from-v1.diff. Text below is s10b-lane v1.
+ # EXEC-FA72EFB2 S11-B S10-B-lane binding v1 (the R36 flip in test/rls-g2-s10c.spec.ts). SOURCE ONLY: NOT RUN.
+ # Minimum substitution of the reviewed D2 binding execution/fa72efb2/s10d2/binding/v1/d2-pg-proof.sh (sha256 9a2f8b36…67e8;
+ # its lock/prestart/fresh-clone/donor-copy/bootstrap mechanics ran in this runtime at 16:05Z and failed only on D2 assertions)
+@@ -38,36 +46,38 @@
+ # Inner stage bounds: clone 120+120 + cp 600 + init 60 + start 60 + bootstrap 900 + identity 8x15 + jest 1500 + stop 75
+ #   = 3555 s soft sum.
+ # Usage (under the separate single-run PG grant, after the D2 gate commit and fill):
+-#   timeout -k 30 4500 bash /home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v1/s10b-lane-pg-proof.sh
++#   timeout -k 30 4500 bash /home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v2/s10b-lane-pg-proof.sh
+ # Filled (parent 08:53, README.md fill table): values re-derived by `git rev-parse` / `sha256sum` in SRC at 144269d1.
+ # Placeholders are refused pre-lock (rc 70, run not consumed).
+ set -uo pipefail
+-D=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v1   # S11-B S10-B-lane binding v1 (from D2 v1)
++D=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v2   # S11-B S10-B-lane binding v2 (from s10b-lane v1)
+ RUNTIME_ROOT=/home/user/workspace/execution/fa72efb2/runtime                     # fa72efb2 runtime namespace (evidence execution/fa72efb2/runtime/raw/rt-setup.log); the fixture carries the same literal and is cross-checked below
+-SRC=/home/user/workspace/worktrees/fa72-s11b                                      # clone source (read-only here): branch fa72/s11b-r1 at 4d31616f (S11-B), clean, lefthook hooks
++SRC=/home/user/workspace/worktrees/fa72-s11b                                      # clone source (read-only here): branch fa72/s11b-r2 at dda794d7 (S11-B r2 on D2), clean, lefthook hooks
+ W=/home/user/workspace/worktrees/fa72-s11b-pg2                                     # the fresh clone this run creates under the lock (must not exist)
+ DONOR_NM=/home/user/workspace/worktrees/fa72-s11a1/node_modules                  # read-only donor (npm ci + prisma generate by rt-setup-fa72efb2.sh from the S10-B schema); copied, never regenerated
+ R=$D/run; LOG=$R/s10b-lane-pg-proof.log; SENT=$R/s10b-lane-pg-proof.sentinel; JLOG=$R/jest.log
+ LOCK=/home/user/workspace/execution/test-validation.lock
+ # ---- pins: all filled (parent 08:53 FILL + REBASE); the placeholder refusal stays as a guard.
+-BASE_HEAD=7fdcbc044dba1747d0db2f2750ced951f3b6b752                     # integration/importer tip after S11-A1 3db615c0 + S11-C 7fdcbc04 landed (= S11-B HEAD^)
+-BASE_TREE=a802231ee1f4dd693284b349e7eb078b3688e8d5                     # git rev-parse "$BASE_HEAD^{tree}"
++BASE_HEAD=275e458ca5a6b3684bb6ec83edb2a854056a6fd0                     # integration/importer tip after S11-A1 3db615c0 + S11-C 7fdcbc04 + S10-D D2 275e458c landed (= S11-B r2 HEAD^^)
++BASE_TREE=6267ef6a57225af187f5a21fb8a2c3cc3fd6103e                     # git rev-parse "$BASE_HEAD^{tree}"
+ S10B_HEAD=a2c74e904ff227b16881c77ee5a08bd006972d48                             # S10-B landing commit; ancestor of BASE_HEAD (checked)
+ HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba                     # kept: G2_S10B_BASE_HEAD / bootstrap BASE_HEAD literal; ancestor of BASE_HEAD (checked)
+-EXPECT_HEAD=4d31616f9288402c0cdd6a74fb30b4b15d0658d3                   # S11-B commit on fa72/s11b-r1 (blobs = reviewed 45b4da1d); PR #562
+-EXPECT_TREE=366efa9f807cf8c1550bfc8a3394b6840f90287b                   # git rev-parse HEAD^{tree}
+-EXPECT_DELTA="src/scout/lifecycle/lifecycle.service.ts src/scout/scout.service.ts test/rls-g2-s10c.spec.ts test/scout/lifecycle/s11b-settle-redrive.spec.ts test/scout/s11/settle-redrive.pg.spec.ts"   # exactly the 5 S11-B paths (sorted); must equal S11B_OWNED and FREEZE-s11b
++EXPECT_HEAD=dda794d7e8bee0482a7ad373795fcc51dcf54bb5                   # S11-B r2 commit on fa72/s11b-r2 (= 9149f823 re-applied); PR #563
++EXPECT_TREE=802e1c196c7a0bd27f091218407f5f0b031dd760                   # git rev-parse HEAD^{tree}
++R1_HEAD=645fb6db022f2ef6299ed4aa2bcd3f409d2a8298                       # S11-B r1 (= 4d31616f re-applied) = HEAD^, parent BASE_HEAD
++R1R2_DELTA="src/scout/lifecycle/lifecycle.service.ts test/scout/lifecycle/lifecycle.service.spec.ts"   # R1_HEAD..HEAD (the r2 fix), exactly
++EXPECT_DELTA="src/scout/lifecycle/lifecycle.service.ts src/scout/scout.service.ts test/rls-g2-s10c.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/lifecycle/s11b-settle-redrive.spec.ts test/scout/s11/settle-redrive.pg.spec.ts"   # exactly the 6 S11-B paths (sorted); must equal S11B_OWNED and FREEZE-s11b
+ EXPECT_CONTRACT_STATE=unchanged                                  # S11-B changes no contract (the 5 paths exclude docs/); kept as the template mechanism
+ EXPECT_CONTRACT_BLOB=1a5deca500d0dd9422edaca2f9883ed57c33a0e8          # = BASE_CONTRACT_BLOB (unchanged by S11-B)
+ EXPECT_HOOK_PRECOMMIT_SHA=67e578d15a4b0d52bd517f06052efbb0e397f7d945fd5582ab639b9928e46a49   # sha256 $SRC/.git/hooks/pre-commit (lefthook)
+ EXPECT_HOOK_COMMITMSG_SHA=18e15068a4c266d4499eafda9cd1d4d5180eb1e95b02939cf5a400c23260f1a9   # sha256 $SRC/.git/hooks/commit-msg (lefthook)
+ EXPECT_S10C_SPEC_BLOB=4a5a6bb6c29222c5c290f3680b4f5b5bd3d209ff                                  # test/rls-g2-s10c.spec.ts at HEAD: the S11-B R36 flip (BASE blob 50a0deae); RUN here
+-S11B_FREEZE=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v1/FREEZE-s11b.sha256
+-S11B_FREEZE_SHA=ca321526e5363ba553dce66f70f3674b18579962cbe926428916cc03ce6424f4   # FREEZE-s11b: sha256 of the 5 S11-B paths at HEAD (paths == delta)
+-LAND_REF=refs/remotes/origin/land/s11b                    # PR #562 head, seen in SRC as refs/remotes/origin/land/s11b
+-EXPECT_LAND_REF=4d31616f9288402c0cdd6a74fb30b4b15d0658d3   # the 40-hex $LAND_REF (refs/remotes/origin/land/s11b) must equal (= EXPECT_HEAD)
++S11B_FREEZE=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11b/binding/s10b-lane-v2/FREEZE-s11b.sha256
++S11B_FREEZE_SHA=603ffa02a95d0e712bba45ca6cda4507295a9331bea827c7809ff0c9b2e4f1d0   # FREEZE-s11b v2: sha256 of the 6 S11-B paths at HEAD (paths == delta)
++LAND_REF=refs/remotes/origin/land/s11b-r2                 # PR #563 head, seen in SRC as refs/remotes/origin/land/s11b-r2
++EXPECT_LAND_REF=dda794d7e8bee0482a7ad373795fcc51dcf54bb5   # the 40-hex $LAND_REF (refs/remotes/origin/land/s11b-r2) must equal (= EXPECT_HEAD)
+ EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                # S10-B migrations tree (173); D2 changes no prisma, so BASE and HEAD both carry it
+-BASE_CONTRACT_BLOB=1a5deca500d0dd9422edaca2f9883ed57c33a0e8            # importer contract blob at BASE 7fdcbc04 (S11-C changed it from bd715150)
++BASE_CONTRACT_BLOB=1a5deca500d0dd9422edaca2f9883ed57c33a0e8            # importer contract blob at BASE 275e458c (= at 7fdcbc04; S11-C changed it from bd715150; D2 did not touch it)
+ # landed S10-B proof files (s10b/gate/HEAD-a2c74e904ff2.txt); frozen through S10-C and D2 (verified equal at BASE 7fdcbc04; also covered by FROZEN below)
+ EXPECT_SPEC_BLOB=b89fec1cb9254a2475908154b1109f16585af0b0                      # test/rls-g2-s10b.spec.ts
+ EXPECT_DB_BLOB=3375f08ba0130bee8f20fb8a4f395a8fac4a5e10                        # test/utils/g2-s10b-db.ts
+@@ -82,12 +92,12 @@
+ EXPECT_FIXTURE_SHA=2fc8012dea542751228a9b1b98e6367fa40cd3d5849e73bcd6f2019147a5db2a                                             # sha256 of s10b-lane-v1/s10b-lane-fixture.sh (builder-filled; README.md)
+ FROZEN=/home/user/workspace/repos/tgp-private-evidence/execution/d3a9f701/s10c/gate/FROZEN.sha256
+ FROZEN_P_PATH=test/scout/induction/manifest-registry.spec.ts   # the ONE FROZEN path the landed premise P (7746a877) re-stated; ancestor of BASE
+-FROZEN_P_BLOB=9b5de3743ec27181b58e8277591a6c8c1a8adc65          # its blob at BASE 7fdcbc04 (= at 6a33df9b; S11-A1/S11-C did not touch it; S11-B does not either)
++FROZEN_P_BLOB=9b5de3743ec27181b58e8277591a6c8c1a8adc65          # its blob at BASE 275e458c (= at 7fdcbc04 / 6a33df9b; S11-A1/S11-C/D2 did not touch it; S11-B does not either)
+ FROZEN_SHA=e9c71f09462a25e36baafe0fa90ba012ef6b3f384f04b3951fb1c7bbf1f4be21
+ S10B_MIGRATION=20270124000000_scout_run_observation_expand
+ EXPECT_MIGRATIONS=173
+-# the 5 S11-B paths (S11B_BINDING_BUILD_GRANT.md; reviewed 45b4da1d); EXPECT_DELTA must be exactly these
+-S11B_OWNED="src/scout/lifecycle/lifecycle.service.ts src/scout/scout.service.ts test/rls-g2-s10c.spec.ts test/scout/lifecycle/s11b-settle-redrive.spec.ts test/scout/s11/settle-redrive.pg.spec.ts"
++# the 6 S11-B r2 paths (S11B_BINDING_V2_BUILD_GRANT.md; r1 reviewed 45b4da1d, r2 delta review GO s11b_r2_review.md); EXPECT_DELTA must be exactly these
++S11B_OWNED="src/scout/lifecycle/lifecycle.service.ts src/scout/scout.service.ts test/rls-g2-s10c.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/lifecycle/s11b-settle-redrive.spec.ts test/scout/s11/settle-redrive.pg.spec.ts"
+ CONTRACT=docs/contracts/importer-openapi.json
+ # ---- tool pins: from the fa72efb2 runtime setup log raw/rt-setup.log (compare only, never adjusted at run time); byte-identical to the S10-C v6 pins.
+ EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+@@ -140,8 +150,8 @@
+ STAGE=preconditions-prelock; STARTED=0; LOG=$R/prelock.log
+ fail(){ log "PRELOCK_REFUSED stage=$STAGE rc=$1 $(ts) (no lock taken, no sentinel written; the run is not consumed)"; exit "$1"; }
+ log "PRELOCK_START $(ts) pid=$$ user=$(id -un) head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA"
+-case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_DELTA$EXPECT_CONTRACT_STATE$EXPECT_CONTRACT_BLOB$EXPECT_S10C_SPEC_BLOB$EXPECT_HOOK_PRECOMMIT_SHA$EXPECT_HOOK_COMMITMSG_SHA$EXPECT_FIXTURE_SHA$FROZEN_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA$S11B_FREEZE_SHA$EXPECT_LAND_REF" in *__*) log "PRECONDITION_FAIL pins not filled (head, tree, FREEZE-s11b, hooks or land ref; README.md)"; fail 70;; esac
+-for v in BASE_HEAD BASE_TREE EXPECT_HEAD EXPECT_TREE EXPECT_CONTRACT_BLOB EXPECT_S10C_SPEC_BLOB FROZEN_P_BLOB; do [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || { log "PRECONDITION_FAIL $v not 40-hex (${!v})"; fail 70; }; done
++case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$R1_HEAD$EXPECT_DELTA$EXPECT_CONTRACT_STATE$EXPECT_CONTRACT_BLOB$EXPECT_S10C_SPEC_BLOB$EXPECT_HOOK_PRECOMMIT_SHA$EXPECT_HOOK_COMMITMSG_SHA$EXPECT_FIXTURE_SHA$FROZEN_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA$S11B_FREEZE_SHA$EXPECT_LAND_REF" in *__*) log "PRECONDITION_FAIL pins not filled (head, tree, FREEZE-s11b, hooks or land ref; README.md)"; fail 70;; esac
++for v in BASE_HEAD BASE_TREE EXPECT_HEAD EXPECT_TREE R1_HEAD EXPECT_CONTRACT_BLOB EXPECT_S10C_SPEC_BLOB FROZEN_P_BLOB; do [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || { log "PRECONDITION_FAIL $v not 40-hex (${!v})"; fail 70; }; done
+ for v in EXPECT_NM_CLIENT_SHA EXPECT_NM_CLIENT_SCHEMA_SHA EXPECT_HOOK_PRECOMMIT_SHA EXPECT_HOOK_COMMITMSG_SHA EXPECT_FIXTURE_SHA FROZEN_SHA S11B_FREEZE_SHA; do [[ "${!v}" =~ ^[0-9a-f]{64}$ ]] || { log "PRECONDITION_FAIL $v not 64-hex (${!v})"; fail 70; }; done
+ case "$EXPECT_LAND_REF" in none) ;; *) [ "$EXPECT_LAND_REF" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_LAND_REF must be none or = EXPECT_HEAD ($EXPECT_LAND_REF)"; fail 70; };; esac
+ # lane refusals (review B B4): never an s10-b lane, never the S9-C/S10-B/S11 ports
+@@ -157,7 +167,7 @@
+   *) log "PRECONDITION_FAIL EXPECT_CONTRACT_STATE must be changed|unchanged ($EXPECT_CONTRACT_STATE)"; fail 70;; esac
+ WANT_DELTA=$(printf '%s\n' $S11B_OWNED $( [ "$EXPECT_CONTRACT_STATE" = changed ] && echo "$CONTRACT") | sort | tr '\n' ' ' | sed 's/ $//')
+ EXPECT_DELTA=$(echo $EXPECT_DELTA)
+-[ "$EXPECT_DELTA" = "$WANT_DELTA" ] || { log "PRECONDITION_FAIL filled EXPECT_DELTA [$EXPECT_DELTA] != the 5 S11-B paths (+ contract iff changed) [$WANT_DELTA]"; fail 70; }
++[ "$EXPECT_DELTA" = "$WANT_DELTA" ] || { log "PRECONDITION_FAIL filled EXPECT_DELTA [$EXPECT_DELTA] != the 6 S11-B paths (+ contract iff changed) [$WANT_DELTA]"; fail 70; }
+ [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base, not a candidate"; fail 70; }
+ [ "$EXPECT_CONTRACT_STATE" = unchanged ] || { log "PRECONDITION_FAIL S11-B changes no contract (EXPECT_CONTRACT_STATE=$EXPECT_CONTRACT_STATE)"; fail 70; }
+ [ "$EXPECT_NM_CLIENT_SHA" = "$DONOR_CLIENT_SHA" ] && [ "$EXPECT_NM_CLIENT_SCHEMA_SHA" = "$DONOR_CLIENT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL INVERTED guard: the donor was generated from the S10-B schema, so the expected clone client must EQUAL the donor client"; fail 70; }
+@@ -171,17 +181,18 @@
+ grep -qF 'grep -q s10b-lane-pg-proof.sh "/proc/$D2_RUNNER_PID/cmdline"' <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture does not require this runner"; fail 70; }
+ # clone source: a real repository at the committed candidate; the fresh clone path and the lane must not exist yet
+ [ -d "$SRC/.git" ] && [ ! -L "$SRC/.git" ] && [ ! -L "$SRC" ] || { log "PRECONDITION_FAIL $SRC/.git is not a real repository directory"; fail 70; }
+-[ "$(git -C "$SRC" rev-parse --verify -q refs/heads/fa72/s11b-r1)" = "$EXPECT_HEAD" ] && [ "$(git -C "$SRC" symbolic-ref -q HEAD)" = refs/heads/fa72/s11b-r1 ] || { log "PRECONDITION_FAIL $SRC is not on fa72/s11b-r1 at $EXPECT_HEAD"; fail 70; }
++[ "$(git -C "$SRC" rev-parse --verify -q refs/heads/fa72/s11b-r2)" = "$EXPECT_HEAD" ] && [ "$(git -C "$SRC" symbolic-ref -q HEAD)" = refs/heads/fa72/s11b-r2 ] || { log "PRECONDITION_FAIL $SRC is not on fa72/s11b-r2 at $EXPECT_HEAD"; fail 70; }
+ case "$EXPECT_LAND_REF" in none) log "PRELOCK land_ref=none ($LAND_REF not checked: no land ref pushed)";;
+   *) [ "$(git -C "$SRC" rev-parse --verify -q "$LAND_REF")" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL $LAND_REF != $EXPECT_HEAD"; fail 70; };; esac
+ { [ -e "$W" ] || [ -L "$W" ]; } && { log "PRECONDITION_FAIL $W exists (fresh clone only; never reuse)"; fail 70; }
+ [ "$(git -C "$SRC" rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL HEAD != $EXPECT_HEAD"; fail 70; }
+ [ "$(git -C "$SRC" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] || { log "PRECONDITION_FAIL tree mismatch"; fail 70; }
+ [ "$(git -C "$SRC" rev-parse "$BASE_HEAD^{tree}")" = "$BASE_TREE" ] || { log "PRECONDITION_FAIL base tree mismatch"; fail 70; }
+-[ "$(git -C "$SRC" rev-parse HEAD^)" = "$BASE_HEAD" ] && [ "$(git -C "$SRC" rev-list --count "$BASE_HEAD..HEAD")" = 1 ] || { log "PRECONDITION_FAIL HEAD^ != $BASE_HEAD (the gate makes exactly one commit on BASE)"; fail 70; }
++[ "$(git -C "$SRC" rev-parse HEAD^)" = "$R1_HEAD" ] && [ "$(git -C "$SRC" rev-parse HEAD^^)" = "$BASE_HEAD" ] && [ "$(git -C "$SRC" rev-list --count "$BASE_HEAD..HEAD")" = 2 ] || { log "PRECONDITION_FAIL chain != $BASE_HEAD -> $R1_HEAD -> HEAD (two commits on BASE)"; fail 70; }
++[ "$(git -C "$SRC" diff --name-only "$R1_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')" = "$R1R2_DELTA" ] || { log "PRECONDITION_FAIL r1..r2 delta != [$R1R2_DELTA]"; fail 70; }
+ git -C "$SRC" merge-base --is-ancestor "$S10B_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL S10-B landing $S10B_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+ git -C "$SRC" merge-base --is-ancestor "$HARNESS_BASE_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+-# exact delta: BASE..HEAD = the 5 S11-B paths, byte-equal to FREEZE-s11b; FROZEN S10-A/S10-B bytes at HEAD (one premise-P exception)
++# exact delta: BASE..HEAD = the 6 S11-B paths, byte-equal to FREEZE-s11b; FROZEN S10-A/S10-B bytes at HEAD (one premise-P exception)
+ DELTA=$(git -C "$SRC" diff --name-only "$BASE_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')
+ [ "$DELTA" = "$EXPECT_DELTA" ] || { log "PRECONDITION_FAIL BASE..HEAD delta [$DELTA] != receipt delta [$EXPECT_DELTA]"; fail 70; }
+ [ -f "$S11B_FREEZE" ] && [ ! -L "$S11B_FREEZE" ] && [ "$(sha "$S11B_FREEZE")" = "$S11B_FREEZE_SHA" ] || { log "PRECONDITION_FAIL FREEZE-s11b absent, a symlink or sha mismatch"; fail 70; }
+@@ -287,7 +298,7 @@
+ log "LOCKED $(ts) pid=$$ lock=$LOCK(held nonblocking fd9, inode $(stat -c %i "$LOCK")) (prestart: nothing consumed yet)"
+ # re-verify under the lock the state that could have moved since the pre-lock preconditions (cheap, read-only)
+ [ "$(sha "$FIX")" = "$EXPECT_FIXTURE_SHA" ] && [ "$(git -C "$SRC" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ -z "$(git -C "$SRC" status --porcelain --untracked-files=all)" ] \
+-  && [ "$(git -C "$SRC" rev-parse --verify -q refs/heads/fa72/s11b-r1)" = "$EXPECT_HEAD" ] && [ "$(sha "$S11B_FREEZE")" = "$S11B_FREEZE_SHA" ] && { [ "$EXPECT_LAND_REF" = none ] || [ "$(git -C "$SRC" rev-parse --verify -q "$LAND_REF")" = "$EXPECT_HEAD" ]; } \
++  && [ "$(git -C "$SRC" rev-parse --verify -q refs/heads/fa72/s11b-r2)" = "$EXPECT_HEAD" ] && [ "$(sha "$S11B_FREEZE")" = "$S11B_FREEZE_SHA" ] && { [ "$EXPECT_LAND_REF" = none ] || [ "$(git -C "$SRC" rev-parse --verify -q "$LAND_REF")" = "$EXPECT_HEAD" ]; } \
+   && [ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] && [ ! -e "$W" ] && [ ! -L "$W" ] \
+   || { log "PRECONDITION_FAIL fixture/source HEAD/source worktree/FREEZE-s11b/land ref/donor client/clone path moved after the pre-lock preconditions"; fail 70; }
+ [ -z "$(git -C "$SRC" config --get core.hooksPath)" ] && [ "$(git -C "$SRC" rev-parse --git-path hooks)" = .git/hooks ] && [ -d "$H" ] && [ ! -L "$H" ] \
+@@ -318,7 +329,7 @@
+ W_CREATED=1   # from here a prestart refusal removes $W (this run created it, empty, by mkdir-exclusive; git clone accepts an empty dir)
+ timeout -k 30 120 git -c core.hooksPath=/dev/null clone --quiet --shared --no-checkout "$SRC" "$W" >>"$LOG" 2>&1; rc=$?; log "CLONE rc=$rc $(ts)"; [ $rc = 0 ] || fail 71
+ timeout -k 30 120 git -C "$W" -c core.hooksPath=/dev/null checkout --quiet --detach "$EXPECT_HEAD" >>"$LOG" 2>&1; rc=$?; log "CHECKOUT rc=$rc $(ts)"; [ $rc = 0 ] || fail 71
+-[ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] && [ "$(git -C "$W" rev-parse HEAD^)" = "$BASE_HEAD" ] \
++[ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] && [ "$(git -C "$W" rev-parse HEAD^)" = "$R1_HEAD" ] && [ "$(git -C "$W" rev-parse HEAD^^)" = "$BASE_HEAD" ] \
+   && [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] && [ "$(git -C "$W" rev-parse HEAD:prisma/migrations)" = "$EXPECT_MIGRATIONS_TREE" ] \
+   && git -C "$W" merge-base --is-ancestor "$HARNESS_BASE_HEAD" HEAD && [ -z "$(git -C "$W" config --get core.hooksPath)" ] \
+   || { log "CLONE_FAIL clone head/tree/parent/clean/migrations/harness-base mismatch"; fail 71; }
+--- s10b-lane-v1/launch-when-free.sh	2026-09-26 16:24:10.504556904 +0000
++++ s10b-lane-v2/launch-when-free.sh	2026-09-26 17:12:07.328556904 +0000
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env bash
+ # Parent launcher: waits until no process holds or waits on the canonical lock for 3 consecutive 5 s polls, then starts the
+-# single granted S11-A1 v3 proof run detached. It never touches the lock itself.
++# single granted S11-B S10-B-lane v2 proof run detached. It never touches the lock itself.
+ L=/home/user/workspace/execution/test-validation.lock; D=$(cd "$(dirname "$0")" && pwd)
+ ok=0; for i in $(seq 1 720); do
+   H=$(lslocks -n -o PATH 2>/dev/null | grep -c test-validation || true); Wt=$(pgrep -fc 'flock -w [0-9]+ /home/user/workspace/execution/test-validation.lock' || true)
+--- s10b-lane-v1/FREEZE-s11b.sha256	2026-09-26 16:14:39.564556904 +0000
++++ s10b-lane-v2/FREEZE-s11b.sha256	2026-09-26 17:10:05.696556904 +0000
+@@ -1,5 +1,6 @@
+-7c8c42c331c028cc6246ae6be8462525e97a9847073f61ce48291ab04962fff4  src/scout/lifecycle/lifecycle.service.ts
++8e7db85ccc09f9a8d8ebcb18fe3ce97c0cbcc4b3e936024a08bb2c3fcd931eaf  src/scout/lifecycle/lifecycle.service.ts
+ d9b7b0e121c4b56f8a65573438e5e0741ad3d7ce3d8c24a5cf04446e6bb45511  src/scout/scout.service.ts
+ 87fd54aaab2a135752199764511016b20f30f95b2c55cf2ac8b4683455ceb7f8  test/rls-g2-s10c.spec.ts
++cbb0d0b2dd0007f290423ce6709fc85de879ea1423155a6a4c87ae026733ffc8  test/scout/lifecycle/lifecycle.service.spec.ts
+ 4a6138995b525196911ff5a1d9344de680bd9fbc6b717c215303761a105da2f2  test/scout/lifecycle/s11b-settle-redrive.spec.ts
+ 70ddf75f33e088ac5a182a60e2fb01cd8eda052209b92e11cecc12988b743cc0  test/scout/s11/settle-redrive.pg.spec.ts
