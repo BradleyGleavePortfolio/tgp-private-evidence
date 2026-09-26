@@ -1,5 +1,13 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-D3A9F701, 2026-09-26 UTC
+
+Read `execution/d3a9f701/RECOVERY.md` and the leading `execution/DISPATCHES.md` section. The owner's September 25 17:19–17:21 PT continuation controls; lower sections are historical.
+
+Verified backend integration `9497ca52`, backend main `1c10e2a1`, extension main `a889f4ad`. S8-F/S9-A and bridge bytes are landed and remain closed. S8-G exact `820ce85b` is recovered unchanged but unaccepted; its owner-reported 5/19 failed PG output has not yet been recovered. S9-B was an uncommitted pinned tree; exact recovery is in progress, and its narrow gate comparison repair already exists in durable evidence.
+
+Two fresh bounded recovery owners are assigned. No heavy slot is granted, no old process/lock adopted, and no consumed proof rerun. The current sandbox's absent lock does not establish remote runtime release. Product refs and all owner-reserved boundaries remain unchanged.
+
 ## CURRENT: EXEC-1910A060, 2026-09-25 21:12Z
 
 Controlling scope: `execution/1910a060/SCOPE.md`. Bradley's explicit 14:08 PT

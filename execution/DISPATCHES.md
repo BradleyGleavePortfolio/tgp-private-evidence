@@ -1,5 +1,14 @@
 # Current execution dispatches
 
+## CURRENT EXEC-D3A9F701, 2026-09-26 UTC
+
+The September 25 17:19–17:21 PT owner handoff resets S8-G/S9-B builder ownership. Current grants and recovery limitations are in `d3a9f701/RECOVERY.md`.
+
+- S8-G: `s8_g_fresh_diagnosis_owner_muhnbqcc`, exact `820ce85b`, failed-output recovery and diagnosis only.
+- S9-B: `s9_b_fresh_harness_owner_muhnbqcg`, exact-byte recovery and narrow gate assessment only.
+- Parent is sole evidence publisher and future grant/acceptance/landing coordinator.
+- No current heavy-slot grantee. No inherited process ownership, consumed-proof retry or accepted-history re-audit.
+
 ## CURRENT EXEC-1910A060, 2026-09-25 21:12Z
 
 Latest Bradley OWNER CONTINUATION RESET14:08PT controls.
