@@ -3,3 +3,8 @@ Candidate 38d0d366 on 54be96f1 (review Round 2 GO, s11d_review.md); binding v1 i
 B1 closure: fa72-s11d2 + hooks + origin/land/s11d frozen; no npm/lefthook there; pgrep -cx postgres = 0 immediately before launch.
 Qualifier C1: the two cherry-picks were hookless (PARENT_REBASE_NOTE.md). One run via binding/v1/launch-when-free.sh (7800 s).
 Expected full 6, guard 95. Failure after STARTED: preserve, classify, never rerun the same bytes.
+
+## v2 (after v1 FAILED — PROOF_V1_FINDING.md)
+Candidate r3 aed23289 (review Round 3 GO); binding v2 independent T3 GO (binding/v2/S11D_BINDING_V2_REVIEW.md). B1 closure: fa72-s11d2
++ hooks + origin/land/s11d frozen; pgrep -cx postgres = 0 immediately before launch. One run via binding/v2/launch-when-free.sh (7800 s).
+Expected full 6, guard 95.

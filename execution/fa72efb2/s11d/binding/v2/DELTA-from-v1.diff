@@ -1,0 +1,117 @@
+--- v1/s11-pg-proof.sh	2026-09-26 18:51:53.656556904 +0000
++++ v2/s11-pg-proof.sh	2026-09-26 19:36:15.084556904 +0000
+@@ -1,4 +1,12 @@
+ #!/usr/bin/env bash
++# EXEC-FA72EFB2 S11-D binding v2 — minimum substitution of s11d/binding/v1 (sha256 8dda61d6…6225; its run was consumed and
++# FAILED at jest-full: J20 4/4 passed, J19 legs A/B spec defects, s11d/PROOF_V1_FINDING.md) to the r3 candidate: chain
++# 54be96f1 -> a52d20d6 (r1) -> 38d0d366 (r2) -> aed23289 (r3: J19 leg A push count, leg B report field), tree 6787b255.
++# Changes: three-commit chain check (HEAD^ = R2_HEAD, HEAD^^ = R1_HEAD, HEAD~3 = BASE, count 3; same in the clone check),
++# r1->r2 check kept (R1_HEAD..R2_HEAD) + new r2->r3 check (exactly test/scout/s11/journey-full.pg.spec.ts), EXPECT_FULL_BLOB
++# 9ca2ebb6, FREEZE-s11d regenerated at HEAD r3, fresh clone worktrees/fa72-s11d2-pg2, own dir/run. Delta (1 path), other
++# freezes/pins, stages (bootstrap + full 6 + guard 95), counts and bounds (full 4200, outer 7800) unchanged.
++# Full delta: DELTA-from-v1.diff. Text below is s11d v1.
+ # EXEC-FA72EFB2 S11-D binding v1 — minimum substitution of s11a2/binding/v2 (sha256 c785752b…c708; ran END rc=0 127/127,
+ # S11-A2 landed as integration/importer = 54be96f1, PR #564) to the S11-D candidate: chain 54be96f1 (tree 435fec78) -> a52d20d6
+ # (r1) -> 38d0d366 (r2), tree 075c1513, branch fa72/s11d-r2, land ref land/s11d, clone source worktrees/fa72-s11d2, fresh clone
+@@ -100,12 +108,12 @@
+ # 13500 (570 s margin). Induction bound: 4 cases x jest.setTimeout 600 s = 2400 s hard jest ceiling + 600 s for boot/hooks; ~38
+ # ts-node worker processes (J09 15, J10 11, J11a 6, J11b 6; each harness worker has its own 90 s kill cap), cf. journey-core
+ # 8 cases 180 s and redrive 226 s in the v2 run. A timeout is a failure (rc 124), never a retry.
+-# Usage (under the separate single-run PG grant): timeout -k 30 7800 bash .../fa72efb2/s11d/binding/v1/s11-pg-proof.sh
++# Usage (under the separate single-run PG grant): timeout -k 30 7800 bash .../fa72efb2/s11d/binding/v2/s11-pg-proof.sh
+ set -uo pipefail
+-D=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11d/binding/v1
++D=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11d/binding/v2
+ RUNTIME_ROOT=/home/user/workspace/execution/fa72efb2/runtime                     # fa72efb2 runtime namespace (rt-setup-fa72efb2.sh RC=0); the fixture carries the same literal (cross-checked below)
+-SRC=/home/user/workspace/worktrees/fa72-s11d2                                    # clone source (read-only here): HEAD 38d0d366 (= origin/land/s11d, branch fa72/s11d-r2), clean, lefthook hooks
+-W=/home/user/workspace/worktrees/fa72-s11d2-pg1                                  # the fresh clone this run creates (must not exist)
++SRC=/home/user/workspace/worktrees/fa72-s11d2                                    # clone source (read-only here): HEAD aed23289 (= origin/land/s11d, branch fa72/s11d-r2), clean, lefthook hooks
++W=/home/user/workspace/worktrees/fa72-s11d2-pg2                                  # the fresh clone this run creates (must not exist)
+ DONOR_NM=/home/user/workspace/worktrees/fa72-s11a1/node_modules                  # read-only donor (npm ci + prisma generate at 3db615c0 by rt-setup-fa72efb2.sh); copied, never regenerated
+ R=$D/run; LOG=$R/s11-pg-proof.log; SENT=$R/s11-pg-proof.sentinel; STARTED_F=$R/STARTED
+ JLOG1=$R/jest-rls.log; JLOG2=$R/jest-journey.log; JLOG3=$R/jest-guard.log; JLOG4=$R/jest-readiness.log; JLOG5=$R/jest-redrive.log; JLOG6=$R/jest-induction.log; JLOG7=$R/jest-full.log; GENLOG=$R/prisma-generate.log
+@@ -114,10 +122,12 @@
+ BASE_HEAD=54be96f18c314cae35d1e5d3000af9f06d693d81                               # S11-A2 r2 (proof RC=0 127/127; landed = integration/importer, PR #564) (= HEAD^^)
+ HARNESS_BASE=711c1f8f8b42157bca97f2a721557be7ef006667                            # harness literal (bootstrap BASE_HEAD / G2_S11_BASE_HEAD); must be an ancestor of HEAD
+ BASE_TREE=435fec782672214c7e8e81b2eb91f8f9266331b4
+-EXPECT_HEAD=38d0d366730331e4edf19a14cda8247435b89431                             # S11-D r2 candidate (J20 live-gated, roster-bridge qualifier, full range), two commits on BASE_HEAD
+-EXPECT_TREE=075c1513d54367abb796c35faac0bf2872acbace
+-R1_HEAD=a52d20d6827ae51da58505050ab0d29327659796                                 # S11-D r1 (J19 + J20) = HEAD^, parent BASE_HEAD
+-R1R2_DELTA="test/scout/s11/journey-full.pg.spec.ts"   # R1_HEAD..HEAD (the r2 review fixes), exactly
++EXPECT_HEAD=aed23289024898cceca7385d3778cd7373b7424d                             # S11-D r3 candidate (J19 leg A push count, leg B report field), three commits on BASE_HEAD
++EXPECT_TREE=6787b25531ab7614c9de70e745381a996d66b119
++R1_HEAD=a52d20d6827ae51da58505050ab0d29327659796                                 # S11-D r1 (J19 + J20) = HEAD^^, parent BASE_HEAD
++R2_HEAD=38d0d366730331e4edf19a14cda8247435b89431                                 # S11-D r2 (binding v1 candidate) = HEAD^, parent R1_HEAD
++R1R2_DELTA="test/scout/s11/journey-full.pg.spec.ts"   # R1_HEAD..R2_HEAD (the r2 review fixes), exactly
++R2R3_DELTA="test/scout/s11/journey-full.pg.spec.ts"   # R2_HEAD..HEAD (the r3 J19 fixes), exactly
+ LAND_REF=refs/remotes/origin/land/s11d
+ EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                  # HEAD:prisma/migrations == BASE:prisma/migrations (no candidate migration)
+ EXPECT_MIGRATIONS=173
+@@ -131,7 +141,7 @@
+ EXPECT_PGH_BLOB=ad32b5693390228bba001184acc2145b898879ac                          # test/utils/g2-s11-pg-harness.ts (S11-A2 edit)
+ EXPECT_WORKER_BLOB=562038a1127f82ec5eb285010f8d8eade4cb2c8e                       # test/utils/g2-s11-worker.cjs (S11-A2 edit)
+ EXPECT_INDUCTION_BLOB=1b9832bcbce7a51da6a58df60c312a5b0416f144                    # test/scout/s11/journey-induction.pg.spec.ts (S11-A2, new)
+-EXPECT_FULL_BLOB=ecfe8cef35eb99f955d7b0acdaddeb84d3cef8e2                         # test/scout/s11/journey-full.pg.spec.ts (S11-D r2, new; the delta)
++EXPECT_FULL_BLOB=9ca2ebb6c1f0f43d3984dfcaf94021de03abbd6d                         # test/scout/s11/journey-full.pg.spec.ts (S11-D r3, new; the delta)
+ EXPECT_JEST_RLS_BLOB=44c9691533be2ea27f9a416271d9ff400f7faa3f                     # jest.rls.config.js
+ EXPECT_JEST_BLOB=769a414698125340d6e347160f6ad81122cce863                         # jest.config.js
+ EXPECT_READINESS_BLOB=1afcb07d715b6bceca70daf046538e8ecdff6196                    # test/scout/s11/readiness.pg.spec.ts (S11-C)
+@@ -156,7 +166,7 @@
+ S11A2_FREEZE_SHA=51d901ef8689b396ed23074911dbea1daaf5058ebc54864135484b3d80047290      # FREEZE-s11a2 v2: the 12 S11-A2 files, byte-identical at HEAD (S11-D: no longer the delta)
+ S11A2_FILES="test/fixtures/scout/s11/s11-sources.ts test/fixtures/scout/s11/s11_second/induction-manifest.json test/fixtures/scout/s11/s11_second/mapping-spec.json test/fixtures/scout/s11/s11_second/native-rules.json test/fixtures/scout/s11/s11_second/signer-test-key.json test/fixtures/scout/s11/s11_second/staged-rows.json test/fixtures/scout/s11/s11_second/statements.json test/scout/s11/journey-induction.pg.spec.ts test/utils/g2-s11-db-guard.spec.ts test/utils/g2-s11-harness.ts test/utils/g2-s11-pg-harness.ts test/utils/g2-s11-worker.cjs"
+ S11D_FREEZE=$D/FREEZE-s11d.sha256
+-S11D_FREEZE_SHA=6819f7854806e862faa9bb12da5dd4f991a1d1150d517fe7caad8abf05cd1f9f      # FREEZE-s11d v1: the 1 S11-D path at HEAD r2 (paths == delta)
++S11D_FREEZE_SHA=60977d8c13be17ec1aeed6b1338d4bac3e12c17cde32ee1432364f3c061befc3      # FREEZE-s11d v2: the 1 S11-D path at HEAD r3 (paths == delta)
+ EXPECT_DELTA="test/scout/s11/journey-full.pg.spec.ts"
+ EXPECT_TESTS_RLS=6          # it( in test/rls-g2-s11.spec.ts (no each/skip/only/todo)
+ EXPECT_TESTS_JOURNEY=8      # it( in test/scout/s11/journey-core.pg.spec.ts (no each/skip/only/todo; describe.skip only when G2_S11_DATABASE_URL is unset)
+@@ -213,7 +223,7 @@
+ STAGE=preconditions-prelock; LOG=$R/prelock.log
+ fail(){ log "PRELOCK_REFUSED stage=$STAGE rc=$1 $(ts) (no lock taken, no STARTED, no sentinel; the run is not consumed)"; exit "$1"; }
+ log "PRELOCK_START $(ts) pid=$$ user=$(id -un) head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA"
+-case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$R1_HEAD$EXPECT_MIGRATIONS_TREE$EXPECT_SPEC_BLOB$EXPECT_JOURNEY_BLOB$EXPECT_GUARD_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_DB_BLOB$EXPECT_HARNESS_BLOB$EXPECT_PGH_BLOB$EXPECT_WORKER_BLOB$EXPECT_READINESS_BLOB$EXPECT_SERVICE_BLOB$EXPECT_DTO_BLOB$EXPECT_REDRIVE_BLOB$EXPECT_INDUCTION_BLOB$EXPECT_LIFECYCLE_BLOB$EXPECT_SCOUTSVC_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$S11_FREEZE_SHA$S11C_FREEZE_SHA$S11B_FREEZE_SHA$S11A2_FREEZE_SHA$EXPECT_FULL_BLOB$S11D_FREEZE_SHA" in *__*) log "PRECONDITION_FAIL pins not filled"; fail 70;; esac
++case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$R1_HEAD$R2_HEAD$EXPECT_MIGRATIONS_TREE$EXPECT_SPEC_BLOB$EXPECT_JOURNEY_BLOB$EXPECT_GUARD_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_DB_BLOB$EXPECT_HARNESS_BLOB$EXPECT_PGH_BLOB$EXPECT_WORKER_BLOB$EXPECT_READINESS_BLOB$EXPECT_SERVICE_BLOB$EXPECT_DTO_BLOB$EXPECT_REDRIVE_BLOB$EXPECT_INDUCTION_BLOB$EXPECT_LIFECYCLE_BLOB$EXPECT_SCOUTSVC_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$S11_FREEZE_SHA$S11C_FREEZE_SHA$S11B_FREEZE_SHA$S11A2_FREEZE_SHA$EXPECT_FULL_BLOB$S11D_FREEZE_SHA" in *__*) log "PRECONDITION_FAIL pins not filled"; fail 70;; esac
+ for p in $REFUSED_LANE_PORTS; do [ "$PORT" != "$p" ] || { log "PRECONDITION_FAIL lane port $PORT is a refused lane port ($REFUSED_LANE_PORTS)"; fail 70; }; done
+ [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base"; fail 70; }
+ [ "$EXPECT_NM_CLIENT_SHA" = "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL v3 donor was generated from the base schema; expected clone client must equal the donor client"; fail 70; }
+@@ -222,12 +232,13 @@
+ grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture RUNTIME_ROOT line != $RUNTIME_ROOT"; fail 70; }
+ grep -qx "PORT=$PORT; SUPER=$ADMIN; PASS=$FIXPASS; MARKER=$MARKER" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture PORT/SUPER/PASS/MARKER line != runner"; fail 70; }
+ grep -qx "LANE=\$RUNTIME_ROOT/clusters/s11" <<<"$FIXTXT" && grep -qx "DATA=\$LANE/pg-data; LOG=\$LANE/pg.log; SOCK=\$RUNTIME_ROOT/run/s11" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture lane/socket lines != clusters/s11 + run/s11"; fail 70; }
+-# clone source: committed candidate, two commits on BASE (r1, r2), pushed, clean, produced through the tracked lefthook hooks
++# clone source: committed candidate, three commits on BASE (r1, r2, r3), pushed, clean, produced through the tracked lefthook hooks
+ [ -d "$SRC/.git" ] && [ ! -L "$SRC/.git" ] || { log "PRECONDITION_FAIL $SRC/.git is not a real repository directory"; fail 70; }
+ [ "$(g rev-parse HEAD)" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL source HEAD != $EXPECT_HEAD"; fail 70; }
+ [ "$(g rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] || { log "PRECONDITION_FAIL source tree mismatch"; fail 70; }
+-[ "$(g rev-parse HEAD^)" = "$R1_HEAD" ] && [ "$(g rev-parse HEAD^^)" = "$BASE_HEAD" ] && [ "$(g rev-list --count "$BASE_HEAD..HEAD")" = 2 ] || { log "PRECONDITION_FAIL chain != $BASE_HEAD -> $R1_HEAD -> HEAD (two commits)"; fail 70; }
+-[ "$(g diff --name-only "$R1_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')" = "$R1R2_DELTA" ] || { log "PRECONDITION_FAIL r1..r2 delta != [$R1R2_DELTA]"; fail 70; }
++[ "$(g rev-parse HEAD^)" = "$R2_HEAD" ] && [ "$(g rev-parse HEAD^^)" = "$R1_HEAD" ] && [ "$(g rev-parse HEAD~3)" = "$BASE_HEAD" ] && [ "$(g rev-list --count "$BASE_HEAD..HEAD")" = 3 ] || { log "PRECONDITION_FAIL chain != $BASE_HEAD -> $R1_HEAD -> $R2_HEAD -> HEAD (three commits)"; fail 70; }
++[ "$(g diff --name-only "$R1_HEAD" "$R2_HEAD" | sort | tr '\n' ' ' | sed 's/ $//')" = "$R1R2_DELTA" ] || { log "PRECONDITION_FAIL r1..r2 delta != [$R1R2_DELTA]"; fail 70; }
++[ "$(g diff --name-only "$R2_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')" = "$R2R3_DELTA" ] || { log "PRECONDITION_FAIL r2..r3 delta != [$R2R3_DELTA]"; fail 70; }
+ g merge-base --is-ancestor "$HARNESS_BASE" "$BASE_HEAD" || { log "PRECONDITION_FAIL harness base $HARNESS_BASE is not an ancestor of $BASE_HEAD"; fail 70; }
+ [ -z "$(g diff --name-only "$HARNESS_BASE" "$BASE_HEAD" -- prisma package.json package-lock.json)" ] || { log "PRECONDITION_FAIL prisma/deps moved between the harness base and BASE_HEAD"; fail 70; }
+ A1_UTILS=$(tr ' ' '\n' <<<"$A1_FILES" | grep '^test/utils/' | tr '\n' ' ' | sed 's/ $//')
+@@ -375,7 +386,7 @@
+ STAGE=clone
+ timeout -k 30 120 git -c core.hooksPath=/dev/null clone --quiet --shared --no-checkout "$SRC" "$W" >>"$LOG" 2>&1; rc=$?; log "CLONE rc=$rc $(ts)"; [ $rc = 0 ] || fail 71
+ timeout -k 30 120 git -C "$W" -c core.hooksPath=/dev/null checkout --quiet --detach "$EXPECT_HEAD" >>"$LOG" 2>&1; rc=$?; log "CHECKOUT rc=$rc $(ts)"; [ $rc = 0 ] || fail 71
+-[ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] && [ "$(git -C "$W" rev-parse HEAD^)" = "$R1_HEAD" ] && [ "$(git -C "$W" rev-parse HEAD^^)" = "$BASE_HEAD" ] \
++[ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ "$(git -C "$W" rev-parse 'HEAD^{tree}')" = "$EXPECT_TREE" ] && [ "$(git -C "$W" rev-parse HEAD^)" = "$R2_HEAD" ] && [ "$(git -C "$W" rev-parse HEAD^^)" = "$R1_HEAD" ] && [ "$(git -C "$W" rev-parse HEAD~3)" = "$BASE_HEAD" ] \
+   && [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] && [ "$(git -C "$W" rev-parse HEAD:prisma/migrations)" = "$EXPECT_MIGRATIONS_TREE" ] \
+   || { log "CLONE_FAIL clone head/tree/parent/clean/migrations mismatch"; fail 71; }
+ [ "$(find "$W/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)" = "$EXPECT_MIGRATIONS" ] || { log "CLONE_FAIL migration dir count"; fail 71; }
+--- v1/launch-when-free.sh	2026-09-26 18:51:53.656556904 +0000
++++ v2/launch-when-free.sh	2026-09-26 19:36:15.084556904 +0000
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env bash
+ # Parent launcher: waits until no process holds or waits on the canonical lock for 3 consecutive 5 s polls, then starts the
+-# single granted S11-D binding v1 proof run detached. It never touches the lock itself.
++# single granted S11-D binding v2 proof run detached. It never touches the lock itself.
+ L=/home/user/workspace/execution/test-validation.lock; D=$(cd "$(dirname "$0")" && pwd)
+ ok=0; for i in $(seq 1 720); do
+   H=$(lslocks -n -o PATH 2>/dev/null | grep -c test-validation || true); Wt=$(pgrep -fc 'flock -w [0-9]+ /home/user/workspace/execution/test-validation.lock' || true)
+--- v1/FREEZE-s11d.sha256	2026-09-26 18:51:53.656556904 +0000
++++ v2/FREEZE-s11d.sha256	2026-09-26 19:36:15.084556904 +0000
+@@ -1 +1 @@
+-84afc31a8100d20ee7ae3077b7fb7267137ba7a3bb24d659c1e102a109b53820  test/scout/s11/journey-full.pg.spec.ts
++110a02df004301f553fdbce44a77872d29f3484d6aa25fa7bb6bc914f79abffe  test/scout/s11/journey-full.pg.spec.ts

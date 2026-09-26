@@ -420,3 +420,392 @@ unconditionally.
 - `src/scout/scout-roster.service.ts:178-179` (`roster_bridge_pending: ROSTER_BRIDGE_PENDING`)
 - `test/scout/s11/journey-full.pg.spec.ts` (this round's file, commit `c61b71e9`)
 
+
+---
+
+# Round 3 (real-PG proof v1 diagnosis)
+
+Real-PG proof v1 (`s11d/PROOF_V1_FINDING.md`) ran candidate `a52d20d6` (Round 2's commit,
+mis-titled in that finding as `fbb97b30`'s successor — the actual candidate committed was Round
+2's `c61b71e9` from `worktrees/fa72-s11d`, re-based by the parent onto the S11-A2 r2 base
+`54be96f1` inside the new standalone clone `worktrees/fa72-s11d2` as `a52d20d6` on top of
+`38d0d366`) against a full-history local clone. Result: **J20 passed 4/4 live**; **J19 leg A and
+leg B both failed**. Classification per the finding: B (candidate spec defects; no product
+finding implied). This round diagnoses and fixes both, working in `worktrees/fa72-s11d2` on
+branch `fa72/s11d-r2`, **one new commit on top of `38d0d366`** — no amend, no rebase.
+`worktrees/fa72-s11d` (Round 1/2's worktree) was not touched this round, per the parent's
+instruction.
+
+## Diagnosis
+
+### Leg A — `redrive.pushes` expected 1, received 0 (`journey-full.pg.spec.ts:270`)
+
+**Root cause**: the assertion encoded a wrong assumption about the product's re-drive contract,
+never checked against a live-passing precedent before Round 1/2.
+
+- `src/scout/scout.service.ts:369-371` (the docblock immediately above `completeServerRun`)
+  states explicitly: "the stored claim stays the arbiter input, and **the push and analytics
+  event stay first-claim-only**."
+- The code enforces this exactly: the P2002 branch at `src/scout/scout.service.ts:407-412`
+  (taken when a second claim hits the ledger's unique constraint because the first claim already
+  committed — the G1 re-drive path) calls `this.lifecycle.onTransferSettled(...)` directly and
+  never calls `notifyComplete` or `analytics.capture`. Those two calls only happen on the
+  **first-claim** success path at lines 415-419, which the interrupted worker never reached
+  because it was killed before getting there.
+- The precedent that already exercises this exact shape live and passes:
+  `test/scout/s11/settle-redrive.pg.spec.ts:263-266` — the `J12 (G1)` case calls
+  `expectNoClaimSideEffects(replay)` on the winning re-drive claim, and that helper
+  (`settle-redrive.pg.spec.ts:231-235`) asserts `expect(r.pushes).toBe(0)` and
+  `expect(r.pushCalls).toEqual([])`. Every other G1/re-drive case in that file
+  (`J12 edge`, `J13`, `J14`) asserts the same `expectNoClaimSideEffects` on its own replay.
+- **Fix**: `journey-full.pg.spec.ts:270` (now further down after the added comment) changed from
+  `expect(redrive.pushes).toBe(1)` to `expect(redrive.pushes).toBe(0)`, with a comment citing
+  both the service docblock and the precedent spec's line numbers. `redrive.queries.filter(
+  isTerminal)).toHaveLength(1)` was already correct and unchanged — the terminal write still
+  happens exactly once, only the notification/analytics side effects are absent.
+- No product change; this is a genuine spec defect fixed by aligning with documented,
+  live-verified behavior. **Not a product finding.**
+
+### Leg B — `report.coverage` undefined (`journey-full.pg.spec.ts:157` via `:376`)
+
+**Root cause**: a field-name mismatch. The local `Report`/`byFamily`/`coverage` helpers
+(originally at `journey-full.pg.spec.ts:150-159`) read `report.coverage`, but the real report
+type has no such array field.
+
+- `src/scout/reconciliation/types.ts:301-324` (`ReconciliationReportV1`) declares
+  `readonly families: readonly ReconciliationFamilyV1[]` (line 324) — the per-family coverage
+  array is named **`families`**, not `coverage`.
+- A same-named but unrelated `coverage` field does exist, but on a different type entirely:
+  `RunFactsV1` at `types.ts:242` (`readonly coverage: Readonly<Record<string, CoverageFact>> |
+  null`) — a `Record`, not an array, and not the shape `ScoutRunSettledBasis.report` (what
+  `settledBasisRows` returns) ever produces.
+- The live-passing precedent already reads the correct field:
+  `test/scout/s10/s10-unseen.pg.spec.ts:302-303` — `const familyOf = (basis, family) =>
+  basis.report.families.find((f) => f.family === family);`. D2's own spec exercises this
+  accessor across many live-passing cases (`s10-unseen.pg.spec.ts:319-445`).
+- **Fix**: renamed the local `Report` type's field from `coverage` to `families`, and both
+  helper bodies (`coverage()`, `byFamily()`) from `report.coverage` to `report.families`. No
+  other field on `ReconciliationFamilyV1` (`types.ts:267-292`) needed a rename — `family`,
+  `completeness_basis`, `observed_unique`, `qualifiers` are all declared there verbatim and
+  already matched what this spec asserted.
+- No product change; this is a genuine spec defect (wrong field name), fixed to match the real
+  DTO. **Not a product finding.**
+
+## Audit of every other J19 report/cell/roster/status field access
+
+Per the parent's instruction, every remaining J19 assertion in both legs was checked against a
+live-passing precedent, citing the precedent's file:line. No further mismatches found:
+
+| Assertion (journey-full.pg.spec.ts) | Field(s) | Precedent (file:line) | Result |
+|---|---|---|---|
+| `basis.report` `toMatchObject({ basis: 'settled', conditions: [] })` | `basis`, `conditions` | `src/scout/reconciliation/types.ts:307-313` (`ReconciliationReportV1.basis`); `s10-unseen.pg.spec.ts:319` (`conditions`) | Match — declared fields, live-asserted shape |
+| `basis.report.required_families` | `required_families` | `types.ts:315`; `s10-unseen.pg.spec.ts:320` | Match |
+| `byFamily(...).observed_unique`, `.completeness_basis`, `.qualifiers` | `ReconciliationFamilyV1` fields | `types.ts:267-292`; `s10-unseen.pg.spec.ts:322,325-327,436` | Match (after the `families` rename above) |
+| `run.terminal_status`, `run.reason_code` | run-row fields | `s10-unseen.pg.spec.ts:314-315,351-352` | Match |
+| `redrive.queries.filter(isTerminal)` | query-shape helper | `settle-redrive.pg.spec.ts:52` (identical `isTerminal` definition) and `:263` (same usage) | Match |
+| `third.pushes` `toBe(0)` (no-op third claim) | `pushes` | `settle-redrive.pg.spec.ts:233` (`expectNoClaimSideEffects`, asserted on every replay including a closed-gate no-op) | Match — already correct, no change needed |
+| `roster.result.accounting.staged`, `.persons`, `.roster_bridge_pending` | roster response fields | `src/scout/scout-roster.service.ts:164-179` (response object literal) | Match |
+| `person.state`, `.source_platform`, `.source_person_id` | roster person fields | `src/scout/scout-roster.service.ts:220-227` (`materialize()` push shape) | Match |
+| `person.state` `toBe('InvitePending')` | Prisma enum value | `prisma/schema.prisma:6952` (`InvitePending` enum member; Prisma serializes enum members as their literal name) | Match |
+| `midStatus.result` `toMatchObject({ status, phase, claimed_status })`; `midStatus.queries.filter(...)` `toEqual([])` | status-read fields | `settle-redrive.pg.spec.ts` `statusOf` usage pattern (same harness function, same shape) | Match |
+| `readiness.result.readiness` `{ run, source_declared, declared_platforms }`; readiness never leaks `partial`/reason codes | readiness fields | `src/extension-pair/extension-pair.service.ts:241` (readiness only ever emits `open`/`terminal`, cited in Round 1) | Match — already verified pre-Round-1 |
+
+No further B-class defects found. The two fixes above (leg A's `pushes`, leg B's `families`) are
+the complete set required to make both legs consistent with already-live-passing precedent.
+
+## Commands run (Round 3), with RC
+
+All heavy commands ran under `flock -w 3600 .../test-validation.lock`, `PROOF_SLOT_FREE`
+re-checked present before each. No PostgreSQL, no push.
+
+| # | Command (abbreviated) | RC |
+|---|---|---|
+| 1 | Read `s11d/PROOF_V1_FINDING.md` and `s11d/binding/v1/run/jest-full.log` in full (read-only; never edited) | 0 |
+| 2 | Read `test/scout/s11/settle-redrive.pg.spec.ts` in full (the G1 re-drive precedent) | 0 |
+| 3 | Read `test/scout/s10/s10-unseen.pg.spec.ts:1-60,290-450` (the `familyOf`/D2 precedent) | 0 |
+| 4 | `grep`/`read` of `src/scout/scout.service.ts` (`complete`, `completeServerRun`, `notifyComplete`), `src/scout/reconciliation/types.ts` (`ReconciliationReportV1`, `ReconciliationFamilyV1`, `RunFactsV1`), `src/scout/scout-roster.service.ts`, `prisma/schema.prisma` | 0 |
+| 5 | `edit` — flipped `redrive.pushes` to `toBe(0)` with citation comment (leg A) | 0 |
+| 6 | `edit` — renamed `Report.coverage` → `Report.families` and both helper bodies (leg B) | 0 |
+| 7 | `prettier --write` then `--check test/scout/s11/journey-full.pg.spec.ts` | 0 |
+| 8 | `flock ... eslint --no-warn-ignored --max-warnings 0 test/scout/s11/journey-full.pg.spec.ts` | 0 |
+| 9 | `flock ... tsc --noEmit` | 0 |
+| 10 | `flock ... jest --runInBand --runTestsByPath test/utils/g2-s11-db-guard.spec.ts test/scout/s11/journey-full.pg.spec.ts --verbose` (no `G2_S11_DATABASE_URL`) | 0 — `Tests: 6 skipped, 95 passed, 101 total` |
+| 11 | `git add test/scout/s11/journey-full.pg.spec.ts`; `node scripts/check-r75.js --mode=staged` | 0 — "OK — no positive token change" |
+| 12 | `git commit -F <msg file>` under flock, `GIT_AUTHOR_NAME/EMAIL`/`GIT_COMMITTER_NAME/EMAIL` = `Bradley Gleave <bradley@bradleytgpcoaching.com>`, no `--no-verify`, **new commit, not amend** | First attempt RC=1 (lefthook's own `tsc` hook OOM'd — "JavaScript heap out of memory" — while a concurrent sibling worker's `tsc` process was also running under the same flock at the same moment; no commit was created, tree remained staged-but-uncommitted). Re-ran after confirming memory was free and no competing process remained, with `NODE_OPTIONS=--max-old-space-size=4096` exported for the hook's own subshell: RC=0 — commit `aed23289` created, all six lefthook hooks (`prod-readiness-quick`, `banned-cast-tokens`, `eslint`, `prettier`, `tsc`, `no-ai-tokens`) passed |
+| 13 | `git status --porcelain --untracked-files=all`; `git log --oneline -5`; `git diff --name-only 03e7a2344ef95b019c751983527bbc9f78200921 HEAD -- src prisma`; `git diff --name-only 03e7a2344ef95b019c751983527bbc9f78200921 HEAD`; final re-run of command #10 post-commit | 0 each — tree clean; `-- src prisma` empty; full diff shows only `test/scout/s11/journey-full.pg.spec.ts` (this round) plus `test/utils/g2-s11-harness.ts` (the parent's own prior S11-A2 r2 rebase commit `54be96f1`, not touched by this round's commit — confirmed via `git show --stat` and `git log -- test/utils/g2-s11-harness.ts` showing only `54be96f1`); same 6-skipped/95-passed result |
+
+## Round 3 head / tree / blob
+
+- **HEAD:** `aed23289024898cceca7385d3778cd7373b7424d` (branch `fa72/s11d-r2`, one new commit on
+  top of the proof-v1 candidate `38d0d366` — not an amend, not a rebase)
+- **Tree:** `6787b25531ab7614c9de70e745381a996d66b119`
+- **Blob** (`test/scout/s11/journey-full.pg.spec.ts`): `9ca2ebb6c1f0f43d3984dfcaf94021de03abbd6d`
+  (sha256 of working-tree content: `110a02df004301f553fdbce44a77872d29f3484d6aa25fa7bb6bc914f79abffe`)
+- `git log --oneline -5`:
+  ```
+  aed23289 fix(scout): S11-D round 3 — J19 leg A push count and leg B report field name
+  38d0d366 test(scout): S11-D round 2 — gate J20 live, assert roster-bridge qualifier, cover full range
+  a52d20d6 test(scout): S11-D full two-host journey (J19) and core-diff check (J20)
+  54be96f1 test(scout): S11-A2 r2 reset the S10-B tables only by cascade
+  03e7a234 test(scout): S11-A2 two-source induction proof J09-J11
+  ```
+- Working tree at finish: clean.
+- Author and committer both `Bradley Gleave <bradley@bradleytgpcoaching.com>`; no AI/co-author
+  trailers.
+
+## Round 3 files + LOC
+
+Still the single spec file (relative to the S11-A2 r2 base `03e7a2344ef95b019c751983527bbc9f78200921`,
+the harness file `test/utils/g2-s11-harness.ts` also differs, but that is the parent's own
+`54be96f1` commit, not this round's):
+
+| path | LOC (round 3 diff) | total LOC |
+|---|---|---|
+| `test/scout/s11/journey-full.pg.spec.ts` | 17 insertions(+), 5 deletions(-) | 633 |
+
+## Round 3 expected live count
+
+Unchanged from Round 2's structure — still **6 `it()` cases, ALL gated inside `live(...)`**:
+2 J19 legs + 4 J20 checks. What changes this round is correctness, not count: J20 already
+passed 4/4 in proof v1; J19's 2 legs are now expected to pass as well, since both diagnosed
+defects (leg A's push-count assumption, leg B's field name) are fixed and independently verified
+against live-passing precedent code paths and specs. This builder did not and cannot run the
+live PG lane to confirm (WORKER_RULES §3) — that confirmation is proof v2, parent-owned.
+
+## Round 3 gate results
+
+| Gate | Result |
+|---|---|
+| Prettier | PASS |
+| ESLint (`--max-warnings 0`) | PASS (0 errors, 0 warnings) |
+| `tsc --noEmit` (manual, pre-commit) | PASS (0 errors) |
+| `banned-cast-tokens` (R75) | PASS — "OK — no positive token change" |
+| No-DB jest — guard spec | PASS, **95/95** unchanged |
+| No-DB jest — `journey-full.pg.spec.ts` | PASS — all 6 cases still show `skipped` (fix is inside the live-gated body; no-DB behavior is unaffected by design) |
+| Lefthook (`git commit`), attempt 1 | **FAIL** (RC=1) — the hook's own `tsc` sub-process hit an out-of-memory abort while a concurrent sibling worker held the same flock lock for its own `tsc` run; no commit was created (verified via `git log`/`git status` immediately after) |
+| Lefthook (`git commit`), attempt 2 | PASS (RC=0) — re-ran after confirming free memory and no competing process, with a larger `NODE_OPTIONS` heap cap for the hook's subshell; all 6 hooks passed, commit `aed23289` created |
+| `git diff --name-only <base> HEAD -- src prisma` | Empty |
+| Real PostgreSQL run | Not performed this round either — parent-only; this round's diagnosis is verified by source-reading and citing precedent specs/lines, per the finding's own required closure ("diagnose both against passing live specs, fix the spec only") |
+
+## Round 3 risks
+
+- **Risk 5 (C, record only).** The first commit attempt failed with an out-of-memory abort in
+  the pre-commit `tsc` hook, caused by resource contention with a concurrent sibling worker
+  under the shared flock lock, not by any defect in this round's change (the identical manual
+  `tsc --noEmit` had already passed cleanly moments earlier under the standard 3072 MB cap).
+  **CONCRETE HARM:** none — no commit was created by the failed attempt (verified), so no
+  corrupt or partial commit exists on `fa72/s11d-r2`; the retry succeeded cleanly. **MINIMUM
+  CLOSURE:** none needed beyond what was done (confirm free memory, retry with a larger heap cap
+  for the hook's own subshell); noting it here in case the same contention recurs for a sibling
+  worker's own heavy `tsc`/`jest` runs under this shared lock.
+- **This builder cannot run the live PG lane** (WORKER_RULES §3), so leg A's and leg B's fixes
+  are verified by source-reading (`scout.service.ts`'s own docblock and P2002 branch,
+  `reconciliation/types.ts`'s field declarations) and by citing live-passing precedent specs
+  (`settle-redrive.pg.spec.ts`, `s10-unseen.pg.spec.ts`), not by an actual passing live jest run
+  of this file. **CONCRETE HARM:** none identified — both root causes trace to an explicit,
+  unambiguous source-code contract (the docblock's own words; the type declaration's own field
+  name) rather than to inferred behavior. **MINIMUM CLOSURE:** proof v2 (parent-owned) will
+  confirm both legs pass for real.
+- **B3 remains parent-owned and is already closed** in this base (`54be96f1`, "S11-A2 r2 reset
+  the S10-B tables only by cascade" — confirmed present in the log above), consistent with the
+  parent's stated plan; no action was needed or taken on it this round.
+- Round 1's Risk 1, Risk 2, Risk 3, and Round 2's Risk 4 all still apply and are unchanged by
+  this round.
+
+## Sources (Round 3)
+
+- `execution/fa72efb2/s11d/PROOF_V1_FINDING.md` (the proof-v1 FAILED finding this round diagnoses)
+- `execution/fa72efb2/s11d/binding/v1/run/jest-full.log` (read-only; the preserved failing run's exact output, never edited)
+- `test/scout/s11/settle-redrive.pg.spec.ts:52,165,231-266,403` (the G1 re-drive precedent; `isTerminal`, `expectNoClaimSideEffects`, `pushes` assertions)
+- `test/scout/s10/s10-unseen.pg.spec.ts:302-303,314-327,436` (D2's `familyOf`/`basis.report.families` precedent)
+- `src/scout/scout.service.ts:281-419` (`complete`, `completeServerRun`, `notifyComplete`, the docblock at :369-371 and the P2002 branch at :407-412)
+- `src/scout/reconciliation/types.ts:242,267-292,301-324` (`RunFactsV1.coverage`, `ReconciliationFamilyV1`, `ReconciliationReportV1.families`)
+- `src/scout/scout-roster.service.ts:164-227` (roster response and `materialize()` shapes)
+- `prisma/schema.prisma:6952` (`PersonState.InvitePending` enum member)
+- `test/scout/s11/journey-full.pg.spec.ts` (this round's file, commit `aed23289`)
+
+# Round 4 (real-PG proof v2 diagnosis — T4 escalation)
+
+Proof v2 (`s11d/binding/v2/run/jest-full.log`, preserved, never edited; launcher `binding/v2/launcher.out`: `JEST_END full rc=1`,
+`Tests: 2 failed, 4 passed, 6 total`) ran candidate `aed23289` (Round 3). J20 passed 4/4 again. J19 leg A stopped at
+`journey-full.pg.spec.ts:313` (`lateReadiness.failure` was a 404 "Pairing session not found. Create a new pairing code."); J19 leg B
+stopped at `:426` (`roster.result.accounting.staged` expected 2, received 0). `s11d/PROOF_V2_FINDING.md` did not exist when this
+round started (only `PROOF_V1_FINDING.md`); the diagnosis below is taken from the v2 log itself. Work in
+`/home/user/workspace/worktrees/fa72-s11d2`, branch `fa72/s11d-r2`, ONE new commit on top of `aed23289` (no amend, no rebase), spec
+file only, through lefthook. No PostgreSQL, no push, no src/prisma/harness edit.
+
+## Diagnosis
+
+### Leg A — `pairCurrent` 404 after the terminal (`:312-313` pre-edit) — SPEC DEFECT, fixed
+
+- The harness signature is `pairCurrent(host, coach, nonce?)` → worker `pairing.current(input.coach, body.nonce)`
+  (`test/utils/g2-s11-harness.ts:322-323`; `test/utils/g2-s11-worker.cjs:403-404`). The spec passed `intentId` as that third
+  argument (live: `g2g_19`, `"body":{"nonce":"a4713392-…"}`, jest-full.log:240).
+- `ExtensionPairService.current(coachId, nonce)` filters `nonce ? { setup_nonce: nonce } : { superseded_at: null }`
+  (`src/extension-pair/extension-pair.service.ts:192-193`); `readSetup` does one `importIntent.findFirst` on that filter and throws
+  `NotFoundException('Pairing session not found. Create a new pairing code.')` when nothing matches (`:200-206`). This leg's
+  `pairInit` posted `body: {}` (`g2g_1`, log:2) → `init(coach, 's11-label', undefined)` → the intent row was created with
+  `setup_nonce: undefined` (NULL) (`:124-131`), so `setup_nonce = <intentId>` matches no row. **Nothing is consumed, bound or
+  expired at the terminal** — the same no-nonce `pairCurrent('P1', COACH_A)` already passed live earlier in this leg (`g2g_3`,
+  log:30, `status: paired`), and leg B's post-terminal `pairSession` read `run: 'terminal'` fine (`g2g_32`, log:422).
+- Live-passing precedent for the terminal read: S11-C `test/scout/s11/readiness.pg.spec.ts:139-145` (R4 "then terminal":
+  `h.pairCurrent('P1', COACH)` with NO nonce → `{ run: 'terminal', … }`), and `:82-83` (R1 compares `pairCurrent`'s echo to the
+  `pairSession` result including `import_intent_id`).
+- **Fix** (`journey-full.pg.spec.ts:321`): `h.pairCurrent('P2', COACH_A)` — no nonce, mirroring R4 exactly; plus
+  `expect(lateReadiness.result.import_intent_id).toBe(intentId)` (`:325`) so the "current setup" read is provably this run's
+  setup (`readSetup` echoes `import_intent_id: row.id`, service `:216`). Not a product finding.
+
+### Leg A — step-11 empty roster tightened (`:340`)
+
+While tracing leg B (below) it became clear that at this head the roster reader returns an empty projection for every S11 source
+regardless of what was staged, so `persons: []` / `staged: 0` alone did not discriminate "empty because none were staged" from "empty
+because the reader cannot see this source". Added `expect(h.persons(COACH_A)).toEqual([])` — the direct `Person` read
+`journey-induction.pg.spec.ts:147` and `settle-redrive.pg.spec.ts:146` use live — immediately before the roster read. Guaranteed by:
+no roster token in either native-clean set (`:224-226`, live-passed), the second source has no roster family
+(`journey-induction.pg.spec.ts:13`), `resetData()` deletes `Person` before each case (`g2-s11-harness.ts:292`), and only
+`clientsFamily.persist` writes `Person` (`src/scout/reconstruct/families.ts:83-101`).
+
+### Leg B — `accounting.staged` 0 vs 2 (`:443` post-edit) — PRODUCT FINDING, NOT bent. STOPPED.
+
+Full write-up: `s11d/S11D_R4_LEG_B_ROSTER_FINDING.md` (class B). Summary of the trace:
+
+- What `accounting.staged` counts: `scoutIngestEntity.count({ where: { coach_id, intent_id, entity_type: RECONSTRUCT_ENTITY_TYPE } })`
+  (`src/scout/scout-roster.service.ts:72-76,109`), `RECONSTRUCT_ENTITY_TYPE = 'clients'` (`src/scout/scout-reconstruct.dto.ts:91`).
+  Ledger counts and the page use the same literal (`:110-128`). No token resolution; no family/token parameter on the controller
+  (`scout-roster.controller.ts:85-90`) or in the worker action (`g2-s11-worker.cjs:409-416`).
+- What this run staged: `entity_type = 'u10-members'` (the source token; `scout-ingest.service.ts:88`; live `g2g_24`, log:310).
+  The engine reconstructs by token (`family-plan.ts:88-92`; `scout-reconstruct.service.ts:248-253`) and ledgers under
+  `ledgerType = row.entity_type ?? family.entityType` = `'u10-members'` (`:445`, `:576-582`). S9 joins on that same token identity
+  (`facts.service.ts:87-88,414-416`) — which is exactly why leg B's own settled-basis assertions PASSED live (`:399-417`:
+  `partial/unresolved_identities`, `observed_unique 2`, `qualifiers ['roster_bridge_pending']`).
+- Therefore the IMPORTER-G roster read sees `staged 0 / reconstructed 0 / persons []` for ANY token-mapped source at this head
+  (`u10-members`; S11-A1's `people`, `g2-s11-harness.ts:55-56`), while the Person rows exist (D2 (h) proves `persons: 2` by SQL,
+  `s10-unseen.pg.spec.ts:293,451`). The only live-passing roster-with-people precedent (`test/rls-g2-ledger-expand.spec.ts:244-256,310`)
+  ingests with the literal `entity_type: 'clients'`. S11-A1's step-11 roster read asserts only `intent_id` + cross-host equality
+  (`journey-core.pg.spec.ts:262-267`). D2 (h) never calls the roster reader.
+- The S11 decision record wording ("a native roster read (step 11) that lists exactly the reconstructed identities",
+  `docs/decisions/2026-09-26-s11-journey.md:432-433`) and the grant's leg-B wording are therefore genuinely contradicted by the
+  product for the `s10_unseen` source at this head; satisfying them needs a `src` change (reader resolving tokens through the
+  registry, or engine ledgering under the canonical family — the latter would move S9's join key). Per the grant's STOP rule and
+  D-S11-6, the assertion at `:443-453` is left byte-identical, and the finding is reported for re-grading instead.
+- Also true at S8-D1 (`worktrees/fa72-s8d1` HEAD `03b574e4`: `scout-roster.service.ts:75` and `scout-reconstruct.service.ts:445`
+  unchanged), so S8-D1's §6 patch expectation for this file (`s8d1/s8d1_build.md:125`, `accounting.staged === rosterIds.size`) is
+  unrunnable too. Sibling IMPORTER-I reader has the same `entity_type: family` scoping (`scout-entities.service.ts:113,180,236,330`) —
+  recorded, not asserted here.
+
+**Consequence for the next live run: leg B WILL still fail at `:443` on this commit.** Expected live result of r4 as-is: 5 passed /
+1 failed (leg A, J20×4 pass; leg B fails). Do not bind r4 expecting 6/6; the parent must first decide the leg-B re-grade.
+
+## Assertion trace (post-edit line numbers, `test/scout/s11/journey-full.pg.spec.ts` at `913811fd`)
+
+Legend: LIVE = already executed and passed in proof v2 (jest-full.log process names in brackets); PREC = live-passing precedent line;
+CODE = executing code path.
+
+| Line | Assertion | CODE (file:line) | PREC / LIVE | Status |
+|---|---|---|---|---|
+| 177-183 | pair init/redeem ok; `pairCurrent('P1')` paired | `extension-pair.service.ts:75-135,207-215` | LIVE g2g_1-3 | passes |
+| 185-190 | start ok, `runCount 1`, replayed start identical | `run.controller`/lifecycle start idempotent | LIVE g2g_4-5 | passes |
+| 195-200 | early readiness `open/false/0` | `extension-pair.service.ts:234-244` | LIVE g2g_6; readiness R2 `:93-98` | passes |
+| 205-216 | declare ok; mid readiness `open/true/2` | `:239-243` (distinct platforms) | LIVE g2g_7-8; readiness R3 `:112-117` | passes |
+| 220-226 | stagedCount = both native-clean sets; no `u10-members` token | `scout-ingest.service.ts:82-95`; fixture sets | LIVE g2g_9-12 | passes |
+| 231 | observation rows = first.families + second.families | S10-B observation store | LIVE g2g_13-14; induction J09 | passes |
+| 247-257 | victim paused `after-row`, killed; run open `reconciling`, epoch 1, no basis | `scout.service.ts:368-392` claim; S11-B kill | LIVE (g2g_15 absent = killed); settle-redrive `:165-230` | passes |
+| 261-269 | mid status `running/reconciling/success`, no writes | `scout.service.ts:460-540` | LIVE g2g_16 | passes |
+| 279-282 | re-drive ack, 1 terminal write, 0 pushes | `scout.service.ts:407-419` | LIVE g2g_17; settle-redrive `:231-266` | passes |
+| 284-290 | run `complete`, reason null, 1 basis row | arbiter CAS + settled basis | LIVE (reached :313) | passes |
+| 294-298 | third claim: ack, 0 terminal, 0 pushes, still 1 basis | closed-gate no-op path | LIVE g2g_18; settle-redrive J15 | passes |
+| 304-309 | report `settled`, `conditions []`, `required_families [clients, programs, workouts]`, all cells `source_signed_enumeration`, clients `observed_unique 0` | `reconciliation/types.ts:301-324` | LIVE (reached :313); D2 `s10-unseen.pg.spec.ts:311-335` | passes |
+| 322 | `pairCurrent('P2', COACH_A)` no failure | `extension-pair.service.ts:193` `{superseded_at:null}` → the one intent for COACH_A (init `:120-131`; `resetData` `:293` clears `ImportIntent`) | readiness R4 `:139-140`; same call LIVE g2g_3 | **FIXED r4** |
+| 325 | echoed `import_intent_id === intentId` | `extension-pair.service.ts:216` | readiness R1 `:82-83` | new r4 |
+| 326-330 | readiness `terminal/true/2` | `:241-243` (`terminal_status 'complete'` non-null; 2 declared platforms) | readiness R4 `:140-144`, R5 `:154-158`; LIVE g2g_32 (leg B, same shape) | passes |
+| 331 | body has no `complete` | `PairSessionResult` = status/import_intent_id/chosen_platform/readiness only (`:207-221`) | readiness R4 `:145` (`not.toContain('timed_out')`) | passes |
+| 340 | `h.persons(COACH_A)` = [] | `families.ts:83-101` only Person writer; no clients rows staged (`:224-226`) | induction `:147`, settle-redrive `:146` | new r4 |
+| 342-344 | roster P1 ok, `persons []`, `staged 0` | `scout-roster.service.ts:91-97` gate (terminal non-null), `:109` count, `:132` materialize | journey-core `:263-266` | passes (C: non-discriminating alone at this head — hence :340) |
+| 346-347 | roster P2 byte-identical | same deterministic object (`:165-179`; no time fields) | journey-core `:267` | passes |
+| 353-354 | status P1 == P2; `complete`/null | `getImportStatus` read-only at terminal | induction `:296-304`; journey-core `:253-258` | passes |
+| 373-386 | leg B pair/start/declare ok; stagedCount; roster ids distinct | as leg A | LIVE g2g_20-28 | passes |
+| 394-395 | complete ack | `scout.service.ts:368-419` | LIVE g2g_31 | passes |
+| 399-401 | `partial`, `unresolved_identities`, not `complete` | `reconcile.ts:136-146,347` | LIVE; D2 (h) `:432-433` | passes |
+| 404-417 | `conditions ['unresolved_identities']`; clients cell `source_signed_enumeration`, `observed_unique 2`, `qualifiers ['roster_bridge_pending']` | `facts.service.ts:145-147`; `types.ts:267-292` | LIVE; D2 (h) `:435-444` | passes |
+| 421-428 | `pairSession('P2')` terminal/true/2; no `partial`/reason leak | `extension-pair.service.ts:188-189,241-243` | LIVE g2g_32; readiness R5 `:153-159` | passes |
+| 436 | roster read ok (gate passes: `terminal_status 'partial'` non-null) | `scout-roster.service.ts:91-97` | LIVE g2g_33 | passes |
+| 442 | `roster_bridge_pending === true` | `scout-roster.dto.ts:42`; service `:178` | LIVE g2g_33 | passes |
+| **443** | `accounting.staged === 2` | `scout-roster.service.ts:72-76,109` counts `entity_type='clients'`; rows are `u10-members` | NO precedent exists for a token-mapped source; LIVE g2g_33 = 0 | **BLOCKED — product finding, unchanged** |
+| 447-450 | ids == staged roster ids; each `InvitePending`, `source_platform == first.platform` | would need ledger rows under `'clients'` (`:119-128`) — none exist for this run | `rls-g2-ledger-expand.spec.ts:244-256` only with literal `clients` token | blocked behind :443 (would receive `[]`) |
+| 453 | roster P2 byte-identical | deterministic object | journey-core `:267` | would pass |
+| 536-647 | J20 ×4 | unchanged | LIVE v1+v2 4/4 | passes |
+
+## Commands run (Round 4), with RC
+
+Heavy commands ran ONLY as `flock -w 3600 /home/user/workspace/execution/test-validation.lock bash -c '…'` with
+`/home/user/workspace/execution/fa72efb2/PROOF_SLOT_FREE` checked present immediately before (it was absent when this round started
+at ~19:46Z and appeared at 19:47Z; nothing heavy ran before that). No PostgreSQL, no push, no npm/prisma.
+
+| # | Command (abbreviated) | RC |
+|---|---|---|
+| 1 | Read (read-only) `WORKER_RULES.md`, `S11D_BUILD_GRANT.md`, `PROOF_V1_FINDING.md`, `s11d_build.md` r1-3, `s11d_review.md` r2-3, `binding/v1/run/jest-full.log` (via r3 report), `binding/v2/run/jest-full.log` (`rg -n PG17_PROCESS`, failure blocks :452-490), `binding/v2/launcher.out`, `S11D_PG_PROOF_GRANT.md`, `PARENT_REBASE_NOTE.md` | 0 (`cat PROOF_V2_FINDING.md` RC 1 — file does not exist) |
+| 2 | `nl -ba`/`rg` over `src/extension-pair/extension-pair.service.ts:60-135,180-280`, `test/scout/s11/readiness.pg.spec.ts:60-165`, `test/utils/g2-s11-harness.ts:219-330`, `test/utils/g2-s11-worker.cjs:380-470` | 0 |
+| 3 | `nl -ba`/`rg` over `src/scout/scout-roster.service.ts` (full), `scout-roster.controller.ts:60-90`, `scout-roster.dto.ts:30-45`, `scout-reconstruct.dto.ts:1-30,85-120`, `scout-reconstruct.service.ts:225-300,440-640`, `reconstruct/orchestration/family-plan.ts`, `reconstruct/families.ts:66-104`, `reconstruct/sources/s10_unseen.json`, `reconciliation/facts.service.ts:76-95` + `rg entity_type`, `scout-ingest.service.ts:80-95`, `scout-entities.service.ts` (`rg entity_type`) | 0 |
+| 4 | Precedent reads: `test/scout/s10/s10-unseen.pg.spec.ts:20-70,280-300,425-454`; `test/rls-g2-ledger-expand.spec.ts` (`rg roster|staged|entity_type`); `test/utils/g2-tq0-worker.cjs:78-96`; `test/scout/s11/journey-core.pg.spec.ts:225-274`; `journey-induction.pg.spec.ts:290-307,396-409`; `test/scout/roster/scout-roster.service.spec.ts` (`rg entity_type`); `docs/decisions/2026-09-26-s11-journey.md:115-135,420-440`; evidence `s8d/s8d_decision_record.md:40-52`, `s8d1/s8d1_build.md:20-40` + patch head; `git -C worktrees/fa72-s8d1 log -1` + `rg ledgerType|RECONSTRUCT_ENTITY_TYPE` there (read-only) | 0 |
+| 5 | `git status/log/branch` in fa72-s11d2 (clean, HEAD aed23289, branch fa72/s11d-r2); `ls PROOF_SLOT_FREE` | 0 (ls RC 2 at 19:46Z — absent; present from 19:47Z) |
+| 6 | `edit` ×3 on `test/scout/s11/journey-full.pg.spec.ts`: no-nonce `pairCurrent` + comment; `import_intent_id` echo assertion; `h.persons(COACH_A)` empty assertion + comment | 0 |
+| 7 | `prettier --write` then `--check` on the spec (prettier 3.9.9 from runtime/tools, light) | 0 ("unchanged", all files formatted) |
+| 8 | `flock … eslint --no-warn-ignored --max-warnings 0 test/scout/s11/journey-full.pg.spec.ts` | 0 |
+| 9 | `flock … tsc --noEmit` — first launch (plain `&` inside the tool shell) was torn down with the tool call and produced NO result (log empty; no tsc process; not counted as a pass or fail) | n/a (aborted, no output) |
+| 10 | `flock … tsc --noEmit` (relaunched via `nohup setsid`, `NODE_OPTIONS=--max-old-space-size=3072`) | 0 (`TSC_RC=0`) |
+| 11 | `flock … jest --runInBand --runTestsByPath test/utils/g2-s11-db-guard.spec.ts test/scout/s11/journey-full.pg.spec.ts` (no `G2_S11_DATABASE_URL`) | 0 — `Tests: 6 skipped, 95 passed, 101 total`; guard 95/95; pg spec skips cleanly |
+| 12 | `git add test/scout/s11/journey-full.pg.spec.ts`; `node scripts/check-r75.js --mode=staged` | 0 — "OK — no positive token change" |
+| 13 | `flock … git commit -F /tmp/s11d_r4_msg.txt` with `GIT_AUTHOR_*`/`GIT_COMMITTER_*` = Bradley Gleave <bradley@bradleytgpcoaching.com>, no `--no-verify`, NEW commit (not amend) | 0 — lefthook pre-commit: prod-readiness-quick ✔, banned-cast-tokens ✔, eslint ✔, prettier ✔, tsc ✔ (49.9 s); commit-msg no-ai-tokens ✔; `[fa72/s11d-r2 913811fd]` |
+| 14 | `git status --porcelain --untracked-files=all` (empty); `git diff --name-only aed23289 HEAD` (spec only); `… -- src prisma test/utils .github` (empty); `git diff --check aed23289 HEAD` | 0 each |
+| 15 | `write` `s11d/S11D_R4_LEG_B_ROSTER_FINDING.md`; append this Round 4 section to `s11d/s11d_build.md` | 0 |
+
+## Round 4 head / tree / blob
+
+- **HEAD:** `913811fdd37016e13ed4e01ddaed7678982641fc` (branch `fa72/s11d-r2`; parent `aed23289024898cceca7385d3778cd7373b7424d`;
+  one new commit, no amend)
+- **Tree:** `2d6c7bf75d70d90900b3f506cbfa3db41e01d9f7`
+- **Blob** `test/scout/s11/journey-full.pg.spec.ts`: `0a2d7b7e07716533fd39cddbe527344be286c7fa`
+  (sha256 `3c86d84045af3daf0d8dbec91a71ddafcd543fba16e06834dedf9ab484c6b903`; 650 LOC; r4 diff +18/−1)
+- Author and committer `Bradley Gleave <bradley@bradleytgpcoaching.com>`; no AI/co-author trailers (grep 0). Working tree clean.
+- `git log --oneline -3`: `913811fd` r4 · `aed23289` r3 · `38d0d366` r2.
+- Evidence files this round (not git-committed — parent commits): `s11d/S11D_R4_LEG_B_ROSTER_FINDING.md`, this section.
+
+## Round 4 expected live count
+
+Still 6 `it()` cases inside `live(...)`. Honest expectation for a live run of `913811fd` at this head: **5 pass / 1 fail** —
+leg A (fixed) + J20 ×4 pass; **leg B fails at `:443`** (`accounting.staged` 0 ≠ 2) until the roster-reader finding is re-graded. This
+builder did not and cannot run the PG lane (WORKER_RULES §3).
+
+## Round 4 risks
+
+- **B (reported, blocking leg B)** — `S11D_R4_LEG_B_ROSTER_FINDING.md`: IMPORTER-G roster reader is scoped to the literal `clients`
+  `entity_type`; the S8-G engine ledgers token-mapped sources under their token. CONCRETE HARM: native review shows an empty roster
+  (`staged: 0`, a silent zero) for every newly inducted source; J19 step 11 unprovable as worded; S8-D1 §6 patch expectation also
+  unrunnable. EXACT DECISION BLOCKED: landing S11-D leg B (#565). MINIMUM CLOSURE: parent/owner re-grade — reader token→family
+  resolution (natural home S8-D2) or an explicit decision-record re-wording of step 11 with leg B asserting Person rows by SQL.
+  EXECUTION UNLOCKED: S11-D landing; truthful S8-D2 roster contract.
+- **C (recorded)** — sibling IMPORTER-I entities reader has the same `entity_type: family` scoping; not asserted by this file.
+- **C (recorded)** — the r4 `h.persons(COACH_A)` assertion is a tightening of an existing step-11 claim, not a new worker action or
+  harness change (`h.persons` already exists and is used live by two S11 specs).
+- **C (recorded)** — command #9: a heavy command launched with a bare `&` inside a tool shell was torn down with the call and left no
+  result; relaunched with `nohup setsid` and completed RC 0. No lock was stolen or left held (`flock` exits with its child).
+- Rounds 1-3 risks unchanged.
+
+## Sources (Round 4)
+
+- `execution/fa72efb2/s11d/binding/v2/run/jest-full.log:2-490` and `binding/v2/launcher.out` (read-only)
+- `src/extension-pair/extension-pair.service.ts:75-135,188-249`
+- `test/scout/s11/readiness.pg.spec.ts:73-160`
+- `test/utils/g2-s11-harness.ts:55-62,219-330`; `test/utils/g2-s11-worker.cjs:397-416`
+- `src/scout/scout-roster.service.ts:57-180`; `scout-roster.controller.ts:77-90`; `scout-roster.dto.ts:33-42`; `scout-reconstruct.dto.ts:13-21,91`
+- `src/scout/scout-reconstruct.service.ts:233-290,440-612`; `src/scout/reconstruct/orchestration/family-plan.ts:82-100`;
+  `src/scout/reconstruct/families.ts:75-103`; `src/scout/reconstruct/sources/s10_unseen.json`; `src/scout/scout-ingest.service.ts:82-95`
+- `src/scout/reconciliation/facts.service.ts:78-91,404-423`
+- `test/scout/s10/s10-unseen.pg.spec.ts:56-58,292-300,429-453`; `test/rls-g2-ledger-expand.spec.ts:233-317`;
+  `test/scout/s11/journey-core.pg.spec.ts:253-274`; `test/scout/s11/journey-induction.pg.spec.ts:147,295-306`
+- `docs/decisions/2026-09-26-s11-journey.md:117-129,424-435`
+- `execution/fa72efb2/s8d1/s8d1_build.md:27,38,111,125`; `worktrees/fa72-s8d1` @ `03b574e4` (read-only rg)
+
+Addendum (end of Round 4): `s11d/PROOF_V2_FINDING.md` appeared during this round (parent-written). Its two stop points (`:313` 404
+on `pairCurrent`; `:426` `accounting.staged` 0 vs 2) match the v2-log diagnosis above; its stated assumption for leg A ("the pairing
+session is still readable after the terminal") is confirmed TRUE by the code — the 404 was the nonce-argument misuse, not readability.
