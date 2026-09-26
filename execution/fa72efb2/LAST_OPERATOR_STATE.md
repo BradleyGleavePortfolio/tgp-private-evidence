@@ -1,4 +1,13 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 17:45Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 18:50Z)
+
+- LANDED 18:45:20Z: S11-A2 r2 54be96f1 on integration/importer (FF from dda794d7, PR #564). Proof v1 FAILED (class B, preserved s11a2/PROOF_V1_FINDING.md: resetData deleted S10-B insert-only tables directly) → r2 (cascade-only reset, T4 delta GO) → binding v2 T3 GO → END rc=0 127/127 (rls 6, journey 8, readiness 6, redrive 8, induction 4, guard 95); CI green.
+- OFFICIAL OWNER DECISION: D-S8-2 option (a) + D-S8-LINK L1–L8 DECIDED (OWNER_DECISION_S8D_2026-09-26.md "OFFICIAL"; evidence 5a3e9f2).
+- S8-D decision record: draft ded755ab (fa72/s8d) independent T4 NO-GO (s8d/s8d_review.md B1 RLS claim false for CheckIn coach policy; B2 proposal lifecycle; B3 fresh invite on every re-link; B4 D1 create-only/Deleted; B5 D4b+D5 one release gate). Round 2 in progress. Owner questions OQ-1,2,6,7,9,10,12,13 open (safe interim defaults; D1/D2 independent of them).
+- S11-D: J19/J20 spec (T2) review round 1 NO-GO → round 2 GO; re-based onto 54be96f1 as 38d0d366 (fa72-s11d2, standalone) = land/s11d PR #565; binding v1 (bootstrap + full 6 + guard 95) being built.
+- Repaired: S11-D builder used `git worktree add` from repos/backend and rewrote its shared origin URL to no_push; restored (worktree-scoped config). LEARNINGS.md.
+- NEXT: S11-D binding review → proof → land; S8-D round 2 → re-review → land doc → S8-D1 (typed person handoff, T4); S12 prep to owner boundary.
+
+## 17:45Z
 
 - LANDED 17:42:43Z: S11-B r2 dda794d7 on integration/importer (FF from 275e458c, PR #563). LANDED 17:42:45Z: mobile readiness panel a876268c on mobile main (FF from affc2818, PR #296).
 - OWNER DECISION: D-S8-2 option (a) direction approved (OWNER_DECISION_S8D_2026-09-26.md) + linking answers (email OR phone chosen by client among coach-held contacts; client confirmation always; 30-day undo — both sides recommended, pending confirmation). Next: linking decision record draft + independent T4 security review → Bradley sign-off before S8-D/E claim build.

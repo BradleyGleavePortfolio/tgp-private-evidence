@@ -2,7 +2,7 @@
 
 ## CURRENT: EXEC-FA72EFB2, 2026-09-26 15:20Z
 
-Owner takeover (session fa72efb2). Read `execution/fa72efb2/TAKEOVER.md` and `execution/fa72efb2/LAST_OPERATOR_STATE.md`; they supersede the sections below, which are preserved as history. Live: integration/importer dda794d7 (S11-B landed 17:42:43Z on D2 275e458c / S11-C 7fdcbc04); mobile main a876268c (readiness panel 17:42:45Z); backend main 1c10e2a1, extension main a889f4ad unchanged.
+Owner takeover (session fa72efb2). Read `execution/fa72efb2/TAKEOVER.md` and `execution/fa72efb2/LAST_OPERATOR_STATE.md`; they supersede the sections below, which are preserved as history. Live: integration/importer 54be96f1 (S11-A2 landed 18:45:20Z on S11-B dda794d7); mobile main a876268c (readiness panel 17:42:45Z); backend main 1c10e2a1, extension main a889f4ad unchanged.
 
 ## CURRENT: EXEC-D3A9F701, 2026-09-26 02:25Z
 
