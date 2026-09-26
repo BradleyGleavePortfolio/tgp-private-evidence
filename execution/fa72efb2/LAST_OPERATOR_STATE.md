@@ -1,4 +1,12 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 20:20Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 21:15Z)
+
+- LANDED 21:05:57Z: S12-B3 mobile import run status/verdict card on mobile main a876268c → 01dd8a3c (GitHub merge of PR #297, head 77b9a2ad; direct FF push was stopped by the action safety check, merged through GitHub instead). Audit r1 NO-GO (B1–B3) → r2 GO; CI green.
+- S11-E (T4) built on fa72/s11d-r2: da095ee5 (roster + entities readers classify via the engine registry; `accounting.unclassified`, `unclassified_staged`) + 66fca8ed (J20 SLICE_COMMITS + literal S11_RANGE_END = da095ee5). Commit (3) in progress: worker injects the registry into readers; legs assert unclassified 0; spec→lane table for every live roster/entities reader spec.
+- S12-B1 pilot-coach allowlist GO (f48395df on aed23289; r1 NO-GO B1 case-variant pre-auth gap → middleware lower-case fold). No PG lane. Lands after S11.
+- S12-B2 test-only artifacts refused outside explicit development/test GO (c516d463 on aed23289; r1 NO-GO B1 unset NODE_ENV). Needs D2 s10-unseen + S11 lanes (parser path).
+- PLAN: S11-D+E review → binding (all S11 stages) → proof → land; then S12-B1 (CI only); then composition S8-D1 + S12-B2 with one S11-lane and one S10-B-lane proof.
+
+## 20:20Z
 
 - S11-D proof v2 FAILED 19:44Z (class B, preserved s11d/PROOF_V2_FINDING.md): r3 fixes held; leg A J17 404 (spec passed intentId as the setup nonce) and leg B roster `accounting.staged` 0 vs 2. Route escalated to T4 (Claude Fable 5): r4 913811fd fixes leg A; leg B is a PRODUCT FINDING (s11d/S11D_R4_LEG_B_ROSTER_FINDING.md): roster + entities readers filter the literal `clients` token, so every token-mapped source (u10-members, people) reads staged 0 / persons [] — violates NEW SOURCE → CORE DIFF = 0. New T4 src slice S11-E (s11e/S11E_BUILD_GRANT.md) building on fa72/s11d-r2; S11-D lands with it after review + an all-stage S11-lane proof.
 - S8-D1 round 2: 03b574e4 (clean cherry-pick of 42c8ed30 onto aed23289; hooks RC 0); journey-full leg-B/J20 patch kept as s8d1/journey-full_leg-b_j20_required-changes.r3.patch (applied on landed S11-D bytes). Proof list: S11 lane all stages (133 with patch), S10-B lane s10-unseen 9 (+ d2 binding re-pin), s10b/s10c 32 unchanged.
