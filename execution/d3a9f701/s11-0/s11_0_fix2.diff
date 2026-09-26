@@ -1,0 +1,38 @@
+--- s11_0_decision_draft.pre-fix-2.md	2026-09-26 04:54:37.279187820 +0000
++++ s11_0_decision_draft.md	2026-09-26 04:54:37.291187820 +0000
+@@ -313,9 +313,14 @@
+    neither read nor change the first coach's intent, run, declaration, observation or native
+    rows. This is a no-foreign-access property, not one response code on every route:
+    - routes whose accepted contracts answer 404 for a foreign or unknown intent keep that
+-     uniform 404 (setup reads, `import/status`, `runs/start|cancel`, reconstruct reads);
+-   - `POST scout/progress` keeps its accepted 204 ignore for a foreign, fenced or unstarted run
+-     (`scout.controller.ts` L66-85; `scout.service.ts` L125-155);
++     uniform 404 (setup reads, `runs/start|cancel`, reconstruct reads). `import/status` answers
++     404 for a foreign intent only while coach B has no evidence of its own under that string;
++   - `POST scout/progress` keeps its accepted 204 (`scout.controller.ts` L66-85;
++     `scout.service.ts` L125-155). A UUID owned by coach A resolves as legacy for coach B
++     (`lifecycle.service.ts` L221-241), so B's snapshot is cached and flushed under B, with no
++     ingest-row FK (`scout.service.ts` L143-173, L197-225). B's `import/status` may then read that
++     B-owned snapshot (L427-457). This is accepted behaviour and not a leak, because nothing of
++     coach A's is written, cached or disclosed;
+    - legacy (non-UUID) intent strings keep their legacy semantics and are asserted separately.
+ 6. **No customer-facing side effect.** No notification, drip, email or message reaches a
+    coach's client during steps 5 to 8. The only push is the existing coach-directed
+@@ -375,9 +380,14 @@
+   other host sees the same terminal.
+ - **J07 (A1)** Tenant isolation. Coach B's journey interleaves on P1 and P2.
+   - Cross-coach calls to 404-contract operations get the uniform 404 (D-S11-7(5)).
+-  - A cross-coach `/progress` gets 204. It writes no gate update, no phase or
+-    `last_observed_at` change and no cached snapshot for the foreign run, and leaves nothing
+-    readable by either coach.
++  - A cross-coach `/progress` gets 204.
++  - **No foreign access:** nothing is written to, cached for, or readable from coach A's run
++    or rows by coach B. That means no gate update, no change to A's phase or
++    `last_observed_at`, no A-keyed snapshot, and no A field in any response to B.
++  - Coach B may get a B-owned legacy snapshot keyed by that intent string, and B's
++    `import/status` may return it (D-S11-7(5)). This is accepted behaviour, not a leak.
++  - B's `import/status` for A's intent answers 404 before B creates any evidence of its own
++    under that string.
+   - Legacy intent strings are covered by a separate case.
+   - Row counts and all of coach A's run fields are exactly per coach before and after.
+ - **J08 (A1)** Side effects. Across J01-J07, notification, drip, email and messaging spies show

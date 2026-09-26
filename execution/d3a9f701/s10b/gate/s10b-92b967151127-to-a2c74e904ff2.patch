@@ -1,0 +1,4082 @@
+diff --git a/prisma/migrations/20270124000000_scout_run_observation_expand/down.sql b/prisma/migrations/20270124000000_scout_run_observation_expand/down.sql
+new file mode 100644
+index 00000000..b5e5243e
+--- /dev/null
++++ b/prisma/migrations/20270124000000_scout_run_observation_expand/down.sql
+@@ -0,0 +1,78 @@
++-- Reverse of 20270124000000_scout_run_observation_expand (G2-S10-B).
++-- Disposable/pre-use only. Returns the catalog to the accepted S7-L1 (+S8-B) shape: drops ONLY
++-- the three S10 run tables (ScoutRunDeclaration, ScoutRunObservation, ScoutRunSettledBasis, with
++-- their own keys, constraints, FKs, triggers and policies) and the two trigger functions this
++-- expand created. ScoutImport, its rows, keys, RLS flags and policies are untouched. Refuses to
++-- erase even one recorded declaration, observation or settled basis: once any row exists in any
++-- of the three tables the schema is retained and repair is forward-only (same doctrine as the C1,
++-- S7-L1 and S8-B downs; S7L-DOC L273). Refuses when S10-B is absent or not exactly as shipped, so
++-- raw reruns fail atomically; the recorded migration history is not rewritten here.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++-- Do not certify emptiness from an RLS-filtered view, even for a table owner.
++-- This setting rejects filtered queries; it does not disable or bypass RLS.
++SET LOCAL row_security = off;
++
++DO $$
++BEGIN
++  -- S10-B exactly as shipped. Presence is tested first (by name, no regclass cast) so a pre-S10-B
++  -- database or a rerun receives this fixed text, not a raw undefined-table error; the table
++  -- locks are taken only once the relations are known to exist.
++  IF (
++    SELECT count(*) FROM pg_catalog.pg_class t
++    WHERE t.oid IN (to_regclass('public."ScoutRunDeclaration"'), to_regclass('public."ScoutRunObservation"'),
++                    to_regclass('public."ScoutRunSettledBasis"'))
++      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++  ) <> 3 OR to_regprocedure('public.scout_run_observation_insert_only()') IS NULL
++    OR to_regprocedure('public.scout_run_declaration_one_challenge()') IS NULL THEN
++    RAISE EXCEPTION 'G2-S10B observation tables absent';
++  END IF;
++  LOCK TABLE public."ScoutRunObservation", public."ScoutRunDeclaration", public."ScoutRunSettledBasis"
++    IN ACCESS EXCLUSIVE MODE;
++  IF (
++    SELECT count(*) FROM pg_catalog.pg_constraint c
++    WHERE c.contype = 'f' AND c.convalidated
++      AND c.confrelid IN (to_regclass('public."ScoutImport"'), to_regclass('public."ScoutRunDeclaration"'))
++      AND c.conname IN ('ScoutRunDeclaration_coach_id_intent_id_fkey', 'ScoutRunObservation_coach_id_intent_id_fkey',
++                        'ScoutRunObservation_declaration_fkey', 'ScoutRunSettledBasis_coach_id_intent_id_fkey')
++  ) <> 4 OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_index i
++    WHERE i.indexrelid = to_regclass('public."ScoutRunObservation_unit_key"')
++      AND i.indrelid = 'public."ScoutRunObservation"'::regclass
++      AND i.indisunique AND i.indisvalid AND i.indpred IS NULL
++      AND pg_get_indexdef(i.indexrelid) =
++        'CREATE UNIQUE INDEX "ScoutRunObservation_unit_key" ON public."ScoutRunObservation" USING btree (coach_id, intent_id, execution_epoch, source_platform, account_scope_id_digest, family)'
++  ) OR (
++    SELECT count(*) FROM pg_catalog.pg_trigger g
++    WHERE NOT g.tgisinternal
++      AND g.tgrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
++                        'public."ScoutRunSettledBasis"'::regclass)
++      AND g.tgname IN ('ScoutRunDeclaration_one_challenge', 'ScoutRunDeclaration_insert_only',
++                       'ScoutRunDeclaration_no_truncate', 'ScoutRunObservation_insert_only',
++                       'ScoutRunObservation_no_truncate', 'ScoutRunSettledBasis_insert_only',
++                       'ScoutRunSettledBasis_no_truncate')
++  ) <> 7 OR (
++    SELECT count(*) FROM pg_catalog.pg_policy p
++    WHERE p.polrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
++                         'public."ScoutRunSettledBasis"'::regclass)
++  ) <> 9 THEN
++    RAISE EXCEPTION 'G2-S10B observation tables absent';
++  END IF;
++  -- Refuse to erase recorded S10 facts. Fixed, identifier-free text; nothing is named.
++  IF EXISTS (SELECT 1 FROM public."ScoutRunDeclaration")
++    OR EXISTS (SELECT 1 FROM public."ScoutRunObservation")
++    OR EXISTS (SELECT 1 FROM public."ScoutRunSettledBasis") THEN
++    RAISE EXCEPTION 'Run declaration or observation state exists; retain schema and use compatible forward repair';
++  END IF;
++END $$;
++
++-- No CASCADE: any dependent object makes the drop refuse atomically. Policies, indexes, triggers,
++-- FKs and CHECKs of each table go with it; the observation table goes first (it references the
++-- declaration table).
++DROP TABLE public."ScoutRunObservation";
++DROP TABLE public."ScoutRunDeclaration";
++DROP TABLE public."ScoutRunSettledBasis";
++DROP FUNCTION public.scout_run_declaration_one_challenge();
++DROP FUNCTION public.scout_run_observation_insert_only();
++COMMIT;
+diff --git a/prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql b/prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql
+new file mode 100644
+index 00000000..695c694d
+--- /dev/null
++++ b/prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql
+@@ -0,0 +1,288 @@
++-- G2-S10-B only: the run declaration / observation evidence / settled basis expand
++-- (docs/decisions/2026-09-26-s10-induction.md D-S10-2, D-S10-4; acceptance R29-R32).
++-- Additive: THREE new insert-only tables, each keyed by the bearer's coach_id and bound by a
++-- composite FK (coach_id, intent_id) -> ScoutImport(coach_id, intent_id), so a row for another
++-- coach's intent is unrepresentable:
++--   ScoutRunDeclaration   the run's immutable authorized platform/scope set and its ONE shared
++--                         32-byte challenge (identical challenge and declared_at per run: trigger)
++--   ScoutRunObservation   one validated ObservationEvidenceV1 per (epoch, platform, scope, family)
++--   ScoutRunSettledBasis  the settle-time report (written by S10-C only; schema-only here)
++-- Deletion posture (D-S10-4 "Deletion", findings 4 / B-2): UPDATE, DELETE and TRUNCATE are
++-- revoked from every runtime role (anon, authenticated, service_role; service_role keeps SELECT
++-- and INSERT only); a BEFORE UPDATE OR DELETE row trigger refuses every UPDATE and every
++-- top-level (pg_trigger_depth() = 1) DELETE; a BEFORE TRUNCATE trigger refuses TRUNCATE. A parent
++-- run delete removes the children by ON DELETE CASCADE: referential cleanup only, for a parent run
++-- deleted under a separately authorized L8 policy; NOT a retention or erasure authorization (Q3).
++-- Depth > 1 is a nesting test, not proof of an FK action: a nested DELETE by a privileged
++-- (owner/superuser) trigger is not excluded and is reserved to database governance. Today the run
++-- is RESTRICT-bound to its intent and erasure tombstones the User, so every row stays in place.
++-- RLS copies the ImportNativeProvenance set exactly (20270122000000 L168-182): ENABLE + FORCE,
++-- one service_role policy, RESTRICTIVE deny-all for anon and authenticated. No existing table,
++-- column, index, constraint, policy or row is changed. NOT a writer change by itself: the S10-B
++-- routes are the first code that writes a declaration or observation row; S10-C the first basis.
++-- Separate release artifact; applies after 20270123000000 (S7-L1), whose run key it references.
++--
++-- Entry gate (refuses, never derives, deletes or repairs): the accepted ScoutImport run identity
++-- (RLS enabled+forced, the (coach_id, intent_id) key exactly as shipped, coach_id / intent_id
++-- NOT NULL TEXT, S7-L1's execution_epoch present) and none of the objects this file creates (raw
++-- rerun, partial state or a decoy holding one of the names). Raw reruns fail atomically.
++BEGIN;
++SET LOCAL lock_timeout = '5s';
++SET LOCAL statement_timeout = '30s';
++LOCK TABLE public."ScoutImport" IN SHARE ROW EXCLUSIVE MODE;
++
++DO $$
++BEGIN
++  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_index i
++    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
++    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
++      AND i.indrelid = to_regclass('public."ScoutImport"')
++      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
++      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
++      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
++      AND pg_get_indexdef(i.indexrelid) =
++        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
++  ) THEN
++    RAISE EXCEPTION 'G2-S10B unexpected run identity prerequisite';
++  END IF;
++  -- Run key columns exactly as shipped, and S7-L1's epoch (the observation binding) present.
++  IF NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'intent_id'
++      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
++  ) OR NOT EXISTS (
++    SELECT 1 FROM pg_catalog.pg_attribute a
++    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'execution_epoch'
++      AND NOT a.attisdropped AND a.atttypid = 'int4'::regtype AND a.attnotnull
++  ) THEN
++    RAISE EXCEPTION 'G2-S10B unexpected run column prerequisite';
++  END IF;
++  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
++  IF to_regclass('public."ScoutRunDeclaration"') IS NOT NULL
++    OR to_regclass('public."ScoutRunObservation"') IS NOT NULL
++    OR to_regclass('public."ScoutRunSettledBasis"') IS NOT NULL
++    OR to_regclass('public."ScoutRunDeclaration_pkey"') IS NOT NULL
++    OR to_regclass('public."ScoutRunObservation_pkey"') IS NOT NULL
++    OR to_regclass('public."ScoutRunObservation_unit_key"') IS NOT NULL
++    OR to_regclass('public."ScoutRunSettledBasis_pkey"') IS NOT NULL
++    OR to_regprocedure('public.scout_run_observation_insert_only()') IS NOT NULL
++    OR to_regprocedure('public.scout_run_declaration_one_challenge()') IS NOT NULL
++    OR EXISTS (
++      SELECT 1 FROM pg_catalog.pg_constraint
++      WHERE connamespace = 'public'::regnamespace
++        AND conname LIKE ANY (ARRAY['ScoutRunDeclaration\_%', 'ScoutRunObservation\_%', 'ScoutRunSettledBasis\_%'])
++    ) THEN
++    RAISE EXCEPTION 'G2-S10B observation tables already present';
++  END IF;
++END $$;
++
++-- D-S10-2 run declaration. One row per declared (platform, scope); the whole set is inserted in
++-- one transaction under the run lock (S10-B service). account_scope_id_digest is sha256 hex of the
++-- source's scope id, never the raw id. challenge is the ONE server-generated 32-byte challenge.
++CREATE TABLE public."ScoutRunDeclaration" (
++  "coach_id"                TEXT NOT NULL,
++  "intent_id"               TEXT NOT NULL,
++  "source_platform"         TEXT NOT NULL,
++  "account_scope_id_digest" TEXT NOT NULL,
++  "challenge"               BYTEA NOT NULL,
++  "declared_at"             TIMESTAMP(3) NOT NULL,
++  CONSTRAINT "ScoutRunDeclaration_pkey"
++    PRIMARY KEY ("coach_id", "intent_id", "source_platform", "account_scope_id_digest"),
++  CONSTRAINT "ScoutRunDeclaration_source_platform_canonical"
++    CHECK ("source_platform" COLLATE "C" ~ '^[a-z0-9][a-z0-9._:-]{0,255}$'),
++  CONSTRAINT "ScoutRunDeclaration_scope_digest_check"
++    CHECK ("account_scope_id_digest" COLLATE "C" ~ '^[0-9a-f]{64}$'),
++  CONSTRAINT "ScoutRunDeclaration_challenge_check"
++    CHECK (octet_length("challenge") = 32),
++  -- Composite owner-scoped FK to the run key: another coach's intent is unrepresentable.
++  -- ON DELETE CASCADE is referential cleanup only (D-S10-4); ON UPDATE RESTRICT (the run key never moves).
++  CONSTRAINT "ScoutRunDeclaration_coach_id_intent_id_fkey"
++    FOREIGN KEY ("coach_id", "intent_id") REFERENCES public."ScoutImport" ("coach_id", "intent_id")
++    ON DELETE CASCADE ON UPDATE RESTRICT
++);
++
++-- D-S10-2 observation evidence. One validated upload per (epoch, platform, scope, family); the
++-- server-bound columns (coach_id from the bearer, execution_epoch read under the run lock,
++-- received_at, evidence_digest) are never client-supplied. The unit must be declared (FK).
++CREATE TABLE public."ScoutRunObservation" (
++  "id"                      TEXT NOT NULL,
++  "coach_id"                TEXT NOT NULL,
++  "intent_id"               TEXT NOT NULL,
++  "execution_epoch"         INTEGER NOT NULL,
++  "source_platform"         TEXT NOT NULL,
++  "account_scope_id_digest" TEXT NOT NULL,
++  "family"                  TEXT NOT NULL,
++  "basis_kind"              TEXT NOT NULL,
++  "evidence"                JSONB NOT NULL,
++  "evidence_digest"         CHAR(64) NOT NULL,
++  "received_at"             TIMESTAMP(3) NOT NULL,
++  CONSTRAINT "ScoutRunObservation_pkey" PRIMARY KEY ("id"),
++  CONSTRAINT "ScoutRunObservation_epoch_check" CHECK ("execution_epoch" >= 1),
++  CONSTRAINT "ScoutRunObservation_source_platform_canonical"
++    CHECK ("source_platform" COLLATE "C" ~ '^[a-z0-9][a-z0-9._:-]{0,255}$'),
++  CONSTRAINT "ScoutRunObservation_scope_digest_check"
++    CHECK ("account_scope_id_digest" COLLATE "C" ~ '^[0-9a-f]{64}$'),
++  -- Closed vocabularies: the four canonical families; COMPLETENESS_BASIS_KINDS minus 'none'
++  -- (append-only; adding a kind is a core change by design).
++  CONSTRAINT "ScoutRunObservation_family_check"
++    CHECK ("family" IN ('clients', 'workouts', 'client_history', 'programs')),
++  CONSTRAINT "ScoutRunObservation_basis_kind_check"
++    CHECK ("basis_kind" IN ('source_signed_enumeration')),
++  CONSTRAINT "ScoutRunObservation_evidence_check" CHECK (jsonb_typeof("evidence") = 'object'),
++  CONSTRAINT "ScoutRunObservation_evidence_digest_check"
++    CHECK ("evidence_digest" COLLATE "C" ~ '^[0-9a-f]{64}$'),
++  CONSTRAINT "ScoutRunObservation_coach_id_intent_id_fkey"
++    FOREIGN KEY ("coach_id", "intent_id") REFERENCES public."ScoutImport" ("coach_id", "intent_id")
++    ON DELETE CASCADE ON UPDATE RESTRICT,
++  CONSTRAINT "ScoutRunObservation_declaration_fkey"
++    FOREIGN KEY ("coach_id", "intent_id", "source_platform", "account_scope_id_digest")
++    REFERENCES public."ScoutRunDeclaration" ("coach_id", "intent_id", "source_platform", "account_scope_id_digest")
++    ON DELETE CASCADE ON UPDATE RESTRICT
++);
++-- At most one evidence row per unit and epoch (E2 "exactly one evidence row").
++CREATE UNIQUE INDEX "ScoutRunObservation_unit_key"
++  ON public."ScoutRunObservation"
++  ("coach_id", "intent_id", "execution_epoch", "source_platform", "account_scope_id_digest", "family");
++
++-- D-S10-4 settled basis (S10-C writes it in the settle transaction after writeTerminal).
++CREATE TABLE public."ScoutRunSettledBasis" (
++  "coach_id"            TEXT NOT NULL,
++  "intent_id"           TEXT NOT NULL,
++  "execution_epoch"     INTEGER NOT NULL,
++  "report_version"      INTEGER NOT NULL,
++  "report"              JSONB NOT NULL,
++  "observation_digests" TEXT[] NOT NULL,
++  "settled_at"          TIMESTAMP(3) NOT NULL,
++  CONSTRAINT "ScoutRunSettledBasis_pkey" PRIMARY KEY ("coach_id", "intent_id"),
++  CONSTRAINT "ScoutRunSettledBasis_epoch_check" CHECK ("execution_epoch" >= 1),
++  CONSTRAINT "ScoutRunSettledBasis_report_version_check" CHECK ("report_version" >= 1),
++  CONSTRAINT "ScoutRunSettledBasis_report_check" CHECK (jsonb_typeof("report") = 'object'),
++  CONSTRAINT "ScoutRunSettledBasis_observation_digests_check"
++    CHECK (array_position("observation_digests", NULL) IS NULL
++      AND array_to_string("observation_digests", ',') COLLATE "C" ~ '^([0-9a-f]{64}(,[0-9a-f]{64})*)?$'),
++  CONSTRAINT "ScoutRunSettledBasis_coach_id_intent_id_fkey"
++    FOREIGN KEY ("coach_id", "intent_id") REFERENCES public."ScoutImport" ("coach_id", "intent_id")
++    ON DELETE CASCADE ON UPDATE RESTRICT
++);
++
++-- Insert-only guard for all three tables. Refuses, never repairs. Every UPDATE is refused (the
++-- FKs are ON UPDATE RESTRICT, so no referential action ever needs one); a DELETE is refused at
++-- top level (pg_trigger_depth() = 1) and passes only when nested (a parent-run ON DELETE CASCADE,
++-- or a privileged nested trigger reserved to database governance, D-S10-4); TRUNCATE is refused.
++CREATE FUNCTION public.scout_run_observation_insert_only() RETURNS trigger
++LANGUAGE plpgsql
++SET search_path = ''
++AS $$
++BEGIN
++  IF TG_OP = 'TRUNCATE' OR TG_OP = 'UPDATE' OR (TG_OP = 'DELETE' AND pg_trigger_depth() = 1) THEN
++    RAISE EXCEPTION 'G2-S10B insert-only: % on % refused', TG_OP, TG_TABLE_NAME
++      USING ERRCODE = 'restrict_violation';
++  END IF;
++  RETURN OLD;
++END $$;
++-- Not SECURITY DEFINER; trigger firing needs no EXECUTE grant, so nothing is callable.
++REVOKE ALL ON FUNCTION public.scout_run_observation_insert_only() FROM PUBLIC;
++COMMENT ON FUNCTION public.scout_run_observation_insert_only() IS
++  'G2-S10B: refuses UPDATE, top-level DELETE and TRUNCATE on the three S10 run tables; nested DELETE (parent-run cascade) passes. Removed by 20270124000000 down.sql only.';
++
++-- One statement per run: every declaration row of a run carries the same challenge and
++-- declared_at. The run row is locked first (FOR NO KEY UPDATE, re-entrant for the S10-B writer
++-- that already holds it), so two concurrent declarers serialise instead of both passing the check.
++CREATE FUNCTION public.scout_run_declaration_one_challenge() RETURNS trigger
++LANGUAGE plpgsql
++SET search_path = ''
++AS $$
++BEGIN
++  PERFORM 1 FROM public."ScoutImport" r
++    WHERE r.coach_id = NEW.coach_id AND r.intent_id = NEW.intent_id
++    FOR NO KEY UPDATE;
++  IF EXISTS (
++    SELECT 1 FROM public."ScoutRunDeclaration" d
++    WHERE d.coach_id = NEW.coach_id AND d.intent_id = NEW.intent_id
++      AND (d.challenge <> NEW.challenge OR d.declared_at <> NEW.declared_at)
++  ) THEN
++    RAISE EXCEPTION 'G2-S10B declaration challenge differs within one run'
++      USING ERRCODE = 'check_violation';
++  END IF;
++  RETURN NEW;
++END $$;
++REVOKE ALL ON FUNCTION public.scout_run_declaration_one_challenge() FROM PUBLIC;
++COMMENT ON FUNCTION public.scout_run_declaration_one_challenge() IS
++  'G2-S10B: refuses a ScoutRunDeclaration row whose challenge or declared_at differs from the run''s existing rows. Removed by 20270124000000 down.sql only.';
++
++CREATE TRIGGER "ScoutRunDeclaration_one_challenge"
++  BEFORE INSERT ON public."ScoutRunDeclaration"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_run_declaration_one_challenge();
++CREATE TRIGGER "ScoutRunDeclaration_insert_only"
++  BEFORE UPDATE OR DELETE ON public."ScoutRunDeclaration"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_run_observation_insert_only();
++CREATE TRIGGER "ScoutRunDeclaration_no_truncate"
++  BEFORE TRUNCATE ON public."ScoutRunDeclaration"
++  FOR EACH STATEMENT EXECUTE FUNCTION public.scout_run_observation_insert_only();
++CREATE TRIGGER "ScoutRunObservation_insert_only"
++  BEFORE UPDATE OR DELETE ON public."ScoutRunObservation"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_run_observation_insert_only();
++CREATE TRIGGER "ScoutRunObservation_no_truncate"
++  BEFORE TRUNCATE ON public."ScoutRunObservation"
++  FOR EACH STATEMENT EXECUTE FUNCTION public.scout_run_observation_insert_only();
++CREATE TRIGGER "ScoutRunSettledBasis_insert_only"
++  BEFORE UPDATE OR DELETE ON public."ScoutRunSettledBasis"
++  FOR EACH ROW EXECUTE FUNCTION public.scout_run_observation_insert_only();
++CREATE TRIGGER "ScoutRunSettledBasis_no_truncate"
++  BEFORE TRUNCATE ON public."ScoutRunSettledBasis"
++  FOR EACH STATEMENT EXECUTE FUNCTION public.scout_run_observation_insert_only();
++
++-- Privileges: nothing for PUBLIC / anon / authenticated; service_role SELECT + INSERT only
++-- (UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER revoked from every runtime role). Supabase's
++-- default privileges would otherwise grant ALL to the three API roles on these new tables.
++REVOKE ALL PRIVILEGES ON TABLE public."ScoutRunDeclaration" FROM PUBLIC, anon, authenticated, service_role;
++REVOKE ALL PRIVILEGES ON TABLE public."ScoutRunObservation" FROM PUBLIC, anon, authenticated, service_role;
++REVOKE ALL PRIVILEGES ON TABLE public."ScoutRunSettledBasis" FROM PUBLIC, anon, authenticated, service_role;
++GRANT SELECT, INSERT ON TABLE public."ScoutRunDeclaration" TO service_role;
++GRANT SELECT, INSERT ON TABLE public."ScoutRunObservation" TO service_role;
++GRANT SELECT, INSERT ON TABLE public."ScoutRunSettledBasis" TO service_role;
++
++-- RLS: the ImportNativeProvenance set exactly (ENABLE + FORCE, one service_role policy,
++-- RESTRICTIVE deny-all for anon and authenticated). Every S10-B/C access filters on the bearer's coach_id.
++ALTER TABLE public."ScoutRunDeclaration" ENABLE ROW LEVEL SECURITY;
++ALTER TABLE public."ScoutRunDeclaration" FORCE ROW LEVEL SECURITY;
++CREATE POLICY "p_scout_run_declaration_service_role_all" ON public."ScoutRunDeclaration"
++  AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true);
++COMMENT ON POLICY "p_scout_run_declaration_service_role_all" ON public."ScoutRunDeclaration" IS 'service_role bypass: run declarations are written/read only via the server-side S10 routes running as service_role (table grants limit it to SELECT + INSERT).';
++CREATE POLICY "deny_all_anon_scout_run_declaration" ON public."ScoutRunDeclaration"
++  AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_anon_scout_run_declaration" ON public."ScoutRunDeclaration" IS 'RESTRICTIVE deny-all: anon can never read/write run declarations regardless of any permissive policy.';
++CREATE POLICY "deny_all_authenticated_scout_run_declaration" ON public."ScoutRunDeclaration"
++  AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_authenticated_scout_run_declaration" ON public."ScoutRunDeclaration" IS 'RESTRICTIVE deny-all: authenticated principals can never read/write run declarations directly; only service_role may (no cross-tenant oracle).';
++
++ALTER TABLE public."ScoutRunObservation" ENABLE ROW LEVEL SECURITY;
++ALTER TABLE public."ScoutRunObservation" FORCE ROW LEVEL SECURITY;
++CREATE POLICY "p_scout_run_observation_service_role_all" ON public."ScoutRunObservation"
++  AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true);
++COMMENT ON POLICY "p_scout_run_observation_service_role_all" ON public."ScoutRunObservation" IS 'service_role bypass: observation evidence is written/read only via the server-side S10 routes running as service_role (table grants limit it to SELECT + INSERT).';
++CREATE POLICY "deny_all_anon_scout_run_observation" ON public."ScoutRunObservation"
++  AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_anon_scout_run_observation" ON public."ScoutRunObservation" IS 'RESTRICTIVE deny-all: anon can never read/write observation evidence regardless of any permissive policy.';
++CREATE POLICY "deny_all_authenticated_scout_run_observation" ON public."ScoutRunObservation"
++  AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_authenticated_scout_run_observation" ON public."ScoutRunObservation" IS 'RESTRICTIVE deny-all: authenticated principals can never read/write observation evidence directly; only service_role may (no cross-tenant oracle).';
++
++ALTER TABLE public."ScoutRunSettledBasis" ENABLE ROW LEVEL SECURITY;
++ALTER TABLE public."ScoutRunSettledBasis" FORCE ROW LEVEL SECURITY;
++CREATE POLICY "p_scout_run_settled_basis_service_role_all" ON public."ScoutRunSettledBasis"
++  AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true);
++COMMENT ON POLICY "p_scout_run_settled_basis_service_role_all" ON public."ScoutRunSettledBasis" IS 'service_role bypass: the settled basis is written/read only via the server-side settle path running as service_role (table grants limit it to SELECT + INSERT).';
++CREATE POLICY "deny_all_anon_scout_run_settled_basis" ON public."ScoutRunSettledBasis"
++  AS RESTRICTIVE FOR ALL TO anon USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_anon_scout_run_settled_basis" ON public."ScoutRunSettledBasis" IS 'RESTRICTIVE deny-all: anon can never read/write the settled basis regardless of any permissive policy.';
++CREATE POLICY "deny_all_authenticated_scout_run_settled_basis" ON public."ScoutRunSettledBasis"
++  AS RESTRICTIVE FOR ALL TO authenticated USING (false) WITH CHECK (false);
++COMMENT ON POLICY "deny_all_authenticated_scout_run_settled_basis" ON public."ScoutRunSettledBasis" IS 'RESTRICTIVE deny-all: authenticated principals can never read/write the settled basis directly; only service_role may (no cross-tenant oracle).';
++COMMIT;
+diff --git a/prisma/schema.prisma b/prisma/schema.prisma
+index 2e328bbc..f86c1f5d 100644
+--- a/prisma/schema.prisma
++++ b/prisma/schema.prisma
+@@ -6890,6 +6890,10 @@ model ScoutImport {
+   // Owner-scoped binding to the setup authority; at most one run per intent (partial unique index
+   // ScoutImport_import_intent_id_key WHERE import_intent_id IS NOT NULL).
+   intent            ImportIntent? @relation(fields: [import_intent_id, coach_id], references: [id, coach_id], onDelete: Restrict, onUpdate: Cascade)
++  // S10-B back-relations only (Prisma requires them for the three child FKs below); no column.
++  declarations      ScoutRunDeclaration[]
++  observations      ScoutRunObservation[]
++  settledBasis      ScoutRunSettledBasis?
+ 
+   @@unique([coach_id, intent_id])
+   @@unique([import_intent_id])
+@@ -7025,6 +7029,65 @@ model ImportNativeProvenance {
+   @@index([coach_id, import_intent_id])
+ }
+ 
++// S10-B run declaration / observation evidence / settled basis (docs/decisions/2026-09-26-s10-induction.md
++// D-S10-2, D-S10-4; migration 20270124000000_scout_run_observation_expand). Three insert-only tables
++// keyed by the bearer's coach_id and bound to the run key (coach_id, intent_id) by composite FKs with
++// ON DELETE CASCADE (referential cleanup only, never a retention/erasure authorization; Q3). The
++// database carries what Prisma cannot express: the closed CHECKs (canonical slug, 64-hex digests,
++// 32-byte challenge, family / basis_kind vocabularies), the one-challenge-per-run trigger, the
++// insert-only trigger (every UPDATE, top-level DELETE and TRUNCATE refused) and the grants
++// (service_role SELECT + INSERT only). RLS RESTRICTIVE deny-all to anon + authenticated;
++// service_role only. Written by src/scout/induction/observation.service.ts (declaration,
++// observation) and by the S10-C settle path (settled basis).
++model ScoutRunDeclaration {
++  coach_id                String
++  intent_id               String
++  source_platform         String
++  // sha256 hex of the source's account/workspace scope id, never the raw id.
++  account_scope_id_digest String
++  // The run's ONE server-generated 32-byte challenge, identical in every row of the run.
++  challenge               Bytes
++  declared_at             DateTime
++  run                     ScoutImport           @relation(fields: [coach_id, intent_id], references: [coach_id, intent_id], onDelete: Cascade, onUpdate: Restrict)
++  observations            ScoutRunObservation[]
++
++  @@id([coach_id, intent_id, source_platform, account_scope_id_digest])
++}
++
++model ScoutRunObservation {
++  id                      String              @id @default(uuid())
++  coach_id                String
++  intent_id               String
++  // Read under the run row lock at upload; never client-supplied.
++  execution_epoch         Int
++  source_platform         String
++  account_scope_id_digest String
++  family                  String
++  basis_kind              String
++  // The validated ObservationEvidenceV1 (S10-A parseEvidence), re-validated by the evaluator.
++  evidence                Json
++  // sha256 of the canonical JSON of `evidence`.
++  evidence_digest         String              @db.Char(64)
++  received_at             DateTime
++  run                     ScoutImport         @relation(fields: [coach_id, intent_id], references: [coach_id, intent_id], onDelete: Cascade, onUpdate: Restrict)
++  declaration             ScoutRunDeclaration @relation(fields: [coach_id, intent_id, source_platform, account_scope_id_digest], references: [coach_id, intent_id, source_platform, account_scope_id_digest], onDelete: Cascade, onUpdate: Restrict, map: "ScoutRunObservation_declaration_fkey")
++
++  @@unique([coach_id, intent_id, execution_epoch, source_platform, account_scope_id_digest, family], map: "ScoutRunObservation_unit_key")
++}
++
++model ScoutRunSettledBasis {
++  coach_id            String
++  intent_id           String
++  execution_epoch     Int
++  report_version      Int
++  report              Json
++  observation_digests String[]
++  settled_at          DateTime
++  run                 ScoutImport @relation(fields: [coach_id, intent_id], references: [coach_id, intent_id], onDelete: Cascade, onUpdate: Restrict)
++
++  @@id([coach_id, intent_id])
++}
++
+ // ============================================================
+ // IMPORTER-H — multi-family reconstruction (canonical non-person entities)
+ // ============================================================
+diff --git a/src/scout/induction/observation.controller.ts b/src/scout/induction/observation.controller.ts
+new file mode 100644
+index 00000000..1da39eda
+--- /dev/null
++++ b/src/scout/induction/observation.controller.ts
+@@ -0,0 +1,153 @@
++import { Body, Controller, HttpCode, Post, Request } from '@nestjs/common';
++import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
++import { Throttle } from '@nestjs/throttler';
++import type { AuthedRequest } from '../../auth/auth-request';
++import { Roles } from '../../common/decorators/roles.decorator';
++import {
++  envelopeWithCode,
++  errorEnvelopeSchema,
++  rateLimitSchema,
++} from '../../common/errors/importer-error-responses';
++import { checkObservationBodySize } from './parse';
++import {
++  observationBodyRejected,
++  parseObservationEnvelope,
++  ScoutRunDeclarationDto,
++  ScoutRunDeclarationResult,
++  ScoutRunObservationDto,
++  ScoutRunObservationResult,
++} from './observation.dto';
++import { ObservationService } from './observation.service';
++
++/** The express request with the raw body `main.ts` captures (`rawBody: true`). */
++export type ObservationRequest = AuthedRequest & { rawBody?: Buffer };
++
++/**
++ * S10-B — the two induction routes of a server-owned run (docs/decisions/2026-09-26-s10-induction.md
++ * D-S10-4 "Routes"): `POST /api/scout/runs/declaration` and `POST /api/scout/runs/observation`.
++ *
++ * Same posture as ScoutRunController (`run.controller.ts`): the global JwtAuthGuard verifies the
++ * extension bearer token, the coach is `req.user.id` (never a body field), `@Roles('coach',
++ * 'owner')`, 30/min, and FEATURE_SCOUT_INGEST off yields the uniform R-DARK-1 404 before any guard
++ * runs (the `/api/scout` prefix gate). Both write under `FOR NO KEY UPDATE` on the run row, open
++ * `mode='server'` runs only. Registration in ScoutModule is S10-C's (D-S10-7); until then the
++ * routes are not mounted.
++ */
++@ApiTags('scout')
++@ApiBearerAuth('bearer')
++@ApiResponse({
++  status: 400,
++  description:
++    'Malformed body (global ValidationPipe: whitelist + forbidNonWhitelisted, or the S10 ' +
++    'envelope/evidence grammar, or a body over 32 KiB). Standard HttpExceptionFilter envelope; no row is written.',
++  schema: errorEnvelopeSchema(),
++})
++@ApiResponse({
++  status: 401,
++  description: 'Missing or invalid bearer token.',
++  schema: errorEnvelopeSchema(),
++})
++@ApiResponse({
++  status: 403,
++  description: 'Caller is not a coach or owner.',
++  schema: errorEnvelopeSchema(),
++})
++@ApiResponse({
++  status: 404,
++  description:
++    'Uniform not-found: FEATURE_SCOUT_INGEST off (R-DARK-1) OR the intent is unknown to the ' +
++    'calling coach. Deliberately indistinguishable — no existence oracle.',
++  schema: errorEnvelopeSchema(),
++})
++@ApiResponse({ status: 429, description: 'Rate limit exceeded.', schema: rateLimitSchema() })
++@Controller('scout')
++export class ObservationController {
++  constructor(private readonly observations: ObservationService) {}
++
++  @ApiOperation({
++    summary: 'Declare the run’s authorized platforms and expected account scopes',
++    description:
++      'Before the run’s first staged row: records the immutable authorized platform set and, per ' +
++      'platform, the expected account scope set (sha256 digests), in one transaction under the run ' +
++      'lock, and returns the run’s ONE server-generated 32-byte challenge. An exact replay (order ' +
++      'ignored) returns the original challenge and writes nothing.',
++  })
++  @ApiResponse({
++    status: 200,
++    description: 'Declared (or exact replay).',
++    type: ScoutRunDeclarationResult,
++  })
++  @ApiResponse({
++    status: 409,
++    description:
++      'Refused. `code` is `declaration_conflict` (a different set is already declared), ' +
++      '`declaration_after_ingest` (first declaration after a staged row or claim), or a run ' +
++      'lifecycle code: `run_not_started`, `run_fenced`, `run_terminal`, `legacy_run`.',
++    schema: envelopeWithCode([
++      'declaration_conflict',
++      'declaration_after_ingest',
++      'run_not_started',
++      'run_fenced',
++      'run_terminal',
++      'legacy_run',
++    ]),
++  })
++  @Post('runs/declaration')
++  @HttpCode(200)
++  @Roles('coach', 'owner')
++  @Throttle({ default: { ttl: 60_000, limit: 30 } })
++  postDeclaration(
++    @Request() req: AuthedRequest,
++    @Body() body: ScoutRunDeclarationDto,
++  ): Promise<ScoutRunDeclarationResult> {
++    return this.observations.declare(req.user.id, body.intent_id, body.platforms);
++  }
++
++  @ApiOperation({
++    summary: 'Upload source-signed observation evidence for a declared run',
++    description:
++      'Only after a declaration and before the claim. Stores one validated ObservationEvidenceV1 ' +
++      'per (platform, scope, family), bound to the epoch read under the run lock. The server ' +
++      'records the evidence; it proves nothing until the settle-time evaluator verifies it. An ' +
++      'identical replay writes nothing. The body is at most 32 KiB.',
++  })
++  @ApiResponse({
++    status: 200,
++    description: 'Stored (or identical replay).',
++    type: ScoutRunObservationResult,
++  })
++  @ApiResponse({
++    status: 409,
++    description:
++      'Refused (nothing stored). `code` is `declaration_missing`, `observation_conflict` (a ' +
++      'different evidence is stored for the unit), `observation_after_claim`, ' +
++      '`observation_not_declared` (undeclared platform/scope, no induction manifest, or a family ' +
++      'outside it), or a run lifecycle code: `run_not_started`, `run_fenced`, `run_terminal`, `legacy_run`.',
++    schema: envelopeWithCode([
++      'declaration_missing',
++      'observation_conflict',
++      'observation_after_claim',
++      'observation_not_declared',
++      'run_not_started',
++      'run_fenced',
++      'run_terminal',
++      'legacy_run',
++    ]),
++  })
++  @Post('runs/observation')
++  @HttpCode(200)
++  @Roles('coach', 'owner')
++  @Throttle({ default: { ttl: 60_000, limit: 30 } })
++  postObservation(
++    @Request() req: ObservationRequest,
++    @Body() body: ScoutRunObservationDto,
++  ): Promise<ScoutRunObservationResult> {
++    // R21 "body > 32 KiB": the exact received bytes, never a re-serialisation. A request without
++    // the captured raw body is refused (fail closed), never measured some other way.
++    const size = checkObservationBodySize(Buffer.isBuffer(req.rawBody) ? req.rawBody.length : -1);
++    if (!size.ok) return Promise.reject(observationBodyRejected(size.reason));
++    const envelope = parseObservationEnvelope(body);
++    if (!envelope.ok) return Promise.reject(observationBodyRejected(envelope.reason));
++    return this.observations.observe(req.user.id, envelope.intent_id, envelope.observations);
++  }
++}
+diff --git a/src/scout/induction/observation.dto.ts b/src/scout/induction/observation.dto.ts
+new file mode 100644
+index 00000000..6e95d7ea
+--- /dev/null
++++ b/src/scout/induction/observation.dto.ts
+@@ -0,0 +1,356 @@
++import { BadRequestException, ConflictException } from '@nestjs/common';
++import { ApiProperty } from '@nestjs/swagger';
++import { Type } from 'class-transformer';
++import {
++  ArrayMaxSize,
++  ArrayMinSize,
++  ArrayUnique,
++  IsArray,
++  IsObject,
++  IsString,
++  Length,
++  Matches,
++  ValidateNested,
++} from 'class-validator';
++import { CANONICAL_FAMILIES } from '../reconstruct/mapping-spec';
++import { isCanonicalPlatform } from '../scout-platform';
++import {
++  HEX64_PATTERN,
++  OBSERVATION_CONFLICT_CODES,
++  type ArtifactRejection,
++  type ObservationConflictCode,
++} from './contract';
++import { isHex64, parseEvidence, unitKey, type ParsedEvidence } from './parse';
++
++// S10-B — DTOs, bounds and the route-body envelope of the two S10 run routes
++// (docs/decisions/2026-09-26-s10-induction.md D-S10-2, D-S10-4 "Routes"). The per-evidence grammar
++// is S10-A's `parseEvidence`; the body-size cap is S10-A's `OBSERVATION_BODY_MAX_BYTES` /
++// `checkObservationBodySize` (enforced by the controller). S10-B owns the envelope: `intent_id`,
++// one entry per unit and the cardinality bound ≤ 4 families × declared scopes. The 409 codes are
++// the closed `OBSERVATION_CONFLICT_CODES` (S10-A contract.ts) beside `RUN_CONFLICT_CODES`,
++// unedited. coach_id, execution_epoch, received_at, evidence_digest and the challenge are
++// server-bound and never appear in a request body (whitelist + forbidNonWhitelisted rejects them).
++
++/** Canonical slug grammar (`isCanonicalPlatform`), as a validator pattern. */
++const CANONICAL_PLATFORM_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,255}$/;
++
++/**
++ * Declaration bounds (fail-closed S10-B choice; the doc fixes no number): at most 16 platforms and
++ * 16 scopes per platform, so one declaration is ≤ 256 units per family and a matching observation
++ * body stays within the 32 KiB cap.
++ */
++export const DECLARATION_MAX_PLATFORMS = 16;
++export const DECLARATION_MAX_SCOPES_PER_PLATFORM = 16;
++/** Static upper bound of `observations[]` (4 families × every declarable scope). */
++export const OBSERVATION_MAX_ENTRIES =
++  CANONICAL_FAMILIES.length * DECLARATION_MAX_PLATFORMS * DECLARATION_MAX_SCOPES_PER_PLATFORM;
++
++/** Fixed, identifier-free messages; the code is the machine-readable part. */
++const OBSERVATION_CONFLICT_MESSAGES: Record<ObservationConflictCode, string> = {
++  declaration_conflict: 'The run already holds a different declaration; it is immutable.',
++  declaration_after_ingest:
++    'The run has already staged rows or a claim; it can no longer be declared.',
++  declaration_missing: 'The run has no declaration; declare its platforms and scopes first.',
++  observation_conflict: 'A different observation is already stored for this unit and epoch.',
++  observation_after_claim:
++    'The run has already been claimed; no further observations are accepted.',
++  observation_not_declared:
++    'The observation names a platform, scope or family the run did not declare.',
++};
++
++/** Body of every S10 observation 409: `{code, message}` (the `runConflict` shape). */
++export interface ObservationConflictBody {
++  code: ObservationConflictCode;
++  message: string;
++}
++
++/** The single constructor for S10 observation conflicts (same envelope as `runConflict`). */
++export function observationConflict(code: ObservationConflictCode): ConflictException {
++  const body: ObservationConflictBody = { code, message: OBSERVATION_CONFLICT_MESSAGES[code] };
++  return new ConflictException(body);
++}
++
++export const isObservationConflictCode = (value: unknown): value is ObservationConflictCode =>
++  typeof value === 'string' && (OBSERVATION_CONFLICT_CODES as readonly string[]).includes(value);
++
++/**
++ * Why the S10-B envelope refused a body: an S10-A artifact/size rejection, or one of the two
++ * envelope-only reasons S10-B owns (`bad_intent`, `duplicate_unit`).
++ */
++export type EnvelopeRejection = ArtifactRejection | 'bad_intent' | 'duplicate_unit';
++
++/** A 400 for a body the envelope refuses; the rejection is a diagnostic only. */
++export function observationBodyRejected(reason: EnvelopeRejection): BadRequestException {
++  return new BadRequestException(`observation body rejected: ${reason}`);
++}
++
++// ── POST /api/scout/runs/declaration ────────────────────────────────────────────────────
++
++/** One declared platform and its expected account scopes. */
++export class ScoutRunDeclarationPlatformDto {
++  @ApiProperty({
++    description: 'Canonical source platform slug (never normalised).',
++    minLength: 1,
++    maxLength: 256,
++    pattern: CANONICAL_PLATFORM_PATTERN.source,
++  })
++  @IsString()
++  @Length(1, 256)
++  @Matches(CANONICAL_PLATFORM_PATTERN)
++  source_platform!: string;
++
++  @ApiProperty({
++    description:
++      'The source accounts/workspaces authorized for this import, each as sha256 hex of the ' +
++      "source's scope id (never the raw id). Non-empty and unique.",
++    type: [String],
++    minItems: 1,
++    maxItems: DECLARATION_MAX_SCOPES_PER_PLATFORM,
++    uniqueItems: true,
++  })
++  @IsArray()
++  @ArrayMinSize(1)
++  @ArrayMaxSize(DECLARATION_MAX_SCOPES_PER_PLATFORM)
++  @ArrayUnique()
++  @IsString({ each: true })
++  @Matches(HEX64_PATTERN, { each: true })
++  account_scope_id_digests!: string[];
++}
++
++/** POST /api/scout/runs/declaration body. */
++export class ScoutRunDeclarationDto {
++  @ApiProperty({
++    description: 'Intent id of the open server run (the text form of the server setup intent).',
++    minLength: 1,
++    maxLength: 128,
++  })
++  @IsString()
++  @Length(1, 128)
++  intent_id!: string;
++
++  @ApiProperty({
++    description:
++      'The run’s authorized platform set: non-empty, unique canonical slugs, each with its ' +
++      'non-empty expected scope set. Immutable once recorded.',
++    type: [ScoutRunDeclarationPlatformDto],
++    minItems: 1,
++    maxItems: DECLARATION_MAX_PLATFORMS,
++  })
++  @IsArray()
++  @ArrayMinSize(1)
++  @ArrayMaxSize(DECLARATION_MAX_PLATFORMS)
++  @ValidateNested({ each: true })
++  @Type(() => ScoutRunDeclarationPlatformDto)
++  platforms!: ScoutRunDeclarationPlatformDto[];
++}
++
++/** 200 body of the declaration (identical on an exact replay). */
++export class ScoutRunDeclarationResult {
++  @ApiProperty({ description: 'The run key: the intent id.' })
++  intent_id!: string;
++
++  @ApiProperty({
++    description:
++      'The run’s ONE server-generated 32-byte challenge (RFC 4648 §4 base64) that every source ' +
++      'statement must embed. An exact replay returns the original challenge.',
++    minLength: 44,
++    maxLength: 44,
++  })
++  challenge_b64!: string;
++
++  @ApiProperty({ type: String, format: 'date-time', description: 'Server-owned; set once.' })
++  declared_at!: string;
++}
++
++/** One declared unit set, normalised: platforms sorted, scopes sorted. */
++export interface NormalizedDeclaration {
++  readonly platforms: readonly {
++    readonly source_platform: string;
++    readonly account_scope_id_digests: readonly string[];
++  }[];
++}
++
++function byteOrder(a: string, b: string): number {
++  return a < b ? -1 : a > b ? 1 : 0;
++}
++
++/**
++ * Service-side re-validation of a declaration (fail closed even without the global pipe):
++ * `platforms` non-empty, unique canonical slugs; each scope array non-empty, unique, 64 hex.
++ * Returns the normalised set or `null` (→ 400, no row). An empty list never means "declared".
++ */
++export function normalizeDeclaration(platforms: unknown): NormalizedDeclaration | null {
++  if (!Array.isArray(platforms)) return null;
++  const entries: readonly unknown[] = platforms;
++  if (entries.length === 0 || entries.length > DECLARATION_MAX_PLATFORMS) return null;
++  const seen = new Set<string>();
++  const out: { source_platform: string; account_scope_id_digests: string[] }[] = [];
++  for (const entry of entries) {
++    if (entry === null || typeof entry !== 'object') return null;
++    const platform: unknown = Reflect.get(entry, 'source_platform');
++    const scopes: unknown = Reflect.get(entry, 'account_scope_id_digests');
++    if (!isCanonicalPlatform(platform) || seen.has(platform)) return null;
++    seen.add(platform);
++    if (!Array.isArray(scopes)) return null;
++    const scopeList: readonly unknown[] = scopes;
++    if (scopeList.length === 0 || scopeList.length > DECLARATION_MAX_SCOPES_PER_PLATFORM)
++      return null;
++    const unique = new Set<string>();
++    for (const scope of scopeList) {
++      if (!isHex64(scope) || unique.has(scope)) return null;
++      unique.add(scope);
++    }
++    out.push({ source_platform: platform, account_scope_id_digests: [...unique].sort(byteOrder) });
++  }
++  out.sort((a, b) => byteOrder(a.source_platform, b.source_platform));
++  return { platforms: out };
++}
++
++/** The declared `(platform, scope)` pairs as order-free keys (exact-replay comparison). */
++export function declarationPairKeys(declaration: NormalizedDeclaration): string[] {
++  const keys: string[] = [];
++  for (const p of declaration.platforms) {
++    for (const scope of p.account_scope_id_digests) {
++      keys.push(JSON.stringify([p.source_platform, scope]));
++    }
++  }
++  return keys.sort(byteOrder);
++}
++
++// ── POST /api/scout/runs/observation ────────────────────────────────────────────────────
++
++/** OpenAPI shape of one ObservationEvidenceV1 (validated strictly by S10-A `parseEvidence`). */
++export class ScoutRunObservationEvidenceSchema {
++  @ApiProperty({ enum: [1] })
++  evidence_version!: 1;
++
++  @ApiProperty({ pattern: CANONICAL_PLATFORM_PATTERN.source })
++  source_platform!: string;
++
++  @ApiProperty({ pattern: HEX64_PATTERN.source })
++  account_scope_id_digest!: string;
++
++  @ApiProperty({ enum: [...CANONICAL_FAMILIES] })
++  family!: string;
++
++  @ApiProperty({ enum: ['source_signed_enumeration'] })
++  basis_kind!: 'source_signed_enumeration';
++
++  @ApiProperty({ pattern: HEX64_PATTERN.source })
++  mapping_spec_digest!: string;
++
++  @ApiProperty({ description: 'Canonical base64 of the strict canonical JSON source statement.' })
++  statement_b64!: string;
++
++  @ApiProperty({ pattern: '^[a-z0-9._-]{1,64}$' })
++  key_id!: string;
++
++  @ApiProperty({ description: 'Canonical base64 of the 64-byte Ed25519 source signature.' })
++  signature_b64!: string;
++}
++
++/**
++ * POST /api/scout/runs/observation body. `observations[]` entries are deliberately NOT nested
++ * class-validator DTOs: each is parsed by S10-A `parseEvidence` (strict keys, canonical base64,
++ * canonical statement), so the envelope never whitelists, strips or coerces an evidence field.
++ */
++export class ScoutRunObservationDto {
++  @ApiProperty({
++    description: 'Intent id of the open, declared server run.',
++    minLength: 1,
++    maxLength: 128,
++  })
++  @IsString()
++  @Length(1, 128)
++  intent_id!: string;
++
++  @ApiProperty({
++    description:
++      'One ObservationEvidenceV1 per (platform, scope, family): at most 4 families × the ' +
++      'declared scopes, one entry per unit; the whole body is ≤ 32 KiB.',
++    type: [ScoutRunObservationEvidenceSchema],
++    minItems: 1,
++    maxItems: OBSERVATION_MAX_ENTRIES,
++  })
++  @IsArray()
++  @ArrayMinSize(1)
++  @ArrayMaxSize(OBSERVATION_MAX_ENTRIES)
++  @IsObject({ each: true })
++  observations!: object[];
++}
++
++/** 200 body of an observation upload (identical replay stores nothing new). */
++export class ScoutRunObservationResult {
++  @ApiProperty({ description: 'The run key: the intent id.' })
++  intent_id!: string;
++
++  @ApiProperty({
++    description: 'Epoch read under the run row lock and bound to every row.',
++    minimum: 1,
++  })
++  execution_epoch!: number;
++
++  @ApiProperty({ description: 'Evidence rows inserted by this request.', minimum: 0 })
++  stored!: number;
++
++  @ApiProperty({
++    description: 'Entries identical to an already stored row (no row written).',
++    minimum: 0,
++  })
++  replayed!: number;
++}
++
++export type EnvelopeResult =
++  | {
++      readonly ok: true;
++      readonly intent_id: string;
++      readonly observations: readonly ParsedEvidence[];
++    }
++  | { readonly ok: false; readonly reason: EnvelopeRejection };
++
++/**
++ * The observation envelope (S10-B-owned): exactly `{intent_id, observations}`, `intent_id` 1-128
++ * chars, `observations` a non-empty array ≤ `OBSERVATION_MAX_ENTRIES`, every entry a valid
++ * `parseEvidence` object, at most one entry per `(platform, scope, family)` unit. Never throws.
++ * The declared-scope cardinality is checked under the run lock (`withinDeclaredCardinality`).
++ */
++export function parseObservationEnvelope(body: unknown): EnvelopeResult {
++  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
++    return { ok: false, reason: 'not_object' };
++  }
++  const keys = Object.keys(body);
++  for (const key of keys) {
++    if (key !== 'intent_id' && key !== 'observations') return { ok: false, reason: 'unknown_key' };
++  }
++  const intent: unknown = Reflect.get(body, 'intent_id');
++  const list: unknown = Reflect.get(body, 'observations');
++  if (intent === undefined || list === undefined) return { ok: false, reason: 'missing_key' };
++  if (typeof intent !== 'string' || intent.length === 0 || intent.length > 128) {
++    return { ok: false, reason: 'bad_intent' };
++  }
++  if (!Array.isArray(list)) return { ok: false, reason: 'bad_count' };
++  const items: readonly unknown[] = list;
++  if (items.length === 0) return { ok: false, reason: 'bad_count' };
++  if (items.length > OBSERVATION_MAX_ENTRIES) return { ok: false, reason: 'too_large' };
++  const seen = new Set<string>();
++  const observations: ParsedEvidence[] = [];
++  for (const item of items) {
++    const parsed = parseEvidence(item);
++    if (!parsed.ok) return { ok: false, reason: parsed.reason };
++    const { source_platform, account_scope_id_digest, family } = parsed.value.evidence;
++    const key = unitKey(source_platform, account_scope_id_digest, family);
++    if (seen.has(key)) return { ok: false, reason: 'duplicate_unit' };
++    seen.add(key);
++    observations.push(parsed.value);
++  }
++  return { ok: true, intent_id: intent, observations };
++}
++
++/** D-S10-2 "Privacy and bounds": at most 4 families × the run's declared scopes. */
++export function withinDeclaredCardinality(entries: number, declaredScopeCount: number): boolean {
++  return (
++    Number.isSafeInteger(declaredScopeCount) &&
++    declaredScopeCount > 0 &&
++    entries <= CANONICAL_FAMILIES.length * declaredScopeCount
++  );
++}
+diff --git a/src/scout/induction/observation.module.ts b/src/scout/induction/observation.module.ts
+new file mode 100644
+index 00000000..a05ccc6f
+--- /dev/null
++++ b/src/scout/induction/observation.module.ts
+@@ -0,0 +1,32 @@
++import { Module } from '@nestjs/common';
++import { JwtAuthGuard } from '../../auth/auth.guard';
++import { JwksVerifierService } from '../../auth/jwks.service';
++import { RolesGuard } from '../../auth/roles.guard';
++import { PrismaService } from '../../prisma.service';
++import { ScoutLifecycleService } from '../lifecycle/lifecycle.service';
++import { ObservationController } from './observation.controller';
++import { ObservationService } from './observation.service';
++
++// S10-B — the induction routes (POST /api/scout/runs/declaration|observation;
++// docs/decisions/2026-09-26-s10-induction.md D-S10-4). Self-contained like ScoutModule: the
++// guards and PrismaService are provided locally (the MacrosModule pattern), AnalyticsService is
++// @Global, and ScoutLifecycleService is provided here for the shared run refusals
++// (`classifyClosed` / `closedConflict`); it constructs its own reconstruct engine and is never
++// asked to settle from this module. It imports NO notification, drip, email, messaging,
++// workout-builder, AI or billing module (D-S10-6 invariant 5, R38).
++//
++// Registration: the doc assigns the ScoutModule import of this module to S10-C (D-S10-7), so
++// S10-B ships it unregistered and the routes stay unmounted until S10-C lands.
++@Module({
++  controllers: [ObservationController],
++  providers: [
++    ObservationService,
++    ScoutLifecycleService,
++    PrismaService,
++    JwtAuthGuard,
++    RolesGuard,
++    JwksVerifierService,
++  ],
++  exports: [ObservationService],
++})
++export class ObservationModule {}
+diff --git a/src/scout/induction/observation.service.ts b/src/scout/induction/observation.service.ts
+new file mode 100644
+index 00000000..3dd1128a
+--- /dev/null
++++ b/src/scout/induction/observation.service.ts
+@@ -0,0 +1,367 @@
++import { randomBytes } from 'crypto';
++import {
++  BadRequestException,
++  Inject,
++  Injectable,
++  NotFoundException,
++  Optional,
++} from '@nestjs/common';
++import type { Prisma } from '@prisma/client';
++import { PrismaService } from '../../prisma.service';
++import { isFenceReason, runConflict } from '../lifecycle/reason-codes';
++import { ScoutLifecycleService, type Tx } from '../lifecycle/lifecycle.service';
++import { loadNativeRuleSets } from '../reconstruct/native/native-rule-registry';
++import { loadSourceMappingSpecs } from '../reconstruct/source-mapper-registry';
++import { CHALLENGE_BYTES, type ObservationEvidenceV1 } from './contract';
++import { canonicalJson, sha256Hex } from './digest';
++import {
++  buildInductionRegistry,
++  loadInductionManifests,
++  type InductionRegistry,
++} from './manifest-registry';
++import { unitKey, type ParsedEvidence } from './parse';
++import {
++  declarationPairKeys,
++  normalizeDeclaration,
++  observationConflict,
++  withinDeclaredCardinality,
++  type NormalizedDeclaration,
++  type ScoutRunDeclarationResult,
++  type ScoutRunObservationResult,
++} from './observation.dto';
++
++/** Injection token of the optional test/composition seam (same pattern as S9-B's facts options). */
++export const OBSERVATION_SERVICE_OPTIONS = Symbol('OBSERVATION_SERVICE_OPTIONS');
++
++export interface ObservationServiceOptions {
++  /** The induction registry; default: the on-disk manifests, mapping specs and native rule sets. */
++  readonly registry?: InductionRegistry;
++  /** Challenge source; default `crypto.randomBytes(32)`. Must return exactly 32 bytes. */
++  readonly challenge?: () => Buffer;
++  /** Server clock for `declared_at` / `received_at`; default `new Date()`. */
++  readonly now?: () => Date;
++}
++
++/** The run row as read under `FOR NO KEY UPDATE` (mode = 'server' only). */
++interface LockedRun {
++  execution_epoch: number;
++  terminal_status: string | null;
++  fenced_at: Date | null;
++  fence_reason: string | null;
++  phase: string | null;
++  open_before_deadline: boolean;
++}
++
++/** Thrown inside the transaction when the run is absent or past its deadline; rolls back. */
++class RunNotWritable extends Error {
++  constructor(readonly kind: 'absent' | 'expired') {
++    super('scout run not writable');
++    this.name = 'RunNotWritable';
++  }
++}
++
++const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
++
++/** The row JSON of one validated evidence object (a fresh literal: the Prisma JSON input shape). */
++function evidenceJson(e: ObservationEvidenceV1): Prisma.InputJsonObject {
++  return {
++    evidence_version: e.evidence_version,
++    source_platform: e.source_platform,
++    account_scope_id_digest: e.account_scope_id_digest,
++    family: e.family,
++    basis_kind: e.basis_kind,
++    mapping_spec_digest: e.mapping_spec_digest,
++    statement_b64: e.statement_b64,
++    key_id: e.key_id,
++    signature_b64: e.signature_b64,
++  };
++}
++
++/**
++ * S10-B — the run declaration and the observation evidence (docs/decisions/2026-09-26-s10-induction.md
++ * D-S10-2, D-S10-4 "Routes"). Both writes run in ONE interactive transaction that first locks the
++ * run row `FOR NO KEY UPDATE` (the `lifecycle.service.ts` lock statement), so a declaration racing
++ * the first ingest (whose §3.1 gate UPDATEs the same row) and an observation racing `/complete`
++ * serialise on one row: used, or refused with a code — never partial (R32). Open `mode='server'`
++ * runs only. coach_id is always the bearer; epoch, clock, challenge and digests are server-bound.
++ *
++ * It writes only the two S10 tables; it never touches a run column, a terminal field, the settle
++ * path or the facts (S10-C), and imports no notification, drip, email, messaging, workout-builder,
++ * AI or billing module (D-S10-6 invariant 5).
++ */
++@Injectable()
++export class ObservationService {
++  private registryCache: InductionRegistry | undefined;
++  private readonly challenge: () => Buffer;
++  private readonly now: () => Date;
++
++  constructor(
++    private readonly prisma: PrismaService,
++    private readonly lifecycle: ScoutLifecycleService,
++    @Optional() @Inject(OBSERVATION_SERVICE_OPTIONS) options?: ObservationServiceOptions,
++  ) {
++    this.registryCache = options?.registry;
++    this.challenge = options?.challenge ?? (() => randomBytes(CHALLENGE_BYTES));
++    this.now = options?.now ?? (() => new Date());
++  }
++
++  /** Loaded once, fail loud (D-S10-1 V1-V6), exactly like the mapper and native registries. */
++  get registry(): InductionRegistry {
++    this.registryCache ??= buildInductionRegistry({
++      manifests: loadInductionManifests(),
++      specs: loadSourceMappingSpecs(),
++      nativeRuleSets: loadNativeRuleSets(),
++    });
++    return this.registryCache;
++  }
++
++  // ── POST /api/scout/runs/declaration ─────────────────────────────────────────
++
++  /**
++   * One atomic transaction under the run lock inserts the whole declared set or nothing. Exact
++   * replay (order ignored) → the ORIGINAL challenge, no row; any changed, removed or appended
++   * platform/scope → `declaration_conflict` (before or after ingest); a first declaration once a
++   * staged row or a claim exists → `declaration_after_ingest`.
++   */
++  async declare(
++    coachId: string,
++    intentId: string,
++    platforms: unknown,
++  ): Promise<ScoutRunDeclarationResult> {
++    const declaration = normalizeDeclaration(platforms);
++    if (declaration === null) {
++      throw new BadRequestException(
++        'platforms must be a non-empty list of unique canonical slugs, each with a non-empty unique list of 64-hex scope digests',
++      );
++    }
++    const wanted = declarationPairKeys(declaration);
++    return this.underRunLock(coachId, intentId, async (tx) => {
++      const existing = await tx.scoutRunDeclaration.findMany({
++        where: { coach_id: coachId, intent_id: intentId },
++        select: {
++          source_platform: true,
++          account_scope_id_digest: true,
++          challenge: true,
++          declared_at: true,
++        },
++      });
++      if (existing.length > 0) {
++        const held = existing
++          .map((r) => JSON.stringify([r.source_platform, r.account_scope_id_digest]))
++          .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
++        const same = held.length === wanted.length && held.every((k, i) => k === wanted[i]);
++        if (!same) throw observationConflict('declaration_conflict');
++        const first = existing[0];
++        return {
++          intent_id: intentId,
++          challenge_b64: Buffer.from(first.challenge).toString('base64'),
++          declared_at: first.declared_at.toISOString(),
++        };
++      }
++      const [staged, claim] = await Promise.all([
++        tx.scoutIngestEntity.findFirst({
++          where: { coach_id: coachId, intent_id: intentId },
++          select: { id: true },
++        }),
++        tx.scoutImportCompletion.findUnique({
++          where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
++          select: { id: true },
++        }),
++      ]);
++      if (staged !== null || claim !== null) throw observationConflict('declaration_after_ingest');
++      const challenge = this.challenge();
++      if (challenge.length !== CHALLENGE_BYTES) throw new Error('challenge source is not 32 bytes');
++      const declaredAt = this.now();
++      await this.insertDeclaration(tx, coachId, intentId, declaration, challenge, declaredAt);
++      return {
++        intent_id: intentId,
++        challenge_b64: challenge.toString('base64'),
++        declared_at: declaredAt.toISOString(),
++      };
++    });
++  }
++
++  /** Row-by-row inside the caller's transaction: any failure rolls every row back. */
++  private async insertDeclaration(
++    tx: Tx,
++    coachId: string,
++    intentId: string,
++    declaration: NormalizedDeclaration,
++    challenge: Buffer,
++    declaredAt: Date,
++  ): Promise<void> {
++    for (const p of declaration.platforms) {
++      for (const scope of p.account_scope_id_digests) {
++        await tx.scoutRunDeclaration.create({
++          data: {
++            coach_id: coachId,
++            intent_id: intentId,
++            source_platform: p.source_platform,
++            account_scope_id_digest: scope,
++            challenge: new Uint8Array(challenge),
++            declared_at: declaredAt,
++          },
++          select: { source_platform: true },
++        });
++      }
++    }
++  }
++
++  // ── POST /api/scout/runs/observation ─────────────────────────────────────────
++
++  /**
++   * Only after a declaration and before the claim; binds the epoch read under the lock. Every
++   * entry must name a declared (platform, scope), a platform with an induction manifest and a
++   * family in its `expectedFamilies`, else `observation_not_declared`. An identical entry (same
++   * `evidence_digest` for the unit at this epoch) is a replay: no row. A different one →
++   * `observation_conflict`. All-or-nothing: any refusal rolls the whole upload back.
++   */
++  async observe(
++    coachId: string,
++    intentId: string,
++    observations: readonly ParsedEvidence[],
++  ): Promise<ScoutRunObservationResult> {
++    const registry = this.registry;
++    return this.underRunLock(coachId, intentId, async (tx, run) => {
++      const claim = await tx.scoutImportCompletion.findUnique({
++        where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
++        select: { id: true },
++      });
++      if (claim !== null || run.phase === 'reconciling') {
++        throw observationConflict('observation_after_claim');
++      }
++      const declared = await tx.scoutRunDeclaration.findMany({
++        where: { coach_id: coachId, intent_id: intentId },
++        select: { source_platform: true, account_scope_id_digest: true },
++      });
++      if (declared.length === 0) throw observationConflict('declaration_missing');
++      if (!withinDeclaredCardinality(observations.length, declared.length)) {
++        throw new BadRequestException(
++          'observations exceed 4 families × the declared scopes of this run',
++        );
++      }
++      const declaredPairs = new Set(
++        declared.map((d) => JSON.stringify([d.source_platform, d.account_scope_id_digest])),
++      );
++      const epoch = run.execution_epoch;
++      const stored = await tx.scoutRunObservation.findMany({
++        where: { coach_id: coachId, intent_id: intentId, execution_epoch: epoch },
++        select: {
++          source_platform: true,
++          account_scope_id_digest: true,
++          family: true,
++          evidence_digest: true,
++        },
++      });
++      const storedDigest = new Map(
++        stored.map((s) => [
++          unitKey(s.source_platform, s.account_scope_id_digest, s.family),
++          s.evidence_digest,
++        ]),
++      );
++      const receivedAt = this.now();
++      let inserted = 0;
++      let replayed = 0;
++      for (const item of observations) {
++        const e = item.evidence;
++        const pkg = registry.packages.get(e.source_platform);
++        if (
++          !declaredPairs.has(JSON.stringify([e.source_platform, e.account_scope_id_digest])) ||
++          pkg === undefined ||
++          !pkg.manifest.expectedFamilies.includes(e.family)
++        ) {
++          throw observationConflict('observation_not_declared');
++        }
++        const canonical = canonicalJson(evidenceJson(e));
++        if (canonical === null)
++          throw new BadRequestException('observation evidence is not canonical');
++        const digest = sha256Hex(canonical);
++        const held = storedDigest.get(
++          unitKey(e.source_platform, e.account_scope_id_digest, e.family),
++        );
++        if (held !== undefined) {
++          if (held !== digest) throw observationConflict('observation_conflict');
++          replayed += 1;
++          continue;
++        }
++        await tx.scoutRunObservation.create({
++          data: {
++            coach_id: coachId,
++            intent_id: intentId,
++            execution_epoch: epoch,
++            source_platform: e.source_platform,
++            account_scope_id_digest: e.account_scope_id_digest,
++            family: e.family,
++            basis_kind: e.basis_kind,
++            evidence: evidenceJson(e),
++            evidence_digest: digest,
++            received_at: receivedAt,
++          },
++          select: { id: true },
++        });
++        inserted += 1;
++      }
++      return { intent_id: intentId, execution_epoch: epoch, stored: inserted, replayed };
++    });
++  }
++
++  // ── The run lock and the refusals shared by both routes ─────────────────────
++
++  /**
++   * Lock the open server run (`FOR NO KEY UPDATE`, the lifecycle lock statement), refuse a fenced
++   * (`run_fenced`) or terminal (`run_terminal`) run inside the transaction, then run `body`.
++   * An absent server row or an open run past its deadline rolls back and is classified after
++   * the transaction: legacy → `legacy_run`; unknown to this coach → uniform 404; owned intent
++   * without a run → `run_not_started`; past deadline → the lifecycle fences `timed_out` and the
++   * answer is `run_fenced` (`classifyClosed` / `closedConflict`, unedited).
++   */
++  private async underRunLock<T>(
++    coachId: string,
++    intentId: string,
++    body: (tx: Tx, run: LockedRun) => Promise<T>,
++  ): Promise<T> {
++    try {
++      return await this.prisma.$transaction(async (tx) => {
++        const rows = await tx.$queryRaw<LockedRun[]>`
++          SELECT execution_epoch, terminal_status, fenced_at, fence_reason, phase,
++                 (deadline_at > (now() AT TIME ZONE 'UTC')) AS open_before_deadline
++            FROM "ScoutImport"
++           WHERE coach_id = ${coachId} AND intent_id = ${intentId} AND mode = 'server'
++           FOR NO KEY UPDATE`;
++        const run = rows[0];
++        if (run === undefined) throw new RunNotWritable('absent');
++        if (run.fenced_at !== null) {
++          const reason = run.fence_reason;
++          throw runConflict('run_fenced', isFenceReason(reason) ? reason : undefined);
++        }
++        if (run.terminal_status !== null) throw runConflict('run_terminal');
++        if (run.open_before_deadline !== true) throw new RunNotWritable('expired');
++        return body(tx, run);
++      });
++    } catch (err) {
++      if (!(err instanceof RunNotWritable)) throw err;
++      if (err.kind === 'expired') {
++        throw ScoutLifecycleService.closedConflict(
++          await this.lifecycle.classifyClosed(coachId, intentId),
++        );
++      }
++      throw await this.absentRun(coachId, intentId);
++    }
++  }
++
++  /** No open server row under the lock: legacy, foreign/unknown (404) or not started. */
++  private async absentRun(coachId: string, intentId: string): Promise<Error> {
++    const row = await this.prisma.scoutImport.findUnique({
++      where: { coach_id_intent_id: { coach_id: coachId, intent_id: intentId } },
++      select: { mode: true },
++    });
++    if (row !== null && row.mode !== 'server') return runConflict('legacy_run');
++    if (row !== null) return runConflict('run_not_started');
++    if (!UUID_RE.test(intentId)) return new NotFoundException();
++    const intent = await this.prisma.importIntent.findUnique({
++      where: { id_coach_id: { id: intentId, coach_id: coachId } },
++      select: { id: true },
++    });
++    return intent === null ? new NotFoundException() : runConflict('run_not_started');
++  }
++}
+diff --git a/test/rls-g2-s10b.spec.ts b/test/rls-g2-s10b.spec.ts
+new file mode 100644
+index 00000000..b89fec1c
+--- /dev/null
++++ b/test/rls-g2-s10b.spec.ts
+@@ -0,0 +1,679 @@
++/**
++ * S10-B G2 live proof — run declaration + observation persistence
++ * (docs/decisions/2026-09-26-s10-induction.md D-S10-2, D-S10-4; acceptance cases R29, R30, R31,
++ * R32 of §3, tier B).
++ *
++ * Derived by substitution from the S9-C proof test/rls-g2-s9c.spec.ts (d3a9-s9c-r2, read-only):
++ * same real psql, same real generated Prisma client, the real ObservationController →
++ * ObservationService (+ ScoutLifecycleService / ScoutIngestService / ScoutService for the races) in
++ * separate OS processes (test/utils/g2-s10b-worker.cjs), no query or transaction mocks. Only the
++ * S10-B-only lane (test/utils/g2-s10b-db.ts, G2_S10B_*, port chosen and double-entered by the
++ * operator) is ever touched.
++ *
++ * Proven here: the catalog is exactly the shipped one (three tables, FKs, keys, triggers, grants,
++ * RLS); the routes' refusals and replays on real rows; the epoch bound under the lock; the
++ * deletion controls (REVOKE + insert-only trigger, the nested-DELETE negative control, the parent
++ * cascade positive control, the one-challenge trigger); the down refusal and drop; and the two
++ * races serialising on the run row lock. What stored evidence PROVES is not tested here: storage
++ * never verifies (S10-C's evaluator does).
++ */
++import { execFileSync } from 'child_process';
++import {
++  DECLARATION,
++  declarationInsert,
++  declarationRows,
++  expire,
++  gateSql,
++  intent,
++  legacyRun,
++  OBSERVATION,
++  observationInsert,
++  observationRows,
++  PLATFORM,
++  PLATFORM_B,
++  REGISTRY,
++  resetData,
++  runRow,
++  S10_TABLES,
++  serverRunInsert,
++  SETTLED,
++  settledInsert,
++  stage,
++  count,
++} from './utils/g2-s10b-harness';
++import {
++  appliedMigrations,
++  BASE_HEAD,
++  blocked,
++  candidateHead,
++  directory,
++  downSql,
++  EXPECTED_MIGRATIONS,
++  expectedVersion,
++  holdTransaction,
++  json,
++  jsonAdmin,
++  quote,
++  refused,
++  root,
++  run,
++  S10B_MIGRATION,
++  sql,
++  sqlAdmin,
++  sqlAs,
++  target,
++  upSql,
++  worker,
++} from './utils/g2-s10b-pg-harness';
++import { SCOPE_1, SCOPE_2 } from './utils/g2-s10b-fixtures';
++
++jest.setTimeout(300000);
++
++const COACH = 'coach';
++const OTHER = 'other-coach';
++
++const started = async (coach = COACH) => {
++  const intentId = intent(coach);
++  const start = await run({ action: 'start', coach, intent: intentId });
++  expect(start.failure).toBeUndefined();
++  return intentId;
++};
++const PLATFORMS = [
++  { source_platform: PLATFORM_B, account_scope_id_digests: [SCOPE_1] },
++  { source_platform: PLATFORM, account_scope_id_digests: [SCOPE_2, SCOPE_1] },
++];
++const declare = (intentId: string, platforms: unknown = PLATFORMS, coach = COACH) =>
++  run({ ...REGISTRY, action: 'declare', coach, intent: intentId, body: { platforms } });
++const observe = (
++  intentId: string,
++  evidence: Record<string, unknown>[] = [{}],
++  coach = COACH,
++  extra: Record<string, unknown> = {},
++) => run({ ...REGISTRY, action: 'observe', coach, intent: intentId, body: { evidence }, ...extra });
++const codeOf = (r: { failure?: any }) => r.failure?.response?.code;
++/** Like `refused`, for a statement whose PostgreSQL discriminator is one of several texts. */
++function refusedMatching(statement: string, pattern: RegExp): void {
++  let error: unknown;
++  try {
++    sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toMatch(pattern);
++}
++const noDeadlock = (r: { failure?: any }) => {
++  expect(String(r.failure?.message ?? '')).not.toMatch(/deadlock/i);
++  expect(r.failure?.code).not.toBe('P2034');
++};
++
++beforeEach(() => resetData());
++afterAll(() => resetData());
++
++describe('lane identity (bootstrap state, never repaired here)', () => {
++  it('is the S10-B disposable PG17 lane at the accepted history plus the S10-B expand', () => {
++    const facts =
++      jsonAdmin(`SELECT json_build_object('version',current_setting('server_version_num')::int,
++      'cluster',current_setting('cluster_name'),'directory',current_setting('data_directory'),
++      'port',inet_server_port(),'db',current_database())`);
++    expect(facts).toEqual({
++      version: expectedVersion,
++      cluster: 's10b-disposable-pg17',
++      directory,
++      port: target.port,
++      db: 'g2_s10b_disposable',
++    });
++    expect(Number(appliedMigrations())).toBe(EXPECTED_MIGRATIONS);
++    expect(
++      sql(
++        `SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC, migration_name DESC LIMIT 1`,
++      ),
++    ).toBe(S10B_MIGRATION);
++    expect(
++      sqlAdmin(`SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','authenticator')`),
++    ).toBe('0');
++  });
++
++  it('is bound to one attested candidate head whose prisma diff is exactly schema + the S10-B migration', () => {
++    expect(candidateHead).toMatch(/^[0-9a-f]{40}$/);
++    expect(candidateHead).not.toBe(BASE_HEAD);
++    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()).toBe(
++      candidateHead,
++    );
++    expect(
++      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim(),
++    ).toBe('');
++    expect(
++      execFileSync('git', ['diff', '--name-only', BASE_HEAD, candidateHead, '--', 'prisma'], {
++        cwd: root,
++        encoding: 'utf8',
++      })
++        .trim()
++        .split('\n')
++        .sort(),
++    ).toEqual([
++      `prisma/migrations/${S10B_MIGRATION}/down.sql`,
++      `prisma/migrations/${S10B_MIGRATION}/migration.sql`,
++      'prisma/schema.prisma',
++    ]);
++  });
++});
++
++describe('R31 — catalog exactness', () => {
++  it('three tables with forced RLS, exactly the shipped policies, grants, FKs, keys and triggers', () => {
++    for (const t of S10_TABLES) {
++      expect(
++        sql(
++          `SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public."${t}"'::regclass`,
++        ),
++      ).toBe('t');
++    }
++    const policies = json(`SELECT jsonb_agg(jsonb_build_array(c.relname,p.polname,p.polpermissive,
++        (SELECT array_agg(rolname ORDER BY rolname) FROM pg_roles WHERE oid = ANY(p.polroles)),
++        pg_get_expr(p.polqual,p.polrelid),pg_get_expr(p.polwithcheck,p.polrelid)) ORDER BY c.relname,p.polname)
++      FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid
++      WHERE c.relname IN ('ScoutRunDeclaration','ScoutRunObservation','ScoutRunSettledBasis')`);
++    const expected: unknown[] = [];
++    for (const [table, slug] of [
++      ['ScoutRunDeclaration', 'scout_run_declaration'],
++      ['ScoutRunObservation', 'scout_run_observation'],
++      ['ScoutRunSettledBasis', 'scout_run_settled_basis'],
++    ]) {
++      expected.push(
++        [table, `deny_all_anon_${slug}`, false, ['anon'], 'false', 'false'],
++        [table, `deny_all_authenticated_${slug}`, false, ['authenticated'], 'false', 'false'],
++        [table, `p_${slug}_service_role_all`, true, ['service_role'], 'true', 'true'],
++      );
++    }
++    expect(policies).toEqual(expected);
++    // Grants: API roles nothing; service_role SELECT + INSERT only (DELETE/UPDATE REVOKEd).
++    for (const t of S10_TABLES) {
++      for (const role of ['anon', 'authenticated', 'service_role']) {
++        const privs = json(`SELECT jsonb_build_object(
++          'select',has_table_privilege(${quote(role)},'public."${t}"','SELECT'),
++          'insert',has_table_privilege(${quote(role)},'public."${t}"','INSERT'),
++          'update',has_table_privilege(${quote(role)},'public."${t}"','UPDATE'),
++          'delete',has_table_privilege(${quote(role)},'public."${t}"','DELETE'),
++          'truncate',has_table_privilege(${quote(role)},'public."${t}"','TRUNCATE'),
++          'references',has_table_privilege(${quote(role)},'public."${t}"','REFERENCES'),
++          'trigger',has_table_privilege(${quote(role)},'public."${t}"','TRIGGER'))`);
++        const runtime = role === 'service_role';
++        expect(privs).toEqual({
++          select: runtime,
++          insert: runtime,
++          update: false,
++          delete: false,
++          truncate: false,
++          references: false,
++          trigger: false,
++        });
++      }
++    }
++    const fks =
++      json(`SELECT jsonb_agg(jsonb_build_array(conname,confrelid::regclass::text,confdeltype,confupdtype,convalidated) ORDER BY conname)
++      FROM pg_constraint WHERE contype='f' AND conrelid IN ('public."ScoutRunDeclaration"'::regclass,
++        'public."ScoutRunObservation"'::regclass,'public."ScoutRunSettledBasis"'::regclass)`);
++    expect(fks).toEqual([
++      ['ScoutRunDeclaration_coach_id_intent_id_fkey', '"ScoutImport"', 'c', 'r', true],
++      ['ScoutRunObservation_coach_id_intent_id_fkey', '"ScoutImport"', 'c', 'r', true],
++      ['ScoutRunObservation_declaration_fkey', '"ScoutRunDeclaration"', 'c', 'r', true],
++      ['ScoutRunSettledBasis_coach_id_intent_id_fkey', '"ScoutImport"', 'c', 'r', true],
++    ]);
++    expect(sql(`SELECT pg_get_indexdef('public."ScoutRunObservation_unit_key"'::regclass)`)).toBe(
++      'CREATE UNIQUE INDEX "ScoutRunObservation_unit_key" ON public."ScoutRunObservation" USING btree (coach_id, intent_id, execution_epoch, source_platform, account_scope_id_digest, family)',
++    );
++    expect(
++      sql(`SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger WHERE NOT tgisinternal
++        AND tgrelid IN ('public."ScoutRunDeclaration"'::regclass,'public."ScoutRunObservation"'::regclass,
++          'public."ScoutRunSettledBasis"'::regclass)`),
++    ).toBe(
++      'ScoutRunDeclaration_insert_only,ScoutRunDeclaration_no_truncate,ScoutRunDeclaration_one_challenge,' +
++        'ScoutRunObservation_insert_only,ScoutRunObservation_no_truncate,' +
++        'ScoutRunSettledBasis_insert_only,ScoutRunSettledBasis_no_truncate',
++    );
++    expect(
++      json(`SELECT jsonb_agg(jsonb_build_array(proname,prosecdef,proconfig) ORDER BY proname) FROM pg_proc
++        WHERE proname IN ('scout_run_observation_insert_only','scout_run_declaration_one_challenge')`),
++    ).toEqual([
++      ['scout_run_declaration_one_challenge', false, ['search_path=""']],
++      ['scout_run_observation_insert_only', false, ['search_path=""']],
++    ]);
++  });
++});
++
++describe('R29 — the declaration route on real rows', () => {
++  it('accepted with zero staged rows: all rows share ONE challenge; a reordered exact replay returns it and writes nothing', async () => {
++    const intentId = await started();
++    const first = await declare(intentId);
++    expect(first.failure).toBeUndefined();
++    const rows = declarationRows(COACH, intentId);
++    // declarationRows orders by (platform, scope digest), so the scopes are in sorted-digest order.
++    const [lo, hi] = [SCOPE_1, SCOPE_2].sort();
++    expect(rows.map((r) => [r.source_platform, r.account_scope_id_digest])).toEqual([
++      [PLATFORM, lo],
++      [PLATFORM, hi],
++      [PLATFORM_B, SCOPE_1],
++    ]);
++    expect(new Set(rows.map((r) => r.challenge)).size).toBe(1);
++    expect(Buffer.from(first.result.challenge_b64, 'base64').toString('hex')).toBe(
++      rows[0].challenge,
++    );
++    const replay = await declare(intentId, [...PLATFORMS].reverse());
++    expect(replay.failure).toBeUndefined();
++    expect(replay.result).toEqual(first.result);
++    expect(declarationRows(COACH, intentId)).toEqual(rows);
++  });
++
++  it('changed / appended set → declaration_conflict before and after ingest; nothing written', async () => {
++    const intentId = await started();
++    expect((await declare(intentId)).failure).toBeUndefined();
++    const before = declarationRows(COACH, intentId);
++    const changed = [{ source_platform: PLATFORM, account_scope_id_digests: [SCOPE_1] }];
++    expect(codeOf(await declare(intentId, changed))).toBe('declaration_conflict');
++    stage(COACH, intentId, 'clients', 'c-1');
++    const appended = [
++      ...PLATFORMS,
++      { source_platform: 'synthetic-src-c', account_scope_id_digests: [SCOPE_1] },
++    ];
++    expect(codeOf(await declare(intentId, appended))).toBe('declaration_conflict');
++    expect(declarationRows(COACH, intentId)).toEqual(before);
++  });
++
++  it('first declaration after a staged row → declaration_after_ingest; empty/duplicate input → 400, no row', async () => {
++    const intentId = await started();
++    for (const bad of [
++      [],
++      [{ source_platform: PLATFORM, account_scope_id_digests: [] }],
++      [{ source_platform: PLATFORM, account_scope_id_digests: [SCOPE_1, SCOPE_1] }],
++      [
++        { source_platform: PLATFORM, account_scope_id_digests: [SCOPE_1] },
++        { source_platform: PLATFORM, account_scope_id_digests: [SCOPE_2] },
++      ],
++    ]) {
++      expect((await declare(intentId, bad)).failure?.status).toBe(400);
++    }
++    expect(count(DECLARATION)).toBe(0);
++    stage(COACH, intentId, 'clients', 'c-1');
++    expect(codeOf(await declare(intentId))).toBe('declaration_after_ingest');
++    expect(count(DECLARATION)).toBe(0);
++  });
++
++  it('an injected mid-insert failure rolls every declaration row back', async () => {
++    const intentId = await started();
++    const r = await run({
++      ...REGISTRY,
++      action: 'declare',
++      coach: COACH,
++      intent: intentId,
++      body: { platforms: PLATFORMS },
++      failAfter: { model: 'scoutRunDeclaration', n: 2 },
++    });
++    expect(r.failure?.injected).toBe(true);
++    expect(r.queries).toContain('-- tx:rollback');
++    expect(count(DECLARATION)).toBe(0);
++  });
++
++  it('fenced → run_fenced, expired → run_fenced, legacy → legacy_run, other coach → 404; no row', async () => {
++    const a = await started();
++    expect((await run({ action: 'cancel', coach: COACH, intent: a })).failure).toBeUndefined();
++    expect(codeOf(await declare(a))).toBe('run_fenced');
++    const b = await started(OTHER);
++    expire(OTHER, b);
++    expect(codeOf(await declare(b, PLATFORMS, OTHER))).toBe('run_fenced');
++    expect(runRow(OTHER, b).fence_reason).toBe('timed_out');
++    legacyRun(COACH, 'intent_legacy_s10b');
++    expect(codeOf(await declare('intent_legacy_s10b'))).toBe('legacy_run');
++    const c = await started();
++    expect((await declare(c, PLATFORMS, OTHER)).failure?.status).toBe(404);
++    expect(count(DECLARATION)).toBe(0);
++  });
++});
++
++describe('R29 / R30 — the observation route on real rows', () => {
++  it('declaration_missing, then stored bound to the locked epoch; identical replay adds nothing; a different digest conflicts', async () => {
++    const intentId = await started();
++    expect(codeOf(await observe(intentId))).toBe('declaration_missing');
++    const decl = await declare(intentId);
++    const challengeHex = Buffer.from(decl.result.challenge_b64, 'base64').toString('hex');
++    const entry = { platform: PLATFORM, scope: SCOPE_1, family: 'clients', challengeHex };
++    const stored = await observe(intentId, [entry, { ...entry, family: 'workouts' }]);
++    expect(stored.failure).toBeUndefined();
++    expect(stored.result).toMatchObject({
++      execution_epoch: runRow(COACH, intentId).execution_epoch,
++      stored: 2,
++      replayed: 0,
++    });
++    const rows = observationRows(COACH, intentId);
++    expect(rows).toHaveLength(2);
++    for (const row of rows) {
++      expect(row.execution_epoch).toBe(runRow(COACH, intentId).execution_epoch);
++      expect(row.basis_kind).toBe('source_signed_enumeration');
++      expect(row.evidence_digest).toMatch(/^[0-9a-f]{64}$/);
++    }
++    const replay = await observe(intentId, [entry]);
++    expect(replay.result).toMatchObject({ stored: 0, replayed: 1 });
++    expect(observationRows(COACH, intentId)).toEqual(rows);
++    expect(codeOf(await observe(intentId, [{ ...entry, observedUnique: 99 }]))).toBe(
++      'observation_conflict',
++    );
++    expect(observationRows(COACH, intentId)).toEqual(rows);
++  });
++
++  it('R30: after the epoch moves, the same unit is a NEW row at the new epoch; earlier rows keep theirs', async () => {
++    const intentId = await started();
++    await declare(intentId);
++    const entry = { platform: PLATFORM, scope: SCOPE_1, family: 'clients' };
++    expect((await observe(intentId, [entry])).failure).toBeUndefined();
++    // Fixture clock/epoch shaping as the owner (the service never updates the run row).
++    sql(
++      `UPDATE "ScoutImport" SET execution_epoch=execution_epoch+1 WHERE coach_id=${quote(COACH)} AND intent_id=${quote(intentId)}`,
++    );
++    const moved = await observe(intentId, [{ ...entry, observedUnique: 7 }]);
++    expect(moved.failure).toBeUndefined();
++    const rows = observationRows(COACH, intentId);
++    expect(rows.map((r) => r.execution_epoch)).toEqual([1, 2]);
++  });
++
++  it('undeclared scope, family outside the manifest, platform without a manifest → observation_not_declared; nothing stored', async () => {
++    const intentId = await started();
++    await declare(intentId, [
++      ...PLATFORMS,
++      { source_platform: 'synthetic-src-c', account_scope_id_digests: [SCOPE_1] },
++    ]);
++    for (const bad of [
++      { platform: PLATFORM_B, scope: SCOPE_2 },
++      { platform: PLATFORM_B, family: 'workouts' },
++      { platform: 'synthetic-src-c' },
++    ]) {
++      expect(codeOf(await observe(intentId, [{}, bad]))).toBe('observation_not_declared');
++    }
++    expect(count(OBSERVATION)).toBe(0);
++  });
++
++  it('an injected mid-insert failure rolls every observation row back', async () => {
++    const intentId = await started();
++    await declare(intentId);
++    const r = await observe(intentId, [{}, { family: 'workouts' }], COACH, {
++      failAfter: { model: 'scoutRunObservation', n: 1 },
++    });
++    expect(r.failure?.injected).toBe(true);
++    expect(count(OBSERVATION)).toBe(0);
++  });
++
++  it('a 32769-byte body → 400 before any statement; other coach → 404; a settled (terminal) run → run_terminal', async () => {
++    const intentId = await started();
++    await declare(intentId);
++    const big = await observe(intentId, [{}], COACH, { rawBytes: 32 * 1024 + 1 });
++    expect(big.failure?.status).toBe(400);
++    expect(big.queries.filter((q) => q.includes('FOR NO KEY UPDATE'))).toHaveLength(0);
++    expect((await observe(intentId, [{}], OTHER)).failure?.status).toBe(404);
++    // The real claim + settle path makes the run terminal (not fenced).
++    const done = await run({ action: 'complete', coach: COACH, intent: intentId });
++    expect(done.failure).toBeUndefined();
++    const settled = runRow(COACH, intentId);
++    expect(settled.terminal_status).not.toBeNull();
++    expect(settled.fenced_at).toBeNull();
++    expect(codeOf(await observe(intentId))).toBe('run_terminal');
++    expect(count(OBSERVATION)).toBe(0);
++  });
++});
++
++describe('R31 — access and deletion controls', () => {
++  const seedRun = (coach: string) => {
++    const intentId = intent(coach);
++    sql(`${serverRunInsert(coach, intentId)}; ${declarationInsert(coach, intentId)};
++      ${observationInsert(coach, intentId)}; ${settledInsert(coach, intentId)};`);
++    return intentId;
++  };
++
++  it('anon/authenticated are refused on all three tables; a service_role rollback persists nothing', () => {
++    const intentId = seedRun(COACH);
++    for (const t of S10_TABLES) {
++      for (const role of ['anon', 'authenticated']) {
++        refused(`SET ROLE ${role}; SELECT count(*) FROM "${t}"`, 'permission denied');
++      }
++    }
++    refused(
++      `SET ROLE anon; ${declarationInsert(COACH, intentId, { platform: PLATFORM_B })}`,
++      'permission denied',
++    );
++    sqlAs(
++      'service_role',
++      `BEGIN; ${declarationInsert(COACH, intentId, { platform: PLATFORM_B })}; ROLLBACK;`,
++    );
++    expect(count(DECLARATION, `source_platform=${quote(PLATFORM_B)}`)).toBe(0);
++  });
++
++  it("the FK refuses a row for another coach on A's intent (unrepresentable)", () => {
++    const intentId = seedRun(COACH);
++    refused(
++      declarationInsert(OTHER, intentId),
++      'ScoutRunDeclaration_coach_id_intent_id_fkey',
++      'service_role',
++    );
++    refused(observationInsert(OTHER, intentId), 'violates foreign key constraint', 'service_role');
++    refused(
++      settledInsert(OTHER, intentId),
++      'ScoutRunSettledBasis_coach_id_intent_id_fkey',
++      'service_role',
++    );
++    // An observation of an undeclared (platform, scope) is refused by the declaration FK too.
++    refused(
++      observationInsert(COACH, intentId, { platform: PLATFORM_B }),
++      'ScoutRunObservation_declaration_fkey',
++      'service_role',
++    );
++  });
++
++  it('UPDATE and DELETE: service_role has no privilege; the owner is refused by the insert-only trigger; TRUNCATE refused', () => {
++    seedRun(COACH);
++    for (const t of S10_TABLES) {
++      refused(`UPDATE "${t}" SET coach_id=coach_id`, 'permission denied', 'service_role');
++      refused(`DELETE FROM "${t}"`, 'permission denied', 'service_role');
++      refused(`UPDATE "${t}" SET coach_id=coach_id`, 'G2-S10B insert-only: UPDATE');
++      refused(`DELETE FROM "${t}"`, 'G2-S10B insert-only: DELETE');
++      // The declaration table is also an FK target, so PostgreSQL may refuse its TRUNCATE on the
++      // reference before the statement trigger fires; either way nothing is truncated.
++      refusedMatching(
++        `TRUNCATE "${t}"`,
++        t === DECLARATION
++          ? /G2-S10B insert-only: TRUNCATE|cannot truncate a table referenced in a foreign key constraint/
++          : /G2-S10B insert-only: TRUNCATE/,
++      );
++      expect(count(t)).toBe(1);
++    }
++  });
++
++  it('negative control: a non-FK child DELETE from a nested trigger in a service_role session is refused (no privilege)', () => {
++    seedRun(COACH);
++    refused(
++      `BEGIN;
++       CREATE TABLE public.g2_s10b_probe (id int);
++       CREATE FUNCTION public.g2_s10b_probe_delete() RETURNS trigger LANGUAGE plpgsql AS $$
++         BEGIN DELETE FROM public."ScoutRunObservation"; RETURN NEW; END $$;
++       CREATE TRIGGER g2_s10b_probe_after AFTER INSERT ON public.g2_s10b_probe
++         FOR EACH ROW EXECUTE FUNCTION public.g2_s10b_probe_delete();
++       GRANT INSERT ON public.g2_s10b_probe TO service_role;
++       SET ROLE service_role;
++       INSERT INTO public.g2_s10b_probe VALUES (1);
++       ROLLBACK;`,
++      'permission denied for table ScoutRunObservation',
++    );
++    expect(sql(`SELECT to_regclass('public.g2_s10b_probe') IS NULL`)).toBe('t');
++    expect(count(OBSERVATION)).toBe(1);
++  });
++
++  it('positive control: deleting a parent run cascades ITS children only; a differing challenge is refused', () => {
++    const a1 = seedRun(COACH);
++    const other = seedRun(OTHER);
++    sql(`DELETE FROM "ScoutImport" WHERE coach_id=${quote(COACH)} AND intent_id=${quote(a1)}`);
++    for (const t of S10_TABLES) {
++      expect(count(t, `coach_id=${quote(COACH)}`)).toBe(0);
++      expect(count(t, `coach_id=${quote(OTHER)} AND intent_id=${quote(other)}`)).toBe(1);
++    }
++    refused(
++      declarationInsert(OTHER, other, {
++        platform: PLATFORM_B,
++        challenge: "decode(repeat('08',32),'hex')",
++      }),
++      'G2-S10B declaration challenge differs within one run',
++      'service_role',
++    );
++    refused(
++      declarationInsert(OTHER, other, {
++        platform: PLATFORM_B,
++        declaredAt: "'2026-09-26 00:00:01'",
++      }),
++      'G2-S10B declaration challenge differs within one run',
++      'service_role',
++    );
++    sqlAs('service_role', declarationInsert(OTHER, other, { platform: PLATFORM_B }));
++    expect(count(DECLARATION, `coach_id=${quote(OTHER)}`)).toBe(2);
++  });
++
++  it('CHECKs: raw scope ids, a short challenge, an unknown family, epoch 0 or a non-hex digest are refused', () => {
++    const intentId = intent(COACH);
++    sql(serverRunInsert(COACH, intentId));
++    refused(
++      declarationInsert(COACH, intentId, { scope: quote('raw-account-id') }),
++      'ScoutRunDeclaration_scope_digest_check',
++    );
++    refused(
++      declarationInsert(COACH, intentId, { challenge: "decode('00','hex')" }),
++      'ScoutRunDeclaration_challenge_check',
++    );
++    sql(declarationInsert(COACH, intentId));
++    refused(
++      observationInsert(COACH, intentId, { family: 'notes' }),
++      'ScoutRunObservation_family_check',
++    );
++    refused(observationInsert(COACH, intentId, { epoch: 0 }), 'ScoutRunObservation_epoch_check');
++    refused(
++      observationInsert(COACH, intentId, { digest: quote('not-hex') }),
++      'ScoutRunObservation_evidence_digest_check',
++    );
++  });
++});
++
++describe('R32 — races serialise on the run row lock (used, or refused with its code; never partial, never 40P01)', () => {
++  it('first ingest holds the row → the declaration waits, then refuses declaration_after_ingest', async () => {
++    const intentId = await started();
++    const holder = holdTransaction(
++      `${gateSql(COACH, intentId)}; INSERT INTO "ScoutIngestEntity" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++        VALUES ('race-1',${quote(COACH)},${quote(intentId)},'clients','c-1',${quote(PLATFORM)},'{}')`,
++    );
++    await holder.held;
++    const w = worker({
++      ...REGISTRY,
++      action: 'declare',
++      coach: COACH,
++      intent: intentId,
++      body: { platforms: PLATFORMS },
++    });
++    await blocked(w.name);
++    holder.release();
++    const r = await w.done;
++    noDeadlock(r);
++    expect(codeOf(r)).toBe('declaration_after_ingest');
++    expect(count(DECLARATION)).toBe(0);
++  });
++
++  it('the declaration holds the row → the first ingest waits, then both are used', async () => {
++    const intentId = await started();
++    const d = worker({
++      ...REGISTRY,
++      action: 'declare',
++      coach: COACH,
++      intent: intentId,
++      body: { platforms: PLATFORMS },
++      pause: 'locked',
++      txTimeout: 60000,
++    });
++    await d.ready;
++    const i = worker({ action: 'ingest', coach: COACH, intent: intentId });
++    await blocked(i.name);
++    d.resume();
++    const [dr, ir] = await Promise.all([d.done, i.done]);
++    noDeadlock(dr);
++    noDeadlock(ir);
++    expect(dr.failure).toBeUndefined();
++    expect(ir.failure).toBeUndefined();
++    expect(count(DECLARATION)).toBe(3);
++    expect(count('ScoutIngestEntity')).toBe(1);
++  });
++
++  it('/complete holds the row → the observation waits, then refuses observation_after_claim', async () => {
++    const intentId = await started();
++    await declare(intentId);
++    const c = worker({
++      action: 'complete',
++      coach: COACH,
++      intent: intentId,
++      pause: 'gated',
++      txTimeout: 60000,
++    });
++    await c.ready;
++    const o = worker({
++      ...REGISTRY,
++      action: 'observe',
++      coach: COACH,
++      intent: intentId,
++      body: { evidence: [{}] },
++    });
++    await blocked(o.name);
++    c.resume();
++    const [cr, or] = await Promise.all([c.done, o.done]);
++    noDeadlock(cr);
++    noDeadlock(or);
++    expect(cr.failure).toBeUndefined();
++    expect(codeOf(or)).toBe('observation_after_claim');
++    expect(count(OBSERVATION)).toBe(0);
++  });
++
++  it('the observation holds the row → /complete waits, then both are used', async () => {
++    const intentId = await started();
++    await declare(intentId);
++    const o = worker({
++      ...REGISTRY,
++      action: 'observe',
++      coach: COACH,
++      intent: intentId,
++      body: { evidence: [{}] },
++      pause: 'locked',
++      txTimeout: 60000,
++    });
++    await o.ready;
++    const c = worker({ action: 'complete', coach: COACH, intent: intentId });
++    await blocked(c.name);
++    o.resume();
++    const [or, cr] = await Promise.all([o.done, c.done]);
++    noDeadlock(or);
++    noDeadlock(cr);
++    expect(or.failure).toBeUndefined();
++    expect(cr.failure).toBeUndefined();
++    expect(count(OBSERVATION)).toBe(1);
++  });
++});
++
++describe('R31 — down.sql refuses with rows, drops only the S10 objects when empty (then re-expand)', () => {
++  it('refuses while any row exists; drops cleanly when empty; the expand re-applies', () => {
++    const intentId = intent(COACH);
++    sql(`${serverRunInsert(COACH, intentId)}; ${declarationInsert(COACH, intentId)}`);
++    refused(
++      downSql(),
++      'Run declaration or observation state exists; retain schema and use compatible forward repair',
++    );
++    expect(count(DECLARATION)).toBe(1);
++    resetData();
++    sql(downSql());
++    for (const t of S10_TABLES)
++      expect(sql(`SELECT to_regclass('public."${t}"') IS NULL`)).toBe('t');
++    expect(sql(`SELECT to_regclass('public."ScoutImport"') IS NOT NULL`)).toBe('t');
++    refused(downSql(), 'G2-S10B observation tables absent');
++    sql(upSql());
++    for (const t of S10_TABLES)
++      expect(sql(`SELECT to_regclass('public."${t}"') IS NOT NULL`)).toBe('t');
++    refused(upSql(), 'G2-S10B observation tables already present');
++    expect(count(SETTLED)).toBe(0);
++  });
++});
+diff --git a/test/scout/induction/observation.controller.spec.ts b/test/scout/induction/observation.controller.spec.ts
+new file mode 100644
+index 00000000..00e5e8f3
+--- /dev/null
++++ b/test/scout/induction/observation.controller.spec.ts
+@@ -0,0 +1,261 @@
++import 'reflect-metadata';
++import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
++import { BadRequestException, RequestMethod, ValidationPipe } from '@nestjs/common';
++import type { AuthedRequest } from '../../../src/auth/auth-request';
++import { ROLES_KEY } from '../../../src/common/decorators/roles.decorator';
++import { OBSERVATION_BODY_MAX_BYTES } from '../../../src/scout/induction/contract';
++import {
++  ObservationController,
++  type ObservationRequest,
++} from '../../../src/scout/induction/observation.controller';
++import {
++  OBSERVATION_MAX_ENTRIES,
++  ScoutRunDeclarationDto,
++  ScoutRunObservationDto,
++  parseObservationEnvelope,
++  withinDeclaredCardinality,
++} from '../../../src/scout/induction/observation.dto';
++import { ObservationService } from '../../../src/scout/induction/observation.service';
++import { PLATFORM_A, SCOPE_1, SCOPE_2, rawEvidence } from '../../utils/g2-s10b-fixtures';
++
++// S10-B — the two induction routes: metadata posture (same keys as run.controller.spec.ts),
++// identity from the token only, the S10-A 32 KiB cap (R21) enforced on the exact received bytes,
++// the S10-B envelope (intent binding, one entry per unit, cardinality), and the global
++// ValidationPipe refusing every server-bound field a client might over-post.
++const THROTTLE_LIMIT_DEFAULT_KEY = 'THROTTLER:LIMITdefault';
++const THROTTLE_TTL_DEFAULT_KEY = 'THROTTLER:TTLdefault';
++const INTENT = '5d6e7f80-9a0b-4c1d-8e2f-3a4b5c6d7e8f';
++
++function makeReq(userId: string, rawBody?: Buffer): ObservationRequest {
++  const req: ObservationRequest = { user: { id: userId } as AuthedRequest['user'] };
++  if (rawBody !== undefined) req.rawBody = rawBody;
++  return req;
++}
++
++/** The body as the route receives it, plus its exact serialised bytes. */
++function upload(observations: object[], intentId = INTENT) {
++  const body: ScoutRunObservationDto = { intent_id: intentId, observations };
++  return { body, raw: Buffer.from(JSON.stringify(body), 'utf8') };
++}
++
++/** A raw body of exactly `bytes` bytes (valid JSON whitespace padding; the size is what matters). */
++function paddedRaw(bytes: number): Buffer {
++  return Buffer.alloc(bytes, 0x20);
++}
++
++const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
++
++describe('ObservationController', () => {
++  let declare: jest.Mock;
++  let observe: jest.Mock;
++  let controller: ObservationController;
++
++  beforeEach(() => {
++    declare = jest.fn().mockResolvedValue({
++      intent_id: INTENT,
++      challenge_b64: Buffer.alloc(32).toString('base64'),
++      declared_at: '2026-09-26T12:00:00.000Z',
++    });
++    observe = jest
++      .fn()
++      .mockResolvedValue({ intent_id: INTENT, execution_epoch: 1, stored: 1, replayed: 0 });
++    const service = Object.assign(
++      Object.create(ObservationService.prototype) as ObservationService,
++      { declare, observe },
++    );
++    controller = new ObservationController(service);
++  });
++
++  describe('POST /api/scout/runs/declaration', () => {
++    const platforms = [{ source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_1] }];
++
++    it('delegates with the coach from the token and the body intent/platforms', async () => {
++      await controller.postDeclaration(makeReq('coach-token'), { intent_id: INTENT, platforms });
++      expect(declare).toHaveBeenCalledWith('coach-token', INTENT, platforms);
++    });
++
++    it('never reads an account field from the body — identity is the token', async () => {
++      const overPosted: ScoutRunDeclarationDto & { coach_id: string } = {
++        intent_id: INTENT,
++        platforms,
++        coach_id: 'attacker',
++      };
++      await controller.postDeclaration(makeReq('coach-token'), overPosted);
++      expect(declare.mock.calls[0][0]).toBe('coach-token');
++    });
++
++    it.each(['coach_id', 'challenge_b64', 'declared_at', 'execution_epoch'])(
++      'the ValidationPipe refuses a client-supplied server-bound field `%s`',
++      async (field) => {
++        const body = { intent_id: INTENT, platforms, [field]: 'client-value' };
++        await expect(
++          pipe.transform(body, { type: 'body', metatype: ScoutRunDeclarationDto }),
++        ).rejects.toBeInstanceOf(BadRequestException);
++      },
++    );
++
++    it.each([
++      ['an empty platform list', { intent_id: INTENT, platforms: [] }],
++      [
++        'a raw (non-digest) scope id',
++        {
++          intent_id: INTENT,
++          platforms: [{ source_platform: PLATFORM_A, account_scope_id_digests: ['acct-123'] }],
++        },
++      ],
++      [
++        'a non-canonical slug',
++        {
++          intent_id: INTENT,
++          platforms: [{ source_platform: 'Synthetic Src', account_scope_id_digests: [SCOPE_1] }],
++        },
++      ],
++      [
++        'a duplicate scope',
++        {
++          intent_id: INTENT,
++          platforms: [
++            { source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_1, SCOPE_1] },
++          ],
++        },
++      ],
++      ['a missing intent', { platforms }],
++    ])('the ValidationPipe refuses %s', async (_label, body) => {
++      await expect(
++        pipe.transform(body, { type: 'body', metatype: ScoutRunDeclarationDto }),
++      ).rejects.toBeInstanceOf(BadRequestException);
++    });
++
++    it('is a POST on `runs/declaration`, 200, coach|owner, 30/min', () => {
++      const handler = ObservationController.prototype.postDeclaration;
++      expect(Reflect.getMetadata(PATH_METADATA, ObservationController)).toBe('scout');
++      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('runs/declaration');
++      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
++      expect(Reflect.getMetadata(HTTP_CODE_METADATA, handler)).toBe(200);
++      expect(Reflect.getMetadata(ROLES_KEY, handler)).toEqual(['coach', 'owner']);
++      expect(Reflect.getMetadata(THROTTLE_LIMIT_DEFAULT_KEY, handler)).toBe(30);
++      expect(Reflect.getMetadata(THROTTLE_TTL_DEFAULT_KEY, handler)).toBe(60_000);
++    });
++  });
++
++  describe('POST /api/scout/runs/observation', () => {
++    it('delegates the parsed entries with the coach from the token', async () => {
++      const { body, raw } = upload([rawEvidence()]);
++      await controller.postObservation(makeReq('coach-token', raw), body);
++      expect(observe).toHaveBeenCalledTimes(1);
++      const [coach, intent, entries] = observe.mock.calls[0] as [
++        string,
++        string,
++        { evidence: object }[],
++      ];
++      expect(coach).toBe('coach-token');
++      expect(intent).toBe(INTENT);
++      expect(entries).toHaveLength(1);
++      expect(entries[0].evidence).toMatchObject({ source_platform: PLATFORM_A, family: 'clients' });
++    });
++
++    it('accepts a body of exactly 32 KiB and refuses a 32769-byte body (R21), before the service', async () => {
++      expect(OBSERVATION_BODY_MAX_BYTES).toBe(32 * 1024);
++      const { body } = upload([rawEvidence()]);
++      await controller.postObservation(makeReq('c', paddedRaw(OBSERVATION_BODY_MAX_BYTES)), body);
++      expect(observe).toHaveBeenCalledTimes(1);
++      observe.mockClear();
++      await expect(
++        controller.postObservation(makeReq('c', paddedRaw(32_769)), body),
++      ).rejects.toBeInstanceOf(BadRequestException);
++      expect(observe).not.toHaveBeenCalled();
++    });
++
++    it('refuses when the raw body was not captured (fail closed, never re-measured)', async () => {
++      const { body } = upload([rawEvidence()]);
++      await expect(controller.postObservation(makeReq('c'), body)).rejects.toBeInstanceOf(
++        BadRequestException,
++      );
++      expect(observe).not.toHaveBeenCalled();
++    });
++
++    it('refuses two entries for one unit (one entry per (platform, scope, family))', async () => {
++      const { body, raw } = upload([rawEvidence(), rawEvidence({ observedUnique: 9 })]);
++      await expect(controller.postObservation(makeReq('c', raw), body)).rejects.toBeInstanceOf(
++        BadRequestException,
++      );
++      expect(observe).not.toHaveBeenCalled();
++    });
++
++    it('refuses an entry the S10-A evidence grammar rejects (unknown key)', async () => {
++      const { body, raw } = upload([{ ...rawEvidence(), coach_id: 'attacker' }]);
++      await expect(controller.postObservation(makeReq('c', raw), body)).rejects.toBeInstanceOf(
++        BadRequestException,
++      );
++    });
++
++    it.each(['coach_id', 'execution_epoch', 'received_at', 'evidence_digest'])(
++      'the ValidationPipe refuses a client-supplied server-bound field `%s`',
++      async (field) => {
++        const body = { intent_id: INTENT, observations: [rawEvidence()], [field]: 'client-value' };
++        await expect(
++          pipe.transform(body, { type: 'body', metatype: ScoutRunObservationDto }),
++        ).rejects.toBeInstanceOf(BadRequestException);
++      },
++    );
++
++    it('the ValidationPipe passes evidence entries through unmodified for parseEvidence', async () => {
++      const entry = rawEvidence();
++      const out: unknown = await pipe.transform(
++        { intent_id: INTENT, observations: [entry] },
++        { type: 'body', metatype: ScoutRunObservationDto },
++      );
++      const parsed = parseObservationEnvelope(out);
++      expect(parsed.ok).toBe(true);
++    });
++
++    it('is a POST on `runs/observation`, 200, coach|owner, 30/min', () => {
++      const handler = ObservationController.prototype.postObservation;
++      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('runs/observation');
++      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
++      expect(Reflect.getMetadata(HTTP_CODE_METADATA, handler)).toBe(200);
++      expect(Reflect.getMetadata(ROLES_KEY, handler)).toEqual(['coach', 'owner']);
++      expect(Reflect.getMetadata(THROTTLE_LIMIT_DEFAULT_KEY, handler)).toBe(30);
++      expect(Reflect.getMetadata(THROTTLE_TTL_DEFAULT_KEY, handler)).toBe(60_000);
++    });
++  });
++
++  describe('the S10-B envelope (pure)', () => {
++    it.each([
++      ['a non-object body', [], 'not_object'],
++      [
++        'an extra key',
++        { intent_id: INTENT, observations: [rawEvidence()], extra: 1 },
++        'unknown_key',
++      ],
++      ['a missing key', { intent_id: INTENT }, 'missing_key'],
++      ['an empty intent', { intent_id: '', observations: [rawEvidence()] }, 'bad_intent'],
++      ['an empty list', { intent_id: INTENT, observations: [] }, 'bad_count'],
++    ])('%s → %s', (_label, body, reason) => {
++      expect(parseObservationEnvelope(body)).toEqual({ ok: false, reason });
++    });
++
++    it('refuses more entries than the static bound', () => {
++      const many = Array.from({ length: OBSERVATION_MAX_ENTRIES + 1 }, () => ({}));
++      expect(parseObservationEnvelope({ intent_id: INTENT, observations: many })).toEqual({
++        ok: false,
++        reason: 'too_large',
++      });
++    });
++
++    it('cardinality is at most 4 families × the declared scopes', () => {
++      expect(withinDeclaredCardinality(4, 1)).toBe(true);
++      expect(withinDeclaredCardinality(5, 1)).toBe(false);
++      expect(withinDeclaredCardinality(8, 2)).toBe(true);
++      expect(withinDeclaredCardinality(1, 0)).toBe(false);
++    });
++
++    it('distinct scopes of one platform/family are distinct units', () => {
++      const out = parseObservationEnvelope({
++        intent_id: INTENT,
++        observations: [rawEvidence(), rawEvidence({ scope: SCOPE_2 })],
++      });
++      expect(out.ok).toBe(true);
++    });
++  });
++});
+diff --git a/test/scout/induction/observation.service.spec.ts b/test/scout/induction/observation.service.spec.ts
+new file mode 100644
+index 00000000..70287ee5
+--- /dev/null
++++ b/test/scout/induction/observation.service.spec.ts
+@@ -0,0 +1,493 @@
++import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
++import { PrismaService } from '../../../src/prisma.service';
++import { ScoutLifecycleService } from '../../../src/scout/lifecycle/lifecycle.service';
++import { parseEvidence, type ParsedEvidence } from '../../../src/scout/induction/parse';
++import { ObservationService } from '../../../src/scout/induction/observation.service';
++import {
++  PLATFORM_A,
++  PLATFORM_B,
++  SCOPE_1,
++  SCOPE_2,
++  rawEvidence,
++  syntheticRegistry,
++  type EvidenceSpec,
++} from '../../utils/g2-s10b-fixtures';
++
++// S10-B unit coverage of ObservationService against Prisma doubles: the D-S10-4 route refusals
++// (R29), exact replay, immutability, all-or-nothing (R32), and server binding of every
++// server-owned field. The run lock, FKs, triggers and grants are proven on real PG in
++// test/rls-g2-s10b.spec.ts.
++
++const COACH = 'coach-s10b-unit';
++const INTENT = '5d6e7f80-9a0b-4c1d-8e2f-3a4b5c6d7e8f';
++const CHALLENGE = Buffer.alloc(32, 9);
++const NOW = new Date('2026-09-26T12:00:00.000Z');
++
++interface LockRow {
++  execution_epoch: number;
++  terminal_status: string | null;
++  fenced_at: Date | null;
++  fence_reason: string | null;
++  phase: string | null;
++  open_before_deadline: boolean;
++}
++
++const openLock = (over: Partial<LockRow> = {}): LockRow => ({
++  execution_epoch: 2,
++  terminal_status: null,
++  fenced_at: null,
++  fence_reason: null,
++  phase: 'discovering',
++  open_before_deadline: true,
++  ...over,
++});
++
++interface Doubles {
++  queryRaw: jest.Mock;
++  declFindMany: jest.Mock;
++  declCreate: jest.Mock;
++  entityFindFirst: jest.Mock;
++  completionFindUnique: jest.Mock;
++  obsFindMany: jest.Mock;
++  obsCreate: jest.Mock;
++  runFindUnique: jest.Mock;
++  intentFindUnique: jest.Mock;
++  classifyClosed: jest.Mock;
++  transaction: jest.Mock;
++  committed: { value: boolean };
++}
++
++function makeDoubles(): Doubles {
++  const d: Doubles = {
++    queryRaw: jest.fn().mockResolvedValue([openLock()]),
++    declFindMany: jest.fn().mockResolvedValue([]),
++    declCreate: jest.fn().mockResolvedValue({ source_platform: PLATFORM_A }),
++    entityFindFirst: jest.fn().mockResolvedValue(null),
++    completionFindUnique: jest.fn().mockResolvedValue(null),
++    obsFindMany: jest.fn().mockResolvedValue([]),
++    obsCreate: jest.fn().mockResolvedValue({ id: 'row' }),
++    runFindUnique: jest.fn().mockResolvedValue(null),
++    intentFindUnique: jest.fn().mockResolvedValue(null),
++    classifyClosed: jest.fn(),
++    transaction: jest.fn(),
++    committed: { value: false },
++  };
++  d.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
++    d.committed.value = false;
++    const out = await fn({
++      $queryRaw: d.queryRaw,
++      scoutRunDeclaration: { findMany: d.declFindMany, create: d.declCreate },
++      scoutIngestEntity: { findFirst: d.entityFindFirst },
++      scoutImportCompletion: { findUnique: d.completionFindUnique },
++      scoutRunObservation: { findMany: d.obsFindMany, create: d.obsCreate },
++    });
++    d.committed.value = true;
++    return out;
++  });
++  return d;
++}
++
++function makeService(d: Doubles): ObservationService {
++  const prisma = Object.assign(Object.create(PrismaService.prototype) as PrismaService, {
++    $transaction: d.transaction,
++    scoutImport: { findUnique: d.runFindUnique },
++    importIntent: { findUnique: d.intentFindUnique },
++  });
++  const lifecycle = Object.assign(
++    Object.create(ScoutLifecycleService.prototype) as ScoutLifecycleService,
++    { classifyClosed: d.classifyClosed },
++  );
++  return new ObservationService(prisma, lifecycle, {
++    registry: syntheticRegistry({
++      [PLATFORM_A]: ['clients', 'programs', 'workouts'],
++      [PLATFORM_B]: ['clients'],
++    }),
++    challenge: () => Buffer.from(CHALLENGE),
++    now: () => NOW,
++  });
++}
++
++const DECLARATION = [
++  { source_platform: PLATFORM_B, account_scope_id_digests: [SCOPE_1] },
++  { source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_2, SCOPE_1] },
++];
++
++const heldDeclaration = () => [
++  {
++    source_platform: PLATFORM_A,
++    account_scope_id_digest: SCOPE_1,
++    challenge: CHALLENGE,
++    declared_at: NOW,
++  },
++  {
++    source_platform: PLATFORM_A,
++    account_scope_id_digest: SCOPE_2,
++    challenge: CHALLENGE,
++    declared_at: NOW,
++  },
++  {
++    source_platform: PLATFORM_B,
++    account_scope_id_digest: SCOPE_1,
++    challenge: CHALLENGE,
++    declared_at: NOW,
++  },
++];
++
++function evidence(spec: EvidenceSpec = {}): ParsedEvidence {
++  const parsed = parseEvidence(rawEvidence(spec));
++  if (!parsed.ok) throw new Error(`fixture rejected: ${parsed.reason}`);
++  return parsed.value;
++}
++
++async function codeOf(p: Promise<unknown>): Promise<string> {
++  const err: unknown = await p.then(
++    () => new Error('resolved'),
++    (e: unknown) => e,
++  );
++  if (!(err instanceof ConflictException)) throw err;
++  const body = err.getResponse();
++  return typeof body === 'object' && body !== null ? String(Reflect.get(body, 'code')) : '';
++}
++
++describe('ObservationService.declare (D-S10-4 declaration route)', () => {
++  it('records the whole normalised set in one transaction with ONE server challenge', async () => {
++    const d = makeDoubles();
++    const out = await makeService(d).declare(COACH, INTENT, DECLARATION);
++    expect(out).toEqual({
++      intent_id: INTENT,
++      challenge_b64: CHALLENGE.toString('base64'),
++      declared_at: NOW.toISOString(),
++    });
++    expect(d.transaction).toHaveBeenCalledTimes(1);
++    expect(d.declCreate).toHaveBeenCalledTimes(3);
++    const rows = d.declCreate.mock.calls.map((c: [{ data: Record<string, unknown> }]) => c[0].data);
++    // Rows are written in the NORMALISED order (platform, then scope digest by byte), the order the
++    // exact-replay comparison uses, not the request's input order.
++    const [lo, hi] = [SCOPE_1, SCOPE_2].sort();
++    expect(rows.map((r) => [r.source_platform, r.account_scope_id_digest])).toEqual([
++      [PLATFORM_A, lo],
++      [PLATFORM_A, hi],
++      [PLATFORM_B, SCOPE_1],
++    ]);
++    for (const r of rows) {
++      expect(r.coach_id).toBe(COACH);
++      expect(r.intent_id).toBe(INTENT);
++      expect(Buffer.from(r.challenge as Uint8Array).equals(CHALLENGE)).toBe(true);
++      expect(r.declared_at).toBe(NOW);
++    }
++    // The lock statement is FOR NO KEY UPDATE on the open server run of the bearer's coach.
++    const sql = (d.queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
++    expect(sql).toMatch(/FROM "ScoutImport"/);
++    expect(sql).toMatch(/mode = 'server'/);
++    expect(sql).toMatch(/FOR NO KEY UPDATE/);
++    expect(d.queryRaw.mock.calls[0].slice(1)).toEqual([COACH, INTENT]);
++  });
++
++  it('an exact replay (any order) returns the ORIGINAL challenge and writes nothing', async () => {
++    const d = makeDoubles();
++    const original = Buffer.alloc(32, 3);
++    d.declFindMany.mockResolvedValue(heldDeclaration().map((r) => ({ ...r, challenge: original })));
++    const out = await makeService(d).declare(COACH, INTENT, [...DECLARATION].reverse());
++    expect(out.challenge_b64).toBe(original.toString('base64'));
++    expect(d.declCreate).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    ['a changed scope', [{ source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_1] }]],
++    [
++      'an appended platform',
++      [...DECLARATION, { source_platform: 'synthetic-src-c', account_scope_id_digests: [SCOPE_1] }],
++    ],
++  ])('%s after a declaration → declaration_conflict, no row', async (_label, platforms) => {
++    const d = makeDoubles();
++    d.declFindMany.mockResolvedValue(heldDeclaration());
++    expect(await codeOf(makeService(d).declare(COACH, INTENT, platforms))).toBe(
++      'declaration_conflict',
++    );
++    expect(d.declCreate).not.toHaveBeenCalled();
++  });
++
++  it('a changed set is declaration_conflict even after ingest (immutability wins)', async () => {
++    const d = makeDoubles();
++    d.declFindMany.mockResolvedValue(heldDeclaration());
++    d.entityFindFirst.mockResolvedValue({ id: 'staged' });
++    const changed = [{ source_platform: PLATFORM_B, account_scope_id_digests: [SCOPE_2] }];
++    expect(await codeOf(makeService(d).declare(COACH, INTENT, changed))).toBe(
++      'declaration_conflict',
++    );
++  });
++
++  it.each([
++    ['a staged row', 'entity'],
++    ['a claim', 'claim'],
++  ])('a first declaration after %s → declaration_after_ingest', async (_label, which) => {
++    const d = makeDoubles();
++    if (which === 'entity') d.entityFindFirst.mockResolvedValue({ id: 'staged' });
++    else d.completionFindUnique.mockResolvedValue({ id: 'claim' });
++    expect(await codeOf(makeService(d).declare(COACH, INTENT, DECLARATION))).toBe(
++      'declaration_after_ingest',
++    );
++    expect(d.declCreate).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    ['an empty list', []],
++    [
++      'a non-canonical slug',
++      [{ source_platform: 'Synthetic', account_scope_id_digests: [SCOPE_1] }],
++    ],
++    [
++      'a duplicate platform',
++      [
++        { source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_1] },
++        { source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_2] },
++      ],
++    ],
++    ['an empty scope list', [{ source_platform: PLATFORM_A, account_scope_id_digests: [] }]],
++    [
++      'a duplicate scope',
++      [{ source_platform: PLATFORM_A, account_scope_id_digests: [SCOPE_1, SCOPE_1] }],
++    ],
++    [
++      'a non-hex scope',
++      [{ source_platform: PLATFORM_A, account_scope_id_digests: ['raw-account-id'] }],
++    ],
++  ])('%s → 400 before any transaction', async (_label, platforms) => {
++    const d = makeDoubles();
++    await expect(makeService(d).declare(COACH, INTENT, platforms)).rejects.toBeInstanceOf(
++      BadRequestException,
++    );
++    expect(d.transaction).not.toHaveBeenCalled();
++  });
++
++  it('an injected mid-insert failure rolls the whole declaration back (never partial)', async () => {
++    const d = makeDoubles();
++    d.declCreate
++      .mockResolvedValueOnce({ source_platform: PLATFORM_A })
++      .mockRejectedValueOnce(new Error('injected insert failure'));
++    await expect(makeService(d).declare(COACH, INTENT, DECLARATION)).rejects.toThrow(
++      'injected insert failure',
++    );
++    expect(d.committed.value).toBe(false);
++  });
++});
++
++describe('the shared run refusals (R29)', () => {
++  it.each([
++    [
++      'fenced',
++      openLock({ fenced_at: NOW, fence_reason: 'cancelled', terminal_status: 'cancelled' }),
++      'run_fenced',
++    ],
++    ['terminal', openLock({ terminal_status: 'completed' }), 'run_terminal'],
++  ])('%s run → %s (declaration and observation)', async (_label, lock, code) => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([lock]);
++    const svc = makeService(d);
++    expect(await codeOf(svc.declare(COACH, INTENT, DECLARATION))).toBe(code);
++    expect(await codeOf(svc.observe(COACH, INTENT, [evidence()]))).toBe(code);
++    expect(d.declCreate).not.toHaveBeenCalled();
++    expect(d.obsCreate).not.toHaveBeenCalled();
++  });
++
++  it('fenced carries the fence reason', async () => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([openLock({ fenced_at: NOW, fence_reason: 'timed_out' })]);
++    const err: unknown = await makeService(d)
++      .declare(COACH, INTENT, DECLARATION)
++      .catch((e: unknown) => e);
++    expect(err).toBeInstanceOf(ConflictException);
++    if (err instanceof ConflictException) {
++      expect(err.getResponse()).toMatchObject({ code: 'run_fenced', fence_reason: 'timed_out' });
++    }
++  });
++
++  it('past the deadline → rollback, then the lifecycle classification (run_fenced timed_out)', async () => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([openLock({ open_before_deadline: false })]);
++    d.classifyClosed.mockResolvedValue({
++      kind: 'fenced',
++      fence_reason: 'timed_out',
++      terminal_status: 'timed_out',
++    });
++    expect(await codeOf(makeService(d).declare(COACH, INTENT, DECLARATION))).toBe('run_fenced');
++    expect(d.classifyClosed).toHaveBeenCalledWith(COACH, INTENT);
++    expect(d.declCreate).not.toHaveBeenCalled();
++  });
++
++  it('a legacy row → legacy_run', async () => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([]);
++    d.runFindUnique.mockResolvedValue({ mode: 'legacy' });
++    expect(await codeOf(makeService(d).declare(COACH, INTENT, DECLARATION))).toBe('legacy_run');
++  });
++
++  it('an owned intent without a run → run_not_started', async () => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([]);
++    d.intentFindUnique.mockResolvedValue({ id: INTENT });
++    expect(await codeOf(makeService(d).observe(COACH, INTENT, [evidence()]))).toBe(
++      'run_not_started',
++    );
++    expect(d.intentFindUnique).toHaveBeenCalledWith({
++      where: { id_coach_id: { id: INTENT, coach_id: COACH } },
++      select: { id: true },
++    });
++  });
++
++  it('an intent unknown to this coach (foreign or absent) → uniform 404', async () => {
++    const d = makeDoubles();
++    d.queryRaw.mockResolvedValue([]);
++    await expect(makeService(d).declare(COACH, INTENT, DECLARATION)).rejects.toBeInstanceOf(
++      NotFoundException,
++    );
++    await expect(makeService(d).declare(COACH, 'not-a-uuid', DECLARATION)).rejects.toBeInstanceOf(
++      NotFoundException,
++    );
++  });
++});
++
++describe('ObservationService.observe (D-S10-4 evidence route)', () => {
++  function declared(d: Doubles): void {
++    d.declFindMany.mockResolvedValue(
++      heldDeclaration().map(({ source_platform, account_scope_id_digest }) => ({
++        source_platform,
++        account_scope_id_digest,
++      })),
++    );
++  }
++
++  it('without a declaration → declaration_missing', async () => {
++    const d = makeDoubles();
++    expect(await codeOf(makeService(d).observe(COACH, INTENT, [evidence()]))).toBe(
++      'declaration_missing',
++    );
++  });
++
++  it.each([
++    ['a claim row', 'claim'],
++    ['the reconciling phase', 'phase'],
++  ])('after %s → observation_after_claim', async (_label, which) => {
++    const d = makeDoubles();
++    declared(d);
++    if (which === 'claim') d.completionFindUnique.mockResolvedValue({ id: 'claim' });
++    else d.queryRaw.mockResolvedValue([openLock({ phase: 'reconciling' })]);
++    expect(await codeOf(makeService(d).observe(COACH, INTENT, [evidence()]))).toBe(
++      'observation_after_claim',
++    );
++    expect(d.obsCreate).not.toHaveBeenCalled();
++  });
++
++  it('stores each unit bound to the locked epoch, the bearer coach and the server clock', async () => {
++    const d = makeDoubles();
++    declared(d);
++    const items = [
++      evidence(),
++      evidence({ family: 'workouts' }),
++      evidence({ platform: PLATFORM_B }),
++    ];
++    const out = await makeService(d).observe(COACH, INTENT, items);
++    expect(out).toEqual({ intent_id: INTENT, execution_epoch: 2, stored: 3, replayed: 0 });
++    for (const [call] of d.obsCreate.mock.calls as [{ data: Record<string, unknown> }][]) {
++      expect(call.data).toMatchObject({
++        coach_id: COACH,
++        intent_id: INTENT,
++        execution_epoch: 2,
++        basis_kind: 'source_signed_enumeration',
++        received_at: NOW,
++      });
++      expect(call.data.evidence_digest).toMatch(/^[0-9a-f]{64}$/);
++    }
++    expect(d.obsFindMany).toHaveBeenCalledWith(
++      expect.objectContaining({
++        where: { coach_id: COACH, intent_id: INTENT, execution_epoch: 2 },
++      }),
++    );
++  });
++
++  it('an identical re-upload is a replay (no row); a different one is observation_conflict', async () => {
++    const d = makeDoubles();
++    declared(d);
++    const svc = makeService(d);
++    await svc.observe(COACH, INTENT, [evidence()]);
++    const [first] = d.obsCreate.mock.calls[0] as [{ data: Record<string, unknown> }];
++    d.obsCreate.mockClear();
++    d.obsFindMany.mockResolvedValue([
++      {
++        source_platform: PLATFORM_A,
++        account_scope_id_digest: SCOPE_1,
++        family: 'clients',
++        evidence_digest: first.data.evidence_digest,
++      },
++    ]);
++    expect(await svc.observe(COACH, INTENT, [evidence()])).toMatchObject({
++      stored: 0,
++      replayed: 1,
++    });
++    expect(d.obsCreate).not.toHaveBeenCalled();
++    expect(await codeOf(svc.observe(COACH, INTENT, [evidence({ observedUnique: 4 })]))).toBe(
++      'observation_conflict',
++    );
++  });
++
++  it('a conflicting unit refuses the whole batch (rows already written roll back)', async () => {
++    const d = makeDoubles();
++    declared(d);
++    d.obsFindMany.mockResolvedValue([
++      {
++        source_platform: PLATFORM_A,
++        account_scope_id_digest: SCOPE_1,
++        family: 'workouts',
++        evidence_digest: '0'.repeat(64),
++      },
++    ]);
++    const batch = [evidence(), evidence({ family: 'workouts' })];
++    expect(await codeOf(makeService(d).observe(COACH, INTENT, batch))).toBe('observation_conflict');
++    expect(d.obsCreate).toHaveBeenCalledTimes(1);
++    expect(d.committed.value).toBe(false);
++  });
++
++  it.each<[string, EvidenceSpec]>([
++    ['an undeclared platform', { platform: 'synthetic-src-c' }],
++    ['an undeclared scope', { platform: PLATFORM_B, scope: SCOPE_2 }],
++    ['a family outside the manifest', { platform: PLATFORM_B, family: 'workouts' }],
++    ['a family outside the manifest (client_history)', { family: 'client_history' }],
++  ])('%s → observation_not_declared, nothing stored', async (_label, spec) => {
++    const d = makeDoubles();
++    declared(d);
++    expect(await codeOf(makeService(d).observe(COACH, INTENT, [evidence(), evidence(spec)]))).toBe(
++      'observation_not_declared',
++    );
++    expect(d.committed.value).toBe(false);
++  });
++
++  it('a declared platform without an induction manifest → observation_not_declared', async () => {
++    const d = makeDoubles();
++    d.declFindMany.mockResolvedValue([
++      { source_platform: 'synthetic-src-c', account_scope_id_digest: SCOPE_1 },
++    ]);
++    expect(
++      await codeOf(
++        makeService(d).observe(COACH, INTENT, [evidence({ platform: 'synthetic-src-c' })]),
++      ),
++    ).toBe('observation_not_declared');
++  });
++
++  it('more than 4 families × the declared scopes → 400', async () => {
++    const d = makeDoubles();
++    d.declFindMany.mockResolvedValue([
++      { source_platform: PLATFORM_A, account_scope_id_digest: SCOPE_1 },
++    ]);
++    const five = [
++      evidence(),
++      evidence({ family: 'workouts' }),
++      evidence({ family: 'programs' }),
++      evidence({ family: 'client_history' }),
++      evidence({ scope: SCOPE_2 }),
++    ];
++    await expect(makeService(d).observe(COACH, INTENT, five)).rejects.toBeInstanceOf(
++      BadRequestException,
++    );
++    expect(d.obsCreate).not.toHaveBeenCalled();
++  });
++});
+diff --git a/test/utils/g2-s10b-bootstrap.sh b/test/utils/g2-s10b-bootstrap.sh
+new file mode 100755
+index 00000000..32305683
+--- /dev/null
++++ b/test/utils/g2-s10b-bootstrap.sh
+@@ -0,0 +1,253 @@
++#!/usr/bin/env bash
++# S10-B G2 proof bootstrap, derived by substitution from the S9-C bootstrap
++# test/utils/g2-s9c-bootstrap.sh (d3a9-s9c-r2; itself from the accepted S8-G bootstrap) for the
++# S10-B-only disposable cluster/database. S10-B ships ONE migration
++# (20270124000000_scout_run_observation_expand) and the three matching schema.prisma models: the
++# candidate's prisma diff against the base a4af8e33 must be exactly prisma/schema.prisma plus that
++# migration directory (migration.sql + down.sql). The full accepted history (172 migrations, S8-B
++# and S7-L included) plus the S10-B expand = 173 is installed from the CANDIDATE root through the
++# real release mechanism (`prisma migrate deploy`), and the spec then drives the candidate
++# ObservationService / ScoutLifecycleService / ScoutIngestService against it.
++# Validation harness only: it never touches a hosted or application database, never edits
++# schema/migration/generator sources, and stops on the first unexpected state instead of
++# repairing it.
++#
++# Required environment (all explicit; nothing is inferred from DATABASE_URL):
++#   G2_S10B_DATABASE_URL  postgresql://s10b_super@127.0.0.1:<port>/g2_s10b_disposable?schema=public&connection_limit=2
++#   G2_S10B_CONFIRM       g2_s10b_disposable:<port>
++#   G2_S10B_PASSWORD      disposable local fixture password shared by s10b_super/postgres/service_role
++#                         (never written to a file by this harness; only into process env / in-memory URLs)
++#   G2_S10B_PSQL          absolute path of a psql binary compatible with the PG17 server
++#   G2_S10B_CANDIDATE_HEAD  the attested final candidate head (40 hex); the runtime root must be
++#                        checked out exactly there and clean, and it must not be the base itself
++# Optional:
++#   G2_S10B_SERVER_VERSION  expected server_version_num (default 170006 = 17.6)
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
++# Base pin (kept identical in test/utils/g2-s10b-pg-harness.ts and test/utils/g2-s10b-db.ts).
++BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba
++S8B_MIGRATION=20270122000000_scout_native_provenance_expand
++S7L_MIGRATION=20270123000000_scout_run_lifecycle_expand
++S10B_MIGRATION=20270124000000_scout_run_observation_expand
++# 172 accepted migrations through S7-L tracked by the base, plus the S10-B expand = 173.
++EXPECTED_MIGRATIONS=173
++EXPECTED_VERSION="${G2_S10B_SERVER_VERSION:-170006}"
++# Distinctive S10-B fixture markers: pinned literals, never read from the environment (see
++# test/utils/g2-s10b-db.ts G2_S10B_CLUSTER_MARKER / G2_S10B_DATABASE_MARKER, kept identical by
++# test/rls-g2-s10b.spec.ts). The lane's postgresql.conf must set
++# cluster_name = 's10b-disposable-pg17'; the disposable database carries DB_MARKER as its comment.
++CLUSTER_MARKER=s10b-disposable-pg17
++DB_MARKER=s10b-g2-run-observation-synthetic-disposable-fixture-safe-to-drop
++
++for name in G2_S10B_DATABASE_URL G2_S10B_CONFIRM G2_S10B_PASSWORD G2_S10B_PSQL G2_S10B_CANDIDATE_HEAD; do
++  [[ -n "${!name:-}" ]] || { echo "missing $name" >&2; exit 2; }
++done
++# Candidate binding (mirrors g2S10bCandidateHead in test/utils/g2-s10b-db.ts): one attested head, clean.
++[[ "$G2_S10B_CANDIDATE_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "G2_S10B_CANDIDATE_HEAD is not a 40-hex commit id" >&2; exit 2; }
++[[ "$G2_S10B_CANDIDATE_HEAD" != "$BASE_HEAD" ]] || { echo "G2_S10B_CANDIDATE_HEAD is the accepted base, not a candidate" >&2; exit 2; }
++ACTUAL_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
++[[ "$ACTUAL_HEAD" == "$G2_S10B_CANDIDATE_HEAD" ]] || { echo "runtime root $ROOT is at $ACTUAL_HEAD, not the attested candidate $G2_S10B_CANDIDATE_HEAD" >&2; exit 2; }
++[[ -z "$(git -C "$ROOT" status --porcelain)" ]] || { echo "runtime root $ROOT has uncommitted changes; the attested head must be checked out clean" >&2; exit 2; }
++git -C "$ROOT" merge-base --is-ancestor "$BASE_HEAD" "$ACTUAL_HEAD" || { echo "candidate $ACTUAL_HEAD does not descend from base $BASE_HEAD" >&2; exit 2; }
++echo "CANDIDATE_HEAD=$ACTUAL_HEAD"
++[[ -x "$G2_S10B_PSQL" ]] || { echo "psql binary not executable: $G2_S10B_PSQL" >&2; exit 2; }
++[[ -d "$ROOT/node_modules/prisma" ]] || { echo "node_modules missing in $ROOT (the isolated copy of the accepted dependency tree must be in place first; no npm ci)" >&2; exit 2; }
++# Dependency provenance is closed: nothing in this harness may auto-install.
++export PRISMA_GENERATE_SKIP_AUTOINSTALL=1
++
++# Validate the target before opening any connection (same guard as the spec).
++eval "$(cd "$ROOT" && node -r ts-node/register/transpile-only -e '
++  const { g2S10bTestTarget, withFixturePassword } = require("./test/utils/g2-s10b-db");
++  const t = g2S10bTestTarget(process.env.G2_S10B_DATABASE_URL, process.env.G2_S10B_CONFIRM);
++  const q = (s) => "\x27" + s.replace(/\x27/g, "\x27\\\x27\x27") + "\x27";
++  console.log("PRISMA_URL=" + q(t.prismaUrl)); console.log("PSQL_URL=" + q(t.psqlUrl));
++  console.log("MAINT_URL=" + q(t.maintenanceUrl));
++  console.log("MIGRATE_AUTH_URL=" + q(withFixturePassword(t.prismaUrl, process.env.G2_S10B_PASSWORD, "postgres")));
++')"
++export PGPASSWORD="$G2_S10B_PASSWORD"
++
++psql_maint() { "$G2_S10B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$MAINT_URL" "$@"; }
++psql_db() { "$G2_S10B_PSQL" -X -w -qAt -v ON_ERROR_STOP=1 "$PSQL_URL" "$@"; }
++
++MODE="${1:-bootstrap}"
++case "$MODE" in bootstrap|verify-only) ;; *) echo "usage: g2-s10b-bootstrap.sh [bootstrap|verify-only]" >&2; exit 2;; esac
++if [[ "$MODE" == bootstrap ]]; then
++# 1. Server identity: PostgreSQL 17.x on loopback, expected exact version.
++VERSION="$(psql_maint -c 'SHOW server_version_num')"
++ADDRESS="$(psql_maint -c 'SELECT inet_server_addr()')"
++[[ "$VERSION" == "$EXPECTED_VERSION" ]] || { echo "server_version_num $VERSION != expected $EXPECTED_VERSION" >&2; exit 3; }
++[[ "$ADDRESS" == "127.0.0.1" ]] || { echo "server address $ADDRESS is not loopback" >&2; exit 3; }
++[[ "$(psql_maint -c 'SELECT rolsuper FROM pg_roles WHERE rolname=current_user')" == "t" ]] \
++  || { echo "bootstrap role must be superuser on the disposable cluster" >&2; exit 3; }
++# 1b. Disposable identity marker BEFORE any write: a blank or foreign cluster_name means this is
++#     not the S10-B lane initialised for this proof; stop without creating roles or databases.
++CLUSTER="$(psql_maint -c "SELECT current_setting('cluster_name')")"
++[[ "$CLUSTER" == "$CLUSTER_MARKER" ]] || { echo "cluster_name '$CLUSTER' is not the S10-B fixture marker '$CLUSTER_MARKER'; refusing to touch this server" >&2; exit 3; }
++[[ "$(psql_maint -c "SELECT count(*) FROM pg_roles WHERE rolname IN ('supabase_admin','supabase_auth_admin','supabase_storage_admin','authenticator','pgbouncer')")" == "0" ]] \
++  || { echo "server carries hosted-platform roles; not a synthetic fixture" >&2; exit 3; }
++
++# 2. Explicit fixture role matrix (cluster-level, disposable lane only; shape
++#    mirrors S1's Supabase-like fixture and the hosted role model):
++#      postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS  (owner + migrator)
++#      service_role  BYPASSRLS runtime role (+ harness-only LOGIN for worker processes)
++#      anon/authenticated  NOLOGIN API roles (RLS denial via SET ROLE)
++#    All fixture logins share the one synthetic password from the environment.
++psql_maint -v pw="$G2_S10B_PASSWORD" <<'SQL'
++DO $$ BEGIN
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='postgres') THEN
++    CREATE ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS;
++  END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
++  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
++END $$;
++ALTER ROLE postgres LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS PASSWORD :'pw';
++ALTER ROLE service_role LOGIN BYPASSRLS PASSWORD :'pw';
++GRANT anon, authenticated, service_role TO postgres WITH ADMIN OPTION;
++SQL
++for role in postgres service_role; do
++  [[ "$(psql_maint -c "SELECT rolsuper||':'||rolbypassrls||':'||rolcanlogin FROM pg_roles WHERE rolname='$role'")" == "false:true:true" ]] \
++    || { echo "fixture role $role is not NOSUPERUSER BYPASSRLS LOGIN" >&2; exit 3; }
++done
++
++# 3. Dedicated database owned by the migration role (create once; never drop anything).
++#    Single-shot: a database that already carries migration history must be reset explicitly
++#    by the operator (DROP DATABASE g2_s10b_disposable as the cluster superuser) first.
++#    The database is stamped with DB_MARKER at creation; an existing database of the same name
++#    without exactly that comment is foreign and is refused (never repaired, never dropped here).
++if [[ "$(psql_maint -c "SELECT count(*) FROM pg_database WHERE datname='g2_s10b_disposable'")" == "0" ]]; then
++  psql_maint -c 'CREATE DATABASE g2_s10b_disposable OWNER postgres'
++  psql_maint -v marker="$DB_MARKER" <<'SQL'
++COMMENT ON DATABASE g2_s10b_disposable IS :'marker';
++SQL
++fi
++EXISTING_MARKER="$(psql_maint -c "SELECT COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname='g2_s10b_disposable'")"
++[[ "$EXISTING_MARKER" == "$DB_MARKER" ]] \
++  || { echo "g2_s10b_disposable exists without the S10-B disposable marker comment; refusing to reuse it" >&2; exit 3; }
++psql_maint -c 'ALTER DATABASE g2_s10b_disposable OWNER TO postgres'
++[[ "$(psql_db -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")" == "0" ]] \
++  || { echo "g2_s10b_disposable already has public tables; reset it explicitly before bootstrapping again" >&2; exit 3; }
++psql_db -c 'ALTER SCHEMA public OWNER TO postgres; GRANT USAGE, CREATE ON SCHEMA public TO postgres;'
++# Verbatim CI shim (roles already exist; adds auth schema/helpers and GRANT ... TO postgres).
++psql_db -f "$ROOT/scripts/ci/supabase-shim.sql" >/dev/null
++psql_db -c 'GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;'
++# Supabase default privileges for objects postgres creates in public (same shape as S1's
++# fixture): API roles receive CRUD on every new table, so RLS policies are the only barrier.
++psql_db -c 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
++  ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
++  GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;'
++# Extensions the migration chain needs (Supabase ships them pre-installed; migration
++# 20261221000000_enable_pg_stat_statements requires pg_stat_statements to pre-exist for a non-superuser); superuser-only step.
++psql_db -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS citext; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
++
++fi # MODE=bootstrap steps 1-3
++
++# 4. Candidate source: S10-B ships exactly one migration directory and the schema models. The prisma
++#    diff against the base is exactly prisma/schema.prisma + the S10-B migration.sql/down.sql, and
++#    the tree tracks exactly the accepted 172 directories plus S10-B, S8-B and S7-L included.
++git -C "$ROOT" cat-file -e "$BASE_HEAD^{commit}" || { echo "base $BASE_HEAD unknown in $ROOT" >&2; exit 4; }
++PRISMA_DIFF="$(git -C "$ROOT" diff --name-only "$BASE_HEAD" HEAD -- prisma | LC_ALL=C sort | tr '\n' ' ')"
++EXPECTED_DIFF="prisma/migrations/$S10B_MIGRATION/down.sql prisma/migrations/$S10B_MIGRATION/migration.sql prisma/schema.prisma "
++[[ "$PRISMA_DIFF" == "$EXPECTED_DIFF" ]] \
++  || { echo "candidate prisma diff vs base $BASE_HEAD is '$PRISMA_DIFF', expected exactly '$EXPECTED_DIFF'" >&2; exit 4; }
++[[ -z "$(git -C "$ROOT" diff --name-only --diff-filter=DMR "$BASE_HEAD" HEAD -- prisma/migrations)" ]] \
++  || { echo "candidate modifies, renames or deletes an accepted migration" >&2; exit 4; }
++git -C "$ROOT" diff --quiet HEAD -- prisma || { echo "candidate has uncommitted prisma changes" >&2; exit 4; }
++git -C "$ROOT" diff --quiet "$BASE_HEAD" HEAD -- package.json package-lock.json \
++  || { echo "dependency manifests differ from base; the isolated dependency tree is unsafe" >&2; exit 4; }
++COUNT="$(find "$ROOT/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l)"
++[[ "$COUNT" == "$EXPECTED_MIGRATIONS" ]] || { echo "candidate has $COUNT migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S8B_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S8-B migration" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S7L_MIGRATION/migration.sql" ]] || { echo "candidate lacks the accepted S7-L migration" >&2; exit 4; }
++[[ -f "$ROOT/prisma/migrations/$S10B_MIGRATION/migration.sql" && -f "$ROOT/prisma/migrations/$S10B_MIGRATION/down.sql" ]] \
++  || { echo "candidate lacks the S10-B migration.sql/down.sql" >&2; exit 4; }
++
++if [[ "$MODE" == bootstrap ]]; then
++# 5. Full accepted history (S8-B and S7-L included) plus S10-B through the real release mechanism from the candidate root.
++#    Runs as the non-superuser BYPASSRLS `postgres` role (owner), never as the cluster superuser.
++(cd "$ROOT" && DATABASE_URL="$MIGRATE_AUTH_URL" DIRECT_URL="$MIGRATE_AUTH_URL" \
++  "$ROOT/node_modules/.bin/prisma" migrate deploy --schema prisma/schema.prisma)
++[[ "$(psql_db -c "SELECT count(DISTINCT tableowner) FROM pg_tables WHERE schemaname='public'")" == "1" ]] \
++  && [[ "$(psql_db -c "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public'")" == "postgres" ]] \
++  || { echo "public tables are not all owned by postgres" >&2; exit 5; }
++APPLIED="$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")"
++[[ "$APPLIED" == "$EXPECTED_MIGRATIONS" ]] || { echo "accepted history applied $APPLIED migrations, expected $EXPECTED_MIGRATIONS" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S8B_MIGRATION' AND finished_at IS NOT NULL")" == "1" ]] \
++  || { echo "S8-B not recorded as applied" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S7L_MIGRATION' AND finished_at IS NOT NULL")" == "1" ]] \
++  || { echo "S7-L not recorded as applied" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='$S10B_MIGRATION' AND finished_at IS NOT NULL")" == "1" ]] \
++  || { echo "S10-B not recorded as applied" >&2; exit 5; }
++# The three S10-B tables exist with RLS enabled and forced.
++for rel in ScoutRunDeclaration ScoutRunObservation ScoutRunSettledBasis; do
++  [[ "$(psql_db -c "SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid=to_regclass('public.\"$rel\"')")" == "t" ]] \
++    || { echo "$rel absent or without forced RLS after the S10-B expand" >&2; exit 5; }
++done
++# S7-L run objects the S10-B run lock and refusals depend on must be PRESENT (the accepted target of this slice).
++for col in mode import_intent_id phase accepted_start_at deadline_at last_observed_at execution_epoch fenced_at fence_reason reason_code; do
++  [[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutImport\"'::regclass AND attname='$col' AND NOT attisdropped")" == "1" ]] \
++    || { echo "ScoutImport lacks S7-L's $col" >&2; exit 5; }
++done
++# S8-B objects the S8-G writer and the S9-B facts reader depend on must be PRESENT (the accepted target of this slice).
++[[ "$(psql_db -c "SELECT to_regclass('public.\"ImportNativeProvenance\"') IS NOT NULL")" == "t" ]] \
++  || { echo "ImportNativeProvenance absent after the accepted history" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_attribute WHERE attrelid='public.\"ScoutReconstructionLedger\"'::regclass AND attname='target_kind' AND NOT attisdropped")" == "1" ]] \
++  || { echo "ScoutReconstructionLedger lacks S8-B's target_kind" >&2; exit 5; }
++[[ "$(psql_db -c "SELECT count(*) FROM pg_constraint WHERE conrelid='public.\"ImportNativeProvenance\"'::regclass AND contype='c'")" -ge "3" ]] \
++  || { echo "ImportNativeProvenance CHECK constraints absent" >&2; exit 5; }
++for rel in WorkoutProgram WorkoutPlan WorkoutPlanExercise WorkoutPlanRevision ExerciseCatalogItem ScoutReconstructedEntity; do
++  [[ "$(psql_db -c "SELECT to_regclass('public.\"$rel\"') IS NOT NULL")" == "t" ]] || { echo "$rel absent after the accepted history" >&2; exit 5; }
++done
++fi # MODE=bootstrap step 5
++
++# Provenance reads are enforced, never decorative: a missing file is a refusal (exit 6).
++hash_required() { # <label> <file>
++  [[ -f "$2" ]] || { echo "$1 provenance file missing: $2" >&2; exit 6; }
++  sha256sum "$2" | cut -c1-64
++}
++ENGINE=libquery_engine-debian-openssl-3.0.x.so.node
++PINNED_ENGINE_SHA="$(hash_required 'pinned @prisma/engines' "$ROOT/node_modules/@prisma/engines/$ENGINE")"
++PINNED_RUNTIME="$(cd "$ROOT" && node -p 'require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js"))')"
++PINNED_RUNTIME_SHA="$(hash_required 'pinned @prisma/client runtime' "$PINNED_RUNTIME")"
++
++# 6. Candidate client in the candidate root: generated once by the runtime setup from the CANDIDATE
++#    schema (base + the three S10-B models) and only VERIFIED here; no `prisma generate`.
++[[ -f "$ROOT/node_modules/.prisma/client/index.d.ts" ]] || { echo "candidate client missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++CANDIDATE_ENGINE_SHA="$(hash_required 'generated candidate client engine' "$ROOT/node_modules/.prisma/client/$ENGINE")"
++[[ "$CANDIDATE_ENGINE_SHA" == "$PINNED_ENGINE_SHA" ]] \
++  || { echo "generated candidate client engine differs from the pinned @prisma/engines copy" >&2; exit 6; }
++CANDIDATE_RUNTIME="$(node -p 'try { require("fs").realpathSync(require.resolve("@prisma/client/runtime/library.js", { paths: [process.argv[1]] })) } catch (e) { "UNRESOLVED" }' "$ROOT/node_modules/.prisma/client")"
++[[ "$CANDIDATE_RUNTIME" == "$PINNED_RUNTIME" ]] \
++  || { echo "candidate client runtime resolves to $CANDIDATE_RUNTIME, not the pinned $PINNED_RUNTIME" >&2; exit 6; }
++# The generated client copy is normalized by Prisma (never byte-equal to prisma/schema.prisma), so it
++# is verified STRUCTURALLY: it must carry the accepted S7-L run fields and relation, S8-B's provenance
++# model and target_kind, and N's ledger source_platform. A stale pre-S7-L client is refused (exit 7).
++[[ -f "$ROOT/node_modules/.prisma/client/schema.prisma" ]] \
++  || { echo "candidate client schema copy missing in $ROOT/node_modules/.prisma/client (isolated tree not in place)" >&2; exit 7; }
++for field in mode import_intent_id phase accepted_start_at deadline_at last_observed_at execution_epoch fenced_at fence_reason reason_code; do
++  awk '/model ScoutImport \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq "^ +$field +" \
++    || { echo "candidate client ScoutImport lacks $field; a pre-S7-L client (stale generated client)" >&2; exit 7; }
++done
++awk '/model ScoutImport \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +intent +ImportIntent\?' \
++  || { echo "candidate client ScoutImport lacks the ImportIntent relation (stale generated client)" >&2; exit 7; }
++grep -q 'model ImportNativeProvenance ' "$ROOT/node_modules/.prisma/client/schema.prisma" \
++  || { echo "candidate client lacks ImportNativeProvenance (pre-S8-B client)" >&2; exit 7; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +target_kind +String\?' \
++  || { echo "candidate client ledger lacks target_kind String? (pre-S8-B client)" >&2; exit 7; }
++awk '/model ScoutReconstructionLedger \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq 'source_platform +String( |$)' \
++  || { echo "candidate client does not carry N's required ledger source_platform" >&2; exit 7; }
++awk '/model ScoutIngestEntity \{/,/\}/' "$ROOT/node_modules/.prisma/client/schema.prisma" | grep -Eq '^ +entity_type +String( |$)' \
++  || { echo "candidate client staged rows lack entity_type" >&2; exit 7; }
++for model in ScoutRunDeclaration ScoutRunObservation ScoutRunSettledBasis; do
++  grep -q "model $model " "$ROOT/node_modules/.prisma/client/schema.prisma" \
++    || { echo "candidate client lacks $model (a pre-S10-B client; regenerate in the runtime setup)" >&2; exit 7; }
++done
++echo "CANDIDATE_CLIENT_VERIFIED dir=$ROOT/node_modules/.prisma/client engine_sha256=$CANDIDATE_ENGINE_SHA runtime=$CANDIDATE_RUNTIME runtime_sha256=$PINNED_RUNTIME_SHA"
++
++if [[ "$MODE" == verify-only ]]; then echo "G2_S10B_VERIFY_OK"; exit 0; fi   # no connection in this mode
++psql_db -c "SELECT json_build_object('database',current_database(),'version',current_setting('server_version_num'),
++  'directory',current_setting('data_directory'),'address',inet_server_addr(),'port',inet_server_port(),
++  'applied',(SELECT count(*) FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL))"
++echo "G2_S10B_BOOTSTRAP_OK"
+diff --git a/test/utils/g2-s10b-db.ts b/test/utils/g2-s10b-db.ts
+new file mode 100644
+index 00000000..3375f08b
+--- /dev/null
++++ b/test/utils/g2-s10b-db.ts
+@@ -0,0 +1,161 @@
++/**
++ * S10-B G2 proof target guard: derived by literal substitution from the S9-C guard
++ * test/utils/g2-s9c-db.ts (d3a9-s9c-r2; itself from the accepted S8-G guard), which stays
++ * byte-identical and keeps governing the S9-C proof. One dedicated disposable database on an
++ * S10-B-only disposable PostgreSQL 17 cluster; a further identity, separate from the E, T/Q0, S5,
++ * B, R, N/Q1, C, S7-L, S8-B, S8-C, S8-G, S9-B and S9-C targets, so no earlier proof state is
++ * reused and no earlier fixture is recreated.
++ *
++ * S1 chooses the loopback port, so the port is not hard-coded here. Instead
++ * the operator must double-enter it in the confirmation (`<database>:<port>`),
++ * and well-known application/pooler ports are refused unconditionally.
++ * Validation happens before any connection is opened.
++ */
++export const G2_S10B_DATABASE = 'g2_s10b_disposable';
++/**
++ * Explicit fixture role matrix (mirrors the accepted S5 Supabase-like PG17 fixture shape):
++ *  - admin      s10b_super    cluster superuser: CREATE DATABASE/ROLE, lock observation only
++ *  - migration  postgres      LOGIN NOSUPERUSER CREATEDB CREATEROLE BYPASSRLS, owns objects,
++ *                             runs `prisma migrate deploy` (accepted history + the S10-B expand) and all harness DDL/data
++ *  - runtime    service_role  BYPASSRLS runtime role used by the candidate observation/lifecycle worker processes
++ *  - api        anon/authenticated  NOLOGIN, exercised only via SET ROLE for RLS denial
++ */
++export const G2_S10B_ROLE = 's10b_super';
++export const G2_S10B_ADMIN_ROLE = G2_S10B_ROLE;
++export const G2_S10B_MIGRATION_ROLE = 'postgres';
++export const G2_S10B_RUNTIME_ROLE = 'service_role';
++export const G2_S10B_LOGIN_ROLES = new Set([
++  G2_S10B_ADMIN_ROLE,
++  G2_S10B_MIGRATION_ROLE,
++  G2_S10B_RUNTIME_ROLE,
++]);
++/** Fixture password is supplied only through this environment variable, never in a URL or file. */
++export const G2_S10B_PASSWORD_ENV = 'G2_S10B_PASSWORD';
++/**
++ * Distinctive S10-B fixture markers. Both are pinned literals, deliberately NOT read from the
++ * environment, so no operator variable can re-point a destructive step at another server:
++ *  - cluster marker: the lane must be initialised with `cluster_name = 's10b-disposable-pg17'`
++ *    (postgresql.conf). A blank or foreign `cluster_name` is refused before any mutation.
++ *  - database marker: bootstrap stamps `COMMENT ON DATABASE g2_s10b_disposable` with this
++ *    literal at creation; `DROP DATABASE` (runner `reset`) and bootstrap reuse are refused unless
++ *    the existing database carries exactly this comment.
++ * test/utils/g2-s10b-bootstrap.sh and the S10-B binding under execution/d3a9f701/s10b/ must carry the same literals.
++ */
++export const G2_S10B_CLUSTER_MARKER = 's10b-disposable-pg17';
++export const G2_S10B_DATABASE_MARKER =
++  's10b-g2-run-observation-synthetic-disposable-fixture-safe-to-drop';
++// 54321 is S1's own cluster; 55439 is the retained stopped C1 lane; 54325 is the (absent) S5 lane;
++// 55461 is the retained stopped B lane (accepted proof at 0d69c7ba); 55471 is the retained stopped
++// R lane (accepted proof at 7d2895e1); 55481 is the N/Q1 lane; 55491 is the C lane; 55501 is the
++// S7-L lane; 55511 is the accepted S8-B lane; 55641 is the accepted S7-L (64e33dc7) lane; 55642 is
++// the accepted S8-C lane; 55643 is the retained S8-F lane; 55644 is the accepted S8-G lane
++// (1910a060/s8g); 55645 is the S9-B lane (1910a060/s9b); 55646 is the S9-C lane (d3a9f701/s9c).
++// The S10-B lane port is chosen by the parent (55647 suggested, execution/d3a9f701),
++// double-entered in the confirmation, never hard-coded.
++const REFUSED_PORTS = new Set([
++  '5432',
++  '5433',
++  '6543',
++  '54321',
++  '54322',
++  '55439',
++  '54325',
++  '55461',
++  '55471',
++  '55481',
++  '55491',
++  '55501',
++  '55511',
++  '55641',
++  '55642',
++  '55643',
++  '55644',
++  '55645',
++  '55646',
++]);
++const PRISMA_ONLY = new Set(['schema', 'connection_limit']);
++
++export function g2S10bTestTarget(raw: string, confirmation?: string) {
++  const url = new URL(raw);
++  if (
++    url.protocol !== 'postgresql:' ||
++    url.hostname !== '127.0.0.1' ||
++    !/^[1-9][0-9]{3,4}$/.test(url.port) ||
++    REFUSED_PORTS.has(url.port) ||
++    Number(url.port) > 65535 ||
++    url.pathname !== `/${G2_S10B_DATABASE}` ||
++    url.username !== G2_S10B_ROLE ||
++    url.password ||
++    url.hash ||
++    confirmation !== `${G2_S10B_DATABASE}:${url.port}`
++  ) {
++    throw new Error(
++      'S10-B G2 proof requires its explicitly confirmed loopback disposable database and port',
++    );
++  }
++  for (const [key, value] of url.searchParams) {
++    if (
++      !['schema', 'connection_limit', 'connect_timeout'].includes(key) ||
++      url.searchParams.getAll(key).length !== 1 ||
++      (key === 'schema' && value !== 'public') ||
++      (key !== 'schema' && (!/^[1-9][0-9]?$/.test(value) || Number(value) > 10))
++    ) {
++      throw new Error('S10-B G2 proof unsupported or ambiguous connection option');
++    }
++  }
++  if (!url.searchParams.has('connect_timeout')) url.searchParams.set('connect_timeout', '5');
++  const prismaUrl = url.toString();
++  for (const key of PRISMA_ONLY) url.searchParams.delete(key);
++  const psqlUrl = url.toString();
++  // Maintenance database on the same server, used only to CREATE the disposable DB.
++  url.pathname = '/postgres';
++  return { prismaUrl, psqlUrl, maintenanceUrl: url.toString(), port: Number(url.port) };
++}
++
++/** Attach the fixture password for a client that cannot read PGPASSWORD (Prisma). */
++export function withFixturePassword(
++  url: string,
++  password: string | undefined,
++  username = G2_S10B_ROLE,
++): string {
++  if (!password || /[\s@/:?#]/.test(password))
++    throw new Error('S10-B G2 proof requires a plain fixture password in the environment');
++  if (!G2_S10B_LOGIN_ROLES.has(username))
++    throw new Error('S10-B G2 proof connects only as a fixture matrix login role');
++  const parsed = new URL(url);
++  parsed.username = username;
++  parsed.password = password;
++  return parsed.toString();
++}
++
++/**
++ * Candidate binding. The one-run S10-B proof is granted against ONE attested final head, so the
++ * driver refuses to run against anything else: the operator double-enters the attested head in
++ * G2_S10B_CANDIDATE_HEAD, and it must equal the checked-out HEAD of the runtime root exactly,
++ * that head must not be the base itself (a candidate, not the accepted tree), and the tree must
++ * be clean (an uncommitted edit would make the proof about bytes no attestation covers). Pure:
++ * the callers supply `git rev-parse HEAD` and `git status --porcelain` output.
++ */
++export const G2_S10B_CANDIDATE_HEAD_ENV = 'G2_S10B_CANDIDATE_HEAD';
++export const G2_S10B_BASE_HEAD = 'a4af8e330bd4d6f882f0aebd411200b76d651aba';
++export function g2S10bCandidateHead(
++  declared: string | undefined,
++  checkedOut: string,
++  porcelain: string,
++): string {
++  if (!declared || !/^[0-9a-f]{40}$/.test(declared))
++    throw new Error(
++      `S10-B G2 proof requires the attested candidate head in ${G2_S10B_CANDIDATE_HEAD_ENV}`,
++    );
++  if (declared === G2_S10B_BASE_HEAD)
++    throw new Error('S10-B G2 proof target is a candidate head, not the accepted base');
++  if (checkedOut.trim() !== declared)
++    throw new Error(
++      `S10-B G2 proof runtime root is at ${checkedOut.trim()}, not the attested candidate ${declared}`,
++    );
++  if (porcelain.trim() !== '')
++    throw new Error(
++      'S10-B G2 proof runtime root has uncommitted changes; the attested head must be checked out clean',
++    );
++  return declared;
++}
+diff --git a/test/utils/g2-s10b-fixtures.ts b/test/utils/g2-s10b-fixtures.ts
+new file mode 100644
+index 00000000..8055dbef
+--- /dev/null
++++ b/test/utils/g2-s10b-fixtures.ts
+@@ -0,0 +1,90 @@
++import type { CanonicalFamily } from '../../src/scout/reconstruct/mapping-spec';
++import type { InductionManifestV1 } from '../../src/scout/induction/contract';
++import { canonicalJson, sha256Hex } from '../../src/scout/induction/digest';
++import type { InductionRegistry } from '../../src/scout/induction/manifest-registry';
++
++// S10-B synthetic fixtures (unit specs + the real-PG worker). Every value is synthetic: platform
++// slugs, scope digests and statements are generated here and name no real source, coach or client.
++// The signature is 64 zero bytes: storage never verifies (the S10-C evaluator does), so a stored
++// row proves nothing — exactly the D-S10-2 posture this slice must keep.
++
++export const PLATFORM_A = 'synthetic-src-a';
++export const PLATFORM_B = 'synthetic-src-b';
++export const SCOPE_1 = sha256Hex('synthetic-scope-1');
++export const SCOPE_2 = sha256Hex('synthetic-scope-2');
++export const SPEC_DIGEST = sha256Hex('synthetic-mapping-spec');
++export const ZERO_CHALLENGE = Buffer.alloc(32, 7);
++
++export interface EvidenceSpec {
++  platform?: string;
++  scope?: string;
++  family?: CanonicalFamily;
++  challenge?: Buffer;
++  observedUnique?: number;
++  keyId?: string;
++}
++
++/** One raw (JSON-shaped) ObservationEvidenceV1 whose statement parses under S10-A. */
++export function rawEvidence(spec: EvidenceSpec = {}): Record<string, unknown> {
++  const platform = spec.platform ?? PLATFORM_A;
++  const scope = spec.scope ?? SCOPE_1;
++  const family = spec.family ?? 'clients';
++  const statement = {
++    account_scope_id_digest: scope,
++    challenge_b64: (spec.challenge ?? ZERO_CHALLENGE).toString('base64'),
++    date_window: null,
++    family,
++    id_set_digest: sha256Hex(`synthetic-ids-${platform}-${family}`),
++    issued_at: '2026-09-26T00:00:00Z',
++    observed_unique: spec.observedUnique ?? 3,
++    snapshot_ref_digest: sha256Hex(`synthetic-snapshot-${platform}`),
++    source_platform: platform,
++    statement_version: 1,
++    terminal: 'end_of_list',
++  };
++  const text = canonicalJson(statement);
++  if (text === null) throw new Error('synthetic statement is not canonical');
++  return {
++    evidence_version: 1,
++    source_platform: platform,
++    account_scope_id_digest: scope,
++    family,
++    basis_kind: 'source_signed_enumeration',
++    mapping_spec_digest: SPEC_DIGEST,
++    statement_b64: Buffer.from(text, 'utf8').toString('base64'),
++    key_id: spec.keyId ?? 'synthetic-key-1',
++    signature_b64: Buffer.alloc(64).toString('base64'),
++  };
++}
++
++/** An in-memory InductionRegistry: each platform gets a manifest listing `families`. */
++export function syntheticRegistry(
++  platforms: Readonly<Record<string, readonly CanonicalFamily[]>>,
++): InductionRegistry {
++  const packages = new Map<string, { manifest: InductionManifestV1; specDigest: string }>();
++  const specFamilies = new Map<string, readonly CanonicalFamily[]>();
++  for (const [platform, families] of Object.entries(platforms)) {
++    const sorted = [...families].sort();
++    const basisKinds: Partial<Record<CanonicalFamily, readonly 'source_signed_enumeration'[]>> = {};
++    for (const family of sorted) basisKinds[family] = ['source_signed_enumeration'];
++    packages.set(platform, {
++      manifest: {
++        manifestVersion: 1,
++        sourcePlatform: platform,
++        expectedFamilies: sorted,
++        basisKinds,
++        verifiers: [
++          {
++            key_id: 'synthetic-key-1',
++            alg: 'ed25519',
++            public_key_b64: Buffer.alloc(32).toString('base64'),
++          },
++        ],
++        nativeRules: 'absent',
++      },
++      specDigest: SPEC_DIGEST,
++    });
++    specFamilies.set(platform, sorted);
++  }
++  return { packages, specFamilies };
++}
+diff --git a/test/utils/g2-s10b-harness.ts b/test/utils/g2-s10b-harness.ts
+new file mode 100644
+index 00000000..9956aff7
+--- /dev/null
++++ b/test/utils/g2-s10b-harness.ts
+@@ -0,0 +1,184 @@
++/**
++ * G2-S10-B live-proof observations layered on the S10-B-only derivative
++ * (test/utils/g2-s10b-pg-harness.ts) of the S9-C harness (derived from
++ * test/utils/g2-s9c-harness.ts in d3a9-s9c-r2, read-only). Carries the S7-L run-lifecycle fixture
++ * helpers unchanged by substitution (User → ImportIntent, server/legacy run rows, staged rows,
++ * deadline clock, run/completion snapshots, the exact §3.1 gate text) and adds only the S10-B
++ * table names, SQL-level declaration/observation row fixtures and row readers. The S8-C native /
++ * S9-C settle fixtures (spec, rule set, catalog, target snapshots) are not carried: S10-B never
++ * settles (S10-C). No production writer is emulated: the routes run as the real ObservationService
++ * in test/utils/g2-s10b-worker.cjs. Imported only by the explicitly guarded test/rls-g2-s10b.spec.ts.
++ */
++import { json, quote, sql } from './g2-s10b-pg-harness';
++
++export const RUN = 'ScoutImport';
++export const INTENT = 'ImportIntent';
++export const COMPLETION = 'ScoutImportCompletion';
++export const STAGED = 'ScoutIngestEntity';
++export const DECLARATION = 'ScoutRunDeclaration';
++export const OBSERVATION = 'ScoutRunObservation';
++export const SETTLED = 'ScoutRunSettledBasis';
++export const S10_TABLES = [DECLARATION, OBSERVATION, SETTLED] as const;
++/** Fixture platform: canonical, synthetic, registered only through the injected registry. */
++export const PLATFORM = 'synthetic-src-a';
++export const PLATFORM_B = 'synthetic-src-b';
++/** Worker option injecting the synthetic induction registry (platform → expected families). */
++export const REGISTRY = {
++  registry: {
++    [PLATFORM]: ['clients', 'programs', 'workouts'],
++    [PLATFORM_B]: ['clients'],
++  },
++};
++
++/** Synthetic owner row (User is the FK target of ImportIntent coach_id). */
++export function ensureUser(coach: string) {
++  sql(`INSERT INTO "User" (id,supabase_id,email,name,role)
++    VALUES (${quote(coach)},${quote(`sb-${coach}`)},${quote(`${coach}@synthetic.invalid`)},${quote(`Synthetic ${coach}`)},'coach')
++    ON CONFLICT (id) DO NOTHING`);
++}
++/** Synthetic setup intent for `coach`; returns its UUID. C1 keeps ONE current setup per coach
++ *  (`ImportIntent_one_current_key`), so any earlier current intent of the coach is superseded
++ *  first (fixture shaping). `paired=false` → S7-L Start must refuse `intent_not_paired`. */
++export function intent(coach: string, paired = true): string {
++  ensureUser(coach);
++  return sql(`UPDATE "${INTENT}" SET superseded_at=now() WHERE coach_id=${quote(coach)} AND superseded_at IS NULL;
++    INSERT INTO "${INTENT}" (id,coach_id,chosen_platform,paired_at)
++    VALUES (gen_random_uuid(),${quote(coach)},'truecoach',${paired ? 'now()' : 'NULL'})
++    RETURNING id`);
++}
++/** Settled LEGACY run row (the pre-S7-L writer's shape). */
++export function legacyRun(coach: string, intent: string, terminal: string | null = 'success') {
++  ensureUser(coach);
++  sql(`INSERT INTO "${RUN}" (id,coach_id,intent_id,state,terminal_status,completed_at)
++    VALUES (${quote(`${coach}-${intent}`)},${quote(coach)},${quote(intent)},
++      ${terminal === null ? "'in_progress'" : quote(terminal)},${terminal === null ? 'NULL' : quote(terminal)},
++      ${terminal === null ? 'NULL' : 'now()'})
++    ON CONFLICT DO NOTHING`);
++}
++/** One SERVER run row written directly (SQL-level fixtures only). Behavioural runs come from the
++ *  real Start through the worker. */
++export function serverRunInsert(
++  coach: string,
++  intentId: string,
++  overrides: Partial<Record<string, string>> = {},
++) {
++  const v: Record<string, string> = {
++    id: quote(`${coach}-${intentId}`),
++    coach_id: quote(coach),
++    intent_id: quote(intentId),
++    state: "'in_progress'",
++    terminal_status: 'NULL',
++    mode: "'server'",
++    import_intent_id: `${quote(intentId)}::uuid`,
++    phase: "'discovering'",
++    accepted_start_at: "(now() AT TIME ZONE 'UTC')",
++    deadline_at: "(now() AT TIME ZONE 'UTC') + interval '5 minutes'",
++    ...overrides,
++  };
++  const names = Object.keys(v);
++  return `INSERT INTO "${RUN}" (${names.join(',')}) VALUES (${names.map((n) => v[n]).join(',')})`;
++}
++/** One staged row (the accepted ingest shape) written directly. */
++export function stage(
++  coach: string,
++  intent: string,
++  token: string,
++  source: string,
++  payload: Record<string, unknown> = { name: `Synthetic ${source}` },
++  platform: string = PLATFORM,
++) {
++  sql(`INSERT INTO "${STAGED}" (id,coach_id,intent_id,entity_type,source_id,source_platform,payload)
++    VALUES (${quote(`${coach}-${intent}-${token}-${platform}-${source}`)},${quote(coach)},${quote(intent)},${quote(token)},
++    ${quote(source)},${quote(platform)},${quote(JSON.stringify(payload))})
++    ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`);
++}
++/** Move a server run's deadline into the past (fixture clock; the service never updates it). */
++export function expire(coach: string, intent: string) {
++  sql(`UPDATE "${RUN}" SET deadline_at=accepted_start_at + interval '1 millisecond'
++    WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`);
++}
++
++/** 64-hex digest literal of `text` computed by PostgreSQL (pgcrypto), for SQL-level fixtures. */
++export const hexOf = (text: string) => `encode(digest(${quote(text)},'sha256'),'hex')`;
++/** One declaration row as SQL (SQL-level fixtures only; the route inserts through the service).
++ *  `challenge` is a SQL bytea expression, `scope` a SQL text expression. */
++export function declarationInsert(
++  coach: string,
++  intentId: string,
++  opts: { platform?: string; scope?: string; challenge?: string; declaredAt?: string } = {},
++) {
++  return `INSERT INTO "${DECLARATION}" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
++    VALUES (${quote(coach)},${quote(intentId)},${quote(opts.platform ?? PLATFORM)},
++      ${opts.scope ?? hexOf('synthetic-scope-1')},${opts.challenge ?? "decode(repeat('07',32),'hex')"},
++      ${opts.declaredAt ?? "'2026-09-26 00:00:00'"})`;
++}
++/** One observation row as SQL (SQL-level fixtures only). */
++export function observationInsert(
++  coach: string,
++  intentId: string,
++  opts: {
++    platform?: string;
++    scope?: string;
++    family?: string;
++    epoch?: number;
++    digest?: string;
++  } = {},
++) {
++  return `INSERT INTO "${OBSERVATION}" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
++      family,basis_kind,evidence,evidence_digest,received_at)
++    VALUES (gen_random_uuid()::text,${quote(coach)},${quote(intentId)},${opts.epoch ?? 1},${quote(opts.platform ?? PLATFORM)},
++      ${opts.scope ?? hexOf('synthetic-scope-1')},${quote(opts.family ?? 'clients')},'source_signed_enumeration',
++      '{"evidence_version":1}'::jsonb,${opts.digest ?? hexOf('synthetic-evidence')},'2026-09-26 00:00:00')`;
++}
++/** One settled-basis row as SQL (SQL-level fixtures only; S10-C writes it in production). */
++export function settledInsert(coach: string, intentId: string) {
++  return `INSERT INTO "${SETTLED}" (coach_id,intent_id,execution_epoch,report_version,report,observation_digests,settled_at)
++    VALUES (${quote(coach)},${quote(intentId)},1,1,'{}'::jsonb,ARRAY[${hexOf('synthetic-evidence')}],'2026-09-26 00:00:00')`;
++}
++
++/** One run row (all columns) or null. */
++export const runRow = (coach: string, intent: string) =>
++  json(
++    `SELECT COALESCE((SELECT to_jsonb(r) FROM "${RUN}" r WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}),'null')`,
++  );
++export const completionRows = () =>
++  json(
++    `SELECT COALESCE(jsonb_agg(jsonb_build_array(coach_id,intent_id,terminal_status) ORDER BY coach_id,intent_id),'[]') FROM "${COMPLETION}"`,
++  );
++/** Declaration rows of one run, ordered, with the challenge as hex. */
++export const declarationRows = (coach: string, intent: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('source_platform',source_platform,
++    'account_scope_id_digest',account_scope_id_digest,'challenge',encode(challenge,'hex'),
++    'declared_at',declared_at) ORDER BY source_platform,account_scope_id_digest),'[]')
++    FROM "${DECLARATION}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`) as Array<
++    Record<string, string>
++  >;
++/** Observation rows of one run, ordered by unit. */
++export const observationRows = (coach: string, intent: string) =>
++  json(`SELECT COALESCE(jsonb_agg(jsonb_build_object('execution_epoch',execution_epoch,
++    'source_platform',source_platform,'account_scope_id_digest',account_scope_id_digest,'family',family,
++    'basis_kind',basis_kind,'evidence_digest',evidence_digest,'evidence',evidence)
++    ORDER BY execution_epoch,source_platform,account_scope_id_digest,family),'[]')
++    FROM "${OBSERVATION}" WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)}`) as Array<
++    Record<string, any>
++  >;
++export const count = (table: string, where = 'true') =>
++  Number(sql(`SELECT count(*) FROM "${table}" WHERE ${where}`));
++
++/**
++ * Whole-fixture reset: every table the proof writes. The S10-B children are NEVER deleted
++ * directly (their insert-only trigger refuses a top-level DELETE): deleting the parent run
++ * cascades them, which is exactly the referential-cleanup path the proof asserts.
++ */
++export function resetData() {
++  sql(`DELETE FROM "${STAGED}"; DELETE FROM "ScoutReconstructionLedger"; DELETE FROM "ScoutProgressSnapshot";
++    DELETE FROM "${COMPLETION}"; DELETE FROM "${RUN}";
++    DELETE FROM "ExtensionPairCode"; DELETE FROM "${INTENT}";`);
++}
++/** The exact §3.1 gate statement as SQL text for the two-session serialization check. */
++export const gateSql = (coach: string, intent: string) =>
++  `UPDATE "${RUN}" SET last_observed_at=(now() AT TIME ZONE 'UTC'),
++     phase=CASE WHEN phase='discovering' THEN 'transferring' ELSE phase END
++   WHERE coach_id=${quote(coach)} AND intent_id=${quote(intent)} AND mode='server'
++     AND terminal_status IS NULL AND fenced_at IS NULL AND deadline_at>(now() AT TIME ZONE 'UTC')
++   RETURNING execution_epoch`;
+diff --git a/test/utils/g2-s10b-pg-harness.ts b/test/utils/g2-s10b-pg-harness.ts
+new file mode 100644
+index 00000000..7cf6d633
+--- /dev/null
++++ b/test/utils/g2-s10b-pg-harness.ts
+@@ -0,0 +1,262 @@
++/**
++ * S10-B G2 live-proof helpers: derived by substitution from the S9-C harness
++ * test/utils/g2-s9c-pg-harness.ts (d3a9-s9c-r2), which stays byte-identical. Same real psql, same
++ * real generated Prisma client in separate OS processes (test/utils/g2-s10b-worker.cjs drives the
++ * real ObservationService + ScoutLifecycleService + ScoutIngestService with an injected synthetic
++ * induction registry), no transaction or query mocks; bound to the S10-B-only identity guard
++ * test/utils/g2-s10b-db.ts and the G2_S10B_* environment. Only test/rls-g2-s10b.spec.ts (via
++ * test/utils/g2-s10b-harness.ts) imports this.
++ *
++ * S10-B ships ONE migration (20270124000000_scout_run_observation_expand): the base a4af8e33 prisma
++ * tree (172 accepted migrations through S7-L) plus that expand is installed by the real release
++ * mechanism; its down.sql is read from the candidate tree (`downSql`) for the refusal/drop proof.
++ */
++import { execFileSync, fork, spawn } from 'child_process';
++import { readFileSync } from 'fs';
++import { resolve } from 'path';
++import {
++  G2_S10B_ADMIN_ROLE,
++  G2_S10B_MIGRATION_ROLE,
++  G2_S10B_RUNTIME_ROLE,
++  G2_S10B_BASE_HEAD,
++  G2_S10B_CANDIDATE_HEAD_ENV,
++  g2S10bCandidateHead,
++  g2S10bTestTarget,
++  withFixturePassword,
++} from './g2-s10b-db';
++
++export const root = resolve(__dirname, '..', '..');
++/** Base pin (kept identical in test/utils/g2-s10b-bootstrap.sh and test/utils/g2-s10b-db.ts). */
++export const BASE_HEAD: string = G2_S10B_BASE_HEAD;
++export const S8B_MIGRATION = '20270122000000_scout_native_provenance_expand';
++export const S7L_MIGRATION = '20270123000000_scout_run_lifecycle_expand';
++export const S10B_MIGRATION = '20270124000000_scout_run_observation_expand';
++/** 172 accepted migrations through S7-L (base a4af8e33) plus the S10-B expand = 173. */
++export const EXPECTED_MIGRATIONS = 173;
++
++const raw = process.env.G2_S10B_DATABASE_URL;
++const password = process.env.G2_S10B_PASSWORD;
++export const psql = process.env.G2_S10B_PSQL;
++export const directory = process.env.G2_S10B_DATA_DIRECTORY;
++export const expectedVersion = Number(process.env.G2_S10B_SERVER_VERSION ?? '170006');
++if (!raw || !password || !psql || !directory) {
++  throw new Error('S10-B G2 proof requires explicit database, password, psql and data directory');
++}
++export const target = g2S10bTestTarget(raw, process.env.G2_S10B_CONFIRM);
++/** The attested candidate head this run is bound to: the runtime root must be exactly there, clean. */
++export const candidateHead = g2S10bCandidateHead(
++  process.env[G2_S10B_CANDIDATE_HEAD_ENV],
++  execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }),
++  execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }),
++);
++const psqlEnv = { PATH: process.env.PATH, LC_ALL: 'C', PGPASSWORD: password };
++/** psql URL for a fixture matrix role; the password travels only in PGPASSWORD. */
++const asRole = (role: string) => {
++  const u = new URL(target.psqlUrl);
++  u.username = role;
++  return u.toString();
++};
++/** Every harness DDL/data statement runs as the non-superuser BYPASSRLS owner `postgres`. */
++export const migrationUrl = asRole(G2_S10B_MIGRATION_ROLE);
++/** Cluster superuser: lock-wait observation in pg_stat_activity only. */
++const adminUrl = asRole(G2_S10B_ADMIN_ROLE);
++
++const psqlRun = (url: string, args: string[], input?: string) =>
++  execFileSync(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', ...args, url], {
++    input,
++    encoding: 'utf8',
++    timeout: 60000,
++    env: psqlEnv,
++    stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
++  }).trim();
++export const sql = (text: string): string => psqlRun(migrationUrl, [], text);
++export const sqlAdmin = (text: string): string => psqlRun(adminUrl, [], text);
++/** The same statement text as another fixture-matrix role (runtime `service_role`, or an API
++ *  role reached through SET ROLE from the owner session in the statement itself). */
++export const sqlAs = (role: string, text: string): string => psqlRun(asRole(role), [], text);
++export const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
++export const json = (text: string) => JSON.parse(sql(text));
++export const jsonAdmin = (text: string) => JSON.parse(sqlAdmin(text));
++/** Fails when the statement succeeds; the PostgreSQL discriminator is in child stderr. */
++export function refused(statement: string, message: string, role?: string): void {
++  let error: unknown;
++  try {
++    if (role) sqlAs(role, statement);
++    else sql(statement);
++  } catch (e) {
++    error = e;
++  }
++  if (error === undefined) throw new Error('SQL unexpectedly succeeded');
++  expect(String(error)).toContain(message);
++}
++export const appliedMigrations = () =>
++  sql(`SELECT count(*) FROM "_prisma_migrations"
++  WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL`);
++
++export type Result = {
++  result?: any;
++  failure?: any;
++  queries: string[];
++  events: any[];
++  pushes: number;
++  sideEffectLoads: Record<string, number>;
++  pid: number;
++  families?: string[];
++};
++let sequence = 0;
++/** One real ObservationService / ScoutLifecycleService / ScoutIngestService call in an
++ *  independent OS process with the candidate generated client. `options.registry` is the
++ *  synthetic induction registry (platform → expected families) the worker injects through the
++ *  ObservationService options seam; see test/utils/g2-s10b-worker.cjs. */
++export function worker(options: Record<string, unknown> = {}) {
++  const name = `g2s10b_${++sequence}`;
++  const service = new URL(withFixturePassword(target.prismaUrl, password, G2_S10B_RUNTIME_ROLE));
++  service.searchParams.set('application_name', name);
++  const config = {
++    root,
++    client: resolve(root, 'node_modules/.prisma/client'),
++    head: candidateHead,
++    url: service.toString(),
++    coach: 'coach',
++    intent: 'intent',
++    action: 'status',
++    family: 'workouts',
++    ...options,
++  };
++  const child = fork(resolve(root, 'test/utils/g2-s10b-worker.cjs'), [], {
++    cwd: root,
++    execArgv: ['-r', 'ts-node/register/transpile-only'],
++    env: {
++      ...process.env,
++      G2_S10B_WORKER: JSON.stringify(config),
++      TS_NODE_PROJECT: resolve(root, 'tsconfig.json'),
++    },
++    silent: true,
++  });
++  let output = '';
++  child.stdout!.on('data', (b) => {
++    output += String(b);
++  });
++  child.stderr!.on('data', (b) => {
++    output += String(b);
++  });
++  const timer = setTimeout(() => child.kill(), 90000);
++  // Fixture barrier (carried from the N/Q1 harness): `options.pause` names the phase the worker
++  // pauses at; `ready` settles when it has, `resume()` releases it.
++  let readyResolve: (phase: string) => void = () => undefined;
++  const ready = new Promise<string>((r) => {
++    readyResolve = r;
++  });
++  const done = new Promise<Result>((resolveDone, reject) => {
++    let result: Result | undefined;
++    child.on('message', (message: any) => {
++      if (message.done) result = message;
++      if (message.ready) readyResolve(message.ready);
++    });
++    child.on('error', reject);
++    // 'exit' can precede delivery of the final IPC message; settle only after both the exit code
++    // and the IPC channel close ('disconnect') are known.
++    let exitCode: number | null | undefined;
++    let disconnected = false;
++    const settleWorker = () => {
++      if (exitCode === undefined || !(disconnected || result)) return;
++      const code = exitCode;
++      clearTimeout(timer);
++      if (code !== 0 || !result) {
++        reject(new Error(`worker exited ${code}: ${output}`));
++        return;
++      }
++      // Query shapes, outcomes, fixture identifiers and process IDs only; never parameters.
++      console.warn(
++        'PG17_PROCESS',
++        JSON.stringify({
++          name,
++          options: { ...options, body: undefined },
++          result: result.result,
++          failure: result.failure,
++          queries: result.queries.length,
++          pid: result.pid,
++        }),
++      );
++      resolveDone(result);
++    };
++    child.on('disconnect', () => {
++      disconnected = true;
++      settleWorker();
++    });
++    child.on('exit', (code) => {
++      exitCode = code;
++      settleWorker();
++    });
++  });
++  return { done, ready, resume: () => child.send({}), stop: () => child.kill(), name };
++}
++export const run = (options: Record<string, unknown> = {}) => worker(options).done;
++export async function blocked(name: string) {
++  for (let n = 0; n < 400; n++) {
++    // Other roles' wait events are visible only to a superuser/pg_read_all_stats; observe as admin.
++    const rows =
++      jsonAdmin(`SELECT COALESCE(jsonb_agg(jsonb_build_object('wait',wait_event,'type',wait_event_type)),'[]')
++      FROM pg_stat_activity WHERE application_name=${quote(name)} AND wait_event_type='Lock'`);
++    if (rows.length > 0) {
++      console.warn('PG17_BLOCKED', JSON.stringify({ name, rows }));
++      return;
++    }
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('expected observed PostgreSQL lock wait');
++}
++/** A psql session (default: runtime role service_role) holding an open transaction until released. */
++export function holdTransaction(statements: string, role: string = G2_S10B_RUNTIME_ROLE) {
++  const holder = spawn(psql!, ['-X', '-w', '-qAt', '-v', 'ON_ERROR_STOP=1', asRole(role)], {
++    stdio: ['pipe', 'pipe', 'pipe'],
++    env: psqlEnv,
++  });
++  let output = '';
++  holder.stderr.on('data', (b) => {
++    output += String(b);
++  });
++  const held = new Promise<void>((r, reject) => {
++    holder.stdout.on('data', (b) => {
++      if (String(b).includes('HELD')) r();
++    });
++    holder.on('exit', (code) => {
++      if (code !== 0) reject(new Error(`holder exited ${code}: ${output}`));
++    });
++  });
++  holder.stdin.write(`BEGIN; ${statements}; SELECT 'HELD';\n`);
++  return { held, release: () => holder.stdin.end('COMMIT;\n'), kill: () => holder.kill() };
++}
++export const gitShow = (spec: string) =>
++  execFileSync('git', ['show', spec], { cwd: root, encoding: 'utf8' });
++/** Prisma CLI as the migration role (`postgres`), exactly like the release mechanism. */
++export function prisma(schemaRoot: string, args: string[]): { ok: boolean; output: string } {
++  const url = withFixturePassword(target.prismaUrl, password, G2_S10B_MIGRATION_ROLE);
++  try {
++    const output = execFileSync(
++      resolve(root, 'node_modules/.bin/prisma'),
++      [...args, '--schema', 'prisma/schema.prisma'],
++      {
++        cwd: schemaRoot,
++        encoding: 'utf8',
++        timeout: 120000,
++        env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
++        stdio: ['ignore', 'pipe', 'pipe'],
++      },
++    );
++    return { ok: true, output };
++  } catch (e: any) {
++    return { ok: false, output: `${e.stdout ?? ''}\n${e.stderr ?? ''}` };
++  }
++}
++export function prismaMigrateDeploy(schemaRoot: string): string {
++  const result = prisma(schemaRoot, ['migrate', 'deploy']);
++  if (!result.ok) throw new Error(`prisma migrate deploy failed: ${result.output}`);
++  return result.output;
++}
++/** The candidate S10-B migration.sql text (re-applied verbatim after the down proof). */
++export const upSql = () =>
++  readFileSync(resolve(root, 'prisma/migrations', S10B_MIGRATION, 'migration.sql'), 'utf8');
++/** The candidate S10-B down.sql text (the refusal/drop proof runs it verbatim through psql). */
++export const downSql = () =>
++  readFileSync(resolve(root, 'prisma/migrations', S10B_MIGRATION, 'down.sql'), 'utf8');
+diff --git a/test/utils/g2-s10b-worker.cjs b/test/utils/g2-s10b-worker.cjs
+new file mode 100644
+index 00000000..e0af8412
+--- /dev/null
++++ b/test/utils/g2-s10b-worker.cjs
+@@ -0,0 +1,254 @@
++// S10-B: real ObservationController + ObservationService + ScoutLifecycleService +
++// ScoutIngestService + ScoutService + real generated Prisma client in an independent OS process.
++// Derived by substitution from the S9-C worker test/utils/g2-s9c-worker.cjs (d3a9-s9c-r2,
++// read-only): same candidate binding, same @prisma/client redirection, same side-effect module
++// spies, same Proxy instrument with named barriers and transaction markers. The S10-B deltas: the
++// S8-C/S9-C registry injection (spec/rules/facts) is replaced by the synthetic INDUCTION registry
++// injected through the ObservationService options seam, the lifecycle is constructed with the
++// base (pre-S9-C) three-parameter signature, and the actions are the two S10 routes. Hooks only
++// PAUSE real operations at named barriers or THROW an injected failure at a named insert; they
++// never replace query results or transaction semantics. Used only by the explicitly guarded live
++// proof test/rls-g2-s10b.spec.ts.
++// input (G2_S10B_WORKER JSON): { root, head, client, url, coach, intent, action, pause?,
++//   txTimeout?, deadlineMs?, body?, registry?, failAfter?, rawBytes? }
++// action ∈ declare | observe | start | ingest | complete | cancel | fence | status
++// pause  ∈ before-lock | locked (around the S10-B / lifecycle FOR NO KEY UPDATE)
++//        | before-gate | gated (around the §3.1 gate UPDATE of an ingest)
++// failAfter: { model: 'scoutRunDeclaration'|'scoutRunObservation', n } — the (n+1)-th create
++//   inside a transaction throws (the mid-insert failure of R32).
++const { join } = require('path');
++const { execFileSync } = require('child_process');
++const input = JSON.parse(process.env.G2_S10B_WORKER);
++// Candidate binding: the worker loads source from input.root, so that root must be at the attested
++// head the harness was bound to; a mismatch is a hard failure before any client is constructed.
++const workerHead = execFileSync('git', ['rev-parse', 'HEAD'], {
++  cwd: input.root,
++  encoding: 'utf8',
++}).trim();
++if (workerHead !== input.head) {
++  throw new Error(
++    `worker root ${input.root} is at ${workerHead}, not the attested candidate ${input.head}`,
++  );
++}
++const Module = require('module');
++const resolveFilename = Module._resolveFilename;
++Module._resolveFilename = function (request, ...args) {
++  return request === '@prisma/client'
++    ? join(input.client, 'index.js')
++    : resolveFilename.call(this, request, ...args);
++};
++if (Number.isInteger(input.deadlineMs) && input.deadlineMs > 0) {
++  process.env.SCOUT_RUN_DEADLINE_MS = String(input.deadlineMs);
++}
++// G12 spies: count any load of a side-effect module from this process (never replaces a module).
++const sideEffectLoads = { notifications: 0, drip: 0, assignment: 0, email: 0, billing: 0 };
++const origLoad = Module._load;
++Module._load = function (request, ...args) {
++  const text = String(request);
++  for (const k of Object.keys(sideEffectLoads)) {
++    if (text.includes(`/${k}/`) || text.endsWith(`.${k}.service`)) sideEffectLoads[k] += 1;
++  }
++  return origLoad.call(this, request, ...args);
++};
++
++const { PrismaClient } = require(input.client);
++const { ScoutService } = require(join(input.root, 'src/scout/scout.service'));
++const { ScoutIngestService } = require(join(input.root, 'src/scout/scout-ingest.service'));
++const { ScoutLifecycleService } = require(
++  join(input.root, 'src/scout/lifecycle/lifecycle.service'),
++);
++const { ObservationService } = require(join(input.root, 'src/scout/induction/observation.service'));
++const { ObservationController } = require(
++  join(input.root, 'src/scout/induction/observation.controller'),
++);
++const { rawEvidence, syntheticRegistry } = require(join(input.root, 'test/utils/g2-s10b-fixtures'));
++// Startup loads are the accepted import graph (ScoutService already depends on notifications);
++// the proof counts only what the ACTION loads lazily from here on.
++for (const k of Object.keys(sideEffectLoads)) sideEffectLoads[k] = 0;
++
++const db = new PrismaClient({
++  datasources: { db: { url: input.url } },
++  log: [{ emit: 'event', level: 'query' }],
++});
++const queries = [];
++const events = [];
++db.$on('query', (e) => queries.push(e.query)); // Never log query parameters.
++const analytics = { capture: (...args) => events.push(args) };
++let pushes = 0;
++const notifications = {
++  pushToUser: async () => {
++    pushes += 1;
++  },
++};
++
++let paused = false;
++async function barrier(phase) {
++  if (input.pause !== phase || paused) return;
++  paused = true;
++  process.send({ ready: phase });
++  await new Promise((resolve) => process.once('message', resolve));
++}
++const isGate = (strings) =>
++  Array.isArray(strings) && strings.join('?').includes('last_observed_at');
++const isLock = (strings) =>
++  Array.isArray(strings) && strings.join('?').includes('FOR NO KEY UPDATE');
++
++// Interactive transactions leave fixture markers (`-- tx:begin|commit|rollback`) in the query log
++// so a proof can assert statement ORDER across transaction boundaries; the FIXTURE-ONLY
++// `txTimeout` widens this process's interactive transaction ceiling so a paused writer can hold
++// its row lock deterministically. `inTx` scopes the injected create failure to one transaction.
++function instrument(target, inTx = false) {
++  let creates = 0;
++  return new Proxy(target, {
++    get(object, key) {
++      if (key === '$transaction')
++        return async (fn, ...options) => {
++          if (typeof fn !== 'function') return object.$transaction(fn, ...options);
++          queries.push('-- tx:begin');
++          try {
++            const out = await object.$transaction(
++              (tx) => fn(instrument(tx, true)),
++              ...(options.length === 0 && Number.isInteger(input.txTimeout) && input.txTimeout > 0
++                ? [{ timeout: input.txTimeout }]
++                : options),
++            );
++            queries.push('-- tx:commit');
++            return out;
++          } catch (e) {
++            queries.push('-- tx:rollback');
++            throw e;
++          }
++        };
++      if (key === '$queryRaw')
++        return async (strings, ...values) => {
++          if (isGate(strings)) await barrier('before-gate');
++          if (isLock(strings)) await barrier('before-lock');
++          const result = await object.$queryRaw(strings, ...values);
++          if (isGate(strings)) await barrier('gated');
++          if (isLock(strings)) await barrier('locked');
++          return result;
++        };
++      if (inTx && input.failAfter && key === input.failAfter.model) {
++        const delegate = object[key];
++        return new Proxy(delegate, {
++          get(model, method) {
++            if (method === 'create')
++              return async (...args) => {
++                if (creates >= input.failAfter.n)
++                  throw new Error('fixture injected insert failure');
++                creates += 1;
++                return model.create(...args);
++              };
++            return typeof model[method] === 'function' ? model[method].bind(model) : model[method];
++          },
++        });
++      }
++      return typeof object[key] === 'function' ? object[key].bind(object) : object[key];
++    },
++  });
++}
++
++(async () => {
++  let result;
++  let failure;
++  try {
++    const prisma = instrument(db);
++    const lifecycle = new ScoutLifecycleService(prisma, analytics);
++    const observations = new ObservationService(prisma, lifecycle, {
++      registry: syntheticRegistry(input.registry ?? {}),
++    });
++    const controller = new ObservationController(observations);
++    const scout = new ScoutService(prisma, notifications, analytics, lifecycle);
++    const body = input.body ?? {};
++    const req = (raw) => ({ user: { id: input.coach }, rawBody: raw });
++    switch (input.action) {
++      case 'declare': {
++        const dto = { intent_id: input.intent, platforms: body.platforms ?? [] };
++        result = await controller.postDeclaration(req(), dto);
++        break;
++      }
++      case 'observe': {
++        // body.evidence: synthetic EvidenceSpec list (challengeHex → the statement challenge).
++        const items = (body.evidence ?? [{}]).map((spec) =>
++          rawEvidence({
++            ...spec,
++            challenge: spec.challengeHex ? Buffer.from(spec.challengeHex, 'hex') : undefined,
++          }),
++        );
++        const dto = { intent_id: input.intent, observations: items };
++        const raw = Buffer.from(JSON.stringify(dto), 'utf8');
++        const padded =
++          Number.isInteger(input.rawBytes) && input.rawBytes > raw.length
++            ? Buffer.concat([raw, Buffer.alloc(input.rawBytes - raw.length, 0x20)])
++            : raw;
++        result = await controller.postObservation(req(padded), dto);
++        break;
++      }
++      case 'start':
++        result = await lifecycle.start(input.coach, input.intent);
++        break;
++      case 'cancel':
++        result = await lifecycle.cancel(input.coach, input.intent);
++        break;
++      case 'fence':
++        result = await lifecycle.fence(input.coach, input.intent, body.reason ?? 'revoked');
++        break;
++      case 'ingest':
++        result = await new ScoutIngestService(prisma, analytics, lifecycle).ingest(input.coach, {
++          intent_id: input.intent,
++          entity_type: body.entity_type ?? 'clients',
++          entities: (body.entities ?? [{ sourceId: 'a', payload: { name: 'Synthetic a' } }]).map(
++            (e) => ({
++              sourceId: e.sourceId,
++              sourcePlatform: body.sourcePlatform ?? 'synthetic-src-a',
++              capturedAt: '2026-09-26T00:00:00.000Z',
++              payload: e.payload,
++            }),
++          ),
++        });
++        break;
++      case 'complete':
++        result = await scout.complete(input.coach, {
++          intent_id: input.intent,
++          terminal_status: body.terminal_status ?? 'success',
++          final_counts: body.final_counts,
++          error_summary: body.error_summary,
++        });
++        break;
++      case 'status':
++        result = await scout.getImportStatus(input.coach, input.intent);
++        break;
++      default:
++        throw new Error(`unknown action ${input.action}`);
++    }
++  } catch (e) {
++    failure = {
++      status: typeof e.getStatus === 'function' ? e.getStatus() : 500,
++      // Emulate Nest's public boundary for unexpected DB failures.
++      message: typeof e.getStatus === 'function' ? e.message : 'Internal server error',
++      response: typeof e.getResponse === 'function' ? e.getResponse() : undefined,
++      code: e.code,
++      injected: e instanceof Error && e.message === 'fixture injected insert failure',
++    };
++  } finally {
++    await db.$disconnect();
++  }
++  // process.send is asynchronous: disconnect only from the send callback so the final message
++  // is never lost on the parent side.
++  process.send(
++    {
++      done: true,
++      result,
++      failure,
++      queries,
++      events,
++      pushes,
++      sideEffectLoads,
++      pid: process.pid,
++    },
++    () => process.disconnect(),
++  );
++})().catch((e) => {
++  console.error(e);
++  process.exit(1);
++});

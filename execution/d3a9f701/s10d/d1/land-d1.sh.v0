@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -uo pipefail; W=/home/user/workspace/worktrees/d3a9-s10d; X=/home/user/workspace/private-evidence/execution/d3a9f701/s10d/d1; DONOR=/home/user/workspace/worktrees/1910a060-s8f/node_modules
+TIP=$(git ls-remote https://github.com/BradleyGleavePortfolio/growth-project-backend.git refs/heads/integration/importer | cut -c1-40)
+LOCK=/home/user/workspace/execution/test-validation.lock; [ "$(stat -c %i $LOCK)" = 692282 ] || exit 75; exec 9>>"$LOCK"; flock -n 9 || { echo "LOCK busy"; exit 75; }; echo "LOCK acquired $(date -u +%FT%TZ) tip=$TIP"; cd $W
+[ "$(git rev-parse HEAD)" = "$TIP" ] || { git fetch -q origin integration/importer && git merge -q --ff-only FETCH_HEAD || exit 70; }
+sha256sum -c $X/FREEZE.sha256 || exit 70; [ "$(git status --porcelain --untracked-files=all | grep -vc '^?? node_modules')" = 2 ] || exit 70
+[ -e node_modules ] || cp -a $DONOR node_modules; for hk in pre-commit commit-msg; do { [ -e .git/hooks/$hk ] || [ -L .git/hooks/$hk ]; } && exit 70; done
+./node_modules/.bin/lefthook install > $X/lefthook.log 2>&1; echo "LEFTHOOK rc=$?"
+NODE_OPTIONS=--max-old-space-size=4096 timeout 900 ./node_modules/.bin/nest build > $X/nest-build.log 2>&1; echo "NEST_BUILD rc=$?"; [ -d dist ] && rm -rf dist
+git add -- nest-cli.json scripts/s10-core-diff-gate.sh; git -c user.name="Bradley Gleave" -c user.email=bradley@bradleytgpcoaching.com commit -q -F $X/commit-message.txt > $X/commit.log 2>&1; rc=$?; echo "COMMIT rc=$rc"; [ $rc = 0 ] || exit 71
+H=$(git rev-parse HEAD); echo "HEAD $H tree $(git rev-parse HEAD^{tree}) parent $(git rev-parse HEAD^) | $(git log -1 --format='%an <%ae> | %cn <%ce>')"; git ls-tree HEAD scripts/s10-core-diff-gate.sh nest-cli.json
+[ -z "$(git log -1 --format=%B | grep -iE 'co-authored|signed-off')" ] && echo NO_TRAILERS
+git push -q origin "$H:refs/heads/land/s10d-d1" 2>&1 | tail -1; echo "PUSHED land/s10d-d1 ${H:0:12}"; echo "END $(date -u +%FT%TZ)"

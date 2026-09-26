@@ -1,0 +1,157 @@
+--- s11_0_decision_draft.pre-fix-1.md	2026-09-26 04:52:23.791187820 +0000
++++ s11_0_decision_draft.md	2026-09-26 04:53:14.383187820 +0000
+@@ -89,9 +89,20 @@
+ 
+ **Decision.** S11 proves the journey across all three axes at once:
+ - two independent server processes;
+-- two client principals of one coach, and a second coach;
++- two client roles (phone, extension) of one coach, and a second coach;
+ - a two-platform declaration.
+ 
++The S11 real-PG proofs are **cross-process service and database composition**. Their workers
++call the services directly with a supplied coach id (`test/utils/g2-s9c-worker.cjs` L54-76,
++L181-215), so they do not prove H-C authentication. That boundary is:
++- the phone JWT and the redeemed extension session both authenticate;
++- both guards resolve to the same coach.
++It stays with the existing accepted route and guard specs, which S11 cites and does not re-prove:
++- `src/extension-pair/__tests__/{extension-pair.controller,extension-pair.controller-wiring,`
++  `auth-mint-extension-session,coach-guard-role}.spec.ts`;
++- `test/auth/extension-auth.spec.ts`;
++- `test/scout/lifecycle/run.controller.spec.ts`.
++
+ It changes behaviour only where an H-S per-process behaviour can make the terminal untruthful
+ or unreachable (G1). The other per-process behaviours are accepted as mirror-only and are bounded
+ by tests (D-S11-3).
+@@ -105,7 +116,7 @@
+ | --- | --- | --- | --- | --- |
+ | 1 | Setup created (J3-J5) | `POST extension/pair/init` → `ImportIntent` (`schema.prisma` L6762-6782) | C1 + pairing | landed |
+ | 2 | Paired (J5) | `POST extension/pair/redeem` sets `paired_at`; readable by `pair/session` and `pair/current` (`extension-pair.service.ts` L187-221) | C1 | landed |
+-| 3 | Source authorized (J6) | only the browser knows. The server-side record is the S10 declaration of platforms and scopes (S10-DOC D-S10-2, D-S10-4 routes) | S10-B | **not landed** |
++| 3 | Declaration recorded (J6) | Only the browser knows whether a source is authorized. The server records only the S10 declaration of platforms and scopes (S10-DOC D-S10-2, D-S10-4 routes), and does not verify source authorization (S10-DOC L473-483) | S10-B | **not landed** |
+ | 4 | Start once (J7) | `POST scout/runs/start`, idempotent (`src/scout/lifecycle/run.controller.ts` L55-60, L88). Phase is `discovering` | S7-L | landed |
+ | 5 | Transfer (J8) | `POST scout/ingest` behind the §3.1 gate; `POST scout/progress` (phase `transferring`, `scout.service.ts` L125-155) | S7-L, IMPORTER-E | landed |
+ | 6 | Observation evidence | `POST scout/runs/observation` (S10-DOC D-S10-4) | S10-B | **not landed** |
+@@ -241,29 +252,47 @@
+   L199-201). It exposes no scope digest, challenge or platform names.
+ - Terminal status and reason codes stay on `GET scout/import/status`, the single read of truth
+   (S7L-DOC §5).
+-- It exists so the phone can render J6 ("waiting for your computer / source ready") without
+-  guessing. Absence means "not known" and is never shown as "no".
++- It exists so the phone can render J6 without guessing.
++  - Display semantics are neutral: `source_declared: true` may read "declaration received",
++    and never "source authorized", "source ready" or "connected".
++  - `source_declared` means only that a coach-scoped declaration row exists. Real source
++    authorization stays **unknown** until the owner-reserved verifier and principal policy
++    exist (S10 Q2/Q5, G3-AUTH).
++  - Absence means "not known" and is never shown as "no".
+ - **Owned code:** `src/extension-pair/extension-pair.{service,dto}.ts`, about 60 product lines.
+   The contract is regenerated once by the generator owner.
+ 
+ ### D-S11-6 (G7): one journey harness, reused
+ 
+-- **S11-A creates one harness, once.** It is a literal derivative of the **latest accepted**
+-  harness, `g2-s9c-*` at the read tree, or `g2-s10b-*`/`g2-s10c-*` once those are accepted.
++- **There is one S11 harness, with sequential owners and no fork.**
+   - The files are `test/utils/g2-s11-{bootstrap.sh,db.ts,harness.ts,pg-harness.ts,worker.cjs}`.
+-  - Differences from its donor are limited to a **lane descriptor**: port, database name,
+-    markers, expected migration count, base pin, and the worker action set.
+-  - Every other line stays byte-identical to the donor, and the donor itself stays
+-    byte-identical.
+-- **Later S11 slices add spec cases only.** They go in `test/scout/s11/*.pg.spec.ts`, which runs
+-  through `test/rls-g2-s11.spec.ts`, and each binds its candidate by the descriptor's base pin.
+-  No later S11 slice may add a `test/utils/g2-s11*-*` file.
++  - The donor, `g2-s9c-*` at `92b96715`, stays byte-identical.
++- **S11-A1 builds the harness on the landed tree.** It covers only the actions that tree
++  supports.
++  - Beyond the lane descriptor (port, database name, markers, expected migration count, base
++    pin), it may differ from the donor in three places:
++    - the added `pair-init` and `pair-redeem` worker actions, with their service construction;
++    - the removal of donor actions no S11 case uses;
++    - the matching `harness.ts` wrappers.
++  - Everything else stays donor-derived.
++- **S11-A2 is the next and only writer of those same files**, after S10-B, S10-C and S10-D land
++  and A1 has landed. In one reviewed change, A2:
++  - moves the descriptor to the new base and migration count (the S10-B migration included);
++  - adds the `declare` and `observe` actions;
++  - adds the S10-B/S10-C service composition in the worker (the observation service, the
++    settled-basis lifecycle and facts wiring);
++  - adds the two-source registry, fixture and evidence-signing inputs that J09-J11 need;
++  - updates the harness's own guard spec.
++  Beyond A2's diff, the harness stays exactly as A1 left it.
++- **S11-B, S11-C and S11-D add spec cases only.** They go in `test/scout/s11/*.pg.spec.ts`
++  through `test/rls-g2-s11.spec.ts`, and bind their candidate by the descriptor's base pin. A
++  case needing a new worker action stops and is re-graded (§6), with the harness change routed
++  as a separate sequential edit. No slice may add another `test/utils/g2-s11*-*` file.
+ - **Two hosts means two worker processes.** Each worker is an independent OS process with its
+   own `ScoutService` (and so its own progress cache) over the same PG (`g2-s9c-worker.cjs`
+   L1-18). H-S is proven by routing successive journey steps to worker 1 and worker 2.
+ - **Worker actions** extend the donor's set (`start|ingest|complete|cancel|fence|settled|status|…`,
+-  L13) by exactly four: `pair-init`, `pair-redeem`, `declare` and `observe`. The last two exist
+-  only after S10-B lands.
++  L13). A1 adds `pair-init` and `pair-redeem`. A2 adds `declare` and `observe`.
+ - **Heavy runs** use the single canonical slot
+   (`execution/test-validation.lock`, `private-evidence/execution/daceddc8/SCOPE.md`). No
+   concurrent proofs.
+@@ -282,7 +311,12 @@
+    absent declaration is `null`, `none` or `false`, never 0 or `complete`.
+ 5. **Tenant isolation.** A second coach's concurrent journey on the same two processes can
+    neither read nor change the first coach's intent, run, declaration, observation or native
+-   rows (uniform 404).
++   rows. This is a no-foreign-access property, not one response code on every route:
++   - routes whose accepted contracts answer 404 for a foreign or unknown intent keep that
++     uniform 404 (setup reads, `import/status`, `runs/start|cancel`, reconstruct reads);
++   - `POST scout/progress` keeps its accepted 204 ignore for a foreign, fenced or unstarted run
++     (`scout.controller.ts` L66-85; `scout.service.ts` L125-155);
++   - legacy (non-UUID) intent strings keep their legacy semantics and are asserted separately.
+ 6. **No customer-facing side effect.** No notification, drip, email or message reaches a
+    coach's client during steps 5 to 8. The only push is the existing coach-directed
+    `import.complete` (`scout.service.ts` L563-567), once per run.
+@@ -298,8 +332,8 @@
+ | Slice | Tier | Owned paths | Product LOC | Depends on | Not owned |
+ | --- | --- | --- | --- | --- | --- |
+ | S11-0 | T0 | this record (landing at `docs/decisions/2026-09-2x-s11-journey.md`) | 0 | none | any code |
+-| S11-A1 | T2 (test-only, real PG) | `test/utils/g2-s11-*` (the one harness, D-S11-6); `test/rls-g2-s11.spec.ts`; `test/scout/s11/journey-core.pg.spec.ts`; `test/utils/g2-s11-db-guard` spec | 0 | **may start now**. It proves steps 1, 2, 4, 5, 7-11 on landed code, including G2 and the H-S/H-C/tenant cases in J01-J08 | all `src/**`, `prisma/**` |
+-| S11-A2 | T4 (proof only) | `test/scout/s11/journey-induction.pg.spec.ts`; `test/fixtures/scout/s11/**` | 0 | S10-B, S10-C and S10-D **landed**. It proves steps 3, 6 and 8 with a declaration and evidence, a two-platform `complete` and G6 | the harness (S11-A1 owns it) |
++| S11-A1 | T2 (test-only, real PG) | `test/utils/g2-s11-*` (the one harness, D-S11-6); `test/rls-g2-s11.spec.ts`; `test/scout/s11/journey-core.pg.spec.ts`; `test/utils/g2-s11-db-guard` spec | 0 | **may start now**. It proves steps 1, 2, 4, 5, 7-11 on landed code, including G2 and the cross-process/tenant cases in J01-J08; the H-C authentication proof stays with the existing route specs (D-S11-1) | all `src/**`, `prisma/**` |
++| S11-A2 | T4 (proof only) | `test/scout/s11/journey-induction.pg.spec.ts`; `test/fixtures/scout/s11/**`; **sequential edit** of `test/utils/g2-s11-*` and its guard spec (D-S11-6) | 0 | S10-B, S10-C and S10-D **landed**, and S11-A1 landed. It proves steps 3, 6 and 8 with a declaration and evidence, a two-platform `complete` and G6 | the harness before A1 lands |
+ | S11-B | T4 (terminal truth) | `src/scout/scout.service.ts` (P2002 branch plus the re-drive helper); `src/scout/lifecycle/lifecycle.service.ts` (read helper only); `test/scout/s11/settle-redrive.pg.spec.ts`; unit cases in `test/scout/lifecycle/**` | ≤ 80 | S10-C landed (it owns `lifecycle.service.ts`); S11-A1 landed (harness) | arbiter, reconcile, coverage, reason codes, routes |
+ | S11-C | T3 (contract) + T2 | `src/extension-pair/extension-pair.{service,dto}.ts`; `src/extension-pair/__tests__/readiness.spec.ts`; `test/scout/s11/readiness.pg.spec.ts`; Gen through the **generator owner only** (`scripts/importer-contract.ts`, `docs/contracts/importer-openapi.json`, `test/contracts/importer-contract.spec.ts`) | ≤ 120 | S10-B landed (the declaration table); S10-C's Gen landed first, so there is one regeneration each, in order | lifecycle, scout service, schema |
+ | S11-D | T2 (proof composition) | `test/scout/s11/journey-full.pg.spec.ts` (the §3 J-case matrix end to end on two processes) | 0 | S11-A2, S11-B and S11-C landed | everything else |
+@@ -316,12 +350,15 @@
+ 
+ ## 3. Acceptance cases (J-cases; real PG unless marked "unit")
+ 
+-Two worker processes (P1, P2) run over one disposable PG. Coach A has two principals: `phone`,
+-the coach JWT, and `ext`, the redeemed session. Coach B runs concurrently.
+-
+-- **J01 (A1)** Setup to Start across hosts. `pair/init` runs on P1 (phone), `redeem` on P2
+-  (ext), `pair/current` on P1 shows `paired`, and `runs/start` on P2 (ext) creates one run. A
+-  replayed Start on P1 (phone) returns the identical body.
++Two worker processes (P1, P2) run over one disposable PG. They are direct-service workers
++acting for coach A with a supplied coach id (D-S11-1). "phone" and "ext" label which client
++role a step stands for; they are **not** authenticated principals. Coach B runs concurrently.
++
++- **J01 (A1)** Setup to Start across processes, at the service level. The steps are the
++  pairing service's `init` on P1 (phone role), `redeem` on P2 (ext role), `current` on P1
++  showing `paired`, and lifecycle Start on P2 creating one run. A replayed Start on P1 returns
++  the identical result. The route and guard authentication of each role is out of this case
++  (D-S11-1).
+ - **J02 (A1)** Transfer and claim split across hosts. Batches alternate P1 and P2. The claim goes
+   to P1. The terminal is written exactly once. Status on P2 equals status on P1, byte for byte,
+   apart from the mirror snapshot.
+@@ -336,8 +373,13 @@
+ - **J06 (A1)** Deadline across hosts. A short deadline elapses with no host touching the run.
+   The first status read on either host fences `timed_out` once, and a concurrent read on the
+   other host sees the same terminal.
+-- **J07 (A1)** Tenant isolation. Coach B's journey interleaves on P1 and P2. Every cross-coach
+-  read or write is a uniform 404, and row counts are exactly per coach.
++- **J07 (A1)** Tenant isolation. Coach B's journey interleaves on P1 and P2.
++  - Cross-coach calls to 404-contract operations get the uniform 404 (D-S11-7(5)).
++  - A cross-coach `/progress` gets 204. It writes no gate update, no phase or
++    `last_observed_at` change and no cached snapshot for the foreign run, and leaves nothing
++    readable by either coach.
++  - Legacy intent strings are covered by a separate case.
++  - Row counts and all of coach A's run fields are exactly per coach before and after.
+ - **J08 (A1)** Side effects. Across J01-J07, notification, drip, email and messaging spies show
+   zero client-directed calls and at most one coach `import.complete` push per run.
+ - **J09 (A2)** Two-platform `complete`. The declaration covers `s10_unseen` plus a second

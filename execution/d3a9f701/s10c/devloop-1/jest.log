@@ -1,0 +1,61 @@
+FAIL test/scout/lifecycle/lifecycle.service.spec.ts
+  ● Test suite failed to run
+
+    [96mtest/scout/lifecycle/lifecycle.service.spec.ts[0m:[93m1412[0m:[93m63[0m - [91merror[0m[90m TS2322: [0mType '{ covers_staged_identities: false; known: false; } | { covers_staged_identities: false; known: true; basis_kind: string; observed_unique: number; }' is not assignable to type 'CoverageFact'.
+      Object literal may only specify known properties, and 'covers_staged_identities' does not exist in type '{ readonly known: false; }'.
+
+    [7m1412[0m         coverage: { workouts: { ...proven.coverage!.workouts, covers_staged_identities: false } },
+    [7m    [0m [91m                                                              ~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+PASS test/scout/reconciliation/facts.service.spec.ts
+FAIL test/scout/reconciliation/facts.service.coverage.spec.ts
+  ● S10-C default induction registry (over this service's mapper partition) › without a registry option, manifests come from disk (none here) → unknown, never a throw
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  3
+    + Received  + 12
+
+      Object {
+        "clients": Object {
+    -     "known": false,
+    +     "basis_kind": "source_signed_enumeration",
+    +     "covers_staged_identities": true,
+    +     "known": true,
+    +     "observed_unique": 2,
+        },
+        "programs": Object {
+    -     "known": false,
+    +     "basis_kind": "source_signed_enumeration",
+    +     "covers_staged_identities": true,
+    +     "known": true,
+    +     "observed_unique": 1,
+        },
+        "workouts": Object {
+    -     "known": false,
+    +     "basis_kind": "source_signed_enumeration",
+    +     "covers_staged_identities": true,
+    +     "known": true,
+    +     "observed_unique": 3,
+        },
+      }
+
+      483 |     const db = provenRun();
+      484 |     const facts = await collect(db, RUN, service(undefined));
+    > 485 |     expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
+          |                            ^
+      486 |   });
+      487 |
+      488 |   it('drops a native rule set whose platform has no mapping spec here instead of failing construction', () => {
+
+      at Object.<anonymous> (test/scout/reconciliation/facts.service.coverage.spec.ts:485:28)
+
+PASS test/scout/induction/observation.service.spec.ts
+PASS test/scout/induction/observation.controller.spec.ts
+PASS test/scout/induction/s10c-wiring.spec.ts
+
+Test Suites: 2 failed, 4 passed, 6 total
+Tests:       1 failed, 133 passed, 134 total
+Snapshots:   0 total
+Time:        18.477 s
+Ran all test suites within paths "test/scout/lifecycle/lifecycle.service.spec.ts", "test/scout/reconciliation/facts.service.spec.ts", "test/scout/induction/s10c-wiring.spec.ts", "test/scout/reconciliation/facts.service.coverage.spec.ts", "test/scout/induction/observation.service.spec.ts", "test/scout/induction/observation.controller.spec.ts".
