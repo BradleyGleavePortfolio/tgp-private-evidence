@@ -1,0 +1,321 @@
+2,17c2,24
+< # S10-B real-PG proof — execution binding v1 (EXEC-D3A9F701). SOURCE ONLY: NOT RUN, NOT GRANTED.
+< # Derived by substitution from the S9-C binding execution/d3a9f701/s9c/binding/v2/s9c-pg-proof.sh (= accepted S9-B v3 +
+< # the v2 pipefail/SIGPIPE precondition fix; full diff in DELTA-from-s9c-v2.diff) with the S10-B deltas: standalone clone
+< # worktrees/d3a9-s10b whose candidate head is ONE gate commit on BASE = the S10-A landing commit (itself one commit on
+< # S10A_PARENT = e6f20300, the S9-C landing merge); lane port 55647 / s10b_super / g2_s10b_disposable / cluster s10b-disposable-pg17 / lane dirs
+< # runtime/clusters/s10-b + runtime/run/s10-b; S10-B SHIPS A MIGRATION: 173 applied (172 accepted + 20270124000000_
+< # scout_run_observation_expand, last applied = the S10-B dir), the three S10-B tables present, and the isolated
+< # node_modules client is the one the S10-B gate regenerated IN THE CLONE from the S10-B schema (EXPECT_NM_CLIENT_SHA from
+< # the gate receipt; the donor client is never used here and must still be the pre-S10-B client). Runs the NEW spec
+< # test/rls-g2-s10b.spec.ts exactly once via the repo jest + jest.rls.config.js; no retry, no inherited-proof replay.
+< # Single canonical lock holder: the nonblocking flock on execution/test-validation.lock is taken on fd 9 before any
+< # state change and held until this process exits — through stop, post checks and receipt hashing; the lock file is
+< # never deleted. First nonzero stops; the only cleanup attempted is a bounded fixture stop when this run started the
+< # postmaster. No autonomous cleanup is GUARANTEED: if the outer timeout kills bash, the stop does not run. What governs
+< # is the observed terminal evidence — sentinel/log lines, `pgrep -cx postgres`, the port listener count and any
+< # survivor pid the stop reports — not this header. Data dir RETAINED after stop (destroy = separate marker-gated grant).
+---
+> # S10-C real-PG proof — execution binding v1 (EXEC-D3A9F701). SOURCE ONLY: NOT RUN, NOT GRANTED.
+> # Derived by substitution from the landed S10-B binding execution/d3a9f701/s10b/binding/v1/s10b-pg-proof.sh (filled copy
+> # of the reviewed template; it ran rc 0, 24/24). Full diff in DELTA-from-s10b-v1.diff. S10-C deltas:
+> #   * clone worktrees/d3a9-s10c; candidate head = ONE gate commit on BASE = the integration/importer tip at gate time
+> #     (__FILL__ from the S10-C gate PINS.env / receipt). No parent-shape pin on BASE: S10B_HEAD (a2c74e90) and the harness
+> #     base a4af8e33 must be ANCESTORS of BASE; BASE..HEAD = the S10-C receipt delta (11 owned paths, + the contract iff the
+> #     gate recorded contract_state=changed); the 29 S10-A/S10-B FROZEN paths carry their a2c74e90 bytes at HEAD
+> #   * NO prisma change: schema = the S10-B bytes, 173 migrations ending at the S10-B dir, migrations tree 7b6fe0ed at BASE
+> #     and HEAD; the client is the one the S10-C gate regenerated in the clone (EXPECT_NM_CLIENT_SHA from its receipt)
+> #   * NEW lane (review B B4): clusters/s10-c + run/s10-c on port 55649, REUSING the S10-B harness literals (cluster marker
+> #     s10b-disposable-pg17, DB g2_s10b_disposable, role s10b_super) because the harness parameterizes only port and data
+> #     directory. The retained s10-b lane is never touched: LANE == clusters/s10-b is refused, clusters/s10-b must be
+> #     present, stopped (no postmaster.pid) and byte-fingerprint-unchanged at the end, like every other lane; ports
+> #     55646/55647 are refused as lane ports and must have zero listeners before and after
+> #   * scout.module.ts at HEAD MUST import ObservationModule (S10-C wiring; the S10-B binding required the opposite)
+> #   * runs ONLY test/rls-g2-s10b.spec.ts + test/rls-g2-s10c.spec.ts exactly once via the repo jest + jest.rls.config.js;
+> #     it() counts pinned per spec at HEAD (24 + 8) and the run must print "Tests: 32 passed, 32 total" and
+> #     "Test Suites: 2 passed, 2 total"; no retry, no inherited-proof replay. test/rls-g2-s9c.spec.ts is NOT run (parent:
+> #     it cannot run at S10 heads)
+> # Carried unchanged: single canonical lock holder (nonblocking flock fd 9 before any state change, held through stop, post
+> # checks and receipt hashing; lock file never deleted); ALL pin/shape preconditions before the lock and the sentinel
+> # (prelock.log, PRELOCK_REFUSED does not consume the run); symlink-aware sentinel; under-lock rechecks; first nonzero
+> # stops; the only cleanup is a bounded fixture stop when this run started the postmaster; data dir RETAINED after stop.
+20,23c27,31
+< # Usage (under the separate single-run PG grant, after the gate commit and fill): timeout -k 30 3900 bash .../binding/v1/s10b-pg-proof.sh
+< # Fill (parent): BASE_HEAD / BASE_TREE after S10-A lands; EXPECT_HEAD / EXPECT_TREE / EXPECT_MIGRATIONS_TREE / the six
+< # post-format EXPECT_*_BLOB / EXPECT_NM_CLIENT_SHA / EXPECT_NM_CLIENT_SCHEMA_SHA from the S10-B gate receipt
+< # d3a9f701/s10b/gate/HEAD-<12>.txt (lines head=, tree=, migrations_tree=, blob ..., postgen_client ...). README.md.
+---
+> # Usage (under the separate single-run PG grant, after the gate commit and fill): timeout -k 30 3900 bash .../binding/v1/s10c-pg-proof.sh
+> # Fill (parent, README.md): BASE_HEAD / BASE_TREE (= gate PINS.env BASE/BASE_TREE); EXPECT_HEAD / EXPECT_TREE /
+> # EXPECT_DELTA / EXPECT_CONTRACT_STATE / EXPECT_CONTRACT_BLOB / EXPECT_S10C_SPEC_BLOB / EXPECT_NM_CLIENT_SHA /
+> # EXPECT_NM_CLIENT_SCHEMA_SHA from the S10-C gate receipt d3a9f701/s10c/gate/HEAD-<12>.txt (lines head=, tree=, delta=,
+> # contract_state=, blob test/rls-g2-s10c.spec.ts, postgen_client). Placeholders are refused pre-lock.
+25c33
+< D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10b/binding/v1
+---
+> D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/binding/v1
+27c35
+< W=/home/user/workspace/worktrees/d3a9-s10b
+---
+> W=/home/user/workspace/worktrees/d3a9-s10c
+29c37
+< R=$D/run; LOG=$R/s10b-pg-proof.log; SENT=$R/s10b-pg-proof.sentinel; JLOG=$R/jest.log
+---
+> R=$D/run; LOG=$R/s10c-pg-proof.log; SENT=$R/s10c-pg-proof.sentinel; JLOG=$R/jest.log
+31,45c39,60
+< # ---- pins: head pins are filled by the parent AFTER the S10-A landing and the S10-B gate commit; placeholders are refused.
+< BASE_HEAD=92b9671511279254a8545c4cb531bf965762c597                                                   # S10-A landing commit (= S10-B gate PINS.env BASE)
+< BASE_TREE=b6fbbfd2a6495183433657814193b080c9582ab7                                                   # git rev-parse "$BASE_HEAD^{tree}"
+< S10A_PARENT=e6f20300b495fa9eee9539ae58d30e3b60e5a78c                           # BASE_HEAD^ (S9-C landing merge = integration/importer tip S10-A lands on)
+< HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba                     # kept: G2_S10B_BASE_HEAD / bootstrap BASE_HEAD literal; ancestor of BASE_HEAD (checked); a4af8e33..e6f20300 touches no prisma
+< EXPECT_HEAD=a2c74e904ff227b16881c77ee5a08bd006972d48                                               # gate receipt head=
+< EXPECT_TREE=2cd46ef508745e6f39d10cfbf44e21e98c4f3fc0                                               # gate receipt tree=
+< EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                         # gate receipt migrations_tree= (git rev-parse HEAD:prisma/migrations)
+< EXPECT_SPEC_BLOB=b89fec1cb9254a2475908154b1109f16585af0b0                                            # blob test/rls-g2-s10b.spec.ts (receipt; devloop-2 bytes hash to b89fec1cb9254a2475908154b1109f16585af0b0)
+< EXPECT_DB_BLOB=3375f08ba0130bee8f20fb8a4f395a8fac4a5e10                                                # blob test/utils/g2-s10b-db.ts (receipt; devloop-2: 3375f08ba0130bee8f20fb8a4f395a8fac4a5e10)
+< EXPECT_PGH_BLOB=7cf6d63308d6a2150626ad89d759366a6644d2ec                                              # blob test/utils/g2-s10b-pg-harness.ts (receipt; devloop-2: 7cf6d63308d6a2150626ad89d759366a6644d2ec)
+< EXPECT_HARNESS_BLOB=9956aff77a5664e748a30673760c1a3824c44a7e                                      # blob test/utils/g2-s10b-harness.ts (receipt; devloop-2: 9956aff77a5664e748a30673760c1a3824c44a7e)
+< EXPECT_WORKER_BLOB=e0af841268a03dbe5fc3db25e7e57a7bfe9f275f                                        # blob test/utils/g2-s10b-worker.cjs (receipt; devloop-2: e0af841268a03dbe5fc3db25e7e57a7bfe9f275f)
+< EXPECT_FIXTURES_BLOB=8055dbefa6a4008a6e04f5f851c8d535f755dee1                                    # blob test/utils/g2-s10b-fixtures.ts (receipt; devloop-2: 8055dbefa6a4008a6e04f5f851c8d535f755dee1)
+< # prettier-independent blobs (no parser / .prettierignore), git hash-object --no-filters on the devloop-2 POSTFORMAT bytes (read-only; unchanged by devloop-2):
+---
+> # ---- pins: head pins are filled by the parent AFTER the S10-C gate commit; placeholders are refused.
+> BASE_HEAD=__FILL_BASE_HEAD__                                                   # integration/importer tip the gate committed on (= S10-C gate PINS.env BASE)
+> BASE_TREE=__FILL_BASE_TREE__                                                   # git rev-parse "$BASE_HEAD^{tree}"
+> S10B_HEAD=a2c74e904ff227b16881c77ee5a08bd006972d48                             # S10-B landing commit; ancestor of BASE_HEAD (checked)
+> HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba                     # kept: G2_S10B_BASE_HEAD / bootstrap BASE_HEAD literal; ancestor of BASE_HEAD (checked)
+> EXPECT_HEAD=__FILL_EXPECT_HEAD__                                               # gate receipt head=
+> EXPECT_TREE=__FILL_EXPECT_TREE__                                               # gate receipt tree=
+> EXPECT_DELTA="__FILL_EXPECT_DELTA__"                                           # gate receipt delta= (sorted, space-separated; drop the trailing space)
+> EXPECT_CONTRACT_STATE=__FILL_CONTRACT_STATE__                                  # gate receipt contract_state= (changed|unchanged)
+> EXPECT_CONTRACT_BLOB=__FILL_CONTRACT_BLOB__                                    # gate receipt contract_state ... blob= (= 752f9dbe1a6bdee0c20504a35dce60757880d427 iff unchanged)
+> EXPECT_HOOK_PRECOMMIT_SHA=__FILL_HOOK_PRECOMMIT_SHA__                          # gate receipt "hooks raw pre-commit=<sha256>" (.git/hooks/pre-commit the gate committed through)
+> EXPECT_HOOK_COMMITMSG_SHA=__FILL_HOOK_COMMITMSG_SHA__                          # gate receipt "hooks raw ... commit-msg=<sha256>"
+> EXPECT_S10C_SPEC_BLOB=__FILL_S10C_SPEC_BLOB__                                  # gate receipt "blob test/rls-g2-s10c.spec.ts <blob>"
+> EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                # S10-B migrations tree (173); S10-C changes no prisma, so BASE and HEAD both carry it
+> BASE_CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                    # importer contract blob at a2c74e90 (the gate refuses a BASE that differs)
+> # landed S10-B proof files (s10b/gate/HEAD-a2c74e904ff2.txt); frozen through S10-C (also covered by FROZEN below)
+> EXPECT_SPEC_BLOB=b89fec1cb9254a2475908154b1109f16585af0b0                      # test/rls-g2-s10b.spec.ts
+> EXPECT_DB_BLOB=3375f08ba0130bee8f20fb8a4f395a8fac4a5e10                        # test/utils/g2-s10b-db.ts
+> EXPECT_PGH_BLOB=7cf6d63308d6a2150626ad89d759366a6644d2ec                       # test/utils/g2-s10b-pg-harness.ts
+> EXPECT_HARNESS_BLOB=9956aff77a5664e748a30673760c1a3824c44a7e                   # test/utils/g2-s10b-harness.ts
+> EXPECT_WORKER_BLOB=e0af841268a03dbe5fc3db25e7e57a7bfe9f275f                    # test/utils/g2-s10b-worker.cjs
+> EXPECT_FIXTURES_BLOB=8055dbefa6a4008a6e04f5f851c8d535f755dee1                  # test/utils/g2-s10b-fixtures.ts
+50,52c65,67
+< EXPECT_FIXTURE_SHA=7d9ee89b4333332ea42adcadf538c68c6815127e161d8941db125ac9873120e8                                       # sha256 of binding/v1/s10b-fixture.sh (frozen with this file; BINDING.sha256)
+< S10A_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10a/land/FREEZE.sha256
+< S10A_FREEZE_SHA=d54aee78dcc35910200a3c8db93ecff7305a95d1c34a65985e998ad1c71c398a
+---
+> EXPECT_FIXTURE_SHA=c1b57239c40df1353fc98561816353dcdfd8720a318436637f1315b1cb1992e7                                             # sha256 of binding/v1/s10c-fixture.sh (frozen with this file; BINDING.sha256)
+> FROZEN=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate/FROZEN.sha256
+> FROZEN_SHA=e9c71f09462a25e36baafe0fa90ba012ef6b3f384f04b3951fb1c7bbf1f4be21
+54d68
+< BASE_MIGRATIONS_TREE=654550cb99b55473429a9c60ee08319e1b649106                  # BASE:prisma/migrations (172; same tree at a4af8e33 and e6f20300; S10-A touches no prisma)
+56,58c70,73
+< # exact committed delta BASE..HEAD (the 16 S10-B owned paths; sorted, space-separated)
+< EXPECT_DELTA="prisma/migrations/$S10B_MIGRATION/down.sql prisma/migrations/$S10B_MIGRATION/migration.sql prisma/schema.prisma src/scout/induction/observation.controller.ts src/scout/induction/observation.dto.ts src/scout/induction/observation.module.ts src/scout/induction/observation.service.ts test/rls-g2-s10b.spec.ts test/scout/induction/observation.controller.spec.ts test/scout/induction/observation.service.spec.ts test/utils/g2-s10b-bootstrap.sh test/utils/g2-s10b-db.ts test/utils/g2-s10b-fixtures.ts test/utils/g2-s10b-harness.ts test/utils/g2-s10b-pg-harness.ts test/utils/g2-s10b-worker.cjs"
+< # ---- tool pins: from the 1910a060 runtime setup receipt (compare only, never adjusted at run time); identical to S9-C v2.
+---
+> # the 11 S10-C owned paths (parent 2026-09-25 22:23 + 22:34); EXPECT_DELTA must be exactly these, plus the contract iff changed
+> S10C_OWNED="src/scout/induction/observation.module.ts src/scout/lifecycle/lifecycle.service.ts src/scout/reconciliation/facts.service.ts src/scout/reconciliation/types.ts src/scout/scout.module.ts test/rls-g2-s10c.spec.ts test/rls-g2-s9c.spec.ts test/scout/induction/s10c-wiring.spec.ts test/scout/lifecycle/lifecycle.service.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/reconciliation/facts.service.spec.ts"
+> CONTRACT=docs/contracts/importer-openapi.json
+> # ---- tool pins: from the 1910a060 runtime setup receipt (compare only, never adjusted at run time); identical to S10-B v1.
+64c79,81
+< EXPECT_TESTS=24                                     # it() count in test/rls-g2-s10b.spec.ts (grep -cE '^\s*it\(' on the devloop-2 bytes 5f21ef89; no skip/only/todo/xit/fit; re-checked at HEAD below)
+---
+> EXPECT_TESTS_S10B=24                                # it() count in the frozen test/rls-g2-s10b.spec.ts (re-checked at HEAD)
+> EXPECT_TESTS_S10C=8                                 # it() count in test/rls-g2-s10c.spec.ts (fix-1 bytes 5eeb0fe6; parent 22:34: 24 + 8; re-checked at HEAD; the gate enforced EXPECT_IT_S10C=8)
+> EXPECT_TESTS=$((EXPECT_TESTS_S10B + EXPECT_TESTS_S10C))   # 32: the one jest run must print "Tests: 32 passed, 32 total"
+68,69c85,86
+< EXPECT_NM_CLIENT_SHA=2c819c8a8e2fd4afb59578893122b8e9c406bc1dc7821e643e7ef359c04aa56c         # $W/node_modules/.prisma/client/index.d.ts as regenerated by the S10-B gate (receipt postgen_client index_dts=)
+< EXPECT_NM_CLIENT_SCHEMA_SHA=aca7a558cd379c154e947447782f2858a9f898039298e34c30b886947aed42e5   # $W/node_modules/.prisma/client/schema.prisma (receipt postgen_client schema=)
+---
+> EXPECT_NM_CLIENT_SHA=__FILL_NM_CLIENT_SHA__         # $W/node_modules/.prisma/client/index.d.ts as regenerated by the S10-C gate (receipt postgen_client index_dts=; same schema as S10-B, so expected 2c819c8a…a56c)
+> EXPECT_NM_CLIENT_SCHEMA_SHA=__FILL_NM_CLIENT_SCHEMA_SHA__   # $W/node_modules/.prisma/client/schema.prisma (receipt postgen_client schema=; expected aca7a558…42e5)
+71c88
+< EXPECT_SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96   # prisma/schema.prisma at the S10-B head (never reflowed)
+---
+> EXPECT_SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96   # prisma/schema.prisma (S10-B bytes; S10-C changes no prisma) (never reflowed)
+73,74c90,93
+< DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$CLUSTERS/s10-b; SOCK=$RUNTIME_ROOT/run/s10-b
+< PORT=55647; DBNAME=g2_s10b_disposable; ADMIN=s10b_super; FIXPASS=s10b_local_synthetic
+---
+> DIST=$RUNTIME_ROOT/pg17/dist; CLUSTERS=$RUNTIME_ROOT/clusters; LANE=$CLUSTERS/s10-c; SOCK=$RUNTIME_ROOT/run/s10-c
+> S10B_LANE=$CLUSTERS/s10-b                          # RETAINED S10-B lane: must exist, stay stopped and unchanged; never started, never destroyed here
+> PORT=55649; DBNAME=g2_s10b_disposable; ADMIN=s10b_super; FIXPASS=s10b_local_synthetic   # S10-B harness literals reused (review B B4); only port + data dir differ
+> REFUSED_LANE_PORTS="55646 55647"                    # S9-C / S10-B lane ports: never this lane, zero listeners before and after
+76c95
+< FIX=$D/s10b-fixture.sh
+---
+> FIX=$D/s10c-fixture.sh
+80c99
+< # S10-B-only identity: exactly the G2_S10B_* names the guard/harness/bootstrap read (G2_S10B_DATABASE_URL, _CONFIRM, _PASSWORD,
+---
+> # S10-B-harness identity (reused by the S10-C spec): exactly the G2_S10B_* names the guard/harness/bootstrap read (G2_S10B_DATABASE_URL, _CONFIRM, _PASSWORD,
+89c108
+< export S10B_RUNNER_PID=$$ S10B_STOP_TIMEOUT=45
+---
+> export S10C_RUNNER_PID=$$ S10C_STOP_TIMEOUT=45
+92a112
+> { [ -e "$R/STARTED" ] || [ -L "$R/STARTED" ]; } && { echo "REFUSED: $R/STARTED exists; this proof runs once, no retry" >&2; exit 76; }
+102c122,137
+< case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_MIGRATIONS_TREE$EXPECT_SPEC_BLOB$EXPECT_DB_BLOB$EXPECT_PGH_BLOB$EXPECT_HARNESS_BLOB$EXPECT_WORKER_BLOB$EXPECT_FIXTURES_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: base, head, blobs, client or tool pins; README.md)"; fail 70;; esac
+---
+> case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_DELTA$EXPECT_CONTRACT_STATE$EXPECT_CONTRACT_BLOB$EXPECT_S10C_SPEC_BLOB$EXPECT_HOOK_PRECOMMIT_SHA$EXPECT_HOOK_COMMITMSG_SHA$EXPECT_FIXTURE_SHA$FROZEN_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: base, head, delta, contract, spec blob or client; README.md)"; fail 70;; esac
+> for v in BASE_HEAD BASE_TREE EXPECT_HEAD EXPECT_TREE EXPECT_CONTRACT_BLOB EXPECT_S10C_SPEC_BLOB; do [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || { log "PRECONDITION_FAIL $v not 40-hex (${!v})"; fail 70; }; done
+> for v in EXPECT_NM_CLIENT_SHA EXPECT_NM_CLIENT_SCHEMA_SHA EXPECT_HOOK_PRECOMMIT_SHA EXPECT_HOOK_COMMITMSG_SHA EXPECT_FIXTURE_SHA FROZEN_SHA; do [[ "${!v}" =~ ^[0-9a-f]{64}$ ]] || { log "PRECONDITION_FAIL $v not 64-hex (${!v})"; fail 70; }; done
+> # lane refusals (review B B4): never the retained s10-b lane, never the S9-C/S10-B ports
+> [ "$LANE" = "$CLUSTERS/s10-c" ] && [ "$LANE" != "$S10B_LANE" ] && [ "$SOCK" = "$RUNTIME_ROOT/run/s10-c" ] || { log "PRECONDITION_FAIL lane $LANE / socket $SOCK is not clusters/s10-c + run/s10-c"; fail 70; }
+> for rp in $REFUSED_LANE_PORTS; do [ "$PORT" != "$rp" ] || { log "PRECONDITION_FAIL lane port $PORT is a refused lane port ($REFUSED_LANE_PORTS)"; fail 70; }; done
+> [ "$PORT" = 55649 ] || { log "PRECONDITION_FAIL lane port $PORT != 55649"; fail 70; }
+> [ "$G2_S10B_DATA_DIRECTORY" = "$LANE/pg-data" ] && [ "$G2_S10B_CONFIRM" = "$DBNAME:$PORT" ] || { log "PRECONDITION_FAIL harness env not bound to the s10-c lane"; fail 70; }
+> [ -d "$S10B_LANE/pg-data" ] && [ ! -L "$S10B_LANE" ] || { log "PRECONDITION_FAIL retained S10-B lane $S10B_LANE/pg-data absent or a symlink (it must be retained and untouched; README.md)"; fail 70; }
+> { [ -e "$S10B_LANE/pg-data/postmaster.pid" ] || [ -L "$S10B_LANE/pg-data/postmaster.pid" ]; } && { log "PRECONDITION_FAIL retained S10-B lane has a postmaster.pid (running or unclean); refusing"; fail 70; }
+> case "$EXPECT_CONTRACT_STATE" in changed) [ "$EXPECT_CONTRACT_BLOB" != "$BASE_CONTRACT_BLOB" ] || { log "PRECONDITION_FAIL contract_state=changed but blob = base"; fail 70; };;
+>   unchanged) [ "$EXPECT_CONTRACT_BLOB" = "$BASE_CONTRACT_BLOB" ] || { log "PRECONDITION_FAIL contract_state=unchanged but blob != $BASE_CONTRACT_BLOB"; fail 70; };;
+>   *) log "PRECONDITION_FAIL EXPECT_CONTRACT_STATE must be changed|unchanged ($EXPECT_CONTRACT_STATE)"; fail 70;; esac
+> WANT_DELTA=$(printf '%s\n' $S10C_OWNED $( [ "$EXPECT_CONTRACT_STATE" = changed ] && echo "$CONTRACT") | sort | tr '\n' ' ' | sed 's/ $//')
+> EXPECT_DELTA=$(echo $EXPECT_DELTA)
+> [ "$EXPECT_DELTA" = "$WANT_DELTA" ] || { log "PRECONDITION_FAIL filled EXPECT_DELTA [$EXPECT_DELTA] != the 11 S10-C owned paths (+ contract iff changed) [$WANT_DELTA]"; fail 70; }
+104c139
+< [ "$EXPECT_NM_CLIENT_SHA" != "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL EXPECT_NM_CLIENT_SHA is the pre-S10-B donor client (no S10-B generate recorded)"; fail 70; }
+---
+> [ "$EXPECT_NM_CLIENT_SHA" != "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL EXPECT_NM_CLIENT_SHA is the pre-S10-B donor client (no in-clone generate recorded)"; fail 70; }
+110c145,147
+< grep -qx "LANE=\$RUNTIME_ROOT/clusters/s10-b" <<<"$FIXTXT" && grep -qx "DATA=\$LANE/pg-data; LOG=\$LANE/pg.log; SOCK=\$RUNTIME_ROOT/run/s10-b" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture lane/socket lines != clusters/s10-b + run/s10-b"; fail 70; }
+---
+> grep -qx "LANE=\$RUNTIME_ROOT/clusters/s10-c" <<<"$FIXTXT" && grep -qx "DATA=\$LANE/pg-data; LOG=\$LANE/pg.log; SOCK=\$RUNTIME_ROOT/run/s10-c" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture lane/socket lines != clusters/s10-c + run/s10-c"; fail 70; }
+> grep -qF 'case "$PORT" in 55646|55647)' <<<"$FIXTXT" && grep -qF 'grep -qx "port = $PORT"' <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture lacks the refused-port / port-bound marker checks"; fail 70; }
+> grep -qF 'grep -q s10c-pg-proof.sh "/proc/$S10C_RUNNER_PID/cmdline"' <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture does not require the S10-C runner"; fail 70; }
+115c152
+< [ "$(git -C "$W" rev-parse "$BASE_HEAD^")" = "$S10A_PARENT" ] || { log "PRECONDITION_FAIL BASE^ != $S10A_PARENT (S10-A is one commit on $S10A_PARENT)"; fail 70; }
+---
+> git -C "$W" merge-base --is-ancestor "$S10B_HEAD" "$BASE_HEAD" || { log "PRECONDITION_FAIL S10-B landing $S10B_HEAD not an ancestor of $BASE_HEAD"; fail 70; }
+117c154
+< # exact delta: BASE..HEAD = the 16 S10-B paths; S10A_PARENT..BASE = the 14 S10-A FREEZE paths at their frozen bytes
+---
+> # exact delta: BASE..HEAD = the gate receipt delta (11 S10-C paths, + contract iff changed); FROZEN S10-A/S10-B bytes at HEAD
+119,126c156,162
+< [ "$DELTA" = "$EXPECT_DELTA" ] || { log "PRECONDITION_FAIL BASE..HEAD delta [$DELTA] != the 16 S10-B paths"; fail 70; }
+< [ -f "$S10A_FREEZE" ] && [ "$(sha "$S10A_FREEZE")" = "$S10A_FREEZE_SHA" ] || { log "PRECONDITION_FAIL S10-A FREEZE file absent or sha mismatch"; fail 70; }
+< S10A_FILES=$(awk '$1=="POST"{print $3}' "$S10A_FREEZE" | sort | tr '\n' ' ' | sed 's/ $//')
+< ADELTA=$(git -C "$W" diff --name-only "$S10A_PARENT" "$BASE_HEAD" | sort | tr '\n' ' ' | sed 's/ $//')
+< [ "$ADELTA" = "$S10A_FILES" ] || { log "PRECONDITION_FAIL $S10A_PARENT..BASE delta != the S10-A FREEZE paths"; fail 70; }
+< while read -r tag s p; do [ "$tag" = POST ] || continue
+<   GOT=$(git -C "$W" show "HEAD:$p" | sha256sum | cut -c1-64); [ "$GOT" = "$s" ] || { log "PRECONDITION_FAIL S10-A $p at HEAD != FREEZE"; fail 70; }
+< done < "$S10A_FREEZE"
+---
+> [ "$DELTA" = "$EXPECT_DELTA" ] || { log "PRECONDITION_FAIL BASE..HEAD delta [$DELTA] != receipt delta [$EXPECT_DELTA]"; fail 70; }
+> [ -f "$FROZEN" ] && [ ! -L "$FROZEN" ] && [ "$(sha "$FROZEN")" = "$FROZEN_SHA" ] || { log "PRECONDITION_FAIL FROZEN file absent, a symlink or sha mismatch"; fail 70; }
+> NF=0; while read -r tag s b p; do [ "$tag" = FROZEN ] || continue; NF=$((NF+1))
+>   [ "$(git -C "$W" rev-parse "HEAD:$p" 2>/dev/null)" = "$b" ] || { log "PRECONDITION_FAIL frozen $p at HEAD != $b"; fail 70; }
+> done < "$FROZEN"; [ "$NF" = 29 ] || { log "PRECONDITION_FAIL FROZEN lists $NF paths (want 29)"; fail 70; }
+> [ -z "$(git -C "$W" diff --name-only "$S10B_HEAD" HEAD -- prisma package.json package-lock.json 'test/utils/g2-s10b-*')" ] || { log "PRECONDITION_FAIL prisma / manifests / test/utils/g2-s10b-* differ from the S10-B landing (other test/utils files, e.g. S11-A1 g2-s11-*, may change)"; fail 70; }
+> [ "$(git -C "$W" rev-parse "HEAD:$CONTRACT")" = "$EXPECT_CONTRACT_BLOB" ] && [ "$(git -C "$W" rev-parse "$BASE_HEAD:$CONTRACT")" = "$BASE_CONTRACT_BLOB" ] || { log "PRECONDITION_FAIL contract blob BASE/HEAD != $BASE_CONTRACT_BLOB/$EXPECT_CONTRACT_BLOB ($EXPECT_CONTRACT_STATE)"; fail 70; }
+131,133c167,171
+< [ -z "$(git -C "$W" diff --name-only "$BASE_HEAD" HEAD -- package.json package-lock.json docs scripts src/scout/scout.module.ts)" ] || { log "PRECONDITION_FAIL dependency manifests / docs / scripts / scout.module.ts differ from base"; fail 70; }
+< [ "$(git -C "$W" rev-parse "$BASE_HEAD:prisma/migrations")" = "$BASE_MIGRATIONS_TREE" ] || { log "PRECONDITION_FAIL BASE prisma/migrations tree != $BASE_MIGRATIONS_TREE"; fail 70; }
+< [ "$(git -C "$W" rev-parse HEAD:prisma/migrations)" = "$EXPECT_MIGRATIONS_TREE" ] || { log "PRECONDITION_FAIL HEAD prisma/migrations tree != gate receipt $EXPECT_MIGRATIONS_TREE"; fail 70; }
+---
+> [ -z "$(git -C "$W" diff --name-only "$HARNESS_BASE_HEAD" HEAD -- package.json package-lock.json)" ] || { log "PRECONDITION_FAIL dependency manifests differ from the harness base $HARNESS_BASE_HEAD (g2-s10b-bootstrap.sh L158 would refuse mid-run)"; fail 70; }
+> [ -z "$(git -C "$W" diff --name-only "$BASE_HEAD" HEAD -- prisma package.json package-lock.json)" ] || { log "PRECONDITION_FAIL prisma / dependency manifests differ from base (S10-C changes no prisma)"; fail 70; }
+> DOCD=$(git -C "$W" diff --name-only "$BASE_HEAD" HEAD -- docs | tr '\n' ' ' | sed 's/ $//'); [ -z "$DOCD" ] || [ "$DOCD" = "$CONTRACT" ] || { log "PRECONDITION_FAIL docs delta [$DOCD] beyond the contract artifact"; fail 70; }
+> [ "$(git -C "$W" rev-parse "$BASE_HEAD:prisma/migrations")" = "$EXPECT_MIGRATIONS_TREE" ] || { log "PRECONDITION_FAIL BASE prisma/migrations tree != $EXPECT_MIGRATIONS_TREE (a migration landed after S10-B; the reused harness pins 173)"; fail 70; }
+> [ "$(git -C "$W" rev-parse HEAD:prisma/migrations)" = "$EXPECT_MIGRATIONS_TREE" ] || { log "PRECONDITION_FAIL HEAD prisma/migrations tree != $EXPECT_MIGRATIONS_TREE"; fail 70; }
+138c176,177
+<   && PGH_AT_HEAD=$(git -C "$W" show HEAD:test/utils/g2-s10b-pg-harness.ts) && SPEC_AT_HEAD=$(git -C "$W" show HEAD:test/rls-g2-s10b.spec.ts) || { log "PRECONDITION_FAIL cannot read harness bytes at HEAD"; fail 70; }
+---
+>   && PGH_AT_HEAD=$(git -C "$W" show HEAD:test/utils/g2-s10b-pg-harness.ts) && SPEC_AT_HEAD=$(git -C "$W" show HEAD:test/rls-g2-s10b.spec.ts) \
+>   && SPEC_C_AT_HEAD=$(git -C "$W" show HEAD:test/rls-g2-s10c.spec.ts) || { log "PRECONDITION_FAIL cannot read harness bytes at HEAD"; fail 70; }
+148c187,190
+< NT=$(grep -cE '^\s*it\(' <<<"$SPEC_AT_HEAD" || true); [ "$NT" = "$EXPECT_TESTS" ] || { log "PRECONDITION_FAIL it() count in committed test/rls-g2-s10b.spec.ts $NT != $EXPECT_TESTS"; fail 70; }
+---
+> NT=$(grep -cE '^\s*it\(' <<<"$SPEC_AT_HEAD" || true); [ "$NT" = "$EXPECT_TESTS_S10B" ] || { log "PRECONDITION_FAIL it() count in committed test/rls-g2-s10b.spec.ts $NT != $EXPECT_TESTS_S10B"; fail 70; }
+> NTC=$(grep -cE '^\s*it\(' <<<"$SPEC_C_AT_HEAD" || true); [ "$NTC" = "$EXPECT_TESTS_S10C" ] || { log "PRECONDITION_FAIL it() count in committed test/rls-g2-s10c.spec.ts $NTC != $EXPECT_TESTS_S10C"; fail 70; }
+> for sp in "$SPEC_AT_HEAD" "$SPEC_C_AT_HEAD"; do ! grep -qE '\b(it|describe|test)\.(skip|only|todo)\b|\b(xit|fit|xdescribe|fdescribe)\(' <<<"$sp" || { log "PRECONDITION_FAIL a live spec carries skip/only/todo"; fail 70; }; done
+> grep -qF "from './utils/g2-s10b-harness'" <<<"$SPEC_C_AT_HEAD" && ! grep -qE "g2-s10c-|G2_S10C_" <<<"$SPEC_C_AT_HEAD" || { log "PRECONDITION_FAIL test/rls-g2-s10c.spec.ts does not reuse the S10-B harness (or references an S10-C harness)"; fail 70; }
+153a196
+> [ "$(git -C "$W" rev-parse HEAD:test/rls-g2-s10c.spec.ts)" = "$EXPECT_S10C_SPEC_BLOB" ] || { log "PRECONDITION_FAIL test/rls-g2-s10c.spec.ts blob != receipt $EXPECT_S10C_SPEC_BLOB"; fail 70; }
+156c199,200
+< # the committed head must have been produced through the tracked lefthook hooks (installed by the S10-B gate)
+---
+> # the committed head must have been produced through the tracked lefthook hooks (installed by the S10-C gate)
+> [ -z "$(git -C "$W" config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath is set (alternate hook directory refused)"; fail 70; }
+157a202
+> [ "$H" = "$W/.git/hooks" ] && [ -d "$H" ] && [ ! -L "$H" ] || { log "PRECONDITION_FAIL hooks dir [$H] is not the plain $W/.git/hooks directory"; fail 70; }
+162c207,209
+< # the S10-B module is not mounted (S10-C wiring); the importer contract is BASE's
+---
+> [ "$(sha "$H/pre-commit")" = "$EXPECT_HOOK_PRECOMMIT_SHA" ] && [ "$(sha "$H/commit-msg")" = "$EXPECT_HOOK_COMMITMSG_SHA" ] \
+>   || { log "PRECONDITION_FAIL hook sha256 pre-commit=$(sha "$H/pre-commit") commit-msg=$(sha "$H/commit-msg") != gate receipt hooks raw ($EXPECT_HOOK_PRECOMMIT_SHA / $EXPECT_HOOK_COMMITMSG_SHA)"; fail 70; }
+> # S10-C wiring: ScoutModule imports ObservationModule at HEAD (the S10-B binding required the opposite)
+164,166c211,213
+< ! grep -qF "ObservationModule" <<<"$MOD_AT_HEAD" || { log "PRECONDITION_FAIL scout.module.ts references ObservationModule (S10-C wiring in an S10-B head)"; fail 70; }
+< # dependency tree: the ISOLATED real copy the S10-B gate made (not a symlink, not the donor, not a fresh npm ci), with the
+< # client the gate regenerated from the S10-B schema; the donor still holds the pre-S10-B client (never regenerated)
+---
+> grep -qF "ObservationModule" <<<"$MOD_AT_HEAD" || { log "PRECONDITION_FAIL scout.module.ts does not import ObservationModule (no S10-C wiring at HEAD)"; fail 70; }
+> # dependency tree: the ISOLATED real copy the S10-C gate made (not a symlink, not the donor, not a fresh npm ci), with the
+> # client the S10-C gate regenerated in the clone from the (unchanged) S10-B schema; the donor still holds the pre-S10-B client (never regenerated)
+172,173c219,220
+< [ "$(sha "$W/node_modules/.prisma/client/index.d.ts")" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client index.d.ts != S10-B gate receipt (no generate here; stale or foreign client)"; fail 70; }
+< [ "$(sha "$W/node_modules/.prisma/client/schema.prisma")" = "$EXPECT_NM_CLIENT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL generated client schema.prisma != S10-B gate receipt"; fail 70; }
+---
+> [ "$(sha "$W/node_modules/.prisma/client/index.d.ts")" = "$EXPECT_NM_CLIENT_SHA" ] || { log "PRECONDITION_FAIL generated client index.d.ts != S10-C gate receipt (no generate here; stale or foreign client)"; fail 70; }
+> [ "$(sha "$W/node_modules/.prisma/client/schema.prisma")" = "$EXPECT_NM_CLIENT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL generated client schema.prisma != S10-C gate receipt"; fail 70; }
+176c223
+< [ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL donor client changed (the S10-B generate must never touch $DONOR_NM)"; fail 70; }
+---
+> [ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL donor client changed (the in-clone generate must never touch $DONOR_NM)"; fail 70; }
+192c239
+< LOG=$R/s10b-pg-proof.log
+---
+> LOG=$R/s10c-pg-proof.log
+196a244
+> ( set -C; date -u +%FT%TZ > "$R/STARTED" ) 2>/dev/null || { echo "REFUSED: $R/STARTED exists (or is a symlink) at lock time; this proof runs once, no retry" >&2; exit 76; }   # O_EXCL one-shot marker (gate DELTA-2 analogue)
+199c247
+<   ( cd "$R" && sha256sum s10b-pg-proof.log prelock.log $( [ -e jest.log ] && echo jest.log ) > RECEIPTS.sha256 2>/dev/null )
+---
+>   ( cd "$R" && sha256sum s10c-pg-proof.log prelock.log $( [ -e jest.log ] && echo jest.log ) > RECEIPTS.sha256 2>/dev/null )
+209a258
+> portl(){ local s; s=$(ss -ltn 2>/dev/null || true); grep -c ":$1 " <<<"$s" || true; }
+214a264,267
+> [ -z "$(git -C "$W" config --get core.hooksPath)" ] && [ "$(git -C "$W" rev-parse --git-path hooks)" = .git/hooks ] && [ -d "$H" ] && [ ! -L "$H" ] \
+>   && [ -f "$H/pre-commit" ] && [ ! -L "$H/pre-commit" ] && [ -f "$H/commit-msg" ] && [ ! -L "$H/commit-msg" ] \
+>   && [ "$(sha "$H/pre-commit")" = "$EXPECT_HOOK_PRECOMMIT_SHA" ] && [ "$(sha "$H/commit-msg")" = "$EXPECT_HOOK_COMMITMSG_SHA" ] \
+>   || { log "PRECONDITION_FAIL hook identity/hooksPath changed after the pre-lock preconditions"; fail 70; }
+220a274
+> for rp in $REFUSED_LANE_PORTS; do RL=$(portl "$rp"); [ "$RL" = 0 ] || { log "PREFLIGHT_FAIL refused lane port $rp has listeners=$RL (S9-C/S10-B lane live)"; fail 71; }; done
+226a281,283
+> case " $OTHER0 " in *" clusters/s10-b:"*) ;; *) log "PREFLIGHT_FAIL retained S10-B lane not in the fingerprint set"; fail 71;; esac
+> [ -f "$S10B_LANE/pg-data/postgresql.conf" ] && [ -f "$S10B_LANE/pg-data/global/pg_control" ] || { log "PREFLIGHT_FAIL retained S10-B lane fingerprint incomplete (postgresql.conf / global/pg_control absent)"; fail 71; }
+> log "PREFLIGHT retained_s10b_lane=$S10B_LANE (fingerprinted; must be unchanged at end; never started)"
+232c289
+< grep -q "^S10B_FIXTURE_INIT_OK data=$LANE/pg-data port=$PORT superuser=$ADMIN cluster_name=$MARKER socket=$SOCK " "$LOG" || { log "FIXTURE_INIT marker missing"; fail 72; }
+---
+> grep -q "^S10C_FIXTURE_INIT_OK data=$LANE/pg-data port=$PORT superuser=$ADMIN cluster_name=$MARKER socket=$SOCK " "$LOG" || { log "FIXTURE_INIT marker missing"; fail 72; }
+235c292
+< grep -q "^S10B_FIXTURE_START_OK pid=" "$LOG" || { log "FIXTURE_START marker missing"; fail 72; }
+---
+> grep -q "^S10C_FIXTURE_START_OK pid=" "$LOG" || { log "FIXTURE_START marker missing"; fail 72; }
+259,260c316,317
+< STAGE=jest; log "JEST_START $(ts) cmd='./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s10b.spec.ts --runInBand --ci' candidate_head=$G2_S10B_CANDIDATE_HEAD"
+< ( cd "$W" && timeout -k 30 1500 ./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s10b.spec.ts --runInBand --ci ) >"$JLOG" 2>&1; JRC=$?
+---
+> STAGE=jest; log "JEST_START $(ts) cmd='./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s10b.spec.ts test/rls-g2-s10c.spec.ts --runInBand --ci' candidate_head=$G2_S10B_CANDIDATE_HEAD expect_tests=$EXPECT_TESTS_S10B+$EXPECT_TESTS_S10C"
+> ( cd "$W" && timeout -k 30 1500 ./node_modules/.bin/jest --config jest.rls.config.js test/rls-g2-s10b.spec.ts test/rls-g2-s10c.spec.ts --runInBand --ci ) >"$JLOG" 2>&1; JRC=$?
+265,266c322,326
+< log "JEST_COUNT_OK tests=$EXPECT_TESTS"
+< # ---- step 7 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: s10b-fixture.sh destroy)
+---
+> grep -qE "^Test Suites: +2 passed, 2 total" "$JLOG" || { log "JEST_COUNT_FAIL expected 'Test Suites: 2 passed, 2 total' (got: $(grep -E '^Test Suites:' "$JLOG" | head -1))"; fail 72; }
+> JP=$(grep -E '^PASS ' "$JLOG" | awk '{print $2}' | sort | tr '\n' ' ')
+> [ "$JP" = "test/rls-g2-s10b.spec.ts test/rls-g2-s10c.spec.ts " ] || { log "JEST_COUNT_FAIL PASS lines [$JP] != the two specs"; fail 72; }
+> log "JEST_COUNT_OK tests=$EXPECT_TESTS (s10b=$EXPECT_TESTS_S10B + s10c=$EXPECT_TESTS_S10C pinned at HEAD) suites=2"
+> # ---- step 7 stop (bound 45 s + kill 30); data dir RETAINED (destroy only via separate grant: s10c-fixture.sh destroy)
+278c338,340
+< log "POST other_lanes_unchanged=[${OTHER0:-none}]"
+---
+> for rp in $REFUSED_LANE_PORTS; do RL=$(portl "$rp"); [ "$RL" = 0 ] || { log "POST_FAIL refused lane port $rp listeners=$RL"; fail 74; }; done
+> [ ! -e "$S10B_LANE/pg-data/postmaster.pid" ] && [ ! -L "$S10B_LANE/pg-data/postmaster.pid" ] || { log "POST_FAIL retained S10-B lane postmaster.pid appeared"; fail 74; }
+> log "POST other_lanes_unchanged=[${OTHER0:-none}] retained_s10b_lane=unchanged,stopped refused_ports=[$REFUSED_LANE_PORTS] free"

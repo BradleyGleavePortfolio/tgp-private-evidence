@@ -1,0 +1,136 @@
+1,40c1,43
+< # S10-B gate pins (sourced by s10b-gate-d3a9.sh). Every value is a literal; the driver refuses on any malformed or
+< # unfilled value it needs. Update THIS file (and re-hash) if reviews change an owned file; the driver stays fixed.
+< # Fill help: `bash s10b-gate-d3a9.sh --fill-help <S10-A landing sha>` (read-only; prints the values below) or README.md.
+< # ---- base = the S10-A landing commit: exactly ONE commit on S10A_PARENT (e6f20300, the S9-C landing merge) adding the 14
+< #      FREEZE paths. Unknown at authoring.
+< BASE=92b9671511279254a8545c4cb531bf965762c597                       # git -C <landing clone> rev-parse HEAD after land-s10a.sh (40-hex)
+< BASE_TREE=b6fbbfd2a6495183433657814193b080c9582ab7             # git rev-parse "$BASE^{tree}"
+< MIGRATIONS_TREE=654550cb99b55473429a9c60ee08319e1b649106 # git rev-parse "$BASE:prisma/migrations" (S10-A touches no prisma -> expected 654550cb99b55473429a9c60ee08319e1b649106)
+< S10A_PARENT=e6f20300b495fa9eee9539ae58d30e3b60e5a78c   # BASE^ must be this (S9-C landing merge = integration/importer tip after PR #547 fast-forwards)
+< HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba   # kept: BASE_HEAD literal in test/utils/g2-s10b-{bootstrap.sh,db.ts}; the gate requires it to be an ANCESTOR of S10A_PARENT and BASE (git merge-base --is-ancestor; review B2 option a). a4af8e33..e6f20300 touches no prisma, so the harness prisma diff is still exactly the S10-B three
+< BRANCH=exec-d3a9/s10b
+< # ---- S10-A freeze (the 14 paths BASE adds over S10A_PARENT, "POST <sha256> <path>"). Read from this file; its sha is pinned.
+< S10A_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10a/land/FREEZE.sha256
+< S10A_FREEZE_SHA=d54aee78dcc35910200a3c8db93ecff7305a95d1c34a65985e998ad1c71c398a
+< S10A_FREEZE_COUNT=14
+< # ---- owned S10-B paths: "<sha256> <mode> <state> <path>", M = tracked+modified (` M`), N = new untracked (`??`).
+< # 16 paths = 1 M + 15 N. Bytes = d3a9f701/s10b/devloop-2/POSTFORMAT.sha256 (after the pinned prettier 3.9.9 reflow and the two
+< # devloop test fixes; modes and bytes re-measured read-only in worktrees/d3a9-s10b 2026-09-26). The gate's prettier pass is
+< # expected to be a no-op on these bytes but is still run and recorded (preformat/ + postformat/ copies, POSTFORMAT lines);
+< # prisma/schema.prisma (no prettier parser in the hook globs), migrations/** (.prettierignore) and the .sh are never reflowed.
+< OWNED_PINS='d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96 644 M prisma/schema.prisma
+< 345f12de9037d77c12f69abd96286411edfbaae1fb9df3767b1907fbada7aa15 644 N prisma/migrations/20270124000000_scout_run_observation_expand/migration.sql
+< aee7c7351e89c55f4de03b403f731f96cdcc00183635b0ac48252467ca806905 644 N prisma/migrations/20270124000000_scout_run_observation_expand/down.sql
+< c36e1858a1178478918568595203d4947d92aa2ef60e25ed6d58b6c0fb58b06a 644 N src/scout/induction/observation.controller.ts
+< 091159364d4ef6125f04658e443a83ad9d9aaf335538caf73914b9cf77e38ed5 644 N src/scout/induction/observation.dto.ts
+< 4d18b5111aa893bdb68dcba4267c199aee5eac2ad2543149a16094ff70b1b5c6 644 N src/scout/induction/observation.module.ts
+< aed296c8f26a6683887704cae04424c66a033ded825bd9b416c166d713db41db 644 N src/scout/induction/observation.service.ts
+< 5f21ef89708f3adb6e7d97b3c580a00192321d0ccc6b0193f48dfd3a39e6c504 644 N test/rls-g2-s10b.spec.ts
+< 89b2474ee5a4c61da66bbef37f935f02f0a1d90fef2f38852057233daa8c1638 644 N test/scout/induction/observation.controller.spec.ts
+< 25d28fb83bee3afc0966f37a7cb01836a2a05a224858a69bb2f1794a282d1433 644 N test/scout/induction/observation.service.spec.ts
+< 3fc3f21da01f1748e715c3d0b6ed46dbe635300fffdbd160e2154c138baa80df 755 N test/utils/g2-s10b-bootstrap.sh
+< 03e747a5b6d2237ca763daf3c146ab05c07866381878ffb50378e3bb5b3466bf 644 N test/utils/g2-s10b-db.ts
+< ad4fa44175b6cf644816cb71cfadcab01c311d46dd9166fe4f878f3719df98ba 644 N test/utils/g2-s10b-fixtures.ts
+< 603d90c8cf05b93372b1e4471b23bf8908b8eb2db27dcf90b1d0f133ce7224aa 644 N test/utils/g2-s10b-harness.ts
+< e161105556da1b71b53404890a236e32f1a4d7ae6f5bbe88d6fe66d5479bd519 644 N test/utils/g2-s10b-pg-harness.ts
+< 7a061fc47ce87ca82dde7f23a051bd37635ad8aba14da1cc8a84e83bf4862b35 644 N test/utils/g2-s10b-worker.cjs'
+< # ---- schema: BASE bytes (= a4af8e33 = e6f20300 for prisma; neither S9-C nor S10-A touches prisma) must be a pure-addition base of the working schema
+< BASE_SCHEMA_SHA=0eb41f9a88ef3b77266e908a5ea814206c188d1bdb031bd96d746491fee84015
+< BASE_SCHEMA_BLOB=2e328bbcab0c902c6adb55dfb5ee172defc5f698
+< SCHEMA_ADDED_LINES=63                    # git diff --numstat -- prisma/schema.prisma = 63/0 (three models + three ScoutImport back-relations)
+---
+> # S10-C gate pins (sourced by s10c-gate-d3a9.sh). Every value is a literal; the driver refuses on any malformed or
+> # unfilled value it needs. Update THIS file (and re-hash GATE.sha256) if fix-1 or a review changes an owned file.
+> # Fill help: `bash s10c-gate-d3a9.sh --fill-help <BASE sha>` (read-only; prints the lines to paste) or README.md.
+> # ---- BASE = integration/importer tip AT GATE TIME (22:34: 711c1f8f = a2c74e90 S10-B -> 384035ec D1 -> 711c1f8f S11-0 doc;
+> #      S11-A1 c8ee9005 / PR #552 may land first). Unknown
+> #      at authoring: the parent fetches it into the clone, moves exec-d3a9/s10c onto it, then fills these three.
+> BASE=__FILL__                       # 40-hex; also relayed as S10C_BASE and must be equal
+> BASE_TREE=__FILL__                  # git rev-parse "$BASE^{tree}"
+> MIGRATIONS_TREE=__FILL__            # git rev-parse "$BASE:prisma/migrations" (no prisma change since S10-B expected -> 7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521)
+> S10B_HEAD=a2c74e904ff227b16881c77ee5a08bd006972d48          # S10-B landing commit; must be an ANCESTOR of BASE (git merge-base --is-ancestor)
+> HARNESS_BASE_HEAD=a4af8e330bd4d6f882f0aebd411200b76d651aba  # BASE_HEAD literal of test/utils/g2-s10b-{bootstrap.sh,db.ts}; must be an ANCESTOR of BASE
+> BRANCH=exec-d3a9/s10c
+> # ---- S10-A + S10-B surfaces other than observation.module.ts: bytes pinned at a2c74e90; must be unchanged at BASE, in the
+> #      working tree and in the commit ("FROZEN <sha256> <blob> <path>"; derived from s10b/gate/HEAD-a2c74e904ff2.txt).
+> FROZEN=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s10c/gate/FROZEN.sha256
+> FROZEN_SHA=e9c71f09462a25e36baafe0fa90ba012ef6b3f384f04b3951fb1c7bbf1f4be21
+> FROZEN_COUNT=29
+> # ---- owned S10-C paths: "<sha256> <mode> <state> <path>", M = tracked+modified (` M`), N = new untracked (`??`).
+> # 11 paths = 8 M + 3 N (observation.module.ts is tracked since S10-B, so M: PrismaService provider removed, fix-1).
+> # test/rls-g2-s9c.spec.ts added by the parent 2026-09-25 22:34 PDT: superseded S9-C assertions L289/L297/L444-448 only;
+> # it cannot run at S10 heads and is NOT in the binding (the binding runs only rls-g2-s10b + rls-g2-s10c).
+> # UNFILLED on purpose: paste the OWNED_PINS block printed by --fill-help at gate time (after any late fix).
+> # Values measured read-only 2026-09-25 ~22:45 PDT, fix-1 bytes in place (reference only, NOT pins; fill-help re-measures):
+> #   756cb44b facts.service.ts  d7815e06 types.ts  55c8f24a lifecycle.service.ts  682bc3af scout.module.ts
+> #   2998b71d observation.module.ts  4b3ae75e lifecycle.service.spec.ts  681e0036 facts.service.spec.ts
+> #   681c9031 facts.service.coverage.spec.ts  63f3d3de s10c-wiring.spec.ts  5eeb0fe6 rls-g2-s10c.spec.ts (8 it())
+> #   078fcb1a rls-g2-s9c.spec.ts (10 it(), unchanged count)
+> # Generator-owner paths (scripts/importer-contract.ts, test/contracts/importer-contract.spec.ts) may be listed if a fix
+> # touches them. docs/contracts/importer-openapi.json must NOT be listed: the gate adds it itself if regeneration changes it.
+> OWNED_PINS='__FILL__ 644 M src/scout/reconciliation/facts.service.ts
+> __FILL__ 644 M src/scout/reconciliation/types.ts
+> __FILL__ 644 M src/scout/lifecycle/lifecycle.service.ts
+> __FILL__ 644 M src/scout/scout.module.ts
+> __FILL__ 644 M src/scout/induction/observation.module.ts
+> __FILL__ 644 M test/scout/lifecycle/lifecycle.service.spec.ts
+> __FILL__ 644 M test/scout/reconciliation/facts.service.spec.ts
+> __FILL__ 644 N test/scout/reconciliation/facts.service.coverage.spec.ts
+> __FILL__ 644 N test/scout/induction/s10c-wiring.spec.ts
+> __FILL__ 644 N test/rls-g2-s10c.spec.ts
+> __FILL__ 644 M test/rls-g2-s9c.spec.ts'
+> # ---- prisma: NO change in S10-C. Schema = the S10-B bytes; 173 migration dirs ending at the S10-B dir (BASE and working).
+> SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96
+> SCHEMA_BLOB=f86c1f5df722e855047899abd483f621b42dabe0
+42,44d44
+< # ---- migrations: BASE has 172 dirs ending at S7-L; the working tree/commit adds exactly the S10-B dir (173)
+< BASE_MIGRATION_DIRS=172
+< BASE_LAST_MIGRATION=20270123000000_scout_run_lifecycle_expand
+47c47
+< # ---- dependency manifests unchanged since 93389265 (donor node_modules is an npm ci of this lockfile)
+---
+> # ---- dependency manifests unchanged (donor node_modules is an npm ci of this lockfile)
+52c52
+< # donor client = generated from the BASE schema 0eb41f9a (pre-S10-B). It MUST still read these after the gate (donor untouched).
+---
+> # donor client = pre-S10-B (generated from 0eb41f9a). It MUST still read these after the gate (donor untouched).
+55,57c55,59
+< # post-generate client in the ISOLATED copy $W/node_modules/.prisma/client. Unknown before the first generate (no prisma run
+< # at authoring). RECORD = record the value + structural checks (three S10-B models present, engine = @prisma/engines copy,
+< # index.d.ts != donor). A 64-hex value is ENFORCED (use it if a re-gate must reproduce the first gate's client).
+---
+> # post-generate client in the ISOLATED copy. The S10-B gate generated index_dts 2c819c8a / schema aca7a558 from the SAME
+> # schema bytes; recorded as S10B_CLIENT_* and compared (POSTGEN_MATCHES_S10B=yes|no in the log). RECORD = record only;
+> # a 64-hex value is enforced.
+> S10B_CLIENT_INDEX_DTS=2c819c8a8e2fd4afb59578893122b8e9c406bc1dc7821e643e7ef359c04aa56c
+> S10B_CLIENT_SCHEMA=aca7a558cd379c154e947447782f2858a9f898039298e34c30b886947aed42e5
+60,61c62,64
+< # ---- contract: D-S10-8 S10-B row lists "OpenAPI bytes" as NOT owned; regeneration belongs to S10-C (generator owner).
+< # The artifact is not owned here and must be byte-identical to BASE before, after the scratch re-export, and in the commit.
+---
+> # ---- contract: D-S10-7 S10-C row -> S10-C regenerates docs/contracts/importer-openapi.json. The gate exports to scratch;
+> #      if the bytes differ from BASE it copies them to the canonical path and commits them (contract_state=changed), else
+> #      the canonical file stays byte-identical to BASE (contract_state=unchanged). Either way recorded in the receipt.
+63,64c66,68
+< SHA_CONTRACT_JSON=2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098   # sha256 of e6f20300:docs/contracts/importer-openapi.json (S9-C changed it; S10-A does not)
+< CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                                 # blob at e6f20300 (must equal BASE:$CONTRACT)
+---
+> CONTRACT_MODE=REGEN_COMMIT_IF_CHANGED
+> SHA_CONTRACT_JSON=2db3f27f482d4b26012924bbcf14437df7ac62cf834eebeccffc2d6a27665098   # sha256 at a2c74e90 (expected = BASE; fill-help checks)
+> CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                                 # blob at a2c74e90 (must equal BASE:$CONTRACT)
+69,73c73,80
+< # ---- delta scope: no committed path may fall under these (D-S10-8 S10-B "Not owned": scout.module.ts registration, the
+< # settle path, OpenAPI bytes; plus S10-A/S10-C/S10-D surfaces). prisma is checked separately (exactly the three S10-B paths).
+< FORBIDDEN_DELTA_PATHS='package.json package-lock.json docs scripts nest-cli.json src/scout/scout.module.ts src/scout/lifecycle src/scout/reconciliation src/scout/reconstruct src/scout/induction/contract.ts src/scout/induction/digest.ts src/scout/induction/manifest-registry.ts src/scout/induction/parse.ts src/scout/induction/verify.ts src/scout/induction/sources test/fixtures test/contracts'
+< # ---- targeted jest (explicit paths, --runTestsByPath; driver requires "Test Suites: 7 passed, 7 total"): S10-A 5 + S10-B 2
+< SUITES='test/scout/induction/contract.spec.ts test/scout/induction/digest.spec.ts test/scout/induction/manifest-registry.spec.ts test/scout/induction/parse.spec.ts test/scout/induction/verify.spec.ts test/scout/induction/observation.service.spec.ts test/scout/induction/observation.controller.spec.ts'
+---
+> # ---- delta scope: no committed path may fall under these (prisma is checked separately: empty delta). The S10-A/S10-B
+> #      FROZEN paths are also forbidden. Generator-owner paths are NOT forbidden (D-S10-7 lets S10-C own them).
+> FORBIDDEN_DELTA_PATHS='prisma package.json package-lock.json nest-cli.json docs/decisions docs/runbooks test/utils test/fixtures test/rls-g2-s10b.spec.ts src/scout/reconciliation/reconcile.ts src/scout/reconciliation/coverage.ts src/scout/reconciliation/arbiter.ts src/scout/lifecycle/reason-codes.ts'
+> # ---- targeted jest (explicit paths, --runTestsByPath; driver requires "Test Suites: 7 passed, 7 total"): S10-C 4 + S10-B 2 + module graph
+> SUITES='test/scout/lifecycle/lifecycle.service.spec.ts test/scout/reconciliation/facts.service.spec.ts test/scout/reconciliation/facts.service.coverage.spec.ts test/scout/induction/s10c-wiring.spec.ts test/scout/induction/observation.service.spec.ts test/scout/induction/observation.controller.spec.ts test/module-graph.spec.ts'
+> # ---- it() counts recorded in the receipt for the binding (grep -cE '^\s*it\(' at HEAD). Enforced only if not RECORD.
+> EXPECT_IT_S10B=24
+> EXPECT_IT_S10C=8                  # parent 22:34: 24 + 8 = 32 (enforced pre-lock and on the committed bytes)

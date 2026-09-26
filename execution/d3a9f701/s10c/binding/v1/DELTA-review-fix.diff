@@ -1,0 +1,59 @@
+--- s10c-pg-proof.sh.template.pre-review-fix	2026-09-26 05:49:20.255187820 +0000
++++ s10c-pg-proof.sh.template	2026-09-26 05:49:20.267187820 +0000
+@@ -46,6 +46,8 @@
+ EXPECT_DELTA="__FILL_EXPECT_DELTA__"                                           # gate receipt delta= (sorted, space-separated; drop the trailing space)
+ EXPECT_CONTRACT_STATE=__FILL_CONTRACT_STATE__                                  # gate receipt contract_state= (changed|unchanged)
+ EXPECT_CONTRACT_BLOB=__FILL_CONTRACT_BLOB__                                    # gate receipt contract_state ... blob= (= 752f9dbe1a6bdee0c20504a35dce60757880d427 iff unchanged)
++EXPECT_HOOK_PRECOMMIT_SHA=__FILL_HOOK_PRECOMMIT_SHA__                          # gate receipt "hooks raw pre-commit=<sha256>" (.git/hooks/pre-commit the gate committed through)
++EXPECT_HOOK_COMMITMSG_SHA=__FILL_HOOK_COMMITMSG_SHA__                          # gate receipt "hooks raw ... commit-msg=<sha256>"
+ EXPECT_S10C_SPEC_BLOB=__FILL_S10C_SPEC_BLOB__                                  # gate receipt "blob test/rls-g2-s10c.spec.ts <blob>"
+ EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                # S10-B migrations tree (173); S10-C changes no prisma, so BASE and HEAD both carry it
+ BASE_CONTRACT_BLOB=752f9dbe1a6bdee0c20504a35dce60757880d427                    # importer contract blob at a2c74e90 (the gate refuses a BASE that differs)
+@@ -117,9 +119,9 @@
+ STAGE=preconditions-prelock; STARTED=0; LOG=$R/prelock.log
+ fail(){ log "PRELOCK_REFUSED stage=$STAGE rc=$1 $(ts) (no lock taken, no sentinel written; the run is not consumed)"; exit "$1"; }
+ log "PRELOCK_START $(ts) pid=$$ user=$(id -un) head_expect=$EXPECT_HEAD fixture_expect=$EXPECT_FIXTURE_SHA"
+-case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_DELTA$EXPECT_CONTRACT_STATE$EXPECT_CONTRACT_BLOB$EXPECT_S10C_SPEC_BLOB$EXPECT_FIXTURE_SHA$FROZEN_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: base, head, delta, contract, spec blob or client; README.md)"; fail 70;; esac
++case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_DELTA$EXPECT_CONTRACT_STATE$EXPECT_CONTRACT_BLOB$EXPECT_S10C_SPEC_BLOB$EXPECT_HOOK_PRECOMMIT_SHA$EXPECT_HOOK_COMMITMSG_SHA$EXPECT_FIXTURE_SHA$FROZEN_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$EXPECT_POSTGRES_SHA$EXPECT_INITDB_SHA$EXPECT_PGCTL_SHA$EXPECT_PSQL_REAL_SHA$EXPECT_NODE_SHA$EXPECT_NM_LOCK_SHA" in *__*) log "PRECONDITION_FAIL pins not filled (proposal stage: base, head, delta, contract, spec blob or client; README.md)"; fail 70;; esac
+ for v in BASE_HEAD BASE_TREE EXPECT_HEAD EXPECT_TREE EXPECT_CONTRACT_BLOB EXPECT_S10C_SPEC_BLOB; do [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || { log "PRECONDITION_FAIL $v not 40-hex (${!v})"; fail 70; }; done
+-for v in EXPECT_NM_CLIENT_SHA EXPECT_NM_CLIENT_SCHEMA_SHA EXPECT_FIXTURE_SHA FROZEN_SHA; do [[ "${!v}" =~ ^[0-9a-f]{64}$ ]] || { log "PRECONDITION_FAIL $v not 64-hex (${!v})"; fail 70; }; done
++for v in EXPECT_NM_CLIENT_SHA EXPECT_NM_CLIENT_SCHEMA_SHA EXPECT_HOOK_PRECOMMIT_SHA EXPECT_HOOK_COMMITMSG_SHA EXPECT_FIXTURE_SHA FROZEN_SHA; do [[ "${!v}" =~ ^[0-9a-f]{64}$ ]] || { log "PRECONDITION_FAIL $v not 64-hex (${!v})"; fail 70; }; done
+ # lane refusals (review B B4): never the retained s10-b lane, never the S9-C/S10-B ports
+ [ "$LANE" = "$CLUSTERS/s10-c" ] && [ "$LANE" != "$S10B_LANE" ] && [ "$SOCK" = "$RUNTIME_ROOT/run/s10-c" ] || { log "PRECONDITION_FAIL lane $LANE / socket $SOCK is not clusters/s10-c + run/s10-c"; fail 70; }
+ for rp in $REFUSED_LANE_PORTS; do [ "$PORT" != "$rp" ] || { log "PRECONDITION_FAIL lane port $PORT is a refused lane port ($REFUSED_LANE_PORTS)"; fail 70; }; done
+@@ -156,7 +158,7 @@
+ NF=0; while read -r tag s b p; do [ "$tag" = FROZEN ] || continue; NF=$((NF+1))
+   [ "$(git -C "$W" rev-parse "HEAD:$p" 2>/dev/null)" = "$b" ] || { log "PRECONDITION_FAIL frozen $p at HEAD != $b"; fail 70; }
+ done < "$FROZEN"; [ "$NF" = 29 ] || { log "PRECONDITION_FAIL FROZEN lists $NF paths (want 29)"; fail 70; }
+-[ -z "$(git -C "$W" diff --name-only "$S10B_HEAD" HEAD -- prisma package.json package-lock.json test/utils)" ] || { log "PRECONDITION_FAIL prisma / manifests / test/utils differ from the S10-B landing"; fail 70; }
++[ -z "$(git -C "$W" diff --name-only "$S10B_HEAD" HEAD -- prisma package.json package-lock.json 'test/utils/g2-s10b-*')" ] || { log "PRECONDITION_FAIL prisma / manifests / test/utils/g2-s10b-* differ from the S10-B landing (other test/utils files, e.g. S11-A1 g2-s11-*, may change)"; fail 70; }
+ [ "$(git -C "$W" rev-parse "HEAD:$CONTRACT")" = "$EXPECT_CONTRACT_BLOB" ] && [ "$(git -C "$W" rev-parse "$BASE_HEAD:$CONTRACT")" = "$BASE_CONTRACT_BLOB" ] || { log "PRECONDITION_FAIL contract blob BASE/HEAD != $BASE_CONTRACT_BLOB/$EXPECT_CONTRACT_BLOB ($EXPECT_CONTRACT_STATE)"; fail 70; }
+ # prisma: the candidate delta is exactly schema + the S10-B migration pair (vs BASE and vs the harness base); 173 dirs
+ PD=$(git -C "$W" diff --name-only "$HARNESS_BASE_HEAD" HEAD -- prisma | sort | tr '\n' ' ' | sed 's/ $//')
+@@ -195,11 +197,15 @@
+ [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] || { log "PRECONDITION_FAIL worktree not clean"; fail 70; }
+ [ ! -e "$(git -C "$W" rev-parse --git-path MERGE_HEAD)" ] || { log "PRECONDITION_FAIL MERGE_HEAD present"; fail 70; }
+ # the committed head must have been produced through the tracked lefthook hooks (installed by the S10-C gate)
++[ -z "$(git -C "$W" config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath is set (alternate hook directory refused)"; fail 70; }
+ H=$(git -C "$W" rev-parse --git-path hooks); case "$H" in /*) ;; *) H="$W/$H";; esac
++[ "$H" = "$W/.git/hooks" ] && [ -d "$H" ] && [ ! -L "$H" ] || { log "PRECONDITION_FAIL hooks dir [$H] is not the plain $W/.git/hooks directory"; fail 70; }
+ # symlink-aware (review A B-1 analogue): both hooks must be regular files, never symlinks (dangling or not)
+ for hk in pre-commit commit-msg; do [ -f "$H/$hk" ] && [ ! -L "$H/$hk" ] || { log "PRECONDITION_FAIL $H/$hk is not a regular file (absent or a symlink)"; fail 70; }; done
+ grep -q lefthook "$H/pre-commit" 2>/dev/null && grep -q lefthook "$H/commit-msg" 2>/dev/null \
+   || { log "PRECONDITION_FAIL $H/pre-commit or commit-msg absent or not lefthook (hookless commit)"; fail 70; }
++[ "$(sha "$H/pre-commit")" = "$EXPECT_HOOK_PRECOMMIT_SHA" ] && [ "$(sha "$H/commit-msg")" = "$EXPECT_HOOK_COMMITMSG_SHA" ] \
++  || { log "PRECONDITION_FAIL hook sha256 pre-commit=$(sha "$H/pre-commit") commit-msg=$(sha "$H/commit-msg") != gate receipt hooks raw ($EXPECT_HOOK_PRECOMMIT_SHA / $EXPECT_HOOK_COMMITMSG_SHA)"; fail 70; }
+ # S10-C wiring: ScoutModule imports ObservationModule at HEAD (the S10-B binding required the opposite)
+ MOD_AT_HEAD=$(git -C "$W" show HEAD:src/scout/scout.module.ts) || { log "PRECONDITION_FAIL cannot read scout.module.ts at HEAD"; fail 70; }
+ grep -qF "ObservationModule" <<<"$MOD_AT_HEAD" || { log "PRECONDITION_FAIL scout.module.ts does not import ObservationModule (no S10-C wiring at HEAD)"; fail 70; }
+@@ -255,6 +261,10 @@
+ [ "$(sha "$FIX")" = "$EXPECT_FIXTURE_SHA" ] && [ "$(git -C "$W" rev-parse HEAD)" = "$EXPECT_HEAD" ] && [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ] \
+   && [ "$(sha "$W/node_modules/.prisma/client/index.d.ts")" = "$EXPECT_NM_CLIENT_SHA" ] && [ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] \
+   || { log "PRECONDITION_FAIL fixture/HEAD/worktree/client moved after the pre-lock preconditions"; fail 70; }
++[ -z "$(git -C "$W" config --get core.hooksPath)" ] && [ "$(git -C "$W" rev-parse --git-path hooks)" = .git/hooks ] && [ -d "$H" ] && [ ! -L "$H" ] \
++  && [ -f "$H/pre-commit" ] && [ ! -L "$H/pre-commit" ] && [ -f "$H/commit-msg" ] && [ ! -L "$H/commit-msg" ] \
++  && [ "$(sha "$H/pre-commit")" = "$EXPECT_HOOK_PRECOMMIT_SHA" ] && [ "$(sha "$H/commit-msg")" = "$EXPECT_HOOK_COMMITMSG_SHA" ] \
++  || { log "PRECONDITION_FAIL hook identity/hooksPath changed after the pre-lock preconditions"; fail 70; }
+ # ---- step 1 preflight (read-only): S10-B lane absent; lane port free; no postgres; other lanes under the runtime root (clusters/*
+ #      incl. clusters/s8-g, s9-b, s9-c, and proof-*/clusters/*) fingerprinted and never started
+ STAGE=preflight

@@ -1,0 +1,26 @@
+--- s11-pg-proof.sh.pre-review-fix	2026-09-26 05:39:18.879187820 +0000
++++ s11-pg-proof.sh	2026-09-26 05:43:45.443187820 +0000
+@@ -128,9 +128,12 @@
+ [ "$(g rev-parse --verify -q "$LAND_REF")" = "$EXPECT_HEAD" ] || { log "PRECONDITION_FAIL $LAND_REF != $EXPECT_HEAD (candidate not the pushed head)"; fail 70; }
+ [ -z "$(g status --porcelain --untracked-files=all)" ] || { log "PRECONDITION_FAIL clone source not clean"; fail 70; }
+ [ ! -e "$(g rev-parse --git-path MERGE_HEAD)" ] || { log "PRECONDITION_FAIL MERGE_HEAD present in source"; fail 70; }
++[ -z "$(g config --get core.hooksPath)" ] || { log "PRECONDITION_FAIL core.hooksPath is set in the source (alternate hook directory refused)"; fail 70; }
+ H=$(g rev-parse --git-path hooks); case "$H" in /*) ;; *) H="$SRC/$H";; esac
++[ "$H" = "$SRC/.git/hooks" ] && [ -d "$H" ] && [ ! -L "$H" ] || { log "PRECONDITION_FAIL source hooks dir [$H] is not the plain $SRC/.git/hooks directory"; fail 70; }
+ for hk in pre-commit commit-msg; do [ -f "$H/$hk" ] && [ ! -L "$H/$hk" ] || { log "PRECONDITION_FAIL $H/$hk is not a regular file (absent or a symlink)"; fail 70; }; done
+ grep -q lefthook "$H/pre-commit" 2>/dev/null && grep -q lefthook "$H/commit-msg" 2>/dev/null || { log "PRECONDITION_FAIL source hooks not lefthook (hookless commit)"; fail 70; }
++HOOKSIG0="$(sha "$H/pre-commit"):$(sha "$H/commit-msg")"; log "PRELOCK source_hooks=$HOOKSIG0"
+ DELTA=$(g diff --name-only "$BASE_HEAD" HEAD | sort | tr '\n' ' ' | sed 's/ $//')
+ [ "$DELTA" = "$EXPECT_DELTA" ] || { log "PRECONDITION_FAIL BASE..HEAD delta [$DELTA] != the 8 S11-A1 paths"; fail 70; }
+ [ -f "$S11_FREEZE" ] && [ "$(sha "$S11_FREEZE")" = "$S11_FREEZE_SHA" ] || { log "PRECONDITION_FAIL S11-A1 FREEZE absent or sha mismatch"; fail 70; }
+@@ -215,6 +218,10 @@
+   && [ "$(g rev-parse --verify -q "$LAND_REF")" = "$EXPECT_HEAD" ] && [ "$(sha "$S11_FREEZE")" = "$S11_FREEZE_SHA" ] \
+   && [ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] && [ ! -e "$W" ] && [ ! -L "$W" ] && [ ! -e "$LANE" ] && [ ! -L "$LANE" ] \
+   || { log "PRECONDITION_FAIL fixture/source/FREEZE/donor/clone-path/lane moved after the pre-lock preconditions"; fail 70; }
++[ -z "$(g config --get core.hooksPath)" ] && [ "$(g rev-parse --git-path hooks)" = .git/hooks ] && [ -d "$H" ] && [ ! -L "$H" ] \
++  && [ -f "$H/pre-commit" ] && [ ! -L "$H/pre-commit" ] && [ -f "$H/commit-msg" ] && [ ! -L "$H/commit-msg" ] \
++  && [ "$(sha "$H/pre-commit"):$(sha "$H/commit-msg")" = "$HOOKSIG0" ] \
++  || { log "PRECONDITION_FAIL source hook identity/hooksPath changed after the pre-lock preconditions"; fail 70; }
+ # ---- step 1 preflight (read-only): lane absent; port free; no postgres at all; every other lane fingerprinted, never started
+ STAGE=preflight
+ [ ! -e "$SOCK" ] || [ -z "$(ls -A "$SOCK" 2>/dev/null)" ] || { log "PREFLIGHT_FAIL socket dir $SOCK not empty"; fail 71; }

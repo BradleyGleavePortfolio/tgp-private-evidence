@@ -2,26 +2,93 @@
 
 - **Record:** ACCEPTED S11-0, /home/user/workspace/private-evidence/execution/d3a9f701/s11-0/2026-09-26-s11-journey.md (D-S11-6, D-S11-7, D-S11-8 row S11-A1, §3 J01-J08)
 - **Worktree:** /home/user/workspace/worktrees/d3a9-s11a1
-- **Branch:** exec-d3a9/s11a1. HEAD is still 92b9671511279254a8545c4cb531bf965762c597, with no commit made.
+- **Branch:** exec-d3a9/s11a1. HEAD is now 711c1f8f8b42157bca97f2a721557be7ef006667 (S10-A → S10-B a2c74e90 → D1 384035ec → S11-0 doc 711c1f8f); the 8 files remain untracked, with no commit made.
 - **Status:** SOURCE COMPLETE and NOT RUN.
   - No npm, jest, tsc, prisma or postgres was run, no lock was taken, and nothing was committed.
   - The only checks run were `node --check` on the worker (OK), `bash -n` on the bootstrap (OK) and `rg` for the R75 banned tokens (0 hits in all 8 files).
 - **Scope:** no `src/**`, `prisma/**` or S10-owned path is touched. `git status` shows only the 8 new files, all untracked.
 
-## Files (sha256, lines, it() count)
+## Files (sha256, lines, it() count) — current after fix 3 (includes the pinned-prettier reflow from devloop-1 of worker, guard, rls and journey)
 
 | path | sha256 | lines | it() |
 | --- | --- | --- | --- |
-| test/utils/g2-s11-bootstrap.sh | f95d3015f14ecf8a6af0fca3fe9e5dd3a8c6424bfd8e1a1c839b1368a312efcc | 234 | - |
-| test/utils/g2-s11-db.ts | 4edc214fb5a83ca1a525084c3fe84e7dcb43f7f5a2da00e4bf51c21c86324a15 | 163 | - |
-| test/utils/g2-s11-harness.ts | 84b20c76823f29d561f4f579be2a783617aba53faf24b99ec4363f3b868243fe | 361 | - |
-| test/utils/g2-s11-pg-harness.ts | 8d7c4c68ca0654f5ad581b756f7cbe7523e2a579541526d05d2a4487172efa5c | 260 | - |
-| test/utils/g2-s11-worker.cjs | 34203db81f188c44358bd455e8539492240b86f24ab46ca0c2a1f250c42a0075 | 357 | - |
-| test/utils/g2-s11-db-guard.spec.ts | 9e143abdb76dd0c586db158c9520f7c651cb31790ecd88c47efd194c7d8b0ed8 | 300 | 10 it + 1 it.each (61 URLs) |
-| test/rls-g2-s11.spec.ts | e0e361d888218e7b9c086d8fdf9e3636c420947fe6baa468bea704c6abb50876 | 207 | 6 |
-| test/scout/s11/journey-core.pg.spec.ts | 4544cf634bda7cf80fc2894155e5af4480348a56a6dd73b81a03463a6788967b | 620 | 8 (J01-J08) |
+| test/utils/g2-s11-bootstrap.sh | 4520c02889bb8f1d9ad5a9fe2e8ae009677554e9b37312d495b449a327f01abe | 255 | - |
+| test/utils/g2-s11-db.ts | 0122b355c91e7ea6ad5dd2599a8ebe0361068fdb1cf4c50cc6ebf727daef66af | 164 | - |
+| test/utils/g2-s11-harness.ts | d86ae588abef6673e4f29f799fdf62f33869cce95eb6f2bb08cc76361c5cd514 | 381 | - |
+| test/utils/g2-s11-pg-harness.ts | 5e28004c94f77001f83c59ab4c9a88b8ba86527aac9150b8ced8a4d9d75f38e6 | 269 | - |
+| test/utils/g2-s11-worker.cjs | 9586346766781319a23b34769026cdb3d1e986adaa8c313f2deab05e8a11ab64 | 412 | - |
+| test/utils/g2-s11-db-guard.spec.ts | 4e8c0fee796be2666b565b8e34111df4017869ce0baf3048eec1a615dd7c0c68 | 360 | 10 it + 3 it.each (61 URLs; 20 prohibited ports; 3 controls) |
+| test/rls-g2-s11.spec.ts | 923a927d4e84dfa4b9c3949cdf75edb1eb7afab96a0d2dc9325f7ee3fd8ed895 | 250 | 6 |
+| test/scout/s11/journey-core.pg.spec.ts | 6a56358aa61e7398b1c58d8f227a2cc1d7d5ea0c35fef8f21ba121e1354770f9 | 691 | 8 (J01-J08) |
 
 The full diff against the substituted donor is saved at /home/user/workspace/s11a1_diff_vs_donor.patch (662 lines).
+
+## Fix 1 (review /home/user/workspace/s11a1_review.md, three class-B findings; delta at /home/user/workspace/s11a1_fix1.diff, 345 lines)
+
+Fix 1 changed 5 files. `db.ts`, `bootstrap.sh` and `rls-g2-s11.spec.ts` are unchanged. Nothing was run; the only checks were `node --check`, `bash -n` and `rg` (0 banned tokens, 0 slugs).
+
+1. **Refused-port guard now discriminates (guard spec).**
+   - New `it.each` over the 20 prohibited ports. Each port is paired with its own *matching* confirmation `g2_s11_disposable:<port>`, so only the explicit refused-port set can reject it.
+   - New `it.each` positive control: 55648, 55649 and 55650 are each accepted with their matching confirmation.
+   - The existing mismatch cases are kept as confirmation tests.
+2. **J07 compares A's rows by content (journey spec plus harness reader `stagedRows`).** Before and after B's calls, it compares:
+   - A's full staged rows (not just the count);
+   - `targetSnapshot(COACH, a)`: persons, programs, plans, evidence, provenance and ledger;
+   - A's completion rows.
+
+   B's rows are also checked for isolation:
+   - B's staged rows are exactly its own `q-1` batch;
+   - neither coach has any staged row under the other's intent;
+   - no B provenance row names A's intent;
+   - B's ledger is exactly `q-1`;
+   - there is no B ledger under A's intent and no A ledger under B's;
+   - B has exactly its own completion row.
+3. **J08 now observes outbound calls (worker, pg-harness `Result`, harness `outboundTableCounts`, journey J08, guard).**
+   - **Channel methods:** after the startup import graph loads, every exported class in the already-loaded notifications, email, messaging, drip, nudge and digest modules has each prototype method replaced by a stand-in that records `{channel, method, recipient}` and then throws.
+   - **Transports:** `http.request`/`get`, `https.request`/`get` and `globalThis.fetch` are replaced the same way.
+   - **Non-vacuity:** `outboundSpied` lists what was replaced. J08 asserts that it includes `NotificationsService.*` and all four HTTP(S) transport methods.
+   - **Pushes asserted on the call:** the injected notifications stand-in records `{userId, kind}`. J08 asserts:
+     - `outbound` is `[]` for every result;
+     - non-complete actions have `pushCalls` `[]`;
+     - every complete push is exactly `{userId: <that run's coach>, kind: 'import.complete'}`;
+     - there is ≤ 1 push per run, and at least 2 coach pushes (J02 for coach A, J07 for coach B);
+     - `pushes === pushCalls.length`.
+   - **Persisted side effects:** the row counts of Notification, NotificationDeliveryLog, Message, MessageDraft, CoachMessage, EmailSendLog, CoachNudge, NudgeLog and DripResolverMarker are unchanged from the file's `beforeAll` baseline.
+   - **What was dropped or kept:** the static `pushToUser` source scan is removed. The module-load counters stay, as a supplementary check only.
+   - **Guard:** it now pins, in the worker source, that the spies are installed after the load-counter reset and that pushes are recorded on the call.
+   - **Unverified risk:** the method stand-ins replace prototype methods on `NotificationsService` and similar classes. The scout path never builds those classes, since it gets the injected stand-in. If any other loaded class in those directories were built on the path, its call would now fail visibly instead of passing silently. That is the intended fail-closed behaviour, but it is still unrun.
+
+## Fix 2: base move to 711c1f8f (delta at /home/user/workspace/s11a1_fix2-base.diff, 297 lines)
+
+Seven files changed; `journey-core.pg.spec.ts` is unchanged. Donor g2-s9c-* files are byte-identical between 92b96715 and 711c1f8f (`git diff --stat` empty), so donor-provenance comments still name 92b96715 ("as landed at"). Nothing was run: only `bash -n`, `node --check` and `rg` (0 banned tokens, 0 slugs).
+
+- **bootstrap.sh:**
+  - `BASE_HEAD=711c1f8f8b42157bca97f2a721557be7ef006667`, `EXPECTED_MIGRATIONS=173`, new `S10B_MIGRATION=20270124000000_scout_run_observation_expand` and `S10B_TABLES`.
+  - Step 4 requires the S10-B migration file and that the last sorted migration directory is S10-B's (exit 4).
+  - Step 5 requires S10-B recorded as applied, and each of ScoutRunDeclaration, ScoutRunObservation and ScoutRunSettledBasis present with `relrowsecurity = t` (exit 5).
+  - Step 6 requires the three S10-B models in the generated client (exit 7).
+  - Comments updated (173, S10-B client).
+  - Tree/blob pins: none exist. The bootstrap pins the prisma tree by `git diff --name-only $BASE_HEAD HEAD -- prisma` being empty, so moving BASE_HEAD moves the pin; there are no separate tree or blob hashes to recompute.
+- **pg-harness.ts:** `EXPECTED_MIGRATIONS = 173`, new `S10B_MIGRATION` and `S10B_TABLES` exports; comments updated.
+- **db.ts:** `G2_S11_BASE_HEAD = '711c1f8f…'`; header updated.
+- **guard spec:** pins the new base, 173, the S10-B migration, `S10B_TABLES` in both files and the last-directory check; the repository order check is now S8-B → S7-L → S10-B as the last three; the non-base candidate test uses the new base.
+- **rls spec:** lane identity expects the last applied migration to be S10-B and the three S10-B tables to have RLS on; the anon/authenticated posture loop now also covers the three S10-B tables (refused or 0).
+- **Not enumerated in resetData, on purpose:** the S10-B tables carry insert-only triggers that refuse a top-level DELETE and pass only the parent-run `ON DELETE CASCADE` from ScoutImport. resetData already deletes ScoutImport, so direct deletes would fail and are not added.
+- harness.ts, worker.cjs: comment-only (donor provenance wording).
+
+## Fix 3: forced RLS and non-vacuous S10-B role reads (review 2; delta at /home/user/workspace/s11a1_fix3.diff, 63 lines)
+
+Applied on top of the post-prettier bytes. Only `bootstrap.sh` and `rls-g2-s11.spec.ts` changed. Nothing was run: only `bash -n` and `rg` (0 banned tokens, 0 slugs).
+
+- **Forced RLS:** the bootstrap (step 5, exit 5) and the rls spec's lane-identity case now require `relrowsecurity/relforcerowsecurity` = `true/true` for each of ScoutRunDeclaration, ScoutRunObservation and ScoutRunSettledBasis.
+- **Non-vacuous API-role reads:** the role-posture case now seeds, through the owner path (`sql()`, the postgres owner role):
+  - a parent run (`legacyRun(COACH, i, null)`, satisfying the composite FKs);
+  - one declaration (valid platform, 64-hex digest, 32-byte challenge);
+  - one observation (`clients`, `source_signed_enumeration`);
+  - one settled basis.
+
+  It asserts the owner count is ≥ 1 for ImportIntent, ScoutImport, ScoutProgressSnapshot and all three S10-B tables before the anon/authenticated loop. That loop still requires `0` or a permission refusal for every journey and S10-B table. ExtensionPairCode is not seeded by this case, so it is excluded from the ≥ 1 check.
+- **Cleanup:** resetData's ScoutImport delete removes the seeded S10-B rows by ON DELETE CASCADE (the nested delete the insert-only triggers allow).
 
 ## Lane (D-S11-6 lane descriptor)
 
@@ -33,7 +100,7 @@ The full diff against the substituted donor is saved at /home/user/workspace/s11
   - database `s11-g2-journey-multi-host-synthetic-disposable-fixture-safe-to-drop`.
 - **Refused ports:** the donor list plus **55646 (S9-C) and 55647 (S10-B)**.
   - The guard also refuses 55649, the s9c and s10b database names, and the s9c/s10b superusers.
-- **Base and migrations:** BASE_HEAD = 92b96715…; EXPECTED_MIGRATIONS = 172 (the last is S7-L). S11-A1 ships no migration. The bootstrap requires a prisma tree byte-identical to the base.
+- **Base and migrations (fix 2):** BASE_HEAD = 711c1f8f…; EXPECTED_MIGRATIONS = 173 (the last is S10-B's 20270124000000_scout_run_observation_expand; S7-L and S8-B precede it). S11-A1 ships no migration. The bootstrap requires a prisma tree byte-identical to the base.
 
 ## Diff vs donor (g2-s9c-* at 92b96715)
 
@@ -137,23 +204,35 @@ If any of these is not accepted, the cases depending on it are J01 (current), J0
     - each failure deep-equals the same call on a never-owned UUID from the other host (no oracle);
     - no gate statement runs, and A's id never appears in a failure.
   - B /progress on A's intent succeeds (the 204 path) with no gate statement. B settles its own run on P2.
-  - A is exactly unchanged: run row, setup row, code rows, staged count, A-keyed mirror rows and total run count.
+  - A is exactly unchanged (fix 1):
+    - run row, setup row, code rows, A-keyed mirror rows and total run count;
+    - the **full staged rows**, not just the count;
+    - `targetSnapshot` (persons, programs, plans, evidence, provenance, ledger);
+    - completion rows.
+  - B is isolated (fix 1):
+    - B's staged rows are exactly its own batch, and neither coach has staged rows under the other's intent;
+    - no B provenance row names A's intent, and B's ledger is exactly its own row;
+    - there is no cross-intent ledger in either direction;
+    - B has exactly its own completion row.
   - B's later status on that string is either 404 or a non-server projection with no counts, no epoch and no A clock.
   - A's status is byte-equal on both hosts (running, epoch 1).
-- **J08:**
+- **J08 (fix 1):**
   - The collected results cover every action type and both hosts.
-  - Every worker has all six side-effect load counters (notifications, drip, assignment, email, billing, messaging) at 0.
-  - Only `complete` pushes, and each run has ≤ 1 push in total.
-  - A static check confirms the only `pushToUser` in scout.service.ts is addressed to `coachId` with kind `import.complete`.
+  - On every process, the recording, throwing stand-ins were installed: `NotificationsService.*` plus the http/https transports appear in `outboundSpied`.
+  - `outbound` (observed calls to a notification, email, messaging, drip, nudge or digest method, or to HTTP(S)/fetch) is `[]` for every result.
+  - Non-complete actions have `pushCalls` `[]`.
+  - Each complete push is asserted on the call as `{userId: run's coach, kind: 'import.complete'}`, with ≤ 1 per run and ≥ 2 in total.
+  - The persisted outbound table counts equal the file baseline.
+  - The load counters stay at 0, as a supplementary check.
   - Mints are 1 per successful redeem and 0 per refused redeem.
 
 **test/rls-g2-s11.spec.ts:**
 
-1. Lane identity: PG17 version, cluster marker, data directory, port (not 55646/55647), db, 172 migrations ending at S7-L, S8-B and journey tables present, no supabase roles.
+1. Lane identity: PG17 version, cluster marker, data directory, port (not 55646/55647), db, 173 migrations ending at S10-B, S8-B and journey tables present, the three S10-B tables present with RLS on, no supabase roles.
 2. Candidate binding: 40-hex, not base, HEAD = candidate, clean tree, descends from base, no prisma diff, **no src diff**.
 3. Two hosts: the pairInit, P1 status and P2 status PIDs are distinct from each other and from jest. Uniform 404 on both; the injected families are pinned; each removed donor action gives 500 unknown action; the host label is inert.
 4. Role posture: anon and authenticated see 0 rows, or are refused, on ImportIntent, ExtensionPairCode, ScoutImport and ScoutProgressSnapshot while rows exist.
 5. J07 legacy case: A gets 404 on the legacy string. B's progress on it writes exactly one B-keyed mirror row with no gate. B's status is a non-server running projection with no counts. A still gets 404 on both hosts, and the run count is unchanged.
 6. Legacy settled row: A reads its own legacy success; B gets 404.
 
-**test/utils/g2-s11-db-guard.spec.ts:** no DB. It covers target accept/refuse (61 URLs), confirmation refusal, markers, the fixture-password role set, pins (base, migrations, harness constants), candidate binding plus attestation order, the donor G12 scan, and the 3 S11 shape checks above.
+**test/utils/g2-s11-db-guard.spec.ts:** no DB. It covers target accept/refuse (61 URLs), each prohibited port with its own matching confirmation (20) plus 3 accept controls, confirmation refusal, markers, the fixture-password role set, pins (base, migrations, harness constants), candidate binding plus attestation order, the donor G12 scan, and the 3 S11 shape checks above.

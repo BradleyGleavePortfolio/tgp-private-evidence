@@ -57,3 +57,9 @@ Recovery complete; execution cursor advanced. S8-G landed (771db62a), S9-B lande
 
 ## 2026-09-26T05:18Z
 - S10-B landed a2c74e90 (PR #549; real-PG 24/24). D1 384035ec (PR #550) and S11-0 711c1f8f (PR #551) stacked, CI running. S10-C round-1 fixes in build (devloop-1 + review A). S11-A1 fix-1 in build.
+
+## 2026-09-26T05:59Z
+- Landed: S10-B a2c74e90 (#549), D1 384035ec (#550), S11-0 711c1f8f (#551).
+- S10-C: dual review GO (+delta), devloop-2 green, gate running (BASE 711c1f8f; first relay refused at PINS sourcing, not consumed). Binding v1 (lane s10-c/55649, 32) GO.
+- S11-A1: PR #552 (c8ee9005); proof run-1 RC=1 7/8 (J07 class B, PROOF_RUN1_FINDING.md, preserved). J07 fix GO; v2 = rebase onto the S10-C commit + fix; binding/v2 derived (fill after S10-C commit).
+- Split decisions: S10-C2 (contract Gen for observation routes; review GO; no version bump), S10-D P (test-only no-sources-on-disk invariants; review GO) before D2. S11-B dual GO after fix-1. S11-C GO (commits after S11-A1).

@@ -1,0 +1,325 @@
+diff --git a/test/scout/induction/manifest-registry.spec.ts b/test/scout/induction/manifest-registry.spec.ts
+index 48ad91ea..364172f0 100644
+--- a/test/scout/induction/manifest-registry.spec.ts
++++ b/test/scout/induction/manifest-registry.spec.ts
+@@ -14,6 +14,8 @@ import {
+   type SourceMappingSpec,
+ } from '../../../src/scout/reconstruct/mapping-spec';
+ import type { NativeRuleSet } from '../../../src/scout/reconstruct/native/native-rules';
++import { loadNativeRuleSets } from '../../../src/scout/reconstruct/native/native-rule-registry';
++import { loadSourceMappingSpecs } from '../../../src/scout/reconstruct/source-mapper-registry';
+ import {
+   S10_PURE_MANIFESTS_DIR,
+   S10_PURE_SPEC_PATH,
+@@ -68,8 +70,46 @@ describe('R20 — valid synthetic package', () => {
+     expect(registry.specFamilies.get(SLUG)).toEqual(['clients', 'programs', 'workouts']);
+   });
+ 
+-  it('ships no real platform manifest: the repository directory is absent → empty registry', () => {
+-    expect(loadInductionManifests(INDUCTION_MANIFESTS_DIR)).toEqual([]);
++  // S10-D P: invariants over WHATEVER ships (a new data-only source adds a manifest without
++  // touching this spec), never "the directory is absent". Positive guard: no production platform
++  // ships a manifest (no real source key is established, Q1/Q2).
++  const PRODUCTION_WITHOUT_MANIFEST = ['truecoach'] as const;
++  const shipped = () => ({
++    manifests: loadInductionManifests(INDUCTION_MANIFESTS_DIR),
++    specs: loadSourceMappingSpecs(),
++    nativeRuleSets: loadNativeRuleSets(),
++  });
++
++  it('every shipped manifest is a consistent package over the shipped spec and rule sets', () => {
++    const input = shipped();
++    const registry = buildInductionRegistry(input); // V2/V3/V6 cross-checks throw on a defect
++    expect([...registry.packages.keys()].sort()).toEqual(
++      input.manifests.map((m) => m.sourcePlatform).sort(),
++    );
++    for (const m of input.manifests) {
++      const spec = input.specs.find((s) => s.sourcePlatform === m.sourcePlatform);
++      if (spec === undefined) throw new Error(`no shipped spec for ${m.sourcePlatform}`);
++      expect(registry.packages.get(m.sourcePlatform)?.specDigest).toBe(mappingSpecDigest(spec));
++    }
++    for (const platform of PRODUCTION_WITHOUT_MANIFEST) {
++      expect(registry.packages.has(platform)).toBe(false);
++    }
++  });
++
++  it('the shipped-package invariant still fails on a real defect', () => {
++    const input = shipped();
++    // A manifest whose spec is not shipped (the orphan defect), whatever else ships.
++    const orphan = manifest({ sourcePlatform: 'p-orphan-manifest' });
++    expect(() =>
++      buildInductionRegistry({ ...input, manifests: [...input.manifests, orphan] }),
++    ).toThrow();
++    // A production manifest would trip the positive guard.
++    const guessed = build([manifest({ sourcePlatform: 'truecoach' })], [
++      { ...SPEC, sourcePlatform: 'truecoach' },
++    ]);
++    expect(PRODUCTION_WITHOUT_MANIFEST.filter((p) => guessed.packages.has(p))).toEqual([
++      'truecoach',
++    ]);
+   });
+ 
+   it('absent directory → empty; present-but-empty directory throws', () => {
+diff --git a/test/scout/reconstruct/mapping-spec.spec.ts b/test/scout/reconstruct/mapping-spec.spec.ts
+index 9f5503a3..69206e09 100644
+--- a/test/scout/reconstruct/mapping-spec.spec.ts
++++ b/test/scout/reconstruct/mapping-spec.spec.ts
+@@ -161,12 +161,63 @@ describe('parseSourceMappingSpec — one id space per canonical family (A3)', ()
+     }
+   });
+ 
+-  it('keeps every shipped 1:1 spec valid with no declaration', () => {
+-    for (const spec of loadSourceMappingSpecs()) {
+-      const families = Object.values(spec.steps);
+-      expect(new Set(families).size).toBe(families.length);
+-      expect(spec.sharedIdSpaces).toBeUndefined();
++  // S10-D P: an invariant over WHATEVER ships (a new data-only source may declare a shared id
++  // space without touching this spec), never "no shipped spec declares one". Every multi-step
++  // fan-in is declared with exactly its steps; every 1:1 family carries no declaration.
++  const sharedIdViolations = (spec: {
++    sourcePlatform: string;
++    steps: object;
++    sharedIdSpaces?: object;
++  }): string[] => {
++    const fanIn: Record<string, string[]> = {};
++    for (const [step, family] of Object.entries(spec.steps as Record<string, string>)) {
++      (fanIn[family] ??= []).push(step);
++    }
++    const declared = (spec.sharedIdSpaces ?? {}) as Record<string, readonly string[] | undefined>;
++    const out: string[] = [];
++    for (const family of new Set([...Object.keys(fanIn), ...Object.keys(declared)])) {
++      const steps = [...(fanIn[family] ?? [])].sort();
++      const shared = declared[family];
++      if (steps.length < 2 && shared !== undefined) {
++        out.push(`${spec.sourcePlatform}:${family} 1:1`);
++      }
++      if (steps.length >= 2 && JSON.stringify([...(shared ?? [])].sort()) !== JSON.stringify(steps))
++        out.push(`${spec.sourcePlatform}:${family} undeclared fan-in`);
+     }
++    return out;
++  };
++
++  it('every shipped spec declares exactly its multi-step fan-ins (and nothing for 1:1 families)', () => {
++    const specs = loadSourceMappingSpecs();
++    expect(specs.length).toBeGreaterThan(0);
++    for (const spec of specs) expect(sharedIdViolations(spec)).toEqual([]);
++    // Positive guard: the production TrueCoach spec stays 1:1 with no declaration.
++    const truecoach = specs.find((spec) => spec.sourcePlatform === 'truecoach');
++    if (truecoach === undefined) throw new Error('the truecoach spec is not shipped');
++    const families = Object.values(truecoach.steps);
++    expect(new Set(families).size).toBe(families.length);
++    expect(truecoach.sharedIdSpaces).toBeUndefined();
++  });
++
++  it('the shipped-spec invariant still fails on a real defect', () => {
++    const steps = { people: 'clients', sessions: 'workouts', routines: 'workouts' };
++    expect(sharedIdViolations({ sourcePlatform: 'd', steps })).toEqual([
++      'd:workouts undeclared fan-in',
++    ]);
++    expect(
++      sharedIdViolations({
++        sourcePlatform: 'd',
++        steps,
++        sharedIdSpaces: { workouts: ['sessions'], clients: ['people'] },
++      }),
++    ).toEqual(['d:clients 1:1', 'd:workouts undeclared fan-in']);
++    expect(
++      sharedIdViolations({
++        sourcePlatform: 'd',
++        steps,
++        sharedIdSpaces: { workouts: ['routines', 'sessions'] },
++      }),
++    ).toEqual([]);
+   });
+ });
+ 
+diff --git a/test/scout/reconstruct/native/native-families.spec.ts b/test/scout/reconstruct/native/native-families.spec.ts
+index f0a1223c..b4df1bf2 100644
+--- a/test/scout/reconstruct/native/native-families.spec.ts
++++ b/test/scout/reconstruct/native/native-families.spec.ts
+@@ -233,9 +233,76 @@ describe('family registry (owned wiring)', () => {
+     );
+   });
+ 
+-  it('ships no repository native rule set yet (absent directory → empty registry, nothing native is guessed)', () => {
+-    expect(loadNativeRuleSets(NATIVE_RULES_DIR)).toEqual([]);
+-    expect(buildNativeRuleRegistry().size).toBe(0);
++  // S10-D P: invariants over WHATEVER ships (a new data-only source adds a rule set without
++  // touching this spec), never "the directory is absent". A shipped rule set must be a declared,
++  // consistent artifact of a shipped mapping spec; the positive guard stays: the production
++  // TrueCoach source ships no guessed native rules (its exercise payload shape is not established).
++  const PRODUCTION_WITHOUT_NATIVE_RULES = ['truecoach'] as const;
++  const guessedProduction = (registry: ReadonlyMap<string, unknown>) =>
++    PRODUCTION_WITHOUT_NATIVE_RULES.filter((platform) => registry.has(platform));
++  /** Every shipped rule set pairs with exactly one shipped spec and names only its families. */
++  const nativeRuleViolations = (
++    sets: readonly { sourcePlatform: string; families: object }[],
++    specs: ReadonlyMap<string, { spec: { families: object } }>,
++  ): string[] => {
++    const out: string[] = [];
++    for (const set of sets) {
++      const mapper = specs.get(set.sourcePlatform);
++      if (mapper === undefined) {
++        out.push(`${set.sourcePlatform}: no shipped mapping spec`);
++        continue;
++      }
++      for (const family of Object.keys(set.families)) {
++        if (!Object.prototype.hasOwnProperty.call(mapper.spec.families, family))
++          out.push(`${set.sourcePlatform}: ${family} is not a family of its spec`);
++      }
++    }
++    return out;
++  };
++
++  it('every shipped native rule set is declared data for a shipped spec (none guessed)', () => {
++    const sets = loadNativeRuleSets(NATIVE_RULES_DIR);
++    const registry = buildNativeRuleRegistry();
++    // Loader and default registry agree on exactly the shipped files, one per platform.
++    expect([...registry.keys()].sort()).toEqual(sets.map((s) => s.sourcePlatform).sort());
++    if (sets.length > 0) {
++      const files = readdirSync(NATIVE_RULES_DIR).filter((name) => name.endsWith('.json'));
++      expect(files.sort()).toEqual(sets.map((s) => `${s.sourcePlatform}.json`).sort());
++    }
++    expect(nativeRuleViolations(sets, buildSourceMapperRegistry())).toEqual([]);
++    // Positive guard: no production source ships guessed native rules.
++    expect(guessedProduction(registry)).toEqual([]);
++  });
++
++  it('the invariant still fails on a real defect (a rule set with no spec, or a foreign family)', () => {
++    const specs = buildSourceMapperRegistry([
++      parseSourceMappingSpec(
++        {
++          specVersion: 1,
++          sourcePlatform: 'p-defect',
++          steps: { people: 'clients' },
++          families: { clients: { displayName: { paths: [['name']], coerce: 'string' } } },
++        },
++        'p-defect',
++      ),
++    ]);
++    const orphan = { sourcePlatform: 'p-orphan', families: { programs: {} } };
++    const foreign = { sourcePlatform: 'p-defect', families: { workouts: {} } };
++    expect(nativeRuleViolations([orphan, foreign], specs)).toEqual([
++      'p-orphan: no shipped mapping spec',
++      'p-defect: workouts is not a family of its spec',
++    ]);
++    // A production source that ever shipped rules would trip the positive guard above.
++    const guessed = buildNativeRuleRegistry([
++      parseNativeRuleSet({ specVersion: 1, sourcePlatform: 'truecoach', families: {} }, 'guess'),
++    ]);
++    expect(guessedProduction(guessed)).toEqual(['truecoach']);
++  });
++
++  it('absent directory → empty; present-but-empty directory fails closed', () => {
++    expect(loadNativeRuleSets(join(mkdtempSync(join(tmpdir(), 's8c-absent-')), 'absent'))).toEqual(
++      [],
++    );
+     expect(() => loadNativeRuleSets(mkdtempSync(join(tmpdir(), 's8c-empty-')))).toThrow(
+       /no \*\.json/,
+     );
+--- a/test/scout/reconciliation/facts.service.coverage.spec.ts
++++ b/test/scout/reconciliation/facts.service.coverage.spec.ts
+@@ -1,15 +1,17 @@
+-import { existsSync, readFileSync } from 'fs';
++import { readFileSync } from 'fs';
+ import { join } from 'path';
+ import {
+   buildInductionRegistry,
+-  INDUCTION_MANIFESTS_DIR,
+   loadInductionManifests,
+   type InductionRegistry,
+ } from '../../../src/scout/induction/manifest-registry';
+ import { EMPTY_IDENTITY_SET_DIGEST, identitySetDigest } from '../../../src/scout/induction/digest';
+ import { parseSourceMappingSpec } from '../../../src/scout/reconstruct/mapping-spec';
+ import { parseNativeRuleSet } from '../../../src/scout/reconstruct/native/native-rules';
+-import { buildNativeRuleRegistry } from '../../../src/scout/reconstruct/native/native-rule-registry';
++import {
++  buildNativeRuleRegistry,
++  loadNativeRuleSets,
++} from '../../../src/scout/reconstruct/native/native-rule-registry';
+ import { buildSourceMapperRegistry } from '../../../src/scout/reconstruct/source-mapper-registry';
+ import {
+   ReconciliationFactsService,
+@@ -28,6 +30,7 @@
+   S10_PURE_MANIFESTS_DIR,
+   S10_PURE_SPEC_PATH,
+   sha256,
++  TEST_KEYS,
+   type StatementFields,
+ } from '../../fixtures/scout/s10_pure/s10-pure-signer';
+ 
+@@ -152,11 +155,16 @@
+ 
+ // ── Fixtures ─────────────────────────────────────────────────────────────────────────────────
+ 
+-/** `'default'` = construct WITHOUT a `registry` option (production wiring); else the given one. */
++/**
++ * `'default'` = construct WITHOUT a `registry` option (production wiring) over the SHIPPED native
++ * rule sets, so the disk-loaded manifests stay V6-consistent whatever ships (S10-D P: a shipped
++ * source with `nativeRules: 'declared'` and the same slug must not make construction throw);
++ * else the given registry over no native rules (the fixture package declares none).
++ */
+ const service = (registry: InductionRegistry | 'default' = REGISTRY) =>
+   new ReconciliationFactsService({
+     sourceMappers: MAPPERS,
+-    nativeRules: buildNativeRuleRegistry([]),
++    nativeRules: buildNativeRuleRegistry(registry === 'default' ? loadNativeRuleSets() : []),
+     ...(registry === 'default' ? {} : { registry }),
+   });
+ 
+@@ -592,15 +600,31 @@
+ });
+ 
+ describe("S10-C default induction registry (over this service's mapper partition)", () => {
+-  it('without a registry option, manifests come from disk (none here) → unknown, never a throw', async () => {
++  it('without a registry option, manifests come from disk → the fixture signer is trusted by none → unknown, never a throw', async () => {
+     const db = provenRun();
+     // (devloop-1: `service(undefined)` hit the parameter DEFAULT — the fixture registry — so
+     // this test was proving the fixture, not the disk. `'default'` is an explicit sentinel.)
+     const facts = await collect(db, RUN, service('default'));
+-    expect(existsSync(INDUCTION_MANIFESTS_DIR)).toBe(false); // the premise: no manifest on disk
++    // S10-D P premise, an invariant over whatever ships (never "no manifest on disk"): no shipped
++    // manifest trusts the test-fixture signer, so fixture-signed evidence proves nothing.
++    const shippedKeys = loadInductionManifests().flatMap((m) =>
++      m.verifiers.map((v) => v.public_key_b64),
++    );
++    expect(shippedKeys).not.toContain(TEST_KEYS.source.public_key_b64);
++    expect(shippedKeys).not.toContain(TEST_KEYS.observer.public_key_b64);
+     expect(facts.coverage).toEqual({ clients: UNKNOWN, programs: UNKNOWN, workouts: UNKNOWN });
+   });
+ 
++  it('the default-registry premise still fails on a real defect (a shipped manifest trusting the fixture key)', async () => {
++    const trusting = buildInductionRegistry({
++      manifests: loadInductionManifests(S10_PURE_MANIFESTS_DIR),
++      specs: [SPEC],
++      nativeRuleSets: [],
++    });
++    const facts = await collect(provenRun(), RUN, service(trusting));
++    expect(facts.coverage).toEqual(BASELINE); // the same evidence IS provable once trusted
++  });
++
+   it('drops a native rule set whose platform has no mapping spec here instead of failing construction', () => {
+     const foreignRules = parseNativeRuleSet(
+       {
+@@ -626,12 +650,19 @@
+       },
+       'coverage.spec:foreign',
+     );
++    // The shipped rule sets ride along (S10-D P: a shipped `nativeRules: 'declared'` manifest
++    // for this partition's slug stays V6-consistent); only the foreign one is dropped.
+     const registry = ReconciliationFactsService.defaultRegistry(
+       MAPPERS,
+-      buildNativeRuleRegistry([foreignRules]),
++      buildNativeRuleRegistry([...loadNativeRuleSets(), foreignRules]),
+     );
+     expect(Array.from(registry.specFamilies.keys())).toEqual([SLUG]);
+-    expect(registry.packages.size).toBe(0);
++    expect(Array.from(registry.packages.keys())).toEqual(
++      loadInductionManifests()
++        .map((m) => m.sourcePlatform)
++        .filter((platform) => platform === SLUG),
++    );
++    expect(registry.packages.has('elsewhere')).toBe(false);
+   });
+ });
+ 

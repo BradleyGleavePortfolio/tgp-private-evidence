@@ -1,0 +1,88 @@
+--- a/test/contracts/importer-contract.spec.ts
++++ b/test/contracts/importer-contract.spec.ts
+@@ -527,9 +527,15 @@
+       expect(Object.keys(rec(result.properties)).sort()).toEqual([
+         'chosen_platform',
+         'import_intent_id',
++        'readiness',
+         'status',
+       ]);
+       expect(result.required).toContain('import_intent_id');
++      // S11-C (D-S11-5): optional advisory readiness block, a $ref to PairReadiness.
++      expect(result.required).not.toContain('readiness');
++      expect(dig(result, 'properties', 'readiness', 'allOf')).toEqual([
++        { $ref: '#/components/schemas/PairReadiness' },
++      ]);
+       expect(Object.keys(rec(route.responses)).sort()).toEqual([
+         '200',
+         '400',
+--- a/test/rls-c1-setup.spec.ts
++++ b/test/rls-c1-setup.spec.ts
+@@ -251,11 +251,15 @@
+     await prisma.extensionPairCode.updateMany({ data: { expires_at: new Date(0) } });
+     await expect(svc().init('a', 'truecoach', key)).rejects.toMatchObject({ status: 410 });
+     await prisma.extensionPairCode.deleteMany();
+-    expect(await svc().current('a', key)).toEqual({
++    // S11-C: this lane builds no ScoutImport table, so the readiness read fails and the block is
++    // omitted (unknown): its exact expected value here is absent.
++    const recovered = await svc().current('a', key);
++    expect(recovered).toEqual({
+       import_intent_id: setup.import_intent_id,
+       chosen_platform: 'truecoach',
+       status: 'expired',
+     });
++    expect(recovered).not.toHaveProperty('readiness');
+   });
+ 
+   it('one concurrent redeem wins, atomically records pairing, and never replays tokens', async () => {
+@@ -268,11 +272,14 @@
+     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+     await expect(svc().redeem(setup.pairing_code)).rejects.toMatchObject({ status: 410 });
+     await prisma.extensionPairCode.deleteMany();
+-    expect(await svc().session('a', setup.import_intent_id!)).toEqual({
++    // S11-C: no ScoutImport table on this lane, so readiness is absent (unknown), as above.
++    const paired = await svc().session('a', setup.import_intent_id!);
++    expect(paired).toEqual({
+       import_intent_id: setup.import_intent_id,
+       chosen_platform: 'truecoach',
+       status: 'paired',
+     });
++    expect(paired).not.toHaveProperty('readiness');
+   });
+ 
+   it('mint failure is retryable and expiry/supersession during mint cannot claim', async () => {
+--- a/src/extension-pair/__tests__/readiness.spec.ts
++++ b/src/extension-pair/__tests__/readiness.spec.ts
+@@ -148,6 +148,32 @@
+     expect(Object.prototype.hasOwnProperty.call(r, 'readiness')).toBe(false);
+   });
+ 
++  it('double with NO run table: block absent, setup still answers (no throw)', async () => {
++    const prisma = {
++      importIntent: {
++        findFirst: jest.fn().mockResolvedValue({
++          id: intent,
++          coach_id: 'coach-1',
++          chosen_platform: 'label-only',
++          paired_at: null,
++          superseded_at: null,
++          challenge: { expires_at: new Date(Date.now() + 60_000), failed_attempts: 0 },
++        }),
++      },
++    };
++    const auth = { mintExtensionSessionForCoach: jest.fn() };
++    const svc = new ExtensionPairService(asPrismaDouble(prisma), asAuthDouble(auth));
++    for (const r of [await svc.session('coach-1', intent), await svc.current('coach-1')]) {
++      expect(r).toEqual({
++        status: 'pending',
++        import_intent_id: intent,
++        chosen_platform: 'label-only',
++      });
++      expect(r).not.toHaveProperty('readiness');
++    }
++    expect(auth.mintExtensionSessionForCoach).not.toHaveBeenCalled();
++  });
++
+   it('wording: neutral "declaration received"; optional; closed vocabulary', () => {
+     const key = 'swagger/apiModelProperties';
+     const declared = Reflect.getMetadata(key, PairReadiness.prototype, 'source_declared');

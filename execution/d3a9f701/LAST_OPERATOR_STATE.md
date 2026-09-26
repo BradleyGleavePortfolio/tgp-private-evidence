@@ -1,5 +1,5 @@
 # LAST OPERATOR STATE — d3a9f701 (2026-09-26T04:50Z)
-- integration/importer = a2c74e904ff227b16881c77ee5a08bd006972d48 (S10-B, PR #549) <- 92b96715 (S10-A, PR #548) <- e6f20300 (S9-C, PR #547). main = 1c10e2a1 untouched.
+- integration/importer = 711c1f8f8b42157bca97f2a721557be7ef006667 (S11-0 doc, PR #551) <- 384035ec (S10-D D1, PR #550) <- a2c74e90 (S10-B, PR #549) <- 92b96715 (S10-A). main = 1c10e2a1 untouched.
 - S9-C: ACCEPTED + LANDED (s9c/ACCEPT_RECORD-2e9f6c054b86.md, LAND_GO_S9C.md; PROOF-3 10/10).
 - S10-A: LANDED (s10a/land/LAND_GO_S10A.md).
 - S10-B: devloop-3 green on 92b96715 (150/150); gate+binding source dual GO; one-shot gate RELAYED 04:44Z (s10b/gate/). Next: binding v1 pins from gate receipt -> real-PG proof (lane s10-b, port 55647) -> accept -> land.

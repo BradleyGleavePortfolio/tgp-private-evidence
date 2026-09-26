@@ -1,0 +1,10 @@
+--- s10c-gate-d3a9.sh.pre-review-fix	2026-09-26 05:49:20.259187820 +0000
++++ s10c-gate-d3a9.sh	2026-09-26 05:49:20.267187820 +0000
+@@ -382,6 +382,7 @@
+ node scripts/check-r75.js --mode=staged > "$E/r75-staged.raw.log" 2>&1; rc=$?; log "R75_STAGED rc=$rc"; [ $rc = 0 ] || { tail -40 "$E/r75-staged.raw.log" >> "$LOG"; finish 74; }
+ STAGE=commit
+ log "COMMIT_MESSAGE file=$MSG sha256=$(sha "$MSG") contract_state=$CONTRACT_STATE"
++[ "$(sha .git/hooks/pre-commit)" = "$HP" ] && [ "$(sha .git/hooks/commit-msg)" = "$HC" ] && [ -z "$(git config --get core.hooksPath)" ] && [ "$(git rev-parse --git-path hooks)" = .git/hooks ] && [ -d .git/hooks ] && [ ! -L .git/hooks ] && [ -f .git/hooks/pre-commit ] && [ ! -L .git/hooks/pre-commit ] && [ -f .git/hooks/commit-msg ] && [ ! -L .git/hooks/commit-msg ] || { log "HOOK_FAIL hook shas / core.hooksPath / plain .git/hooks changed before git commit (pre-commit=$(sha .git/hooks/pre-commit) want $HP; commit-msg=$(sha .git/hooks/commit-msg) want $HC)"; finish 71; }
+ NODE_OPTIONS=--max-old-space-size=4096 git commit -F "$MSG" > "$E/commit-attempt-1.raw.log" 2>&1; rc=$?
+ tail -25 "$E/commit-attempt-1.raw.log" >> "$LOG"; log "GIT_COMMIT rc=$rc (NODE_OPTIONS=--max-old-space-size=4096 on the commit line)"; [ $rc = 0 ] || finish 76
+ HEAD=$(git rev-parse HEAD); HTREE=$(git rev-parse 'HEAD^{tree}')

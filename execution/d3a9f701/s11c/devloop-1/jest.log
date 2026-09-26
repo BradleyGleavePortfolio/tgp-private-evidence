@@ -1,0 +1,189 @@
+FAIL test/contracts/importer-contract.spec.ts (61.404 s)
+  ● importer contract (R80 freeze) › drift check › the checked-in artifact is byte-identical to a fresh regeneration
+
+    expect(received).toBe(expected) // Object.is equality
+
+    - Expected  -  0
+    + Received  + 36
+
+    @@ -150,10 +150,38 @@
+                "pairing_code",
+                "expires_at"
+              ],
+              "type": "object"
+            },
+    +       "PairReadiness": {
+    +         "properties": {
+    +           "declared_platforms": {
+    +             "description": "Count of distinct declared source platforms; null when run is none.",
+    +             "nullable": true,
+    +             "type": "number"
+    +           },
+    +           "run": {
+    +             "description": "Server run of this setup: none (no Start accepted), open (no terminal recorded yet; not a liveness claim), terminal (a terminal is recorded; read it from GET /api/scout/import/status, the single read of run truth).",
+    +             "enum": [
+    +               "none",
+    +               "open",
+    +               "terminal"
+    +             ],
+    +             "type": "string"
+    +           },
+    +           "source_declared": {
+    +             "description": "True only when at least one run declaration has been received. Display as \"declaration received\"; never as source authorized, ready or connected. This read does not verify source authorization, which stays unknown.",
+    +             "type": "boolean"
+    +           }
+    +         },
+    +         "required": [
+    +           "run",
+    +           "source_declared",
+    +           "declared_platforms"
+    +         ],
+    +         "type": "object"
+    +       },
+            "PairRedeemDto": {
+              "properties": {
+                "code": {
+                  "description": "6-digit numeric pairing code minted by POST /api/extension/pair/init.",
+                  "example": "142856",
+    @@ -214,10 +242,18 @@
+                },
+                "import_intent_id": {
+                  "description": "Persisted server-issued setup correlation.",
+                  "format": "uuid",
+                  "type": "string"
+    +           },
+    +           "readiness": {
+    +             "allOf": [
+    +               {
+    +                 "$ref": "#/components/schemas/PairReadiness"
+    +               }
+    +             ],
+    +             "description": "Advisory readiness of the run bound to this setup. Absent means not known, never \"no\"."
+                },
+                "status": {
+                  "description": "Lifecycle state of the polled code.",
+                  "enum": [
+                    "pending",
+
+      66 |       const committed = fs.readFileSync(contractOutPath(), 'utf8');
+      67 |       // If this fails, run `npm run contract:importer` and commit the result.
+    > 68 |       expect(serialized).toBe(committed);
+         |                          ^
+      69 |     });
+      70 |
+      71 |     it('serialization is deterministic (stable key order across runs)', () => {
+
+      at Object.<anonymous> (test/contracts/importer-contract.spec.ts:68:26)
+
+  ● importer contract (R80 freeze) › cross-process determinism › a fresh subprocess regeneration is byte-identical to the committed artifact
+
+    expect(received).toBe(expected) // Object.is equality
+
+    - Expected  -  0
+    + Received  + 36
+
+    @@ -150,10 +150,38 @@
+                "pairing_code",
+                "expires_at"
+              ],
+              "type": "object"
+            },
+    +       "PairReadiness": {
+    +         "properties": {
+    +           "declared_platforms": {
+    +             "description": "Count of distinct declared source platforms; null when run is none.",
+    +             "nullable": true,
+    +             "type": "number"
+    +           },
+    +           "run": {
+    +             "description": "Server run of this setup: none (no Start accepted), open (no terminal recorded yet; not a liveness claim), terminal (a terminal is recorded; read it from GET /api/scout/import/status, the single read of run truth).",
+    +             "enum": [
+    +               "none",
+    +               "open",
+    +               "terminal"
+    +             ],
+    +             "type": "string"
+    +           },
+    +           "source_declared": {
+    +             "description": "True only when at least one run declaration has been received. Display as \"declaration received\"; never as source authorized, ready or connected. This read does not verify source authorization, which stays unknown.",
+    +             "type": "boolean"
+    +           }
+    +         },
+    +         "required": [
+    +           "run",
+    +           "source_declared",
+    +           "declared_platforms"
+    +         ],
+    +         "type": "object"
+    +       },
+            "PairRedeemDto": {
+              "properties": {
+                "code": {
+                  "description": "6-digit numeric pairing code minted by POST /api/extension/pair/init.",
+                  "example": "142856",
+    @@ -214,10 +242,18 @@
+                },
+                "import_intent_id": {
+                  "description": "Persisted server-issued setup correlation.",
+                  "format": "uuid",
+                  "type": "string"
+    +           },
+    +           "readiness": {
+    +             "allOf": [
+    +               {
+    +                 "$ref": "#/components/schemas/PairReadiness"
+    +               }
+    +             ],
+    +             "description": "Advisory readiness of the run bound to this setup. Absent means not known, never \"no\"."
+                },
+                "status": {
+                  "description": "Lifecycle state of the polled code.",
+                  "enum": [
+                    "pending",
+
+      1138 |       const fromSubprocess = fs.readFileSync(scratch, 'utf8');
+      1139 |       const committed = fs.readFileSync(contractOutPath(), 'utf8');
+    > 1140 |       expect(fromSubprocess).toBe(committed);
+           |                              ^
+      1141 |     }, 180_000);
+      1142 |   });
+      1143 | });
+
+      at Object.<anonymous> (test/contracts/importer-contract.spec.ts:1140:30)
+
+[31m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [31m  ERROR[39m [38;5;3m[ExtensionPairService] [39m[31mpair init: exhausted code-mint attempts[39m
+[31m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [31m  ERROR[39m [38;5;3m[ExtensionPairService] [39m[31mpair init: exhausted code-mint attempts[39m
+PASS src/extension-pair/__tests__/extension-pair.service.spec.ts
+PASS src/extension-pair/__tests__/durable-session.spec.ts
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:42 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+PASS src/extension-pair/__tests__/durable-intent.spec.ts
+PASS src/extension-pair/__tests__/readiness.spec.ts
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+[33m[Nest] 7424  - [39m09/26/2026, 5:33:43 AM [33m   WARN[39m [38;5;3m[ExtensionPairService] [39m[33msetup readiness read failed; readiness omitted (unknown)[39m
+PASS src/extension-pair/__tests__/extension-pair-redeem-contract.spec.ts
+[31m[Nest] 7424  - [39m09/26/2026, 5:33:44 AM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mpair redeem: generateLink failed: no hashed_token[39m
+[31m[Nest] 7424  - [39m09/26/2026, 5:33:44 AM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mpair redeem: verifyOtp failed: bad otp[39m
+[31m[Nest] 7424  - [39m09/26/2026, 5:33:44 AM [31m  ERROR[39m [38;5;3m[AuthService] [39m[31mpair redeem: generateLink failed: supabase down[39m
+PASS src/extension-pair/__tests__/auth-mint-extension-session.spec.ts
+PASS src/extension-pair/__tests__/extension-pair.controller-wiring.spec.ts
+PASS src/extension-pair/__tests__/extension-pair.dto.spec.ts
+PASS src/extension-pair/__tests__/setup-recovery.spec.ts
+PASS src/extension-pair/__tests__/extension-pair.controller.spec.ts
+PASS src/extension-pair/__tests__/coach-guard-role.spec.ts
+
+Test Suites: 1 failed, 11 passed, 12 total
+Tests:       2 failed, 204 passed, 206 total
+Snapshots:   0 total
+Time:        67.222 s
+Ran all test suites within paths "src/extension-pair/__tests__/readiness.spec.ts", "test/contracts/importer-contract.spec.ts", "src/extension-pair/__tests__/auth-mint-extension-session.spec.ts", "src/extension-pair/__tests__/coach-guard-role.spec.ts", "src/extension-pair/__tests__/durable-intent.spec.ts", "src/extension-pair/__tests__/durable-session.spec.ts", "src/extension-pair/__tests__/extension-pair-redeem-contract.spec.ts", "src/extension-pair/__tests__/extension-pair.controller-wiring.spec.ts", "src/extension-pair/__tests__/extension-pair.controller.spec.ts", "src/extension-pair/__tests__/extension-pair.dto.spec.ts", "src/extension-pair/__tests__/extension-pair.service.spec.ts", "src/extension-pair/__tests__/setup-recovery.spec.ts".

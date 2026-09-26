@@ -1,0 +1,118 @@
+# S11-B fix 1 (review A B-1): J13 now observes BOTH workers at the 'before-lock' barrier (in front of the
+# settle tail's FOR NO KEY UPDATE) before either takes the lock, and asserts per-worker traces: refused
+# completion INSERT → tx:rollback, a later gate, one eligibility read, a lock attempt. Base = the reviewed
+# spec bytes (sha d9a25eaa…). Product code unchanged.
+--- a/test/scout/s11/settle-redrive.pg.spec.ts
++++ b/test/scout/s11/settle-redrive.pg.spec.ts
+@@ -40,6 +40,13 @@
+ const isBasisInsert = (q: string) =>
+   /^\s*INSERT INTO (?:"public"\.)?"ScoutRunSettledBasis"/.test(q);
+ const isGate = (q: string) => /SET last_observed_at\s*=/.test(q);
++const isCompletionInsert = (q: string) =>
++  /^\s*INSERT INTO (?:"public"\.)?"ScoutImportCompletion"/.test(q);
++/** The S11-B eligibility read (`isSettlePending`): the only statement naming both tables. */
++const isPendingRead = (q: string) =>
++  /^\s*SELECT/.test(q) && q.includes('FROM "ScoutImport" r') && /phase = 'reconciling'/.test(q);
++const isLock = (q: string) => q.includes('FOR NO KEY UPDATE');
++const isMarker = (q: string) => q.startsWith('-- tx:');
+ const isWrite = (q: string) => /^\s*(INSERT|UPDATE|DELETE)\b/i.test(q);
+ const eventsNamed = (r: Result, name: string) =>
+   r.events.filter((e: unknown[]) => e[1] === name).length;
+@@ -246,53 +253,64 @@
+     expect(h.count(SETTLED_BASIS)).toBe(1);
+   });
+ 
+-  it('J13: two replayed claims at once on P1 and P2 — both re-drive, one terminal write, one basis row, one settled event; the loser\'s CAS miss is silent', async () => {
++  it('J13: two replayed claims race — BOTH provably enter the re-drive branch (refused claim, eligibility gate, pass, tail lock attempt) before either takes the tail lock; one terminal write, one basis row, one settled event; the loser\'s CAS miss is silent', async () => {
+     const intentId = await pairedAndStarted(COACH);
+     await transfer(COACH, intentId);
+     await completeAndKill('P1', COACH, intentId, 2);
+ 
+-    // P2's re-drive pauses holding the settle tail's row lock; P1's re-drive blocks behind it.
+-    const a = pg.worker({
+-      ...h.REGISTRY,
+-      host: 'P2',
+-      role: 'ext',
+-      action: 'complete',
+-      coach: COACH,
+-      intent: intentId,
+-      body: { terminal_status: 'success' },
+-      pause: 'locked',
+-      txTimeout: 60000,
+-    });
+-    expect(await a.ready).toBe('locked');
+-    const b = pg.worker({
+-      ...h.REGISTRY,
+-      host: 'P1',
+-      role: 'ext',
+-      action: 'complete',
+-      coach: COACH,
+-      intent: intentId,
+-      body: { terminal_status: 'success' },
++    // Review A B-1: each worker pauses at `before-lock`, the barrier in front of the settle
++    // tail's `FOR NO KEY UPDATE` — the first such statement on the replay path. Reaching it is a
++    // positive, per-worker observation that the claim was refused (P2002), the eligibility gate
++    // re-read the run, and the pass ran; neither holds the row while the other is at its gate.
++    const redrive = (host: Host) =>
++      pg.worker({
++        ...h.REGISTRY,
++        host,
++        role: 'ext',
++        action: 'complete',
++        coach: COACH,
++        intent: intentId,
++        body: { terminal_status: 'success' },
++        pause: 'before-lock',
++        txTimeout: 60000,
++      });
++    const a = redrive('P2');
++    const b = redrive('P1');
++    expect(await Promise.all([a.ready, b.ready])).toEqual(['before-lock', 'before-lock']);
++    // Both stand in front of the tail lock: the run is still open and unsettled at this moment.
++    expect(h.runRow(COACH, intentId)).toMatchObject({
++      terminal_status: null,
++      phase: 'reconciling',
+     });
+-    await pg.blocked(b.name);
++    expect(h.count(SETTLED_BASIS)).toBe(0);
+     a.resume();
++    b.resume();
+     const [ar, br] = await Promise.all([a.done, b.done]);
+-    expect(ar.failure).toBeUndefined();
+-    expect(br.failure).toBeUndefined();
+-    expect(ar.result).toEqual(ack(intentId));
+-    expect(br.result).toEqual(ack(intentId));
+-    expect(String(ar.failure?.message ?? '')).not.toMatch(/deadlock/i);
+-    expect(String(br.failure?.message ?? '')).not.toMatch(/deadlock/i);
++    for (const r of [ar, br]) {
++      expect(r.failure).toBeUndefined();
++      expect(r.result).toEqual(ack(intentId));
++      // The re-drive branch, per worker: the refused claim INSERT rolled back, then a second gate
++      // in its own transaction, the eligibility read, and an attempted tail lock.
++      const refused = r.queries.findIndex(isCompletionInsert);
++      expect(refused).toBeGreaterThan(-1);
++      expect(r.queries.slice(refused + 1).find(isMarker)).toBe('-- tx:rollback');
++      const gates = r.queries.map((q, i) => (isGate(q) ? i : -1)).filter((i) => i > refused);
++      expect(gates.length).toBeGreaterThanOrEqual(1); // the eligibility gate (the pass adds more)
++      expect(r.queries.slice(refused).filter(isPendingRead)).toHaveLength(1);
++      expect(r.queries.slice(refused).filter(isLock).length).toBeGreaterThanOrEqual(1);
++      expect(r.pushes).toBe(0);
++      expect(eventsNamed(r, 'scout.ingest.completed')).toBe(0);
++      expect(r.queries.filter(isTerminal).length).toBeLessThanOrEqual(1);
++    }
+ 
+     const row = h.runRow(COACH, intentId);
+     expect(row.terminal_status).not.toBeNull();
+     expect(h.count(SETTLED_BASIS)).toBe(1);
++    expect([...ar.queries, ...br.queries].filter(isTerminal)).toHaveLength(1);
+     expect([...ar.queries, ...br.queries].filter(isBasisInsert)).toHaveLength(1);
+     expect(eventsNamed(ar, 'scout.run.settled') + eventsNamed(br, 'scout.run.settled')).toBe(1);
+-    const completed = (r: Result) => eventsNamed(r, 'scout.ingest.completed');
+-    expect(completed(ar) + completed(br)).toBe(0);
+-    expect(ar.pushes + br.pushes).toBe(0);
+     expect(h.completionRows()).toEqual([[COACH, intentId, 'success']]);
+-    // Unique ledger/provenance keys: two passes, no duplicate row.
++    // Unique ledger/provenance keys: two concurrent passes, no duplicate row, no duplicate native.
+     const ledger = h.ledgerRows(COACH, intentId);
+     const keys = ledger.map((l) => `${l.entity_type}|${l.source_platform}|${l.source_id}`);
+     expect(new Set(keys).size).toBe(keys.length);

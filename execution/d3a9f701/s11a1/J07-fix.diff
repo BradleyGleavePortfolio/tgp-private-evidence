@@ -1,0 +1,23 @@
+--- /home/user/workspace/private-evidence/execution/d3a9f701/s11a1/journey-core.pre-j07fix.ts	2026-09-26 05:24:35.195187820 +0000
++++ test/scout/s11/journey-core.pg.spec.ts	2026-09-26 05:50:50.391187820 +0000
+@@ -612,12 +612,17 @@
+       if (s.coach_id === OTHER) expect(s.device_id).toBe('device-ext');
+     }
+     // After B's own evidence, B's status for that string may answer B's legacy mirror: it carries
+-    // no A field (no server clock, no epoch, no A counts).
++    // no A field (no server clock, no phase, no A counts). A legacy row projects the documented
++    // constant execution_epoch = 1 (scout.dto.ts S7-L note), never a server run's epoch.
+     const bLater = await status('P2', OTHER, a);
+     if (bLater.failure === undefined) {
+-      expect(bLater.result.mode).not.toBe('server');
++      expect(bLater.result.mode).toBe('legacy');
++      expect(bLater.result.phase ?? null).toBeNull();
++      expect(bLater.result.accepted_start_at ?? null).toBeNull();
++      expect(bLater.result.deadline_at ?? null).toBeNull();
++      expect(bLater.result.last_observed_at ?? null).toBeNull();
+       expect(bLater.result.entity_counts).toEqual([]);
+-      expect(bLater.result.execution_epoch ?? null).toBeNull();
++      expect(bLater.result.execution_epoch).toBe(1);
+       expect(JSON.stringify(bLater.result)).not.toContain(
+         String(aRow.accepted_start_at).slice(0, 19),
+       );

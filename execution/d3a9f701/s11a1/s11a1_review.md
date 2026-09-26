@@ -18,3 +18,38 @@
 - Read-only `git status --porcelain` showed only the eight S11 test/harness paths; no `src/**`, `prisma/**`, or S10-owned path was changed.
 
 **Decision:** fix the three B proof gaps before calling this slice GO. This review does not claim the unrun real-PG lane passes.
+
+## Delta review 1 (fix-1)
+
+**GO for this narrow delta; the three original B findings are closed at source level.**
+
+- Refused ports now receive matching per-port confirmations, while 55648/55649/55650 are positive controls (`g2-s11-db-guard.spec.ts:90–127`). Removing a refused port now makes its specific test fail.
+- J07 now compares full A staged-row contents, A's native/evidence/provenance/ledger snapshot, and A completion rows before/after B's operations; it also checks B's own staged/ledger/completion ownership and both cross-intent gaps (`journey-core.pg.spec.ts:531–605`, `g2-s11-harness.ts:353–358`). That closes the identified count-only false-pass.
+- J08 records `{userId,kind}` at the injected notification method invocation and asserts the allowed coach-only push, counts actual outbound method/HTTP(S)/fetch interceptions, and checks persisted outbound table counts (`g2-s11-worker.cjs:106–168`, `journey-core.pg.spec.ts:628–671`, `g2-s11-harness.ts:359–372`). Installation is not merely asserted on an arbitrary unloaded class: `ScoutService` imports `NotificationsService` before the interception pass, and J08 requires a patched `NotificationsService.*` method in every worker plus patched HTTP(S) transports. New lazy email/messaging/drip/notification imports would also trip the retained load counters; an actual intercepted call records and throws. The independently injected notification stub is asserted on its call. No new concrete false-pass was found in these changed regions.
+
+This is **source-only delta GO**, not an assertion that the real-PG run has passed. The separate base-pin move is not reviewed here.
+
+## Delta review 2 (fix-2 base move)
+
+**NO-GO on the added S10-B database-posture proof; base pins and reset exclusion are otherwise sound.**
+
+- The full base pin is `711c1f8f8b42157bca97f2a721557be7ef006667`, matching the checked-out landed S11-0 head. The worktree has 173 migration directories, ending in `20270124000000_scout_run_observation_expand`; bootstrap, pure guard, DB helper, and PG harness agree on these literals. Bootstrap refuses a changed Prisma tree and requires the migration file, applied migration, all three tables and generated-client models (`g2-s11-bootstrap.sh:150–165,175–188,244–247`; `g2-s11-db-guard.spec.ts:191–236`). This part is GO.
+- The S10-B migration's three composite parent FKs are `ON DELETE CASCADE`; its insert-only trigger rejects top-level DELETE at trigger depth 1 and permits nested FK cleanup (`migration.sql:104–107,141–146,170–184`). `resetData()` deletes `ScoutImport` after its dependent legacy rows without directly deleting the three new tables (`g2-s11-harness.ts:262–269`). The omission is correct: direct child DELETE would be refused, parent-run deletion can remove them as referential cleanup. This part is GO.
+- **B — New live RLS checks can false-pass on empty tables and do not assert FORCE.** Both bootstrap and the RLS spec check only `pg_class.relrowsecurity`, not `relforcerowsecurity` (`g2-s11-bootstrap.sh:183–188`; `rls-g2-s11.spec.ts:82–87`). The role-posture loop (`rls-g2-s11.spec.ts:149–165`) inserts an `ImportIntent` and mirror row but no S10-B declaration/observation/basis row; `SELECT count(*) = 0` therefore passes for `anon` or `authenticated` even if those roles were accidentally granted read access with a permissive policy. **Harm:** a weakened database could be certified as having the landed S10-B isolation posture. **Blocked:** the claimed live-PG proof of *forced* RLS and API-role denial for the three new tables. **Minimum fix:** require both `relrowsecurity` and `relforcerowsecurity` for each table; in the role test, either seed an actual child row through the owning fixture and assert non-disclosure, or assert the catalog grants/policies explicitly (`anon`/`authenticated` cannot SELECT/INSERT/UPDATE/DELETE, `service_role` only SELECT/INSERT). This unblocks a discriminating S10-B database-posture proof.
+
+No other new false-pass was found in the base-pin delta. This is a source-only decision; no PG suite or bootstrap was run.
+
+## Delta review 3 (fix-3)
+
+**GO for this narrow delta.** The remaining B proof defect is closed at source level; no new A/B finding.
+
+- Bootstrap and the live lane-identity spec now require *both* `relrowsecurity` and `relforcerowsecurity` to be `true` on each of the three S10-B tables (`g2-s11-bootstrap.sh:183–189`; `rls-g2-s11.spec.ts:84–92`).
+- The role-posture case creates a parent run, then a valid declaration, observation and settled-basis row using the owner connection. It first verifies a nonzero owner count in each new table, then checks `anon` and `authenticated` reads yield zero rows or permission denial (`rls-g2-s11.spec.ts:163–197`). The seeded evidence matches the migration's platform/digest/challenge/epoch/family/basis constraints, and `resetData()` deletes the parent run so the child rows are removed through the accepted FK cascade. A permissive API-role read would now fail, rather than passing because the tables were empty.
+
+**Overall S11-A1 source verdict after fixes 1–3: GO, conditional on the parent's unrun real-PG validation.**
+
+## Proof run-1 delta (J07)
+
+**GO for the narrow J07 fix; class B test-expectation defect, not an observed cross-tenant leak.** The landed status projection emits `execution_epoch: row?.execution_epoch ?? 1` even with no run row (`lifecycle.service.ts:882–899`), and the DTO explicitly documents `mode='legacy'`, null phase/clocks and epoch 1 (`scout.dto.ts:371–412`). B's UUID lookup is scoped by B's coach id (`lifecycle.service.ts:228–241`); the status row, staged groups and mirror reads are likewise B-scoped (`scout.service.ts:428–456`). A's open server run has a non-null accepted start, while the fixed assertion requires the B response to be legacy with null phase and server clocks, empty counts, and no A-clock substring (`journey-core.pg.spec.ts:614–631`). There is no path in these landed reads by which A's row alone produces this legacy shape and the constant epoch 1; the matching numeral is not evidence of A access.
+
+The patch changes only this test branch's incorrect expectation, retaining A-row/tenant invariants and strengthening the legacy discriminator. It is non-vacuous for the observed run-1 failure (the success branch was reached). The alternative 404 branch remains per the accepted legacy-status behavior. Proof run-1's RC=1 remains preserved; a new bound run is still required before reporting a passing real-PG proof.
