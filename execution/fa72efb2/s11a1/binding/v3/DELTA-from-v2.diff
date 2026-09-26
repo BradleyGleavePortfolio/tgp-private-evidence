@@ -1,0 +1,103 @@
+--- ../../../../d3a9f701/s11a1/binding/v2/s11-pg-proof.sh	2026-09-26 14:57:15.884556904 +0000
++++ s11-pg-proof.sh	2026-09-26 15:16:51.132556904 +0000
+@@ -1,4 +1,9 @@
+ #!/usr/bin/env bash
++# EXEC-FA72EFB2 binding v3 — re-pin of the reviewed v2 runner (execution/d3a9f701/s11a1/binding/v2/s11-pg-proof.sh, sha256 e9b87830…)
++# to: base 6a33df9b (C2 landed), candidate 3db615c0 (v2 + delta-GO PROOF_V2-fix.diff), land ref land/s11a1-v3, FREEZE-v3, this host's
++# fresh runtime namespace execution/fa72efb2/runtime, lock inode 686480, donor = npm ci node_modules of the source clone (same hidden
++# lock 05bc530a, client generated from the same S10-B schema => donor client == expected clone client; the v2 inequality guard is
++# inverted accordingly). Every other line is v2 verbatim; the full delta is DELTA-from-v2.diff. Header below is the v1/v2 text.
+ # S11-A1 real-PG proof — execution binding v1 (EXEC-D3A9F701). SOURCE ONLY: NOT RUN, NOT GRANTED.
+ # Derived from the S10-B binding execution/d3a9f701/s10b/binding/v1/s10b-pg-proof.sh (filled, sha256 620f0458…f554, with all
+ # its review fixes: pins checked before anything can write the sentinel, under-lock rechecks, symlink-aware hook checks, no
+@@ -25,27 +30,27 @@
+ # Pipefail rule (S9C-PROOF-1): never `cmd | grep -q`; producer output is captured first, then grepped as a here-string.
+ # Inner stage bounds: clone 120 + cp 600 + generate 600 + init 60 + start 60 + bootstrap 900 + identity 8x15 + jest 1500 +
+ # 1500 + 300 + stop 75 + destroy 75 = 5910 s soft sum.
+-# Usage (under the separate single-run PG grant): timeout -k 30 7200 bash .../s11a1/binding/v1/s11-pg-proof.sh
++# Usage (under the separate single-run PG grant): timeout -k 30 7200 bash .../fa72efb2/s11a1/binding/v3/s11-pg-proof.sh
+ set -uo pipefail
+-D=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s11a1/binding/v2
+-RUNTIME_ROOT=/home/user/workspace/execution/1910a060/runtime                     # 1910a060 runtime namespace; the fixture carries the same literal (cross-checked below)
+-SRC=/home/user/workspace/worktrees/d3a9-s11a1                                    # clone source (read-only here): HEAD c8ee9005, clean
+-W=/home/user/workspace/worktrees/d3a9-s11a1-pg2                                  # the fresh clone this run creates (must not exist)
+-DONOR_NM=/home/user/workspace/worktrees/1910a060-s8f/node_modules                 # read-only donor (pre-S10-B client); copied, never regenerated
++D=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11a1/binding/v3
++RUNTIME_ROOT=/home/user/workspace/execution/fa72efb2/runtime                     # fa72efb2 runtime namespace (rt-setup-fa72efb2.sh RC=0); the fixture carries the same literal (cross-checked below)
++SRC=/home/user/workspace/worktrees/fa72-s11a1                                    # clone source (read-only here): HEAD 3db615c0 (= origin/land/s11a1-v3), clean, lefthook hooks from npm ci
++W=/home/user/workspace/worktrees/fa72-s11a1-pg3                                  # the fresh clone this run creates (must not exist)
++DONOR_NM=/home/user/workspace/worktrees/fa72-s11a1/node_modules                  # read-only donor (npm ci + prisma generate at 3db615c0 by rt-setup-fa72efb2.sh); copied, never regenerated
+ R=$D/run; LOG=$R/s11-pg-proof.log; SENT=$R/s11-pg-proof.sentinel; STARTED_F=$R/STARTED
+ JLOG1=$R/jest-rls.log; JLOG2=$R/jest-journey.log; JLOG3=$R/jest-guard.log; GENLOG=$R/prisma-generate.log
+ LOCK=/home/user/workspace/execution/test-validation.lock
+ # ---- pins (from the clone source at c8ee9005 and its FREEZE; compare only)
+-BASE_HEAD=7746a8772e7e3729406cceb4665308829dcff454                                                 # integration/importer tip after S10-C (= HEAD^)
++BASE_HEAD=6a33df9b2ea1fd246663a2287b92830f0d093abe                               # integration/importer tip after S10-C2 (= HEAD^)
+ HARNESS_BASE=711c1f8f8b42157bca97f2a721557be7ef006667                            # harness literal (bootstrap BASE_HEAD / G2_S11_BASE_HEAD); must be an ancestor of HEAD
+-BASE_TREE=f453534106d5d2c508f431283926a54e3e3e773b
+-EXPECT_HEAD=53b2f70ae9b9d20e13b15df7e2570b0109d4fdc2                                             # S11-A1 v2 candidate (J07 fix), one commit on BASE_HEAD
+-EXPECT_TREE=e26c8ca45034c1bca4fa24e21b27a8fd44d6bd8f
+-LAND_REF=refs/remotes/origin/land/s11a1-v2
++BASE_TREE=454fd501b9353bac11a083036aa5340da354e37c
++EXPECT_HEAD=3db615c0a5e64a63b910d34ce7c732ee6e63f24d                             # S11-A1 v3 candidate (v2 + PROOF_V2-fix.diff, delta GO), one commit on BASE_HEAD
++EXPECT_TREE=6ea6852ca16253f7e5b269aa9a1cdfb69bac2ddb
++LAND_REF=refs/remotes/origin/land/s11a1-v3
+ EXPECT_MIGRATIONS_TREE=7b6fe0eda137ab1e3013b8a7c3b0c7637f69a521                  # HEAD:prisma/migrations == BASE:prisma/migrations (no candidate migration)
+ EXPECT_MIGRATIONS=173
+ S10B_MIGRATION=20270124000000_scout_run_observation_expand                       # last accepted migration directory
+-EXPECT_SPEC_BLOB=50de96084c396916fda940ecf47eedcc29f754cf                         # test/rls-g2-s11.spec.ts
++EXPECT_SPEC_BLOB=a4ba04ee14899d4db79c9a8b1a925a16a1eab72c                         # test/rls-g2-s11.spec.ts
+ EXPECT_JOURNEY_BLOB=95aee484b1f1a0e3aaf2e517476bd6b1c5eb2e75                      # test/scout/s11/journey-core.pg.spec.ts
+ EXPECT_GUARD_BLOB=e1ace171738934a209b10f58039db9d86031b831                        # test/utils/g2-s11-db-guard.spec.ts
+ EXPECT_BOOTSTRAP_BLOB=0e234b5835bdc060edf080928676c0994525598a                    # test/utils/g2-s11-bootstrap.sh (mode 100755)
+@@ -57,26 +62,26 @@
+ EXPECT_JEST_BLOB=769a414698125340d6e347160f6ad81122cce863                         # jest.config.js
+ EXPECT_SCHEMA_BLOB=f86c1f5df722e855047899abd483f621b42dabe0                       # prisma/schema.prisma (== BASE, == S10-B)
+ EXPECT_SCHEMA_SHA=d6d01f546f6c7988d93bdd60588e421bf6ff0a56b312f85eee962e0a6be0eb96
+-S11_FREEZE=/home/user/workspace/tgp-private-evidence/execution/d3a9f701/s11a1/commit-v2/FREEZE.sha256
+-S11_FREEZE_SHA=ee8653b7026309b7ca0b6e570c4680645ac5589bb297493731bc07ec959f872a
++S11_FREEZE=/home/user/workspace/repos/tgp-private-evidence/execution/fa72efb2/s11a1/binding/v3/FREEZE-v3.sha256
++S11_FREEZE_SHA=e6e3a15a8f2d262bbeb06c7be3ec13581bbb59ca237936fbcd6278dbc9e24187
+ EXPECT_DELTA="test/rls-g2-s11.spec.ts test/scout/s11/journey-core.pg.spec.ts test/utils/g2-s11-bootstrap.sh test/utils/g2-s11-db-guard.spec.ts test/utils/g2-s11-db.ts test/utils/g2-s11-harness.ts test/utils/g2-s11-pg-harness.ts test/utils/g2-s11-worker.cjs"
+ EXPECT_TESTS_RLS=6          # it( in test/rls-g2-s11.spec.ts (no each/skip/only/todo)
+ EXPECT_TESTS_JOURNEY=8      # it( in test/scout/s11/journey-core.pg.spec.ts (no each/skip/only/todo; describe.skip only when G2_S11_DATABASE_URL is unset)
+ EXPECT_TESTS_GUARD=94       # 10 it + it.each 61 + 20 + 3 (devloop-1 on the same bytes 4e8c0fee: 94 passed)
+-EXPECT_FIXTURE_SHA=96d2e6b28fd534d156c59d12609689a8b89eabd597e235b26d080f3676e20916                                            # sha256 of binding/v1/s11-fixture.sh (BINDING.sha256)
++EXPECT_FIXTURE_SHA=777e6ac3db359bc6ecb891c19da37943b8296ac9574ba48220ea9a94cfc31636  # sha256 of binding/v3/s11-fixture.sh (v2 fixture + RUNTIME_ROOT literal)
+ # ---- tool / dependency pins (identical to the S10-B binding; S10-B gate receipt for the generated client)
+ EXPECT_POSTGRES_SHA=23cd174849b273064c47d581b55be596be2f5cf0ee5d3e76c0146e2464bf873a
+ EXPECT_INITDB_SHA=b7db9bc2463a4ffbe1e405977512afb50c9846fd3af2b694e315e6d5a270882a
+ EXPECT_PGCTL_SHA=af53d826845af4679a0aaba2bda319f5e527f3b94f3794c67fa174049c9b9401
+ PSQL=/usr/lib/postgresql/18/bin/psql                # CB1: the real client binary, not the /usr/bin/psql pg_wrapper
+ EXPECT_PSQL_REAL_SHA=d1108fdb45b87f2313d7acfbb91a0a65ca97c6c2195f15d8ae9295121029ef67
+-EXPECT_LOCK_INODE=692282
++EXPECT_LOCK_INODE=686480
+ EXPECT_NODE_SHA=a03953a7b16bff002b94d6fb58ada900b68241cbcaee6efc400b20dadd36dddc
+ EXPECT_PRISMA_CLI=6.19.3
+ EXPECT_NM_LOCK_SHA=05bc530aa44bfa6df64f0daa8edb66c5181abf4bfbc309bd8da2c8aff37b6a44    # node_modules/.package-lock.json (donor and copy)
+ EXPECT_PKG_LOCK_SHA=b7fed5ed611c004615022cf69375b83956e9a69604807123fbe0e7965aea9c55   # package-lock.json at HEAD
+-DONOR_CLIENT_SHA=9042e713ba5678c99959a345b7b18a60dfc186b2c7d890b8d9c3ed5c8f4edcc6      # donor .prisma/client/index.d.ts (pre-S10-B)
+-DONOR_CLIENT_SCHEMA_SHA=b84392033ab86776533007505c31f57930307a210844067a7407ed20d25abf3e
++DONOR_CLIENT_SHA=2c819c8a8e2fd4afb59578893122b8e9c406bc1dc7821e643e7ef359c04aa56c      # donor .prisma/client/index.d.ts (rt-setup-fa72efb2 NM_OK; generated from the same S10-B schema d6d01f54)
++DONOR_CLIENT_SCHEMA_SHA=aca7a558cd379c154e947447782f2858a9f898039298e34c30b886947aed42e5
+ EXPECT_NM_CLIENT_SHA=2c819c8a8e2fd4afb59578893122b8e9c406bc1dc7821e643e7ef359c04aa56c   # clone client index.d.ts after generate (= S10-B gate postgen_client, same schema d6d01f54, same CLI)
+ EXPECT_NM_CLIENT_SCHEMA_SHA=aca7a558cd379c154e947447782f2858a9f898039298e34c30b886947aed42e5
+ MIN_FREE_KB=1500000                                 # donor copy ~717M + clone ~28M + lane ~80M + logs
+@@ -114,7 +119,7 @@
+ case "$BASE_HEAD$BASE_TREE$EXPECT_HEAD$EXPECT_TREE$EXPECT_MIGRATIONS_TREE$EXPECT_SPEC_BLOB$EXPECT_JOURNEY_BLOB$EXPECT_GUARD_BLOB$EXPECT_BOOTSTRAP_BLOB$EXPECT_DB_BLOB$EXPECT_HARNESS_BLOB$EXPECT_PGH_BLOB$EXPECT_WORKER_BLOB$EXPECT_FIXTURE_SHA$EXPECT_NM_CLIENT_SHA$EXPECT_NM_CLIENT_SCHEMA_SHA$PORT$RUNTIME_ROOT$S11_FREEZE_SHA" in *__*) log "PRECONDITION_FAIL pins not filled"; fail 70;; esac
+ for p in $REFUSED_LANE_PORTS; do [ "$PORT" != "$p" ] || { log "PRECONDITION_FAIL lane port $PORT is a refused lane port ($REFUSED_LANE_PORTS)"; fail 70; }; done
+ [ "$EXPECT_HEAD" != "$BASE_HEAD" ] || { log "PRECONDITION_FAIL EXPECT_HEAD is the base"; fail 70; }
+-[ "$EXPECT_NM_CLIENT_SHA" != "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL expected clone client equals the pre-S10-B donor client"; fail 70; }
++[ "$EXPECT_NM_CLIENT_SHA" = "$DONOR_CLIENT_SHA" ] || { log "PRECONDITION_FAIL v3 donor was generated from the base schema; expected clone client must equal the donor client"; fail 70; }
+ [ "$(sha "$FIX")" = "$EXPECT_FIXTURE_SHA" ] || { log "PRECONDITION_FAIL fixture sha256 mismatch"; fail 70; }
+ FIXTXT=$(cat "$FIX")
+ grep -qx "RUNTIME_ROOT=$RUNTIME_ROOT" <<<"$FIXTXT" || { log "PRECONDITION_FAIL fixture RUNTIME_ROOT line != $RUNTIME_ROOT"; fail 70; }
+@@ -175,7 +180,7 @@
+ # donor: real dir, pinned hidden lock and pre-S10-B client
+ [ -d "$DONOR_NM" ] && [ ! -L "$DONOR_NM" ] || { log "PRECONDITION_FAIL donor $DONOR_NM absent or a symlink"; fail 70; }
+ [ "$(sha "$DONOR_NM/.package-lock.json")" = "$EXPECT_NM_LOCK_SHA" ] || { log "PRECONDITION_FAIL donor hidden lock != pin"; fail 70; }
+-[ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] && [ "$(sha "$DONOR_NM/.prisma/client/schema.prisma" 2>/dev/null)" = "$DONOR_CLIENT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL donor client != pinned pre-S10-B client"; fail 70; }
++[ "$(sha "$DONOR_NM/.prisma/client/index.d.ts" 2>/dev/null)" = "$DONOR_CLIENT_SHA" ] && [ "$(sha "$DONOR_NM/.prisma/client/schema.prisma" 2>/dev/null)" = "$DONOR_CLIENT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL donor client != pinned rt-setup client"; fail 70; }
+ [ "$(g show HEAD:package-lock.json | sha256sum | cut -c1-64)" = "$EXPECT_PKG_LOCK_SHA" ] || { log "PRECONDITION_FAIL package-lock.json at HEAD != pin"; fail 70; }
+ [ "$(g show HEAD:prisma/schema.prisma | sha256sum | cut -c1-64)" = "$EXPECT_SCHEMA_SHA" ] || { log "PRECONDITION_FAIL schema at HEAD != d6d01f54"; fail 70; }
+ DPV=$("$DONOR_NM/.bin/prisma" --version 2>/dev/null || true); DPV=$(awk '/^prisma /{print $3}' <<<"$DPV")

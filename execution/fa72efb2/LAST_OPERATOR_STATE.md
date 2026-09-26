@@ -1,4 +1,7 @@
-# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 15:20Z)
+# LAST OPERATOR STATE — EXEC-FA72EFB2 (2026-09-26 15:31Z)
+
+- LANDED 15:29:50Z: S11-A1 v3 3db615c0 on integration/importer (FF from 6a33df9b; PR #559 merged). Proof v3 RC=0 6/6, 8/8, 94/94 (s11a1/binding/v3/run). New S11 base = 3db615c0.
+- D2 independent T4 review GO (s10d2/d2_review.md), C-only; C1 recorded for owner: a production run declaring platform `s10_unseen` could be proven complete with the committed test key, own tenant only, never a real platform (D-S10-1 shape; `conformance_alpha` precedent). Not a landing blocker for integration/importer; relevant before any production enablement.
 
 - Takeover accepted (TAKEOVER.md). integration/importer = 6a33df9b (C2 landed 07:31:17Z by d3a9f701; reconcile/C2_LANDED_6a33df9b.md). main 1c10e2a1 untouched.
 - Heavy slot: new canonical lock /home/user/workspace/execution/test-validation.lock inode 686480 (this runtime). Held now by rt-setup-fa72efb2.sh (PG 17.6 pins OK, psql 18.6 real sha d1108fdb = predecessor pin, node sha a03953a7 = predecessor pin; npm ci running in worktrees/fa72-s11a1 @3db615c0).
