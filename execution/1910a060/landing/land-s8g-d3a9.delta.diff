@@ -1,0 +1,31 @@
+30,33c30,34
+< H=820ce85be2ebf994112afbb90739eb9469ad628e              # exact S8-G candidate bytes (reused, never rebuilt)
+< H_TREE=7ede6dbb8f6f2d0ddcc349882a47ef67d415c32a
+< CAND_BUNDLE=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing/bundles/s8g-820ce85be2eb.bundle
+< CAND_BUNDLE_SHA=3013bae3500a6ab121945580ed2b979881ce0515e2be7bad4ab9d7ef44bf9826   # 62471b11..refs/heads/exec1910/s8g
+---
+> H=1279b419ee60b25163c7e6d2809b749dd723fee9              # exact S8-G candidate bytes (reused, never rebuilt)
+> H_TREE=44ece797c9183ee33198b2c43e402f943911369a
+> H0=820ce85be2ebf994112afbb90739eb9469ad628e              # dual-GO product commit; H = its test-only closure (S8G-DIAG-1)
+> CAND_BUNDLE=/home/user/workspace/tgp-private-evidence/execution/1910a060/landing/bundles/s8g-1279b419ee60-full.bundle
+> CAND_BUNDLE_SHA=cf5867b9fb8f648711b713bcf35d654fb7f1a1aa9117fac8f5ea20d91324285d   # 62471b11..refs/heads/exec1910/s8g
+35,37c36,38
+< CAND_RECEIPT=/home/user/workspace/tgp-private-evidence/execution/1910a060/s8g/gate/attempt-4/HEAD-820ce85be2eb.txt
+< CAND_RECEIPT_SHA=6beeee556aaccb430366d790ab2c2e811c2704b13e706e4c67642aba28077c01    # 14 'blob <path> <sha>' lines
+< CAND_RAW_SHA=d904d40cb92e5ddcfba6b43e64de803286e70d99d1526b58bc5b4d8cb52a9a32        # sha256 of diff --raw --no-abbrev MB H
+---
+> CAND_RECEIPT=/home/user/workspace/tgp-private-evidence/execution/1910a060/s8g/closure-d3a9/HEAD-1279b419ee60.txt
+> CAND_RECEIPT_SHA=7b37fd81cc75e208355f68e9c420c12442b7efd0dc37e7a7b40501c9f2ecb0a5    # 14 'blob <path> <sha>' lines
+> CAND_RAW_SHA=297d58bdaf36793ba7826e1e8ff86e9e4e0629250f25a1839461b5e2fb4ae732        # sha256 of diff --raw --no-abbrev MB H
+40c41
+< PRED_TREE=60214a647a0a28270deaa85ba7e65da4cb9e3556      # git merge-tree --write-tree M2 820ce85b (both orders)
+---
+> PRED_TREE=74c06f8ffe26eda1e99251ecf1bbcdface6689ff      # git merge-tree --write-tree M2 820ce85b (both orders)
+50c51
+< LOCK=/home/user/workspace/execution/test-validation.lock; LOCK_INODE=667698
+---
+> LOCK=/home/user/workspace/execution/test-validation.lock; LOCK_INODE=692282
+152c153
+<     && [ "$(git -C "$1" rev-parse "$H^@")" = "$MB" ] || refuse 70 "S8-G head/tree/parent mismatch"
+---
+>     && [ "$(git -C "$1" rev-parse "$H^@")" = "$H0" ] && [ "$(git -C "$1" rev-parse "$H0^@")" = "$MB" ] || refuse 70 "S8-G head/tree/parent mismatch (expect MB -> H0 -> H)"

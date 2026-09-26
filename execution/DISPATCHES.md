@@ -262,3 +262,9 @@ The landing census `landing_backlog_census_mufqyitp` (T3, read-only) is active u
 - C phase 1 draft ready (8 files in `s7-c` uncommitted; binding template at `c/binding`, lane `c-contract`, port 55491). Phase 2 awaits N/Q1 acceptance; `g2-c-old-root.sh` added to its owned paths.
 - N/Q1 attestations A GO (5 C) and B GO (9 C). Single-PG grant issued at 18:37Z (`NQ1_SINGLE_PG_PROOF_GRANT.md`); slot relayed to the N/Q1 builder.
 - N/Q1 single PG proof FAILED rc1 at jest (15/20 passed; N02, N03a, N06, Q05×2), recorded unchanged. Classified B, N/Q1 proof only. v2 minimum spec-only correction GRANTED (`NQ1_V2_MINIMUM_CORRECTION_GRANT.md`); expectation-only edits that drop the failed/skipped coverage are not allowed.
+
+## EXEC-D3A9F701 dispatch log, 2026-09-26 (append)
+- 00:56Z S8G-PROOF-3 parent executor, binding v3 -> 19/19 RC0. 01:00Z predict OK (tree 74c06f8f). 01:02Z compose attempt-1 refused rc70 preflight (relay env unset; nothing touched); 01:03Z attempt-2 RC0 M3=771db62a.
+- 01:06Z stage: PR #544. 01:14Z ff: LANDED integration/importer=771db62a.
+- S9-B final review of rebuilt files: s9_b_rebuilt_files_review_a (gpt_6_sol) GO; s9_b_rebuilt_files_review_b (claude_opus_5_5) GO.
+- 01:06Z S9B-GATE-2 rc74 (r75 driver defect, class B). 01:12Z S9B-GATE-3 granted and launched (GATE_GRANT_D3A9-3.md).

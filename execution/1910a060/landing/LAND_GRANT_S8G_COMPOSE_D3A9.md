@@ -1,0 +1,2 @@
+LAND-S8G-COMPOSE-D3A9 granted 2026-09-26T01:02:27Z by parent (session d3a9f701): one compose run of land-s8g-d3a9.sh sha256 e4023a9d37d9c52ebc8a3db47f45260b30de093f34ee73d40738448be774f8c3; candidate 1279b419 ACCEPTED (../s8g/ACCEPT_RECORD-1279b419.md); tip 9497ca52; PRED_TREE 74c06f8f (predict OK).
+attempt-2 relaunch 2026-09-26T01:03:52Z: attempt-1 refused rc=70 at preflight (relay env unset; no lock/clone/state touched). Relays: DONOR_NM_LOCK_SHA=05bc530a… DONOR_CLIENT_DTS_SHA=9042e713… DONOR_CLIENT_SCHEMA_SHA=b8439203… (match recorded donor pins).

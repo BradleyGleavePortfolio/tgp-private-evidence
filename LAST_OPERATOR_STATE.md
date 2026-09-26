@@ -1,5 +1,14 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-D3A9F701, 2026-09-26 01:16Z
+
+S8-G CLOSED AND LANDED. backend integration/importer 9497ca52 -> 771db62a (ordinary FF, PR #544 CI green; land/s8-g-accepted=1279b419, land/s8-g=771db62a). main unchanged 1c10e2a1.
+- S8G-DIAG-1 (binding/v2): 5/19 failed, all class B (test-only), closed by 1279b419 (child of product commit 820ce85b); delta review A GO / B GO.
+- S8G-PROOF-3 (binding/v3): real PG17, 19/19, RC=0. Acceptance: s8g/ACCEPT_RECORD-1279b419.md. Landing: landing/LAND_GO_S8G.md, land-s8g-d3a9.sh (+ .delta.diff).
+S9-B: 6 lost files rebuilt; final review of the rebuilt files A GO / B GO (C-only; s9b/reviews-d3a9/). S9B-GATE-2 stopped rc74 at r75 (class B, driver called check-r75.js without a mode;
+prettier/eslint/tsc passed); preserved in s9b/gate/attempt-2/. S9B-GATE-3 (one-line driver fix + post-format pins) running under lock inode 692282: prettier/eslint/tsc rc0, targeted jest 8/8 suites 356/356.
+Next: gate commit -> binding v2 re-pin + dual delta review -> one PG proof (port 55645) -> accept -> compose onto 771db62a -> land. Then S9-C wiring (doc D-S9-8), then S10.
+
 ## CURRENT: EXEC-D3A9F701, 2026-09-26 UTC
 
 Read `execution/d3a9f701/RECOVERY.md` and the leading `execution/DISPATCHES.md` section. The owner's September 25 17:19–17:21 PT continuation controls; lower sections are historical.
