@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# EXEC-42D8C5B5 PROOF-RT — S10-B real-PG lane runner (parameterized; built from fa72efb2 s10d2/binding/v2 + s11b/binding/s10b-lane-v2).
+# Usage: lane-s10b.sh <HEAD_SHA> <RUN_DIR> [--stages bootstrap,rls-s10b-s10c,s10-unseen]
+# Stages (fixed order; stop at first failure; never retries): bootstrap (g2-s10b-bootstrap.sh), rls-s10b-s10c (ONE jest run of
+# test/rls-g2-s10b.spec.ts 24 + test/rls-g2-s10c.spec.ts 8 via jest.rls.config.js, as S11-B s10b-lane v2), s10-unseen
+# (test/scout/s10/s10-unseen.pg.spec.ts 9 via jest.config.js, as D2 v2). All three share one fresh cluster and one bootstrap.
+# Binding = HEAD + tree + this file's sha256 (in RUN_DIR/RESULT). See proof/REPORT.md.
+LANE_NAME=s10b
+LANE_ENV=G2_S10B
+DB_TS=test/utils/g2-s10b-db.ts
+BOOT_SH=test/utils/g2-s10b-bootstrap.sh
+CONN_LIMIT=4                                      # D2 / s10b-lane precedent
+FIXPASS=s10b_local_synthetic
+OUTER_TIMEOUT=${LANE_OUTER_TIMEOUT:-6000}
+STAGE_TABLE=(
+  "rls-s10b-s10c|jest.rls.config.js|1500|test/rls-g2-s10b.spec.ts test/rls-g2-s10c.spec.ts|live|req"
+  "s10-unseen|jest.config.js|1500|test/scout/s10/s10-unseen.pg.spec.ts|live|req"
+)
+NEED_RG_FOR=""

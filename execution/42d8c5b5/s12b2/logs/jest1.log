@@ -1,0 +1,54 @@
+PASS test/scout/induction/test-only-exclusion.spec.ts (10.667 s)
+  positive control — the unmarked package proves in every mode
+    ✓ an unmarked manifest is byte-for-byte the same manifest when refusing or allowing (5 ms)
+    ✓ with refusal on, an unmarked manifest still yields three known families (7 ms)
+  refusal of each TEST-ONLY artifact kind (explicit refuseTestOnly)
+    ✓ manifest: allowed → loaded and proves; refused → not loaded, every family unknown (5 ms)
+    ✓ verifier (key): allowed → both keys kept and proves; refused → key dropped, unknown (6 ms)
+    ✓ allowed mode strips the marker: the result equals the unmarked manifest (3 ms)
+    ✓ the caller-supplied raw object is never mutated (1 ms)
+  default loader — refuses unless NODE_ENV is explicitly development|test
+    ✓ NODE_ENV unset refuses (4 ms)
+    ✓ NODE_ENV "" refuses (3 ms)
+    ✓ NODE_ENV "   " refuses (3 ms)
+    ✓ NODE_ENV "production" refuses (7 ms)
+    ✓ NODE_ENV "PRODUCTION" refuses (3 ms)
+    ✓ NODE_ENV "Production " refuses (5 ms)
+    ✓ NODE_ENV "staging" refuses (3 ms)
+    ✓ NODE_ENV "Staging" refuses (3 ms)
+    ✓ NODE_ENV "prod" refuses (3 ms)
+    ✓ NODE_ENV "qa" refuses (2 ms)
+    ✓ NODE_ENV "ci" refuses (2 ms)
+    ✓ NODE_ENV "develop" refuses (3 ms)
+    ✓ NODE_ENV "testing" refuses (3 ms)
+    ✓ NODE_ENV "test" loads (13 ms)
+    ✓ NODE_ENV "development" loads (3 ms)
+    ✓ NODE_ENV "TEST" loads (3 ms)
+    ✓ NODE_ENV " Development " loads (4 ms)
+    ✓ this jest process runs with NODE_ENV=test (every landed no-DB/PG proof keeps its package)
+  the marker is strict data
+    ✓ testOnly false throws in both modes (20 ms)
+    ✓ testOnly "true" throws in both modes (1 ms)
+    ✓ testOnly 1 throws in both modes (1 ms)
+    ✓ testOnly null throws in both modes
+    ✓ testOnly 0 throws in both modes
+    ✓ verifier test_only false throws in both modes (1 ms)
+    ✓ verifier test_only "true" throws in both modes (1 ms)
+    ✓ verifier test_only 1 throws in both modes (1 ms)
+    ✓ verifier test_only null throws in both modes (1 ms)
+    ✓ markers are per object: the other casing is an unknown key (1 ms)
+    ✓ a defective TEST-ONLY manifest fails loudly when refusing (validated before refusal) (4 ms)
+  shipped data
+    ✓ every shipped verifier whose public key is committed under test/fixtures is marked (1 ms)
+    ✓ refusing, the shipped loader trusts no committed key and the registry still builds (2 ms)
+    ✓ allowing (this jest runtime), the shipped loader keeps every shipped manifest (1 ms)
+  no source slug in the touched src; PG harness env stays inherited
+    ✓ parse.ts and manifest-registry.ts carry no platform slug literal
+    ✓ the S10-B/S11 harness and worker sources never set NODE_ENV and forks spread process.env (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       40 passed, 40 total
+Snapshots:   0 total
+Time:        10.931 s
+Ran all test suites within paths "test/scout/induction/test-only-exclusion.spec.ts".
+JEST_RC=0

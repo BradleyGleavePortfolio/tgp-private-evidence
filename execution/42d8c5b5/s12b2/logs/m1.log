@@ -1,0 +1,206 @@
+FAIL test/scout/induction/test-only-exclusion.spec.ts (10.047 s)
+  positive control — the unmarked package proves in every mode
+    ✓ an unmarked manifest is byte-for-byte the same manifest when refusing or allowing (5 ms)
+    ✓ with refusal on, an unmarked manifest still yields three known families (6 ms)
+  refusal of each TEST-ONLY artifact kind (explicit refuseTestOnly)
+    ✓ manifest: allowed → loaded and proves; refused → not loaded, every family unknown (6 ms)
+    ✓ verifier (key): allowed → both keys kept and proves; refused → key dropped, unknown (7 ms)
+    ✓ allowed mode strips the marker: the result equals the unmarked manifest (2 ms)
+    ✓ the caller-supplied raw object is never mutated (1 ms)
+  default loader — refuses unless NODE_ENV is explicitly development|test
+    ✕ NODE_ENV unset refuses (2 ms)
+    ✕ NODE_ENV "" refuses (1 ms)
+    ✕ NODE_ENV "   " refuses
+    ✓ NODE_ENV "production" refuses (3 ms)
+    ✓ NODE_ENV "PRODUCTION" refuses (3 ms)
+    ✓ NODE_ENV "Production " refuses (3 ms)
+    ✓ NODE_ENV "staging" refuses (3 ms)
+    ✓ NODE_ENV "Staging" refuses (3 ms)
+    ✕ NODE_ENV "prod" refuses
+    ✕ NODE_ENV "qa" refuses (1 ms)
+    ✕ NODE_ENV "ci" refuses
+    ✕ NODE_ENV "develop" refuses (1 ms)
+    ✕ NODE_ENV "testing" refuses (2 ms)
+    ✓ NODE_ENV "test" loads (4 ms)
+    ✓ NODE_ENV "development" loads (4 ms)
+    ✓ NODE_ENV "TEST" loads (3 ms)
+    ✓ NODE_ENV " Development " loads (4 ms)
+    ✓ this jest process runs with NODE_ENV=test (every landed no-DB/PG proof keeps its package)
+  the marker is strict data
+    ✓ testOnly false throws in both modes (9 ms)
+    ✓ testOnly "true" throws in both modes (1 ms)
+    ✓ testOnly 1 throws in both modes (8 ms)
+    ✓ testOnly null throws in both modes
+    ✓ testOnly 0 throws in both modes
+    ✓ verifier test_only false throws in both modes (1 ms)
+    ✓ verifier test_only "true" throws in both modes
+    ✓ verifier test_only 1 throws in both modes (1 ms)
+    ✓ verifier test_only null throws in both modes (1 ms)
+    ✓ markers are per object: the other casing is an unknown key (1 ms)
+    ✓ a defective TEST-ONLY manifest fails loudly when refusing (validated before refusal) (4 ms)
+  shipped data
+    ✓ every shipped verifier whose public key is committed under test/fixtures is marked
+    ✓ refusing, the shipped loader trusts no committed key and the registry still builds (2 ms)
+    ✓ allowing (this jest runtime), the shipped loader keeps every shipped manifest (1 ms)
+  no source slug in the touched src; PG harness env stays inherited
+    ✓ parse.ts and manifest-registry.ts carry no platform slug literal
+    ✓ the S10-B/S11 harness and worker sources never set NODE_ENV and forks spread process.env (1 ms)
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV unset refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "   " refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "prod" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "qa" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "ci" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "develop" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "testing" refuses
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      244 |     const verifierDir = dirWith(markedVerifier());
+      245 |     withNodeEnv(value, () => {
+    > 246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+          |                                                              ^
+      247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:246:62
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+Test Suites: 1 failed, 1 total
+Tests:       8 failed, 32 passed, 40 total
+Snapshots:   0 total
+Time:        10.304 s, estimated 11 s
+Ran all test suites within paths "test/scout/induction/test-only-exclusion.spec.ts".
+M1_RC=1

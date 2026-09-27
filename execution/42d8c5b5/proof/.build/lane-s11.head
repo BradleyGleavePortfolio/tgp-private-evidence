@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# EXEC-42D8C5B5 PROOF-RT — S11 real-PG lane runner (parameterized; built from fa72efb2 s11a2/binding/v2 + s11d/binding/v2).
+# Usage: lane-s11.sh <HEAD_SHA> <RUN_DIR> [--stages bootstrap,rls-g2-s11,journey-core,readiness,settle-redrive,journey-induction,journey-full,guard]
+# Stages (fixed order; stop at first failure; never retries): bootstrap, rls-g2-s11 (6), journey-core (8), readiness (6),
+# settle-redrive (8), journey-induction (4), journey-full (only if the file exists at HEAD), guard (G2_S11_* unset, no DB).
+# Binding = HEAD + tree + this file's sha256 (in RUN_DIR/RESULT). See proof/REPORT.md.
+LANE_NAME=s11
+LANE_ENV=G2_S11                                   # env prefix read by the S11 harness / bootstrap / specs
+DB_TS=test/utils/g2-s11-db.ts                     # G2_S11_DATABASE / G2_S11_ROLE / G2_S11_CLUSTER_MARKER literals (read at HEAD)
+BOOT_SH=test/utils/g2-s11-bootstrap.sh            # bootstrap entry point (prints G2_S11_BOOTSTRAP_OK); DB_MARKER literal read at HEAD
+CONN_LIMIT=2                                      # connection_limit in the harness URL (s11a2 v2 precedent)
+FIXPASS=s11_local_synthetic                       # synthetic fixture password (precedent)
+OUTER_TIMEOUT=${LANE_OUTER_TIMEOUT:-18000}        # whole-run watchdog (s)
+# name|jest config|timeout s|spec files (space-separated)|kind (live|guard)|required (req|opt: skipped as a stage iff absent at HEAD)
+STAGE_TABLE=(
+  "rls-g2-s11|jest.rls.config.js|1500|test/rls-g2-s11.spec.ts|live|req"
+  "journey-core|jest.config.js|1500|test/scout/s11/journey-core.pg.spec.ts|live|req"
+  "readiness|jest.config.js|900|test/scout/s11/readiness.pg.spec.ts|live|req"
+  "settle-redrive|jest.config.js|3000|test/scout/s11/settle-redrive.pg.spec.ts|live|req"
+  "journey-induction|jest.config.js|3000|test/scout/s11/journey-induction.pg.spec.ts|live|req"
+  "journey-full|jest.config.js|4200|test/scout/s11/journey-full.pg.spec.ts|live|opt"
+  "guard|jest.config.js|300|test/utils/g2-s11-db-guard.spec.ts|guard|req"
+)
+NEED_RG_FOR="journey-full"                        # J20 runs scripts/s10-core-diff-gate.sh, which needs rg on PATH

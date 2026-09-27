@@ -1,5 +1,8 @@
 # EXEC-42D8C5B5 worker rules (binding on every builder/reviewer this parent dispatches)
 
+HOLD LIFTED 2026-09-27 19:36Z: the owner confirmed in session that the commit/merge identity does not matter. G05 identity (Bradley Gleave
+<bradley@bradleytgpcoaching.com>, no AI co-author) stays the default; scratch-identity commits must be re-created before any push.
+
 Parent: session 42d8c5b5 (sole owner of grants, acceptance, landing, integration refs, evidence commits).
 Doctrine: tgp-agent-context AGENT_RULES.md G01-G22, T0-T4 routing, EXECUTE, Safety ROI (A/B/C). Optimize correct customer value per elapsed time.
 

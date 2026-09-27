@@ -1,0 +1,805 @@
+FAIL test/scout/induction/test-only-exclusion.spec.ts (9.642 s)
+  positive control — the unmarked package proves in every mode
+    ✓ an unmarked manifest is byte-for-byte the same manifest when refusing or allowing (5 ms)
+    ✓ with refusal on, an unmarked manifest still yields three known families (6 ms)
+  refusal of each TEST-ONLY artifact kind (explicit refuseTestOnly)
+    ✕ manifest: allowed → loaded and proves; refused → not loaded, every family unknown (8 ms)
+    ✕ verifier (key): allowed → both keys kept and proves; refused → key dropped, unknown (5 ms)
+    ✓ allowed mode strips the marker: the result equals the unmarked manifest (2 ms)
+    ✓ the caller-supplied raw object is never mutated (2 ms)
+  default loader — refuses unless NODE_ENV is explicitly development|test
+    ✕ NODE_ENV unset refuses (2 ms)
+    ✕ NODE_ENV "" refuses (2 ms)
+    ✕ NODE_ENV "   " refuses (2 ms)
+    ✕ NODE_ENV "production" refuses (2 ms)
+    ✕ NODE_ENV "PRODUCTION" refuses (1 ms)
+    ✕ NODE_ENV "Production " refuses (1 ms)
+    ✕ NODE_ENV "staging" refuses (1 ms)
+    ✕ NODE_ENV "Staging" refuses (2 ms)
+    ✕ NODE_ENV "prod" refuses (1 ms)
+    ✕ NODE_ENV "qa" refuses (1 ms)
+    ✕ NODE_ENV "ci" refuses (1 ms)
+    ✕ NODE_ENV "develop" refuses (2 ms)
+    ✕ NODE_ENV "testing" refuses (2 ms)
+    ✓ NODE_ENV "test" loads (4 ms)
+    ✓ NODE_ENV "development" loads (4 ms)
+    ✓ NODE_ENV "TEST" loads (3 ms)
+    ✓ NODE_ENV " Development " loads (4 ms)
+    ✓ this jest process runs with NODE_ENV=test (every landed no-DB/PG proof keeps its package)
+  the marker is strict data
+    ✓ testOnly false throws in both modes (8 ms)
+    ✓ testOnly "true" throws in both modes (1 ms)
+    ✓ testOnly 1 throws in both modes (1 ms)
+    ✓ testOnly null throws in both modes (1 ms)
+    ✓ testOnly 0 throws in both modes (1 ms)
+    ✓ verifier test_only false throws in both modes (1 ms)
+    ✓ verifier test_only "true" throws in both modes (1 ms)
+    ✓ verifier test_only 1 throws in both modes (1 ms)
+    ✓ verifier test_only null throws in both modes (1 ms)
+    ✓ markers are per object: the other casing is an unknown key (1 ms)
+    ✓ a defective TEST-ONLY manifest fails loudly when refusing (validated before refusal) (4 ms)
+  shipped data
+    ✓ every shipped verifier whose public key is committed under test/fixtures is marked
+    ✕ refusing, the shipped loader trusts no committed key and the registry still builds (2 ms)
+    ✓ allowing (this jest runtime), the shipped loader keeps every shipped manifest (1 ms)
+  no source slug in the touched src; PG harness env stays inherited
+    ✓ parse.ts and manifest-registry.ts carry no platform slug literal (1 ms)
+    ✓ the S10-B/S11 harness and worker sources never set NODE_ENV and forks spread process.env (9 ms)
+
+  ● refusal of each TEST-ONLY artifact kind (explicit refuseTestOnly) › manifest: allowed → loaded and proves; refused → not loaded, every family unknown
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      200 |
+      201 |     const refused = loadInductionManifests(dir, true);
+    > 202 |     expect(refused).toEqual([]);
+          |                     ^
+      203 |     expect(evaluate(registry(refused))).toEqual(UNPROVEN);
+      204 |   });
+      205 |
+
+      at Object.<anonymous> (test/scout/induction/test-only-exclusion.spec.ts:202:21)
+
+  ● refusal of each TEST-ONLY artifact kind (explicit refuseTestOnly) › verifier (key): allowed → both keys kept and proves; refused → key dropped, unknown
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Array [
+    +   "s10_unseen.source.test",
+        "s12b2.other.key",
+      ]
+
+      215 |     const refused = loadInductionManifests(dir, true);
+      216 |     expect(refused.map((m) => m.sourcePlatform)).toEqual([SLUG]);
+    > 217 |     expect(refused[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+          |                                                       ^
+      218 |     expect(Object.isFrozen(refused[0].verifiers)).toBe(true);
+      219 |     expect(evaluate(registry(refused))).toEqual(UNPROVEN);
+      220 |   });
+
+      at Object.<anonymous> (test/scout/induction/test-only-exclusion.spec.ts:217:55)
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV unset refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "   " refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "production" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "PRODUCTION" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "Production " refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "staging" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "Staging" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "prod" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "qa" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "ci" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "develop" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● default loader — refuses unless NODE_ENV is explicitly development|test › NODE_ENV "testing" refuses
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 30
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "basisKinds": Object {
+    +       "clients": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "programs": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +       "workouts": Array [
+    +         "source_signed_enumeration",
+    +       ],
+    +     },
+    +     "expectedFamilies": Array [
+    +       "clients",
+    +       "programs",
+    +       "workouts",
+    +     ],
+    +     "manifestVersion": 1,
+    +     "nativeRules": "absent",
+    +     "sourcePlatform": "s10_unseen",
+    +     "verifiers": Array [
+    +       Object {
+    +         "alg": "ed25519",
+    +         "key_id": "s10_unseen.source.test",
+    +         "public_key_b64": "B4PqUoRPwIRyuuFgtCEJTez5qV33j9WwR96AIHeqxso=",
+    +       },
+    +     ],
+    +   },
+    + ]
+
+      245 |     withNodeEnv(value, () => {
+      246 |       expect(testOnlyArtifactsAllowed(process.env.NODE_ENV)).toBe(false);
+    > 247 |       expect(loadInductionManifests(manifestDir)).toEqual([]);
+          |                                                   ^
+      248 |       const mixed = loadInductionManifests(verifierDir);
+      249 |       expect(mixed[0].verifiers.map((v) => v.key_id)).toEqual([OTHER_VERIFIER.key_id]);
+      250 |       expect(evaluate(registry(mixed))).toEqual(UNPROVEN);
+
+      at test/scout/induction/test-only-exclusion.spec.ts:247:51
+      at withNodeEnv (test/scout/induction/test-only-exclusion.spec.ts:157:12)
+      at test/scout/induction/test-only-exclusion.spec.ts:245:5
+
+  ● shipped data › refusing, the shipped loader trusts no committed key and the registry still builds
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      355 |     const refused = loadInductionManifests(INDUCTION_MANIFESTS_DIR, true);
+      356 |     for (const m of refused) {
+    > 357 |       for (const v of m.verifiers) expect(committed.has(v.public_key_b64)).toBe(false);
+          |                                                                            ^
+      358 |     }
+      359 |     expect(refused.length).toBeLessThan(shippedRaw.length);
+      360 |     expect(() =>
+
+      at Object.<anonymous> (test/scout/induction/test-only-exclusion.spec.ts:357:76)
+
+Test Suites: 1 failed, 1 total
+Tests:       16 failed, 24 passed, 40 total
+Snapshots:   0 total
+Time:        9.911 s, estimated 11 s
+Ran all test suites within paths "test/scout/induction/test-only-exclusion.spec.ts".
+M2_RC=1

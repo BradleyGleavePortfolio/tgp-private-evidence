@@ -1,0 +1,597 @@
+diff --git a/src/scout/reconstruct/native/native-provenance.ts b/src/scout/reconstruct/native/native-provenance.ts
+index 0b182c45..d68caf50 100644
+--- a/src/scout/reconstruct/native/native-provenance.ts
++++ b/src/scout/reconstruct/native/native-provenance.ts
+@@ -114,6 +114,32 @@ export async function recordAlreadyPresent(
+   await tx.importNativeProvenance.update({ where: { id: existing.id }, data });
+ }
+ 
++/**
++ * S8-D1 (A1): is `nativeId` already the RESOLVED target of another raw staged
++ * `source_id` in the same (coach, namespace, family)? Two staged rows whose raw
++ * ids differ are two source identities; the writer refuses to certify both as
++ * one native row. Only resolved rows claim — an unresolved row targets nothing.
++ */
++export async function findOtherClaim(
++  tx: Tx,
++  key: ProvenanceKey,
++  nativeKind: NativeKind,
++  nativeId: string,
++): Promise<{ source_id: string } | null> {
++  return tx.importNativeProvenance.findFirst({
++    where: {
++      coach_id: key.coachId,
++      source_namespace: key.sourceNamespace,
++      entity_type: key.entityType,
++      native_kind: nativeKind,
++      native_id: nativeId,
++      outcome: { not: PROVENANCE_OUTCOME.unresolved },
++      source_id: { not: key.sourceId },
++    },
++    select: { source_id: true },
++  });
++}
++
+ /**
+  * Record (or refresh the reason of) an UNRESOLVED identity. The caller has
+  * already established in this transaction that no CREATED row exists for the
+diff --git a/src/scout/reconstruct/native/person-writer.ts b/src/scout/reconstruct/native/person-writer.ts
+index 996e417b..13049eee 100644
+--- a/src/scout/reconstruct/native/person-writer.ts
++++ b/src/scout/reconstruct/native/person-writer.ts
+@@ -2,6 +2,7 @@ import { PersonState } from '@prisma/client';
+ import type { MappedClient } from '../mapping-spec';
+ import { NATIVE_KIND, PROVENANCE_OUTCOME, UNRESOLVED_CODE, unresolved } from './native-contract';
+ import {
++  findOtherClaim,
+   findProvenance,
+   promoteToCreated,
+   recordAlreadyPresent,
+@@ -25,6 +26,14 @@ import { LEDGER_TARGET_KIND, type PersistOutcome } from './persist-outcome';
+  * (coach, staged namespace, `clients`, raw staged source_id) and — for rows
+  * that predate D1 — the Person external ref (coach, platform, source_person_id).
+  *
++ * One native Person per accepted source identity (A1): the external ref is
++ * keyed by the mapper's trimmed `sourcePersonId`, the provenance by the RAW
++ * staged id, so two raw ids that trim alike would both find one Person. Step 2
++ * therefore adopts a Person only while no other raw id of the family has a
++ * resolved claim on it, and takes a `FOR UPDATE` row lock on the Person first
++ * so a concurrent adopter or creator of the same Person is serialised inside
++ * the engine transaction (the sanctioned lock pattern, regimes.service.ts).
++ *
+  * This module imports Prisma types and the provenance helpers only: no invite,
+  * notification, email or linking path can be reached from an import.
+  */
+@@ -57,12 +66,27 @@ const fail = (reason: string): PersistOutcome => ({ ok: false, reason });
+  * `identity_conflict`. Nothing is written on any branch.
+  */
+ function verifyPerson(coachId: string, person: PersonTarget | null): PersistOutcome {
+-  if (person === null || person.state === PersonState.Deleted)
+-    return fail(unresolved(UNRESOLVED_CODE.native_target_removed));
++  if (person === null) return fail(unresolved(UNRESOLVED_CODE.native_target_removed));
++  // Ownership before state (C1): another coach's Person is a conflict whatever its state.
+   if (person.coach_id !== coachId) return fail(unresolved(UNRESOLVED_CODE.identity_conflict));
++  if (person.state === PersonState.Deleted)
++    return fail(unresolved(UNRESOLVED_CODE.native_target_removed));
+   return ok(person.id);
+ }
+ 
++/**
++ * Step 2 lock: re-read the located Person `FOR UPDATE` on the engine transaction.
++ * The second of two concurrent adopters (or an adopter racing the creator) blocks
++ * here until the first commits and then sees its claim. Parameterised, never
++ * interpolated. An empty result means the row vanished since it was located.
++ */
++async function lockPerson(tx: Tx, personId: string): Promise<PersonTarget | null> {
++  const locked = await tx.$queryRaw<PersonTarget[]>`
++    SELECT "id", "coach_id", "state" FROM "Person" WHERE "id" = ${personId} FOR UPDATE
++  `;
++  return locked[0] ?? null;
++}
++
+ /** Step 1: a resolved provenance row is the identity; its target must be a live Person of this coach. */
+ async function verifyProvenanceTarget(
+   tx: Tx,
+@@ -103,9 +127,10 @@ export async function persistPerson(
+   if (existing !== null && existing.outcome !== PROVENANCE_OUTCOME.unresolved) {
+     return verifyProvenanceTarget(tx, coachId, existing);
+   }
+-  // Step 2 — a Person written before D1 (no provenance) is adopted once at its
+-  // external ref: verified like step 1, provenance `already_present`, name untouched.
+-  const legacy = await tx.person.findUnique({
++  // Step 2 — a Person written before D1 (no provenance) is adopted ONCE at its
++  // external ref: locked, verified like step 1, refused if another raw id of this
++  // family already resolved to it (A1), else provenance `already_present`, name untouched.
++  const located = await tx.person.findUnique({
+     where: {
+       coach_id_source_platform_source_person_id: {
+         coach_id: coachId,
+@@ -113,12 +138,14 @@ export async function persistPerson(
+         source_person_id: client.sourcePersonId,
+       },
+     },
+-    select: PERSON_SELECT,
++    select: { id: true },
+   });
+-  if (legacy !== null) {
+-    const verified = verifyPerson(coachId, legacy);
++  if (located !== null) {
++    const verified = verifyPerson(coachId, await lockPerson(tx, located.id));
+     if (!verified.ok) return verified;
+-    await recordAlreadyPresent(tx, provenance, existing, NATIVE_KIND.person, legacy.id);
++    const claim = await findOtherClaim(tx, provenance, NATIVE_KIND.person, located.id);
++    if (claim !== null) return fail(unresolved(UNRESOLVED_CODE.identity_conflict));
++    await recordAlreadyPresent(tx, provenance, existing, NATIVE_KIND.person, located.id);
+     return verified;
+   }
+   // Step 3 — create: state defaults to InvitePending; no User, no email, no name key.
+diff --git a/test/scout/reconstruct/native/fake-native-tx.ts b/test/scout/reconstruct/native/fake-native-tx.ts
+index 9e84f1dc..55309159 100644
+--- a/test/scout/reconstruct/native/fake-native-tx.ts
++++ b/test/scout/reconstruct/native/fake-native-tx.ts
+@@ -85,6 +85,33 @@ export class FakeNativeTx {
+         null
+       );
+     },
++    /** S8-D1 A1 claim check: exactly the `findOtherClaim` filter shape. */
++    findFirst: async (args: {
++      where: {
++        coach_id: string;
++        source_namespace: string;
++        entity_type: string;
++        native_kind: string;
++        native_id: string;
++        outcome: { not: string };
++        source_id: { not: string };
++      };
++      select: { source_id: true };
++    }) => {
++      this.hit('importNativeProvenance.findFirst');
++      const w = args.where;
++      const row = [...this.provenance.values()].find(
++        (r) =>
++          r.coach_id === w.coach_id &&
++          r.source_namespace === w.source_namespace &&
++          r.entity_type === w.entity_type &&
++          r.native_kind === w.native_kind &&
++          r.native_id === w.native_id &&
++          r.outcome !== w.outcome.not &&
++          r.source_id !== w.source_id.not,
++      );
++      return row === undefined ? null : { source_id: row.source_id };
++    },
+     create: async (args: { data: Omit<ProvenanceRecord, 'id'> }) => {
+       this.hit('importNativeProvenance.create');
+       const k = this.key(args.data);
+@@ -218,6 +245,26 @@ export class FakeNativeTx {
+     },
+   };
+ 
++  /**
++   * The one raw statement the S8-D1 writer issues: `SELECT … FROM "Person" WHERE "id" = $1
++   * FOR UPDATE`. Outside `$transaction` it is a plain locked read (no holder to release).
++   * Inside `$transaction` the per-transaction view below models the row lock: a second
++   * transaction asking for the same Person id waits until the holder commits or rolls back,
++   * and only then reads — the PostgreSQL READ COMMITTED shape the writer relies on.
++   */
++  $queryRaw = async (strings: TemplateStringsArray, ...values: unknown[]) => {
++    this.hit('$queryRaw');
++    return this.lockedRead(strings, values);
++  };
++  private readonly locks = new Map<string, Promise<void>>();
++  private lockedRead(strings: TemplateStringsArray, values: unknown[]) {
++    const sql = strings.join('$');
++    if (!/FROM "Person" WHERE "id" = \$ FOR UPDATE/.test(sql))
++      throw new Error(`unexpected raw statement: ${sql}`);
++    const row = this.persons.get(String(values[0]));
++    return row === undefined ? [] : [{ id: row.id, coach_id: row.coach_id, state: row.state }];
++  }
++
+   /** Seed a Person directly (a pre-D1 row, another coach's row, a Deleted row). */
+   seedPerson(fields: Omit<PersonRecord, 'id'> & { id?: string }): PersonRecord {
+     const row: PersonRecord = { id: fields.id ?? nextId('person'), ...fields };
+@@ -261,8 +308,32 @@ export class FakeNativeTx {
+     },
+   };
+ 
+-  /** Snapshot-and-restore transaction: a throw leaves no partial state behind. */
++  /**
++   * Snapshot-and-restore transaction: a throw leaves no partial state behind. The
++   * callback receives a per-transaction view whose `$queryRaw` holds the Person row
++   * lock until this transaction ends (see `$queryRaw`); everything else is shared.
++   */
+   async $transaction<T>(fn: (tx: FakeNativeTx) => Promise<T>): Promise<T> {
++    const held: Array<() => void> = [];
++    const view: FakeNativeTx = Object.create(this);
++    view.$queryRaw = async (strings, ...values) => {
++      this.hit('$queryRaw');
++      const id = String(values[0]);
++      // Wait for the current holder (loop: another waiter may take it first).
++      while (this.locks.has(id)) await this.locks.get(id);
++      let release: () => void = () => undefined;
++      this.locks.set(
++        id,
++        new Promise<void>((resolve) => {
++          release = resolve;
++        }),
++      );
++      held.push(() => {
++        this.locks.delete(id);
++        release();
++      });
++      return this.lockedRead(strings, values);
++    };
+     const clone = <V extends object>(m: Map<string, V>): Map<string, V> =>
+       new Map([...m].map(([k, v]) => [k, { ...v }]));
+     const snapshot = {
+@@ -275,7 +346,7 @@ export class FakeNativeTx {
+       persons: clone(this.persons),
+     };
+     try {
+-      return await fn(this);
++      return await fn(view);
+     } catch (err) {
+       this.provenance = snapshot.provenance;
+       this.programs = snapshot.programs;
+@@ -285,6 +356,8 @@ export class FakeNativeTx {
+       this.entities = snapshot.entities;
+       this.persons = snapshot.persons;
+       throw err;
++    } finally {
++      for (const release of held) release();
+     }
+   }
+ 
+diff --git a/test/scout/reconstruct/native/person-writer.spec.ts b/test/scout/reconstruct/native/person-writer.spec.ts
+index f5737f74..0be72c70 100644
+--- a/test/scout/reconstruct/native/person-writer.spec.ts
++++ b/test/scout/reconstruct/native/person-writer.spec.ts
+@@ -159,9 +159,12 @@ describe('persistPerson — step 2 adopt a pre-D1 Person', () => {
+     const row = legacy(tx);
+     const first = await run(tx, client('Mapped Name'));
+     expect(first).toEqual(okOutcome(row.id));
++    // Locate → lock the row (`FOR UPDATE`) → A1 claim check → adopt.
+     expect(tx.calls).toEqual([
+       'importNativeProvenance.findUnique',
+       'person.findUnique',
++      '$queryRaw',
++      'importNativeProvenance.findFirst',
+       'importNativeProvenance.create',
+     ]);
+     expect([...tx.provenance.values()]).toEqual([
+@@ -187,7 +190,11 @@ describe('persistPerson — step 2 adopt a pre-D1 Person', () => {
+     const tx = new FakeNativeTx();
+     const row = legacy(tx, 'Deleted');
+     expect(await run(tx)).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
+-    expect(tx.calls).toEqual(['importNativeProvenance.findUnique', 'person.findUnique']);
++    expect(tx.calls).toEqual([
++      'importNativeProvenance.findUnique',
++      'person.findUnique',
++      '$queryRaw',
++    ]);
+     expect(tx.provenance.size).toBe(0);
+     expect(tx.persons.size).toBe(1);
+     expect(row.state).toBe('Deleted');
+@@ -213,6 +220,8 @@ describe('persistPerson — step 2 adopt a pre-D1 Person', () => {
+     expect(tx.calls).toEqual([
+       'importNativeProvenance.findUnique',
+       'person.findUnique',
++      '$queryRaw',
++      'importNativeProvenance.findFirst',
+       'importNativeProvenance.update',
+     ]);
+     expect([...tx.provenance.values()]).toEqual([
+@@ -221,6 +230,173 @@ describe('persistPerson — step 2 adopt a pre-D1 Person', () => {
+   });
+ });
+ 
++describe('persistPerson — A1: one Person per accepted source identity', () => {
++  /** A second staged row whose RAW id differs from ROW's but trims to the same external ref. */
++  const ALIAS = { source_platform: PLATFORM, source_id: 'c-1' };
++  const runAlias = (tx: FakeNativeTx) =>
++    persistPerson(tx.asTx(), COACH, ALIAS, 'clients', client());
++  const provenanceOf = (tx: FakeNativeTx) =>
++    [...tx.provenance.values()].map((r) => [r.source_id, r.outcome, r.native_id]);
++
++  it('sequential: the second raw id that maps to an already-claimed Person is identity_conflict — no adoption, no second provenance row, first row untouched', async () => {
++    const tx = new FakeNativeTx();
++    const first = await run(tx);
++    const person = [...tx.persons.values()][0];
++    const before = JSON.stringify([...tx.provenance.values()]);
++    tx.calls = [];
++    expect(await runAlias(tx)).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    expect(tx.calls).toEqual([
++      'importNativeProvenance.findUnique',
++      'person.findUnique',
++      '$queryRaw',
++      'importNativeProvenance.findFirst',
++    ]);
++    expect(tx.persons.size).toBe(1);
++    expect(JSON.stringify([...tx.provenance.values()])).toBe(before);
++    expect(provenanceOf(tx)).toEqual([[' c-1 ', 'created', person.id]]);
++    // The first identity keeps verifying; the alias keeps being refused, replay after replay.
++    expect(await run(tx)).toEqual(first);
++    expect(await runAlias(tx)).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    expect(tx.provenance.size).toBe(1);
++  });
++
++  it('the refusal also holds when the claim is an adoption (already_present) rather than a create', async () => {
++    const tx = new FakeNativeTx();
++    const row = tx.seedPerson({
++      coach_id: COACH,
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Legacy',
++      state: 'InvitePending',
++    });
++    expect(await runAlias(tx)).toEqual(okOutcome(row.id));
++    expect(await run(tx)).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    expect(provenanceOf(tx)).toEqual([['c-1', 'already_present', row.id]]);
++  });
++
++  it('an UNRESOLVED row for the other raw id is not a claim: the Person is still adoptable once', async () => {
++    const tx = new FakeNativeTx();
++    const row = tx.seedPerson({
++      coach_id: COACH,
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Legacy',
++      state: 'InvitePending',
++    });
++    await tx.importNativeProvenance.create({
++      data: {
++        coach_id: COACH,
++        source_namespace: PLATFORM,
++        entity_type: 'clients',
++        source_id: 'c-1',
++        native_kind: 'person',
++        native_id: null,
++        outcome: 'unresolved',
++        reason: 'unresolved:native_target_removed',
++      },
++    });
++    expect(await run(tx)).toEqual(okOutcome(row.id));
++    expect(await runAlias(tx)).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++  });
++
++  it('a claim under another family, namespace or coach does not block adoption', async () => {
++    const tx = new FakeNativeTx();
++    const row = tx.seedPerson({
++      coach_id: COACH,
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Legacy',
++      state: 'InvitePending',
++    });
++    for (const [coach_id, source_namespace, entity_type] of [
++      [COACH, PLATFORM, 'workouts'],
++      [COACH, 'other-ns', 'clients'],
++      ['coach-b', PLATFORM, 'clients'],
++    ]) {
++      await tx.importNativeProvenance.create({
++        data: {
++          coach_id,
++          source_namespace,
++          entity_type,
++          source_id: 'c-1',
++          native_kind: 'person',
++          native_id: row.id,
++          outcome: 'created',
++          reason: null,
++        },
++      });
++    }
++    expect(await run(tx)).toEqual(okOutcome(row.id));
++  });
++
++  it('concurrent adopters of one unclaimed Person: the row lock serialises them, exactly one adopts, the other is identity_conflict', async () => {
++    const tx = new FakeNativeTx();
++    const row = tx.seedPerson({
++      coach_id: COACH,
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Legacy',
++      state: 'InvitePending',
++    });
++    const outcomes = await Promise.all([
++      tx.$transaction((t) => persistPerson(t.asTx(), COACH, ROW, 'clients', client())),
++      tx.$transaction((t) => persistPerson(t.asTx(), COACH, ALIAS, 'clients', client())),
++    ]);
++    expect(outcomes).toEqual([
++      okOutcome(row.id),
++      { ok: false, reason: 'unresolved:identity_conflict' },
++    ]);
++    expect(provenanceOf(tx)).toEqual([[' c-1 ', 'already_present', row.id]]);
++    // Both located the Person and both asked for the lock before either claim check ran; the
++    // loser's claim check ran only after the holder's adoption was written (its transaction end).
++    expect(tx.calls).toEqual([
++      'importNativeProvenance.findUnique',
++      'importNativeProvenance.findUnique',
++      'person.findUnique',
++      'person.findUnique',
++      '$queryRaw',
++      '$queryRaw',
++      'importNativeProvenance.findFirst',
++      'importNativeProvenance.create',
++      'importNativeProvenance.findFirst',
++    ]);
++  });
++
++  it("C1: another coach's Deleted Person is identity_conflict (ownership before state), on both the provenance and the external-ref path", async () => {
++    const tx = new FakeNativeTx();
++    const foreign = tx.seedPerson({
++      coach_id: 'coach-b',
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Theirs',
++      state: 'Deleted',
++    });
++    await tx.importNativeProvenance.create({
++      data: {
++        coach_id: COACH,
++        source_namespace: PLATFORM,
++        entity_type: 'clients',
++        source_id: ' c-1 ',
++        native_kind: 'person',
++        native_id: foreign.id,
++        outcome: 'created',
++        reason: null,
++      },
++    });
++    expect(await run(tx)).toEqual({ ok: false, reason: 'unresolved:identity_conflict' });
++    // External-ref path: the ref includes coach_id, so a foreign row is never located there;
++    // seed a same-coach Deleted row to pin that state still yields native_target_removed.
++    tx.seedPerson({
++      coach_id: COACH,
++      source_platform: PLATFORM,
++      source_person_id: 'c-1',
++      display_name: 'Mine',
++      state: 'Deleted',
++    });
++    expect(await runAlias(tx)).toEqual({ ok: false, reason: 'unresolved:native_target_removed' });
++  });
++});
++
+ describe('persistPerson — convergence and atomicity', () => {
+   it('five repeated runs with changing mapped names: one Person, one provenance row, identical outcomes, first name kept', async () => {
+     const tx = new FakeNativeTx();
+diff --git a/test/scout/reconstruct/scout-reconstruct.service.spec.ts b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+index b3048eaa..d583eddf 100644
+--- a/test/scout/reconstruct/scout-reconstruct.service.spec.ts
++++ b/test/scout/reconstruct/scout-reconstruct.service.spec.ts
+@@ -223,8 +223,47 @@ class FakePrisma {
+     },
+   };
+ 
+-  /** `ImportNativeProvenance` primitives the S8-D1 writer uses: findUnique / create / update. */
++  /**
++   * The S8-D1 writer's one raw statement: the `FOR UPDATE` re-read of a located Person. The
++   * engine fake is single-writer, so this is a plain read; the lock protocol itself is pinned by
++   * test/scout/reconstruct/native/person-writer.spec.ts on the transaction fake.
++   */
++  $queryRaw = async (strings: TemplateStringsArray, ...values: unknown[]) => {
++    if (!/FOR UPDATE/.test(strings.join(''))) throw new Error('unexpected raw statement');
++    const wantedId = String(values[0]);
++    const found = [...this.persons.values()].find((p) => p.id === wantedId);
++    return found === undefined
++      ? []
++      : [{ id: found.id, coach_id: found.coach_id, state: found.state }];
++  };
++
++  /** `ImportNativeProvenance` primitives the S8-D1 writer uses: findUnique / findFirst / create / update. */
+   importNativeProvenance = {
++    /** A1 claim check: a RESOLVED row of another raw source_id targeting the same native row. */
++    findFirst: async (args: {
++      where: {
++        coach_id: string;
++        source_namespace: string;
++        entity_type: string;
++        native_kind: string;
++        native_id: string;
++        outcome: { not: string };
++        source_id: { not: string };
++      };
++    }) => {
++      const w = args.where;
++      const row = [...this.provenance.values()].find(
++        (r) =>
++          r.coach_id === w.coach_id &&
++          r.source_namespace === w.source_namespace &&
++          r.entity_type === w.entity_type &&
++          r.native_kind === w.native_kind &&
++          r.native_id === w.native_id &&
++          r.outcome !== w.outcome.not &&
++          r.source_id !== w.source_id.not,
++      );
++      return row === undefined ? null : { source_id: row.source_id };
++    },
+     findUnique: async (args: {
+       where: {
+         coach_id_source_namespace_entity_type_source_id: {
+@@ -854,6 +893,39 @@ describe('ScoutReconstructService', () => {
+     expect(prisma.persons.get('coach-1|truecoach|1')?.display_name).toBe('Legacy Name');
+   });
+ 
++  it('S8-D1/A1: two staged raw ids that trim to one external ref yield ONE Person; the second is skipped unresolved:identity_conflict, never a second verified row', async () => {
++    const prisma = new FakePrisma();
++    // '1' and '1 ' are two staged identities (S9 joins on the raw id) but one mapper sourcePersonId;
++    // the pass orders by source_id, so '1' is written first and '1 ' meets the claimed Person.
++    prisma.staged = [stagedClient('1', 'Ada'), stagedClient('1 ', 'Ada Alias')];
++    const service = new ScoutReconstructService(asPrisma(prisma), makeAnalytics(jest.fn()));
++    const first = await service.reconstruct('coach-1', 'intent-1');
++    expect(first).toMatchObject({ staged: 2, reconstructed: 1, skipped: 1, failed: 0 });
++    expect(prisma.persons.size).toBe(1);
++    const person = [...prisma.persons.values()][0];
++    expect(person.display_name).toBe('Ada');
++    expect(
++      [...prisma.ledger.values()].map((l) => [
++        l.source_id,
++        l.status,
++        l.target_kind ?? null,
++        l.reason,
++      ]),
++    ).toEqual([
++      ['1', 'reconstructed', 'person', null],
++      ['1 ', 'skipped', null, 'unresolved:identity_conflict'],
++    ]);
++    // Exactly one provenance row, and it targets the Person under the first raw id.
++    expect(
++      [...prisma.provenance.values()].map((r) => [r.source_id, r.outcome, r.native_id]),
++    ).toEqual([['1', 'created', person.id]]);
++    // Replay converges: same counts, no new Person, the alias is never adopted later.
++    prisma.ledger.clear();
++    expect(await service.reconstruct('coach-1', 'intent-1')).toEqual(first);
++    expect(prisma.persons.size).toBe(1);
++    expect(prisma.provenance.size).toBe(1);
++  });
++
+   it('keeps two coaches isolated even when they share a source_id', async () => {
+     const prismaA = new FakePrisma();
+     prismaA.staged = [stagedClient('shared')];
+diff --git a/test/scout/s10/s10-unseen.pg.spec.ts b/test/scout/s10/s10-unseen.pg.spec.ts
+index 22fb7818..fd6a8761 100644
+--- a/test/scout/s10/s10-unseen.pg.spec.ts
++++ b/test/scout/s10/s10-unseen.pg.spec.ts
+@@ -487,4 +487,42 @@ suite('s10_unseen — NEW SOURCE → CORE DIFF = 0, live on PG17 (R39, R41)', ()
+       ),
+     ).toBe(2);
+   });
++
++  it('(i) A1 rail: a second raw client id that trims to the same person is refused → partial / unresolved_identities, ONE Person, one verified row', async () => {
++    // Round 2 (review A1). `u10-m-1` and `u10-m-1 ` are two staged identities (the ledger and
++    // provenance key the RAW id) but one mapper `sourcePersonId`. The pass orders by source_id, so
++    // the first creates the Person; the second must NOT adopt it as a second verified row —
++    // persistPerson's claim check (under the Person row lock) returns identity_conflict and the
++    // run is an honest partial, never a `complete` that certified two identities as one person.
++    const coach = 's10u-i';
++    const alias: Row = { ...ROSTER[0], source_id: `${ROSTER[0].source_id} ` };
++    const { run, basis } = await chain(coach, [...ROSTER, alias, ...NATIVE_CLEAN]);
++    expect(run.terminal_status).toBe('partial');
++    expect(run.reason_code).toBe('unresolved_identities');
++    expect(basis.report.conditions).toEqual(['unresolved_identities']);
++    expect(familyOf(basis, 'clients')).toMatchObject({
++      staged_unique: 3,
++      native_present_verified: 2,
++      unresolved: 1,
++      reasons: [{ code: 'unresolved:identity_conflict', count: 1 }],
++      completeness_basis: 'source_signed_enumeration',
++      observed_unique: 3,
++    });
++    expect(nativeCounts(coach)).toEqual({ persons: 2, plans: 2, programs: 0 });
++    expect(
++      Number(
++        lane.sql(
++          `SELECT count(*) FROM "ImportNativeProvenance" WHERE coach_id=${lane.quote(coach)}
++             AND entity_type='clients' AND native_kind='person'`,
++        ),
++      ),
++    ).toBe(2);
++    expect(
++      lane.sql(
++        `SELECT status || ':' || COALESCE(reason, '-') FROM "ScoutReconstructionLedger"
++           WHERE coach_id=${lane.quote(coach)} AND entity_type='u10-members'
++             AND source_id=${lane.quote(alias.source_id)}`,
++      ),
++    ).toBe('skipped:unresolved:identity_conflict');
++  });
+ });
