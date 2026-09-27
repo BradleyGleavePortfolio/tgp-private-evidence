@@ -99,3 +99,16 @@ Date: 2026-09-27
   step's guard, Prisma generation, and N1 linted surfaces had already passed.
 
 No PR was merged.
+
+## Correction — 2026-09-27
+
+- Backend #573 was corrected to preserve applied migrations and to scope the
+  guard to importer paths only. Its final head is `0e2cd9cd`; all reported CI
+  checks are green. The final backend ratchet counts are configuration 1,
+  `src/scout/**/*.spec.ts` 6, extension-pair tests 47, `test/scout/**` 349,
+  importer North Star 3, and the quarantined oracle 1.
+- Extension #33 was closed as superseded. Replacement PR #34 is
+  `ci/vendor-name-guard-r2` at `23bcb38d`, created from `main` `63873237`
+  without changing `extractors/_interface.js`; all its CI checks are green.
+- The backend importer-contract snapshot description was regenerated to match
+  the DTO output after the neutral `example-site` change.

@@ -8,3 +8,4 @@
 - Run the PG proof in parallel with independent reviews: the v1 live failure and review B's static finding agreed, and neither waited on the other.
 - 2026-09-27: A repo-wide "rename vendor names" instruction reached an applied migration and unrelated domains. Grants that edit wording must name the in-scope paths explicitly and exclude prisma/migrations/**.
 - 2026-09-27: The extension repo disallows merge commits (rebase/squash only). The backend repo allows merge commits.
+- 2026-09-27: A builder's 'pkill -f vitest' killed other lanes' test runs. Rule added: kill only your own recorded PIDs.

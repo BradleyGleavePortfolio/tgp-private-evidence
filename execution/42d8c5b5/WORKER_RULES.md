@@ -40,3 +40,6 @@ Doctrine: tgp-agent-context AGENT_RULES.md G01-G22, T0-T4 routing, EXECUTE, Safe
   then run `execution/42d8c5b5/proof/gh-accept.sh <run_id> <target_sha40> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=N`
   (acceptor sha256 4da457af…, reviewed GO). ACCEPT = proof. The parent supplies the target and the pins. Re-run the WHOLE workflow, never only failed jobs.
 - Local runners (lane-s11.sh / lane-s10b.sh) remain the fallback.
+
+## Shared-machine rule (2026-09-27)
+- NEVER kill processes by pattern (pkill -f, killall). Other lanes share this machine. Kill only PIDs you started yourself, recorded in your own pidfile.
