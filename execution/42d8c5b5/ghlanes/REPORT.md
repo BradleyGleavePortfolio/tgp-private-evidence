@@ -67,6 +67,25 @@ PROOF_REMOTE=preserve proof/trigger.sh <new-label> <40-hex sha> EXPECT_TOTAL_s11
 # optional override: HARNESS_SHA=<reviewed sha> ...; diagnostic only: STAGES=a,b PARTIAL=1
 ```
 
+### Out-of-band acceptance script (automates the REVIEW_A delta checklist)
+- Script: `execution/42d8c5b5/proof/gh-accept.sh`, sha256 `95e5b9ff9a67e5de2a3d646325887de709b85427af25b25e2c61b3ccd203e4fe`.
+  I did not change proof/harness.
+- Usage: `proof/gh-accept.sh <run_id> <target_sha40> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=N [EXPECT_<stage>=N…]`,
+  run with bash api_credentials ["github"].
+- These values are fixed in the script and never read from the run: harness `0c97a84f…`, the repo, the workflow path and
+  the accepted package-lock.
+- Each call downloads what it reads to `ghlanes/runs/<label>/accept-<run>-a<attempt>-<utc>/`:
+  - run.json and jobs.json
+  - all artifacts
+  - PROOF_TARGET
+  - the approved lanes.sh
+  - the manifest
+  - ACCEPTANCE.txt, a copy of the output
+- Results:
+  - `36351463274` (FULL, 419a756d, pins 133/42/95): **ACCEPT**, exit 0, 18 CHECK lines
+  - `36351497200` (PARTIAL): **REJECT** "PROOF_TARGET has STAGES/PARTIAL", exit 1
+  - `36351482941` (typo): **REJECT** "PROOF_TARGET pin EXPECT_guarrd=95 not among the supplied pins", exit 1
+
 ### Consumer rule (what the harness cannot enforce on itself)
 A run commit can carry any workflow. Before accepting a run, check out of band that:
 - `harness_sha` in the summary == the reviewed SHA, and `git rev-parse <run commit>^` == that SHA
