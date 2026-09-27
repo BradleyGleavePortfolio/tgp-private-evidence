@@ -1,5 +1,9 @@
 # LAST OPERATOR STATE
 
+## CURRENT: EXEC-42D8C5B5, 2026-09-27 17:20Z
+
+Owner takeover (session 42d8c5b5). Read `execution/42d8c5b5/TAKEOVER.md` and `execution/42d8c5b5/LAST_OPERATOR_STATE.md`; they supersede the sections below. Live: integration/importer 54be96f1, backend main 1c10e2a1, extension main a889f4ad, mobile main 01dd8a3c. Predecessor S11-E/S11-D r4/S12-B1/S12-B2/S8-D1 bytes lost with its sandbox; rebuilding.
+
 ## CURRENT: EXEC-FA72EFB2, 2026-09-26 15:20Z
 
 Owner takeover (session fa72efb2). Read `execution/fa72efb2/TAKEOVER.md` and `execution/fa72efb2/LAST_OPERATOR_STATE.md`; they supersede the sections below, which are preserved as history. Live: integration/importer 54be96f1 (S11-A2 landed 18:45:20Z on S11-B dda794d7); mobile main 01dd8a3c (S12-B3 verdict card 21:05:57Z, PR #297, on readiness panel a876268c); backend main 1c10e2a1, extension main a889f4ad unchanged.
