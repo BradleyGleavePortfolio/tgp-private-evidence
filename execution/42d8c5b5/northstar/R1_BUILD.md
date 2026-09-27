@@ -7,20 +7,61 @@ Date: 2026-09-27
 
 | Repository | Base | Head branch | PR | Head commit |
 | --- | --- | --- | --- | --- |
-| growth-project-mobile | `main` @ `01dd8a3c` | `r1/roman-status-binding` | https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/300 | `b283c93620ecd1b12d6dfc73a81368517ac3cd2f` |
+| growth-project-mobile | `main` @ `01dd8a3c` | `r1/roman-status-binding` | https://github.com/BradleyGleavePortfolio/growth-project-mobile/pull/300 | `86144f34dd833889038d1d5c86ccd0993930b181` |
 
 PR left **open, not merged**, per the grant.
 
 ## CI
 
-All checks green on the head commit (`b283c93`):
+All checks green on both pushed heads:
 
-| Check | Conclusion |
-| --- | --- |
-| Typecheck, lint, test | SUCCESS |
-| CodeQL Advanced / Analyze (actions) | SUCCESS |
-| CodeQL Advanced / Analyze (javascript-typescript) | SUCCESS |
-| CodeQL | SUCCESS |
+| Check | `b283c93` (initial) | `86144f3` (finding fix) |
+| --- | --- | --- |
+| Typecheck, lint, test | SUCCESS | SUCCESS |
+| CodeQL Advanced / Analyze (actions) | SUCCESS | SUCCESS |
+| CodeQL Advanced / Analyze (javascript-typescript) | SUCCESS | SUCCESS |
+| CodeQL | SUCCESS | SUCCESS |
+
+## Class-A finding closed (post-review, before independent acceptance)
+
+**Finding:** the initial adapter mapped server `complete`/`partial` to the
+result view's `unavailable` outcome. This regressed the coach from what
+`ImportRunVerdictCard` already shows on `main` today: the server's verdict IS
+the authority (S9 reconciliation settles `complete` before the server ever
+emits it), so showing less than the card already showed for the same read was
+a genuine loss of truth, not honesty.
+
+**Closure (commit `86144f3`, pushed as a second non-force commit on the same
+branch):**
+- `ImportResultView` gained one additive outcome, `serverVerdict`
+  (`authority:'server'`, `status:'complete'|'partial'`), distinct from the
+  native-proof-gated `complete`/`verifiedSubset` outcomes (which still require
+  an `ImportNativeSummary` this hook never carries, and are still never used
+  by this adapter). It renders the same complete/partial headline and body
+  copy `ImportRunVerdictCard` uses today (`result.complete.*` /
+  `result.partial.*`), with no counts, scope or native action — this hook's
+  reading never carried any to show, and none are invented. Every existing
+  outcome branch (`complete`, `verifiedSubset`, `provenZero`, `transferOnly`,
+  `blocked`, the ordinary terminals) is untouched.
+- `importRunStatusAdapter` now maps server `complete` → `serverVerdict`
+  complete (no reason — a settled complete has none, matching the card) and
+  server `partial` → `serverVerdict` partial with the server's `reason_code`
+  mapped through the same four approved local reason keys `blocked` already
+  uses (`revoked→denied`, `cancelled_by_coach→changed`,
+  `unresolved_family|unresolved_identities|relationship_unverified|coverage_basis_unknown→scopeUnknown`,
+  else→`unknown`). Legacy-mode terminals are unchanged — still `unavailable`,
+  matching the card's own `legacyNote` treatment of an unarbitrated extension
+  claim (the finding explicitly exempts this case).
+- Added `ImportRunStatusJourney.parity.test.tsx`: for every server status, it
+  runs the card's own exported `verdictLines(reading)` against the identical
+  reading the Roman adapter receives, and asserts the Roman surface's outcome
+  is at least as informative — specifically that it never collapses to
+  `unavailable` where the card names a real, non-generic verdict. Legacy and
+  truly-unknown-status cases are asserted to match the card's own declines.
+- Reused the existing `result.complete.*`/`result.partial.*` P2 copy keys
+  (already present, previously only reachable via the native-gated branches)
+  and the existing four approved blocked-reason keys — no new P2 copy keys,
+  and no P1 dictionary changes.
 
 Locally, before pushing: targeted jest suites (`importRunStatusAdapter.test.ts`,
 `ImportRunStatusJourney.test.tsx`, all `ExtensionPairingPanel.*.test.tsx`,
@@ -112,22 +153,25 @@ across other concurrent agent worktrees; the full suite is covered by CI.
 
 ## LOC
 
-Counted via `git diff --cached --numstat` against `origin/main@01dd8a3c`.
+Counted via `git diff 01dd8a3c --numstat`, whole branch (both commits) against
+`origin/main@01dd8a3c`.
 
 | File | Type | Added | Removed |
 | --- | --- | ---: | ---: |
-| `src/screens/coach/import-journey/importRunStatusAdapter.ts` | prod | 154 | 0 |
+| `src/screens/coach/import-journey/importRunStatusAdapter.ts` | prod | 168 | 0 |
 | `src/components/coach/ImportRunStatusJourney.tsx` | prod | 51 | 0 |
+| `src/screens/coach/import-journey/ImportResultView.tsx` | prod | 27 | 7 |
 | `src/components/coach/ExtensionPairingPanel.tsx` | prod | 20 | 10 |
-| **Prod total** | | **225** | **10** |
-| `src/screens/coach/import-journey/__tests__/importRunStatusAdapter.test.ts` | test | 167 | 0 |
-| `src/components/coach/__tests__/ImportRunStatusJourney.test.tsx` | test | 96 | 0 |
+| **Prod total** | | **266** | **17** |
+| `src/screens/coach/import-journey/__tests__/importRunStatusAdapter.test.ts` | test | 192 | 0 |
+| `src/components/coach/__tests__/ImportRunStatusJourney.test.tsx` | test | 110 | 0 |
+| `src/components/coach/__tests__/ImportRunStatusJourney.parity.test.tsx` | test | 88 | 0 |
 | `src/components/coach/__tests__/ExtensionPairingPanel.verdict.test.tsx` | test | 25 | 20 |
-| **Test total** | | **288** | **20** |
+| **Test total** | | **415** | **20** |
 
-Added prod LOC: **225** (grant cap: ≤400 added prod LOC — under by 175).
+Added prod LOC: **266** (grant cap: ≤400 added prod LOC — under by 134).
 
-## Status → view mapping (final)
+## Status → view mapping (final, post-finding-closure)
 
 | `useImportRunStatus` view / `DecodedRunStatus.status` | Roman view rendered | Notes |
 | --- | --- | --- |
@@ -137,9 +181,9 @@ Added prod LOC: **225** (grant cap: ≤400 added prod LOC — under by 175).
 | `reading`, status=`running`, phase recognized | `ImportProgressView`, `{freshness:'current', phase}` | discovering→finding, transferring→transferring, reconciling→checking |
 | `reading`, status=`running`, phase null/unknown | `ImportProgressView`, `{freshness:'stale'}` (no lastObservedPhase) | never guesses a phase |
 | `reading`, status=`running`, but `run.stale===true` | `ImportProgressView`, `{freshness:'stale', lastObservedPhase}` if phase known | stale refresh never claims current |
-| `reading`, `mode==='legacy'` any terminal | `ImportResultView`, `outcome:'unavailable'` | extension's own unarbitrated claim, never shown as proven |
-| `reading`, status=`complete` (server) | `ImportResultView`, `outcome:'unavailable'` | server word is real but hook carries no native-write proof required by P2's `complete` outcome — documented limitation, not a downgrade of server truth |
-| `reading`, status=`partial` (server) | `ImportResultView`, `outcome:'unavailable'` | same reasoning — `verifiedSubset` needs `native` proof not carried |
+| `reading`, `mode==='legacy'` any terminal | `ImportResultView`, `outcome:'unavailable'` | extension's own unarbitrated claim, never shown as proven (documented exception — matches the card's own `legacyNote`) |
+| `reading`, status=`complete` (server) | `ImportResultView`, `outcome:'serverVerdict'`, `authority:'server'`, `status:'complete'` | the server's own settled verdict (S9 reconciliation), shown as the authority it is — same headline/body as `ImportRunVerdictCard`, no counts invented |
+| `reading`, status=`partial` (server) | `ImportResultView`, `outcome:'serverVerdict'`, `authority:'server'`, `status:'partial'`, `reason` mapped via `BLOCKED_REASON_MAP` | same headline as the card; server's `reason_code` surfaced through the four approved local reason keys |
 | `reading`, status=`failed` | `ImportResultView`, `outcome:'failed'` | — |
 | `reading`, status=`cancelled` | `ImportResultView`, `outcome:'cancelled'` | — |
 | `reading`, status=`timed_out` | `ImportResultView`, `outcome:'timedOut'` | — |
