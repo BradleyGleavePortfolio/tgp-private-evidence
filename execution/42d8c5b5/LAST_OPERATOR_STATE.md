@@ -66,3 +66,8 @@
 - N0 extension #31 landed (squash/rebase; this repo disallows merge commits). The north star is live in 4/4 repos.
 - N1: extension #33 and mobile #299 are green and under review (gpt_6_sol). Backend #573 went back: A = it edited an applied migration; B = out-of-scope food-logger
   edits; the guard is now scoped to importer paths only.
+
+## 22:00Z
+- GH-LANES AUTHORITATIVE: harness 0c97a84f GO, acceptor gh-accept.sh 4da457af GO. Full proof in about 14 min; parallel runs are fine.
+- N1: backend #573 is scoped to the importer and the migration is reverted; its Test step is failing (under investigation). Extension #33 is being rebuilt as r2 (clean branch). Mobile #299 landed.
+- R1 #300: class-A finding (server complete/partial shown as unavailable) returned to the builder. C2b-1 #32: B1–B3 returned.

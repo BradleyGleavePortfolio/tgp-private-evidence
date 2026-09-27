@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+BASE=/home/user/workspace/repos/tgp-private-evidence/execution/42d8c5b5/ghlanes/runs/qual2-419a756d-full-r1/accept-36351463274-a1-20260927T214231Z
+TEST=/home/user/workspace/repos/tgp-private-evidence/execution/42d8c5b5/ghlanes/acceptor-probe
+[ "$1" = api ] || exit 2
+P=$2
+case "$P" in
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274)
+    cat "$TEST/run-attempt2.json" ;;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274/attempts/2/jobs?per_page=100)
+    cat "$TEST/jobs-attempt2.json" ;;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274/artifacts?per_page=100)
+    cat "$BASE/artifacts.json" ;;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/artifacts/*/zip)
+    ID=${P%/zip}; ID=${ID##*/}
+    NAME=$(jq -r --argjson id "$ID" '.artifacts[] | select(.id == $id) | .name' "$BASE/artifacts.json")
+    [ -n "$NAME" ] || exit 3
+    if [ "$NAME" = stage-s11-guard ]; then cat "$TEST/stage-s11-guard-tampered.zip"
+    else cat "$BASE/$NAME.zip"; fi ;;
+  *) echo "unexpected mock gh api path $P" >&2; exit 4 ;;
+esac

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# fixture gh: $PROBE_RUN / $PROBE_JOBS / $PROBE_ARTS json files; $PROBE_GUARD_ZIP replaces stage-s11-guard zip (empty = original)
+set -euo pipefail
+BASE=/home/user/workspace/repos/tgp-private-evidence/execution/42d8c5b5/ghlanes/runs/qual2-419a756d-full-r1/accept-36351463274-a1-20260927T214231Z
+[ "$1" = api ] || exit 2; P=$2
+case "$P" in
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274) cat "$PROBE_RUN";;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274/attempts/*/jobs?per_page=100) cat "$PROBE_JOBS";;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274/artifacts?per_page=100) cat "$PROBE_ARTS";;
+  repos/BradleyGleavePortfolio/growth-project-backend/actions/artifacts/*/zip) ID=${P%/zip}; ID=${ID##*/}
+    NAME=$(jq -r --argjson id "$ID" '.artifacts[] | select(.id == $id) | .name' "$BASE/artifacts.json"); [ -n "$NAME" ] || exit 3
+    if [ "$NAME" = stage-s11-guard ] && [ -n "${PROBE_GUARD_ZIP:-}" ]; then cat "$PROBE_GUARD_ZIP"; else cat "$BASE/$NAME.zip"; fi;;
+  *) echo "unexpected mock gh api path $P" >&2; exit 4;;
+esac

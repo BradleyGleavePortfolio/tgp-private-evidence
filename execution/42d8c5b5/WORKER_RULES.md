@@ -34,3 +34,9 @@ Doctrine: tgp-agent-context AGENT_RULES.md G01-G22, T0-T4 routing, EXECUTE, Safe
    accounts, CWS, branch protection, spending, external commitments).
 10. Output: report file where the grant says (do not commit the evidence repo — parent commits). Exact heads/trees, pushed cand ref,
     LOC prod/test, commands with RC, risks. Never claim you ran or read something you did not. Keep reports short.
+
+## Authoritative PG proof (effective 2026-09-27 22:00Z)
+- GitHub proof lanes, harness 0c97a84f1ca833bacdd7c20c2cfabf20430504a9 (reviewed GO). Trigger with proof/trigger.sh in worktrees/ghlanes-harness, using PROOF_REMOTE=preserve,
+  then run `execution/42d8c5b5/proof/gh-accept.sh <run_id> <target_sha40> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=N`
+  (acceptor sha256 4da457af…, reviewed GO). ACCEPT = proof. The parent supplies the target and the pins. Re-run the WHOLE workflow, never only failed jobs.
+- Local runners (lane-s11.sh / lane-s10b.sh) remain the fallback.

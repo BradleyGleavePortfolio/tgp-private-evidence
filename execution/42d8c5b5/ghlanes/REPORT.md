@@ -86,6 +86,45 @@ PROOF_REMOTE=preserve proof/trigger.sh <new-label> <40-hex sha> EXPECT_TOTAL_s11
   - `36351497200` (PARTIAL): **REJECT** "PROOF_TARGET has STAGES/PARTIAL", exit 1
   - `36351482941` (typo): **REJECT** "PROOF_TARGET pin EXPECT_guarrd=95 not among the supplied pins", exit 1
 
+#### Acceptor rev 2: closure of "Acceptor review" A
+- The script is now sha256 `4da457af346351ace3575251325540c0e7b6c84f491d49644cd262daf602bc43`; rev 1 was `95e5b9ff…`.
+  Only gh-accept.sh changed.
+- New check 4c, artifact provenance:
+  - The job listing must contain only jobs with run_id = this run, run_attempt = the accepted attempt, and head = the run head.
+  - Artifact names must be unique and exactly equal the required set. That set is preflight, summary, lane-s11, lane-s10b,
+    and stage-<lane>-<stage> for each manifest stage.
+  - Each artifact must have workflow_run.id = this run, head_sha = the run head, and well-formed id, digest and
+    created_at fields.
+  - Each artifact's created_at must be ≥ run_started_at and inside the window of the job that produced it in the accepted
+    attempt.
+  - The downloaded zip's sha256 must equal GitHub's `digest`.
+  - Missing, malformed or inconclusive values all REJECT.
+- New check 4e, receipts, for each of the 11 job artifacts:
+  - RECEIPTS.sha256 must list exactly the files present and `sha256sum --strict -c` must pass.
+  - RESULT must have one `GH_RUN=` line equal to `<run URL> attempt=<accepted attempt>`.
+  - RESULT's HARNESS_COMMIT must equal the independently fetched run head.
+  - RESULT's STAGE_SH_SHA256 and LANES_SH_SHA256 must equal the approved harness files.
+  - LANE and JOB_STAGES must match the artifact name, and START/END must fall inside the job window.
+  - The preflight receipt must have RUN_COMMIT = run head, TARGET, HARNESS_SHA, MODE=FULL, TREE and PREFLIGHT_OK.
+  - The summary's run URL must equal this run.
+- Real run 36351463274: **ACCEPT**, exit 0.
+- The partial run (36351497200) and the typo run (36351482941) still REJECT, for the same reasons as before.
+- Negative probes, all exit 1. The fixtures are in `ghlanes/acceptor-probe/` (the reviewer's, used unchanged) and
+  `ghlanes/acceptor-probe-v2/`.
+  - P0, the reviewer's fixture (attempt-2 run and jobs, attempt-1 receipts, guard altered to attempt=99): REJECT, guard zip
+    sha256 ≠ GitHub digest.
+  - P1, attempt-2 metadata with the original artifacts: REJECT, lane-s10b GH_RUN attempt=1 ≠ attempt=2.
+  - P2, the altered guard zip with the real digest: REJECT, digest mismatch.
+  - P3, the altered zip with its digest forged: REJECT, RECEIPTS.sha256 `RESULT: FAILED`.
+  - P4, the altered zip with RECEIPTS resealed and digest forged: REJECT, guard GH_RUN attempt=99 ≠ attempt=1.
+  - P5, a duplicate artifact name: REJECT. P5, an artifact with a different workflow_run.id: REJECT.
+- Residual limits:
+  - The preflight and summary artifacts carry no attempt marker in their content, because the harness doesn't write one.
+    They are tied to the attempt only through workflow_run.id, the job window and the GitHub digest.
+  - A re-run of only the failed jobs, which carries earlier-attempt jobs into the listing, is rejected. This fails closed:
+    re-run the whole workflow instead.
+  - RECEIPTS.sha256 detects corruption, not forgery. Attempt provenance comes from the GitHub API, not from the receipts.
+
 ### Consumer rule (what the harness cannot enforce on itself)
 A run commit can carry any workflow. Before accepting a run, check out of band that:
 - `harness_sha` in the summary == the reviewed SHA, and `git rev-parse <run commit>^` == that SHA

@@ -4,6 +4,8 @@
 #   run with bash api_credentials ["github"] (gh api through the proxy; git objects from the public GitHub remote).
 # Env: ACCEPT_PKG_LOCK_SHA256 (default = accepted tree b7fed5ed...9c55).
 # Everything read is downloaded under ghlanes/runs/<label>/accept-<run_id>-a<attempt>-<utc>/ (never overwritten).
+# Artifact provenance: exactly the required artifact names, each from this run id/head, created inside its producing job's
+# window in the accepted attempt, zip sha256 = GitHub digest, RECEIPTS.sha256 valid, RESULT GH_RUN = run URL + accepted attempt.
 # Output: one "CHECK ok ..." line per verified item, then ACCEPT (exit 0); any failure prints "REJECT <reason>" (exit 1;
 # usage/tooling errors exit 2). Trust anchors are fixed here, never read from the run: harness, repo, workflow path.
 set -uo pipefail
@@ -101,13 +103,61 @@ NJ=$(jq '.jobs | length' "$D/jobs.json"); NBAD=$(jq '[.jobs[] | select(.conclusi
 [ "$NBAD" = 0 ] && [ "$NJ" = "${#REQ[@]}" ] || reject "jobs: $NJ total, $NBAD not success (expected exactly ${#REQ[@]} required jobs)"
 ok "4b all ${#REQ[@]} required jobs success: $(printf '%s; ' "${REQ[@]}")"
 
-# ---- artifacts of this run (all downloaded)
+field(){ grep -m1 "^$1=" "$2" | cut -d= -f2-; }
+# ---- 4c. artifacts: provenance bound to THIS run id + accepted attempt (REVIEW_A "Acceptor review" A)
+# Expected artifact name -> producing job of the accepted attempt.
+declare -A AJOB=([preflight]="preflight" [summary]="aggregate" [lane-s11]="lane s11 ALL" [lane-s10b]="lane s10b ALL")
+while read -r L N S; do [ "$S" = run ] && AJOB["stage-$L-$N"]="stage $L $N"; done <"$D/manifest.txt"
+RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"; GH_RUN_WANT="$RUN_URL attempt=$ATT"
+RSTART=$(jq -r .run_started_at <<<"$RJ"); ISO='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+[[ "$RSTART" =~ $ISO ]] || reject "run_started_at '$RSTART' malformed (attempt window inconclusive)"
+# every job of the listing must belong to this run id, this attempt and the run head
+jq -e --argjson r "$RUN_ID" --argjson a "$ATT" --arg h "$HEAD_SHA" 'all(.jobs[]; .run_id==$r and .run_attempt==$a and .head_sha==$h)' "$D/jobs.json" >/dev/null \
+  || reject "job listing contains jobs from another run/attempt/head"
+jwin(){ jq -r --arg n "$1" '.jobs[] | select(.name==$n) | "\(.started_at) \(.completed_at)"' "$D/jobs.json"; }
 api "repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" >"$D/artifacts.json" || reject "artifacts unreadable"
-while read -r AID NAME ASHA EXP; do
+NA=$(jq '.artifacts | length' "$D/artifacts.json"); [ "$(jq -r '.total_count' "$D/artifacts.json")" = "$NA" ] || reject "artifact listing incomplete (total_count != listed)"
+DUP=$(jq -r '.artifacts[].name' "$D/artifacts.json" | sort | uniq -d | paste -sd' ' -); [ -z "$DUP" ] || reject "duplicate artifact names: $DUP"
+GOTN=$(jq -r '.artifacts[].name' "$D/artifacts.json" | LC_ALL=C sort | paste -sd' ' -); WANTN=$(printf '%s\n' "${!AJOB[@]}" | LC_ALL=C sort | paste -sd' ' -)
+[ "$GOTN" = "$WANTN" ] || reject "artifact names [$GOTN] != required set [$WANTN] (missing/extra)"
+declare -A AWIN=()
+while IFS=$'\t' read -r AID NAME WRID ASHA EXP DIG CRE; do
+  [[ "$AID" =~ ^[0-9]+$ ]] && [[ "$DIG" =~ ^sha256:[0-9a-f]{64}$ ]] && [[ "$CRE" =~ $ISO ]] || reject "artifact $NAME metadata malformed (id=$AID digest=$DIG created_at=$CRE)"
+  [ "$WRID" = "$RUN_ID" ] || reject "artifact $NAME workflow_run.id $WRID != $RUN_ID"
   [ "$ASHA" = "$HEAD_SHA" ] || reject "artifact $NAME head_sha $ASHA != run head"; [ "$EXP" = false ] || reject "artifact $NAME expired"
-  api "repos/$REPO/actions/artifacts/$AID/zip" >"$D/$NAME.zip" && mkdir -p "$D/art/$NAME" && unzip -q -o "$D/$NAME.zip" -d "$D/art/$NAME" || reject "artifact $NAME download failed"
-done < <(jq -r '.artifacts[] | "\(.id) \(.name) \(.workflow_run.head_sha) \(.expired)"' "$D/artifacts.json")
-ok "4c downloaded $(jq '.artifacts | length' "$D/artifacts.json") artifacts (all from run head $HEAD_SHA) to $D/art"
+  J=${AJOB[$NAME]}; read -r JS JC <<<"$(jwin "$J")"
+  [[ "$JS" =~ $ISO ]] && [[ "$JC" =~ $ISO ]] || reject "artifact $NAME: producing job '$J' of attempt $ATT has no complete window (linkage inconclusive)"
+  [[ ! "$CRE" < "$RSTART" ]] && [[ ! "$CRE" < "$JS" ]] && [[ ! "$CRE" > "$JC" ]] || reject "artifact $NAME created_at $CRE outside attempt-$ATT job '$J' window [$JS, $JC] (run_started_at $RSTART)"
+  api "repos/$REPO/actions/artifacts/$AID/zip" >"$D/$NAME.zip" || reject "artifact $NAME download failed"
+  ZD=$(sha256sum "$D/$NAME.zip" | cut -c1-64); [ "sha256:$ZD" = "$DIG" ] || reject "artifact $NAME zip sha256 $ZD != GitHub digest ${DIG#sha256:}"
+  mkdir -p "$D/art/$NAME" && unzip -q -o "$D/$NAME.zip" -d "$D/art/$NAME" || reject "artifact $NAME unzip failed"
+  AWIN[$NAME]="$JS $JC"
+done < <(jq -r '.artifacts[] | [(.id|tostring), .name, (.workflow_run.id|tostring), .workflow_run.head_sha, (.expired|tostring), (.digest // "none"), .created_at] | @tsv' "$D/artifacts.json")
+ok "4c $NA artifacts = required set, unique names, all workflow_run.id=$RUN_ID head=$HEAD_SHA, each created inside its attempt-$ATT job window, zip sha256 = GitHub digest"
+# receipts: checksum manifest complete + valid; recorded run/attempt/run-commit/harness-script binding
+ST_SHA=$(git -C "$G" show "$APPROVED_HARNESS:proof/stage.sh" | sha256sum | cut -c1-64); LA_SHA=$(sha256sum <"$D/lanes.sh.approved" | cut -c1-64)
+for NAME in $(printf '%s\n' "${!AJOB[@]}" | LC_ALL=C sort); do A=$D/art/$NAME
+  case "$NAME" in
+    preflight) P=$A/PREFLIGHT; [ -f "$P" ] && [ "$(find "$A" -type f | wc -l)" = 1 ] || reject "preflight artifact must contain only PREFLIGHT"
+      grep -qx "TARGET=$TARGET" "$P" && grep -qx "HARNESS_SHA=$APPROVED_HARNESS" "$P" && grep -qx "RUN_COMMIT=$HEAD_SHA" "$P" && grep -qx MODE=FULL "$P" && grep -qx "TREE=$TTREE" "$P" && [ "$(tail -1 "$P")" = PREFLIGHT_OK ] \
+        || reject "preflight receipt target/harness/run-commit/mode/tree mismatch"; continue;;
+    summary) [ -f "$A/SUMMARY.md" ] && [ "$(find "$A" -type f | wc -l)" = 1 ] || reject "summary artifact must contain only SUMMARY.md"
+      grep -qxF -- "- run: $RUN_URL" "$A/SUMMARY.md" || reject "summary run URL != $RUN_URL"; continue;;
+  esac
+  [ -f "$A/RECEIPTS.sha256" ] || reject "$NAME: RECEIPTS.sha256 missing"
+  LISTED=$(awk '{print $2}' "$A/RECEIPTS.sha256" | LC_ALL=C sort | paste -sd' ' -); PRESENT=$(cd "$A" && find . -type f ! -name RECEIPTS.sha256 | sed 's|^\./||' | LC_ALL=C sort | paste -sd' ' -)
+  [ "$LISTED" = "$PRESENT" ] || reject "$NAME: RECEIPTS.sha256 lists [$LISTED] but artifact holds [$PRESENT]"
+  (cd "$A" && sha256sum --quiet --strict -c RECEIPTS.sha256) >"$D/receipts-check-$NAME.txt" 2>&1 || reject "$NAME: receipt checksum failure: $(tr '\n' ' ' <"$D/receipts-check-$NAME.txt")"
+  R=$A/RESULT; [ -f "$R" ] || reject "$NAME: RESULT missing"
+  [ "$(grep -c '^GH_RUN=' "$R")" = 1 ] && [ "$(field GH_RUN "$R")" = "$GH_RUN_WANT" ] || reject "$NAME: RESULT GH_RUN='$(field GH_RUN "$R")' != '$GH_RUN_WANT'"
+  [ "$(field HARNESS_COMMIT "$R")" = "$HEAD_SHA" ] || reject "$NAME: RESULT HARNESS_COMMIT $(field HARNESS_COMMIT "$R") != run head $HEAD_SHA"
+  [ "$(field STAGE_SH_SHA256 "$R")" = "$ST_SHA" ] && [ "$(field LANES_SH_SHA256 "$R")" = "$LA_SHA" ] || reject "$NAME: RESULT stage.sh/lanes.sh sha256 != approved harness files"
+  case "$NAME" in lane-*) WL=${NAME#lane-}; WJ=ALL;; stage-s11-*) WL=s11; WJ=${NAME#stage-s11-};; stage-s10b-*) WL=s10b; WJ=${NAME#stage-s10b-};; esac
+  [ "$(field LANE "$R")" = "$WL" ] && [ "$(field JOB_STAGES "$R")" = "$WJ" ] || reject "$NAME: RESULT LANE/JOB_STAGES $(field LANE "$R")/$(field JOB_STAGES "$R") != $WL/$WJ"
+  RS=$(field START "$R"); RE=$(field END "$R"); read -r JS JC <<<"${AWIN[$NAME]}"
+  [[ "$RS" =~ $ISO ]] && [[ "$RE" =~ $ISO ]] && [[ ! "$RS" < "$JS" ]] && [[ ! "$RE" > "$JC" ]] || reject "$NAME: RESULT START/END $RS..$RE outside job window [$JS, $JC]"
+done
+ok "4e receipts: RECEIPTS.sha256 complete+valid in all $(( ${#AJOB[@]} - 2 )) job artifacts; every RESULT GH_RUN='$GH_RUN_WANT', HARNESS_COMMIT=run head, stage.sh/lanes.sh = approved, LANE/JOB_STAGES = artifact, START/END in job window; preflight RUN_COMMIT=run head; summary run URL = $RUN_URL"
 
 # ---- 4d. summary
 S=$D/art/summary/SUMMARY.md; [ -f "$S" ] || reject "SUMMARY.md missing"
@@ -120,7 +170,6 @@ for k in "${!PIN[@]}"; do grep -qx -- "- $k=${PIN[$k]} got ${PIN[$k]}" "$S" || r
 ok "4d summary: mode FULL, VERDICT: PASS, harness_sha+run commit+target HEAD/TREE match, ${#PIN[@]} pins checked with expected values"
 
 # ---- 5. serial lane receipts
-field(){ grep -m1 "^$1=" "$2" | cut -d= -f2-; }
 sr(){ grep -m1 "^STAGE_RESULT name=$1 " "$2" | grep -oE "(^| )$3=[^ ]+" | head -1 | sed 's/^ //' | cut -d= -f2-; }
 BIND=""
 for L in s11 s10b; do R=$D/art/lane-$L/RESULT; [ -f "$R" ] || reject "lane $L RESULT missing"
