@@ -71,3 +71,10 @@
 - GH-LANES AUTHORITATIVE: harness 0c97a84f GO, acceptor gh-accept.sh 4da457af GO. Full proof in about 14 min; parallel runs are fine.
 - N1: backend #573 is scoped to the importer and the migration is reverted; its Test step is failing (under investigation). Extension #33 is being rebuilt as r2 (clean branch). Mobile #299 landed.
 - R1 #300: class-A finding (server complete/partial shown as unavailable) returned to the builder. C2b-1 #32: B1–B3 returned.
+
+## 22:35Z
+- S11-DE commit 3 → PR #574 (2bd2d85d, test-only; historical rls-g2-nq1 / c-contract specs expect the v3 cursor). PARKED (class B hygiene, not on the north-star
+  path). These specs are in no proof lane, and Q07 needs a two-head PG run. Land when a cheap PG proof path exists (for example a future GH-lane stage), with a T2 review.
+- X1 #35: review A NO-GO (3 A + 2 B) returned to the builder, who also rebases onto main 63873237. Review B pending.
+- C2b-1 #32: r3 cb614bab (B1–B3 closed, 398 LOC), delta review pending.
+- R1 #300: review NO-GO (A1 stale, A2 reason remap, B3–B5 parity). Returned with a SIMPLIFY direction: reuse the card's content inside the Roman frame.

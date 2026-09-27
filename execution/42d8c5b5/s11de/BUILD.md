@@ -95,3 +95,22 @@ Run on the round-2 working tree whose content equals the commit trees (commit 1 
 - A: none open from my side.
 - B: `rls-g2-c-contract.spec.ts:855-885` will fail under v3 emission if that lane is ever re-run (HARM: stale lane assertion; BLOCKED: nothing in S11; MINIMUM CLOSURE: update the expected token builder to the v3 envelope or mark the lane historical; STATE UNLOCKED: lane C green).
 - C: prettier debt in 5 untouched files (listed above); scratch commits `4d30cae7`/`49d2a8c7` left locally on `x42/s11de-r2` (never pushed).
+
+## Commit 3 (test-only, S11-E follow-up) — PR #574
+
+S11-DE landed unchanged in `integration/importer` (`ce37c6ee`, `1ee239c0` are ancestors of `9668af6c`). Commit 3 was rebuilt directly on `9668af6c` (the scratch attempt on `1ee239c0` never committed; the same delta was applied): **`2bd2d85d03bd9e25c220ea482759ab8424cb7eaa`**, tree `6dbd73a6…`, Bradley Gleave author+committer, hooks on. Pushed to `refs/heads/cand/x42/s11de-c3`; PR **#574** → `integration/importer`, title "test(scout): historical rls-g2 lanes expect the v3 roster/entities cursor (S11-E follow-up)". Files: `test/rls-g2-nq1.spec.ts` (+151/−…), `test/rls-g2-c-contract.spec.ts`; 2 files, +184/−27. No src.
+
+### Per-spec status (v2 emission / cursor usage across `test/rls-g2-*.spec.ts`)
+| spec | asserts v2 emission? | change | expected outcome / why |
+|---|---|---|---|
+| `rls-g2-nq1` | YES: Q01 (`toBe(v2(...))` ×2), Q02 chain (×3), Q03 `onward` (×1), Q04 `tokens` array, Q06 (×1); Q07 uses v2 as INPUT | Q01–Q04, Q06 expectations → `v3(...)`; `LEDGER_ORDER` regex gains `entity_type ASC`; Q03 legacy-lookup matcher accepts `(source_platform, entity_type)` projection; Q02/Q04 hand-offs to the OLD reader use the shared v2 form (old head has no v3 branch); Q07 keeps the v2-input acceptance on both heads and adds v3 maximal-token acceptance (candidate) + 400 (old) + v3 malformed shapes; `readPage` excludes `GROUP BY` | **Q07 still passes**: v2 input acceptance is unchanged in `scout-cursor.ts` (`decodeScoutCursor` v2 branch; `resolveScoutCursor` 0-row → continue after pair, which is exactly the "empty final page" Q07 asserts for a maximal token that matches no row). Static claim; lane not run here. |
+| `rls-g2-c-contract` | YES: C16 `tokens` array (:857) | → `v3(...)`; adds old-reader-refuses-v3 assertion; `readPage` excludes `GROUP BY` | passes by construction (same emission as nq1 Q04 tie case). |
+| `rls-g2-pg17-etq0` | **NO** — pre-Q1 lane (old head `925780e0`); stage 4 asserts LEGACY emission (`nextLegacy`, :1020/:1027/:1071); v2 only as input (:1025–1117) | none | already stale vs Q1 emission at base (legacy → v2 happened in `61b93cff`), not an S11-E regression; historical lane. |
+| `rls-g2-tq0` | NO — asserts legacy emission (:603–608); v2 input only | none | same pre-Q1 status as pg17-etq0. |
+| `rls-g2-ledger-expand`, `rls-g2-b-drain`, `rls-g2-r-ready`, `rls-g2-s8b/c/f/g`, `rls-g2-s9`, `rls-g2-s9c`, `rls-g2-s10b/c`, `rls-g2-s11`, `rls-g2-s7l` | no cursor equality (only `toBeNull`/`not.toBeNull` in s8f) | none | unaffected by the envelope. |
+
+### `readPage` correction (both updated lanes)
+The S11-E readers run the two grouped aggregates (`groupBy` on `ScoutIngestEntity`/`ScoutReconstructionLedger`, tenant-scoped) BEFORE cursor resolution; the old helper matched any `"ScoutIngestEntity"` + `COUNT` query and would have flagged every fail-closed path as "a page read happened". Grouped queries are now excluded (`!q.includes('GROUP BY')`); the ledger-page match (`target_id` selected) is unchanged.
+
+### Gates for commit 3 (flock, `--runInBand`, on `9668af6c` + delta)
+prettier RC 0, eslint RC 0, tsc RC 0, jest `test/scout test/contracts/importer-contract.spec.ts test/utils/g2-s11-db-guard.spec.ts`: 73 suites / 1922 passed / 47 skipped, RC 0. PG lanes NOT run here (bootstrap needs `prisma generate` of the old-head client — forbidden by WORKER_RULES); parent runs them in GitHub Actions.
