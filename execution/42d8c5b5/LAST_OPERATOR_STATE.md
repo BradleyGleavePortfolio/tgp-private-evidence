@@ -78,3 +78,6 @@
 - X1 #35: review A NO-GO (3 A + 2 B) returned to the builder, who also rebases onto main 63873237. Review B pending.
 - C2b-1 #32: r3 cb614bab (B1–B3 closed, 398 LOC), delta review pending.
 - R1 #300: review NO-GO (A1 stale, A2 reason remap, B3–B5 parity). Returned with a SIMPLIFY direction: reuse the card's content inside the Roman frame.
+
+## 22:25Z FINAL
+See HANDOFF.md (final). All work is on GitHub or in handoff-wip/. No agent is assumed alive.

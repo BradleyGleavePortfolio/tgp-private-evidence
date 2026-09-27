@@ -1,86 +1,82 @@
-# HANDOFF — EXEC-42D8C5B5 (TGP importer)
+# HANDOFF — EXEC-42D8C5B5 (TGP importer) — FINAL
 
-Owner: Bradley Gleave. Written 2026-09-27 ~22:20Z (15:20 PDT). The owner instruction is "finish in-route work only, no new subagents, clean handoff".
-This file is updated as the in-flight lanes settle. The end state is recorded in the **FINAL STATE** section at the bottom.
+Written 2026-09-27 ~22:45Z (15:45 PDT) by the outgoing operator.
+**Assume no agent, worktree, sandbox file or local process survives.** Only GitHub exists: the four product repos, plus this evidence repo
+(`BradleyGleavePortfolio/tgp-private-evidence`, path `execution/42d8c5b5/`). Everything below points to a GitHub ref or to a file in this repo.
+Anything "in progress" is **in the air**: a pushed WIP branch or a patch, not running work.
 
-## 0. Read first
-1. North star, the only one: `execution/42d8c5b5/northstar/NORTH_STAR.md`. It is also published in each repo: agent-context `/NORTH_STAR.md`, extension `docs/NORTH_STAR.md`,
-   backend `docs/importer/NORTH_STAR.md`, mobile `docs/importer/NORTH_STAR.md`. It covers:
-   - the universal self-learning importer: any site, Start once, AI decodes, learns and remembers, then imports and reports the truth;
-   - the Roman journey as the coach UX;
-   - retirement of the TrueCoach framing, with the legacy extractor and truecoach.json kept only as quarantined oracles until V1 parity;
-   - the AI step: a live, contract-derived prompt, injection defence, hard usage limits, and the best model with an eval gate.
-2. Governance: T0–T4 grading before any work, with routing T0 luna, T1 terra, T2 sonnet, T3 opus, T4 fable. Reviews use gpt_6_sol, and T4 adds claude_opus_5_5.
-   T4 needs two independent final-head attestations. Commits are authored by Bradley Gleave <bradley@bradleytgpcoaching.com>, with no AI co-author.
-   **There is NO 400-LOC cap.** Over ~1,000 prod LOC → one structural challenge.
-3. `WORKER_RULES.md`: never kill processes by pattern; only single non-force pushes; never force-push reviewed refs.
-   The extension repo disallows merge commits (use squash or rebase); backend and mobile allow merges.
-4. Reserved to the owner: production deploy, prod flags, promoting integration/importer → main, destructive prod changes, live source-account
-   operations, Chrome Web Store publishing, new spend, and resolving the Q1–Q5 policy questions.
+## 0. Rules you inherit
+- **North star, the only one:** `execution/42d8c5b5/northstar/NORTH_STAR.md`. Published copies: agent-context `/NORTH_STAR.md`,
+  extension `docs/NORTH_STAR.md`, backend `docs/importer/NORTH_STAR.md`, mobile `docs/importer/NORTH_STAR.md`.
+  The evidence copy is newest: it adds the owner's AI-step requirements, i.e. a live contract-derived prompt, injection defence, usage limits and the best model with an eval gate.
+- **Grading and routing:**
+  - Grade T0–T4 before any work. Builders: T0 gpt_5_6_luna, T1 gpt_5_6_terra, T2 claude_sonnet_5_0, T3 claude_opus_5_5, T4 claude_fable_5.
+  - Reviews: gpt_6_sol, plus claude_opus_5_5 as the second T4 lens. T4 needs two independent attestations on the final head; delta reviews are allowed.
+- **Size:** there is NO 400-LOC cap; that rule was retired. Over ~1,000 hand-written prod LOC → one structural challenge.
+- **Identity:** commits are authored by Bradley Gleave <bradley@bradleytgpcoaching.com>, with no AI co-author. The owner does not care which identity lands merges.
+- **Git hygiene:**
+  - Only single non-force pushes. Never force-push a reviewed ref, and never bypass hooks (`--no-verify` is blocked).
+  - Never kill processes by pattern.
+  - Extension repo: squash or rebase merges only. Backend and mobile allow merge commits.
+- **Reserved to the owner (Bradley):**
+  - production deploy, prod flags, and promoting backend integration/importer → main;
+  - destructive prod changes and live source-account operations;
+  - Chrome Web Store publishing and new spend;
+  - the Q1–Q5 policy answers, and closing PRs this operator did not create.
+- **Accepted risk, do not re-raise:** the backend git history holds a committed `.env` (the prod Supabase service_role key and the DB password). The owner will re-privatise the repos after prod.
 
-## 1. Live refs at handoff start
-| Repo | Ref | SHA |
+## 1. DONE (on GitHub, accepted)
+| Repo / ref | SHA | Contents |
 |---|---|---|
-| backend | integration/importer | 987cba29 (9668af6c + #572 docs) |
-| backend | main | 1c10e2a1 (prod has NOT received integration) |
-| extension | main | 63873237 |
-| mobile | main | 3f91d58a |
-| agent-context | main | 6ea55c75 |
+| backend `integration/importer` | `d84cb7c36cd73168b25594f5312504098a92f555` | S11-D/E #565, S8-D1 #569, S12-B2 #570, S12-B1 #571 (proof: S11 133/133, S10-B 42/42), S8-D doc #566, north star #572, vendor guard #573 |
+| backend `main` | `1c10e2a1` | Unchanged. **Prod has not received integration.** |
+| extension `main` | `30e78a293069340f2b2baad6b36ea3c9bb454f92` | north star #31, vendor guard #34 |
+| mobile `main` | `3f91d58ac4bb887d286ee5898d84bd32eb0bb102` | north star #298, vendor guard #299 |
+| agent-context `main` | `6ea55c757e3de1850078041376bd124cbfb4593b` | north star #36, plus 25 old importer plans bannered SUPERSEDED |
+| extension branch protection | – | Required approvals 1 → 0 (owner-authorized); the `test` and `codeql` checks stay required |
 
-## 2. Landed this session
-- **backend integration/importer**, a fast-forward 54be96f1 → 419a756d:
-  - S11-D/E #565, S8-D1 #569, S12-B2 #570 and S12-B1 #571.
-  - Proof on the exact head: S11 133/133 and S10-B 42/42, both local and on GH lanes.
-  - Then #566 (S8-D decision doc) → 9668af6c, and #572 (north star) → 987cba29.
-- **North star N0:** agent-context #36, extension #31, backend #572, mobile #298.
-- **Vendor guard N1 mobile:** #299.
-- **Extension main protection:** required approvals 1 → 0. This was owner-authorized; the `test` and `codeql` checks and enforce_admins are kept.
+**Authoritative PG proof, reusable:**
+- Harness: backend orphan branch `proof/harness`, reviewed commit `0c97a84f1ca833bacdd7c20c2cfabf20430504a9`.
+- Trigger: `PROOF_REMOTE=preserve proof/trigger.sh <label> <sha40> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=95`.
+- Accept: `execution/42d8c5b5/proof/gh-accept.sh <run_id> <sha40> <pins>` (sha256 `4da457af…`). **ACCEPT = proof.** Re-run the whole workflow, never only failed jobs.
+- Current pins: 133 / 42 / 95.
+- Details: `ghlanes/REPORT.md` and `ghlanes/REVIEW_A.md`.
 
-## 3. Proof infrastructure (authoritative)
-- **GitHub proof lanes:** harness `proof/harness` at **0c97a84f1ca833bacdd7c20c2cfabf20430504a9** (review GO). The launcher head 875aee68 only sets the default HARNESS_SHA.
-  - Trigger, from worktrees/ghlanes-harness: `PROOF_REMOTE=preserve proof/trigger.sh <new-label> <sha40> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=95`
-  - Accept: `execution/42d8c5b5/proof/gh-accept.sh <run_id> <sha40> <same pins>` (sha256 4da457af…, review GO). **ACCEPT = proof.**
-  - Re-run the whole workflow, never only failed jobs. A full run takes about 14 min.
-  - Current pins on integration: s11=133, s10b=42, guard=95.
-- **Local fallback:** proof/lane-s11.sh and proof/lane-s10b.sh.
+## 2. IN THE AIR (pushed but not accepted), in priority order
+| # | Lane | Grade | Where it is on GitHub | Honest state | Next step |
+|---|---|---|---|---|---|
+| 1 | **L0 learn-and-remember design** (drives the whole north star) | T4 | backend `cand/x42/learn-doc-wip` @ `e7a882bb` (629-line doc, WIP) | Draft, UNREVIEWED; completeness not self-certified | Read it against NORTH_STAR, including the AI-step section. Then two reviews (gpt_6_sol + claude_opus_5_5) → land the doc on integration → execute its slice plan |
+| 2 | **X1 extension origin authorization** (removes the vendor lock) | T4 | extension PR #35 @ `7ac1fe9a`; WIP fixes ONLY as the patch `handoff-wip/x1-origin-authorization.patch` (hooks blocked commit) | Review A NO-GO (3 A + 2 B); review B PARTIAL NO-GO (4 B). The patch closes most of review A but has two hook failures | Apply the patch to #35's branch, fix the 2 hook errors, add the remaining regressions, close review B's B1–B4, rebase onto `30e78a29` and shrink the vendor-guard allowlist to `legacy/**`. Then a delta review by both reviewers. See `x1-origin-authorization-STATUS.md`, `northstar/X1_REVIEW_A.md` and `X1_REVIEW_B.md` |
+| 3 | **C2b-1 endpoint roles** (decoding) | T3 | extension PR #32 @ `cb614bab`; WIP `c2b-1-endpoint-roles-r2-wip` @ `607c93e5` | B2/B3 closed (GO); the B1 fix is on the WIP branch, unreviewed, and CI has not run | Push `607c93e5` onto #32's branch (a fast-forward), then CI, then a delta review of B1 (positive-evidence rule). Land after L0 confirms the deterministic role layer. See `c2b1-STATUS.md` and `c2b1/REVIEW_A.md` |
+| 4 | **R1 Roman status binding** | T2 | mobile PR #300 @ `86144f34`; WIP `r1/roman-status-binding-wip` @ `41812117` | Review NO-GO (A stale, A reason remap, B parity). The WIP reuses the card content inside the Roman frame, and the parity test passes 50/50 locally | Lint, the targeted suites and CI on the WIP, then open or update the PR, then a delta review. See `r1-roman-STATUS.md` and `northstar/R1_REVIEW.md` |
+| 5 | **S8-D2** imported people on the roster | T4 | backend `cand/x42/s8d2` @ `854fc456` | Built, local gates green, NOT PG-proven and NOT reviewed | Run the GH proof and ACCEPT (new expected counts per `s8d2-STATUS.md`), then two reviews, then land |
+| 6 | **S12-B4** pilot runbook + read-only SQL pack | T2 | backend `cand/x42/s12b4` @ `4fee2adc` | Built (docs/pilot/** only) | One review (gpt_6_sol), then land |
+| 7 | **S12-B5** prod RLS catalog check script (never run on prod) | T2 | backend `cand/x42/s12b5` @ `fdd19af4` | Built; its local-PG proof was not run | Run it against a disposable PG, then review, then land |
+| 8 | **S12-B6** flag workflow (reconstruct flag + pilot allowlist inputs) | T2 | backend `cand/x42/s12b6` @ `dbfe3558` | Built, gates green, no workflow run | Review, then land. Running the workflow against Fly is owner-reserved |
+| 9 | S11-DE commit 3 (historical rls-g2 tests expect the v3 cursor) | T2 | backend PR #574 @ `2bd2d85d` | PARKED: it is in no proof lane, and Q07 needs a two-head PG run. Hygiene only | Low priority |
 
-## 4. In-flight lanes at handoff start
-The open repo items are backend #573/#574, extension #32/#34/#35 and mobile #300. The other lanes have no PR yet.
+The STATUS files for every lane are in `execution/42d8c5b5/handoff-wip/`. Build and review reports are in the per-lane dirs (`s8d2/`, `s12b4/`, `s12b5/`, `s12b6/`, `c2b1/`, `northstar/`, `learn/`).
 
-| Lane | Grade | PR / branch | State at 22:20Z |
-|---|---|---|---|
-| N1 vendor guard, backend | T1 | backend #573 @141c07b5 | Fixes done, CI green, final delta review running |
-| N1 vendor guard, extension | T1 | extension #34 @0724f8ff (replaces the closed #33) | Fixes done, CI green, final delta review running |
-| X1 origin authorization | T4 | extension #35 @7ac1fe9a | Review A NO-GO (3 A + 2 B). The builder is fixing and rebasing onto main. Review B running |
-| C2b-1 endpoint roles | T3 | extension #32 @cb614bab | B2/B3 closed. B1 is being fixed with the positive-evidence rule (≥2 distinct-id observations prove a literal is structural) |
-| R1 Roman status binding | T2 | mobile #300 @86144f34 | Review NO-GO. Being rebuilt to reuse ImportRunVerdictCard content inside the Roman frame, with a rendered parity test |
-| L0 learn-and-remember design | T4 | backend branch cand/x42/learn-doc (doc only) | Writing. Must include X1/R1 as inputs, the AI-step requirements, the vendor-lock removal and V1 plus the deletion slice |
-| S8-D2 imported people on roster | T4 | cand/x42/s8d2 | Building |
-| S12-B4 pilot runbook / SQL pack | T2 | cand/x42/s12b4 | Building |
-| S12-B5 prod RLS check script (never run on prod) | T2 | cand/x42/s12b5 | Building |
-| S12-B6 flag workflow (reconstruct + pilot allowlist) | T2 | cand/x42/s12b6 | Building |
-| S11-DE commit 3 (historical rls-g2 v3 cursor tests) | T2 | backend #574 @2bd2d85d | PARKED. It is in no proof lane, and Q07 needs a two-head PG run. B-class hygiene only |
+## 3. What the north star still needs (the expected L0 slice chain)
+1. X1 origin authorization (#2 above).
+2. The rest of C2b and C2c: turn captured traffic into a blueprint (data only).
+3. C3: the one-process Start. It decodes, learns and imports with zero coach steps, and the Roman journey is the UX (R1).
+4. The backend AI mapping step (T4). It reuses `src/ai/gateway` and needs:
+   - a live, contract-derived prompt (goal plus TGP structure, generated from the validator contract);
+   - injection defence;
+   - hard usage limits;
+   - the best model, behind an eval harness;
+   - strict validators and conformance against the real rows.
+5. Learned-platform memory (structure only, versioned, invalidated on drift) and the runtime registry: no deploy per site, CORE DIFF = 0.
+6. V1: a real site that was never hand-mapped, imported end to end from one Start.
+7. Delete the legacy TrueCoach extractor and `truecoach.json` at parity, then shrink the guard allowlists to tests only.
 
-## 5. Known items left alone (no authority to act)
-- **Extension #30** (a draft whose head a889f4ad is already on main) should be closed. The classifier blocked closing it because it was not created this session. The owner can close it.
-- **Secrets:** the backend history contains a committed `.env` with the prod Supabase service_role key and the DB password. The owner accepted the risk; re-privatise the repo after prod. Do not raise it again.
-- **Off-path PRs:** old drafts #525–529, #522, #491, #427/428 and the dependabot PRs are off the importer path and untouched.
+## 4. Owner decisions pending
+- **Pilot:** which real platform to use, and authority over the coach's live source account.
+- **AI step:** the provider account/key and the default daily spend cap.
+- **Release:** promote integration → main, deploy, set prod flags (plus the Fly invoice or deploy preconditions noted in earlier evidence).
+- **Stale PR:** close extension #30 (a draft whose head a889f4ad is already on main). This operator was not permitted to close it.
+- **Chrome Web Store:** publishing X1 later (optional host permissions → possible extra review).
 
-## 6. Next state transitions, for the next operator
-1. Land every lane whose final review is GO. For extension, land with --squash or --rebase. Backend changes that touch PG need a GH-lane proof with ACCEPT first.
-2. X1: after the fixes, run a delta review by both reviewers on the final head; land; then shrink the extension vendor-guard allowlist to legacy/** plus tests.
-3. L0 → two reviews → land the doc → execute its slice plan. The expected chain is:
-   1. C2b rest / C2c on the extension;
-   2. C3, the one-process Start;
-   3. the backend AI mapping step (T4, with the adversarial corpus and eval harness);
-   4. the learned-memory store and runtime registry;
-   5. the V1 real never-hand-mapped platform proof;
-   6. the legacy TrueCoach deletion at parity.
-4. The pilot needs owner decisions, collected on one sheet:
-   - platform access, i.e. authority over the live source account;
-   - the AI provider/key and the daily spend cap;
-   - integration → main, deploy, and prod flags.
-
-## Progress log (after handoff start)
-- 22:35Z N1 LANDED: backend #573 → integration/importer d84cb7c3 (whole-repo guard, CI self-test); extension #34 → main 30e78a29. Both had a final review GO.
-  X1 must shrink the extension allowlist in its rebase (the builder has been told).
+## 5. Off-path, untouched
+Backend drafts #525–529, #522, #491, #427/#428 and the dependabot PRs.
