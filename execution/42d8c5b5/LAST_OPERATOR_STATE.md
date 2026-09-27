@@ -39,3 +39,10 @@
 - DELETED: S12-B7 (hand-written pilot mapping).
 - DISPATCHED: L0 decision record (T4, fable; reviews gpt_6_sol + opus); C2b-1 rescue (T3, opus; review gpt_6_sol; landing held until L0).
 - S8-D2, S12-B4/B5/B6 and GH-LANES continue unchanged (platform-independent).
+
+## 21:05Z NORTH STAR + GH LANES
+- NORTH_STAR.md written: universal self-learning importer plus the Roman journey. TrueCoach framing retired; the legacy extractor and truecoach.json are quarantined oracles, deleted at V1 parity.
+- Found: the extension runtime is vendor-locked in 5 places (manifest hosts, capture-policy, protocol, resolve, background). This goes to L0 as a T4 origin-authorization slice.
+- Dispatched: N0 (T0 luna, publish the north star + SUPERSEDED banners in 4 repos), N1 (T1 terra, vendor-name guard ratchet in 3 repos).
+- GH-LANES qualified (harness 4a88f3eb): 54be96f1 127/41, 419a756d 133/42, same as local; bad SHA fails in preflight; 5–6 min vs 24–38.
+  Independent T3 review dispatched (gpt_6_sol). Until it returns GO, local runs remain the authoritative proof.

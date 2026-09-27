@@ -1,3 +1,5 @@
+> Importer north star: execution/42d8c5b5/northstar/NORTH_STAR.md (the only importer north star; every grant cites it).
+
 # EXEC-42D8C5B5 worker rules (binding on every builder/reviewer this parent dispatches)
 
 HOLD LIFTED 2026-09-27 19:36Z: the owner confirmed in session that the commit/merge identity does not matter. G05 identity (Bradley Gleave
