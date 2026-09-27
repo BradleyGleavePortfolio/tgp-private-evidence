@@ -24,6 +24,9 @@ Zero routine coach actions after Start. No human ever writes platform-specific w
 - **Credentials are capabilities, not data.** They are never stored, never learned and never sent to a model.
 
 ## The AI step (owner, 2026-09-27)
+- **A great prompt, built live:** every call explains the goal: move this coach's business into TGP faithfully, map only, never invent, and mark unknowns.
+  It also explains how TGP data is structured: families, fields, types, identity rules and relationships, generated at call time from the same contract the validators use,
+  with verified example mappings. When TGP's structure changes, the prompt changes with it automatically. The prompt version and contract hash are recorded on each run.
 - **Prompt-injection defence:** all source-site content is hostile. The model sees structure plus minimal redacted samples as delimited, untrusted data, never as instructions.
   It has no tools and no network. Its output is schema-constrained, and it may only reference fields actually observed. Deterministic validators and conformance checks
   against the real records are the gate. An adversarial injection corpus is a required CI test.
