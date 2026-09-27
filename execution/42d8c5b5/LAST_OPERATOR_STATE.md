@@ -46,3 +46,11 @@
 - Dispatched: N0 (T0 luna, publish the north star + SUPERSEDED banners in 4 repos), N1 (T1 terra, vendor-name guard ratchet in 3 repos).
 - GH-LANES qualified (harness 4a88f3eb): 54be96f1 127/41, 419a756d 133/42, same as local; bad SHA fails in preflight; 5–6 min vs 24–38.
   Independent T3 review dispatched (gpt_6_sol). Until it returns GO, local runs remain the authoritative proof.
+
+## 21:15Z NORTHSTAR FIX executing
+- N0 LANDED: agent-context #36, backend #572 (integration/importer), mobile #298. Extension #31 is green but BLOCKED: extension main requires
+  1 approving review with enforce_admins=true, and the only account is the PR author. OWNER DECISION: relax to 0 required approvals (keep the
+  test+codeql checks), or add a second reviewer account.
+- Dispatched: X1 (T4 fable, extension origin authorization), R1 (T2 sonnet, Roman P2 views bound to useImportRunStatus; the P2 views are the Roman
+  surface and are NOT waste; correction to the earlier "waste" call).
+- GH-LANES: review A NO-GO (6 A findings + 1 B); returned to the builder with minimum closures. Local remains authoritative.
