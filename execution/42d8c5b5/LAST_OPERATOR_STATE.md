@@ -30,3 +30,12 @@
   S10-B lane 42/42; CI green on all four PRs.
 - #566 (S8-D decision record, docs only) merged via merge commit → integration/importer 9668af6c.
 - NEXT: S11-DE commit 3 (historical cursor-lane tests), S8-D2, S12-B4/B5/B6, GH-LANES qualification; UX-D2 after D2; S12-B7 after owner platform choice.
+
+## 20:58Z OWNER DIRECTION: learn-and-remember is the mission
+- Owner: "This is a new site" → AI decodes the structure → autonomously LEARN AND REMEMBER it → complete the import in one process → never do
+  platform-specific work again.
+- CURRENT CONSTRAINT moves to the learn/remember brain. The backend engine is data-driven, but specs are committed JSON (build time), there is no AI,
+  and there is no memory. The extension chain has been stalled since 09-10 (C2b-1 #20 red, #19 goal-state doc open).
+- DELETED: S12-B7 (hand-written pilot mapping).
+- DISPATCHED: L0 decision record (T4, fable; reviews gpt_6_sol + opus); C2b-1 rescue (T3, opus; review gpt_6_sol; landing held until L0).
+- S8-D2, S12-B4/B5/B6 and GH-LANES continue unchanged (platform-independent).
