@@ -59,3 +59,10 @@
 - OWNER-AUTHORIZED (form + "Yes get the north star change made"): extension main required approvals 1 → 0. test+codeql are still required and enforce_admins stays on.
 - N0 extension #31 merged. The north star is now live in all 4 repos.
 - C2b-1 r2 #32: review A NO-GO. The 10 test expectations were confirmed correct, but B1–B3 in roles.js (one-off ids as structure, origin userinfo, overflow as evidence) went back to the builder.
+
+## 21:55Z
+- GH-LANES: delta review GO on harness 0c97a84f (conditional on the per-run out-of-band checklist in ghlanes/REVIEW_A.md). A full proof takes about 14 min (serial lanes),
+  with a per-stage signal in about 5 min. The builder is automating the checklist as proof/gh-accept.sh. Once that exists, GH runs plus ACCEPT are authoritative proof.
+- N0 extension #31 landed (squash/rebase; this repo disallows merge commits). The north star is live in 4/4 repos.
+- N1: extension #33 and mobile #299 are green and under review (gpt_6_sol). Backend #573 went back: A = it edited an applied migration; B = out-of-scope food-logger
+  edits; the guard is now scoped to importer paths only.
