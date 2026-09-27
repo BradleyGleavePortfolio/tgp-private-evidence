@@ -9,3 +9,4 @@
 - 2026-09-27: A repo-wide "rename vendor names" instruction reached an applied migration and unrelated domains. Grants that edit wording must name the in-scope paths explicitly and exclude prisma/migrations/**.
 - 2026-09-27: The extension repo disallows merge commits (rebase/squash only). The backend repo allows merge commits.
 - 2026-09-27: A builder's 'pkill -f vitest' killed other lanes' test runs. Rule added: kill only your own recorded PIDs.
+- 2026-09-27: The parent copied a retired 400-LOC cap from the superseded extension docs into grants (C2b-1, X1, R1, L0). Corrected. Always check a rule against the current governance docs before putting it in a grant.

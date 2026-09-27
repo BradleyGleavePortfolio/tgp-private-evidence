@@ -53,3 +53,32 @@
 - `git diff --check a889f4ad HEAD` passed. The focused role suite passed: **79/79** (`npx vitest run test/blueprint-roles.spec.js --reporter=dot`).
 - `npm test` was attempted in the worktree. Initially dependencies were absent. After `npm ci --ignore-scripts --no-audit --no-fund`, the complete suite ran but did not reach a summary within the bounded local attempt (a 90-second timeout and then a 300-second bounded run); do not claim a fresh full-suite pass from this review. Builder's BUILD.md reports prior 1938/1938 on its environment, but that report is not this review's independent full-suite result.
 - This review neither modified the PR nor committed the evidence report.
+
+---
+
+## Round-3 delta review — head `cb614babb3ad2351778f977e2d42019080bcd039`
+
+**Verdict: NO-GO.** Reviewed only the delta from `5556c6a9` to `cb614bab` and reran the original probes in the updated worktree. B2 and B3 are closed for those probes. B1 closes the numeric-ID example but **remains open for ordinary slug/name identifiers**, which the new predicate calls structural without evidence. The original ten expectation decisions above are unchanged.
+
+### Closure verification
+
+- **B1 numeric probe: closed narrowly.** The normalized one-off `/clients/101/workouts` list now gives only `{reason:"unproven_template_literal", endpoint.template:null}`; no `101` is emitted. The new check runs before a candidate is constructed (`roles.js:94–107, 342–355`).
+- **B2: closed.** Repeating the direct credential-bearing origin probe now gives only `{endpoint:null, reason:"invalid_origin", support:2}`, with neither userinfo nor the origin echoed. The implementation reuses C2a's `safeOrigin` for both clusters and observations (`roles.js:108–117, 303–322, 384–390`; `url-templates.js:75–96, 253`). No credential-bearing candidate survives.
+- **B3: closed.** The original normalized 201-key item now gives `uninspected_item_shape`, not a list candidate. The new signature check also covers `work(overflow)`, `object(cycle)`, and unsupported signatures for item and singleton bodies (`roles.js:33–34, 153–179`).
+- **Positive control: accepted.** A valid cluster `/v2/clients/:id/workouts` joined to `/v2/clients/101/workouts` still returns a replay-compatible list candidate. This checks the important `/v2/` literal versus dynamic-ID boundary. By contrast, a **single** normalized `/v2/clients/101/workouts` observation is refused, appropriately, because C2a has not yet inferred `:id`.
+
+### B1 still open — one-off slug/name is emitted as reusable structure
+
+**Independent reproduction:** A normalized single GET of `https://coach.example/clients/alice/workouts`, response `{"items":[{"id":5}]}`, produces a C2a literal template `/clients/alice/workouts`; `inferEndpointRoles` returns `roles:["list"]`, `replayCompatible:true`, and that literal template. Replacing `alice` with `jane-doe` does the same. `candidateKind("alice")` is null and `/^[\d.-]+$/` does not match, so the new `structuralTemplate` accepts it (`roles.js:94–107`). Neither observation count nor proof of shared structure is considered.
+
+**Harm:** A coach/client slug or name can be emitted and later persisted/replayed as site-wide structural knowledge. This is the same privacy and cross-coach correctness failure as original B1, merely with a nonnumeric identifier. The new check is a shape-based heuristic, not proof that a literal is structural.
+
+**Blocked:** Treating B1 as closed, and landing this role output as safe reusable blueprint evidence under the north-star structure-only invariant.
+
+**Minimum closure:** Keep unproven literal segments in non-persistable/non-replayable evidence, or require defensible positive structural proof before replay compatibility; add a normalized one-off alphabetic slug regression and preserve the `/v2/clients/:id/workouts` positive control. Do not add site-specific names or route maps to core.
+
+### Verification and scope
+
+- Delta: `roles.js` imports `safeOrigin` and adds `UNINSPECTED_SHAPE`, `structuralTemplate`, invalid-origin accounting, and explicit refusals; `url-templates.js` exports existing `safeOrigin`; tests add 17 cases. No runtime wiring or vendor branch was introduced in this delta.
+- `git diff --check 5556c6a9..cb614bab` passed. Focused `npx vitest run test/blueprint-roles.spec.js --reporter=dot` passed **96/96**. This delta review did not obtain a new independent full-suite result; BUILD.md reports green CI on this exact head.
+- No PR file was modified; this appended report is uncommitted evidence.

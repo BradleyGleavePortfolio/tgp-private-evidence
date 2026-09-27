@@ -43,3 +43,7 @@ Doctrine: tgp-agent-context AGENT_RULES.md G01-G22, T0-T4 routing, EXECUTE, Safe
 
 ## Shared-machine rule (2026-09-27)
 - NEVER kill processes by pattern (pkill -f, killall). Other lanes share this machine. Kill only PIDs you started yourself, recorded in your own pidfile.
+
+## Size rule (correction, 2026-09-27 22:10Z)
+- There is NO 400-LOC cap. It came from the retired extension docs (Rule map R23/R76 DELETE; Governance Refactor: "Retire automatic 400-line P1").
+  Current rule: size for reviewability and consequence. Over ~1,000 hand-written prod LOC → one structural challenge (PROCEED / SPLIT / SIMPLIFY FIRST). Never split or trim slices artificially.
