@@ -1,5 +1,90 @@
 # GH-LANES report (EXEC-42D8C5B5, T3, builder claude_opus_5_5)
 
+## Rev 2: closure of REVIEW_A, 2026-09-27 21:36Z (this section supersedes the rev-1 sections below)
+- **Reviewed harness: `0c97a84f1ca833bacdd7c20c2cfabf20430504a9`** on `proof/harness`.
+  - It is a new commit on top of `4a88f3eb`, not a force-push.
+  - Diff vs 4a88f3eb: 7 files, +266/-136.
+- **Launcher commit: `875aee68`**. It changes only one line: `proof/trigger.sh` `DEFAULT_HARNESS_SHA=0c97a84f…`. This is
+  the current head of proof/harness.
+  - The runs are parented on 0c97a84f, not on 875aee68.
+  - A commit cannot contain its own SHA, so the default is set in this separate commit.
+- Identity: Bradley Gleave, through the hooks. Pushes went only to `proof/harness` and `proof/run/*`.
+- File sha256 at 875aee68:
+  - `stage.sh` `6594c6d5…`
+  - `lanes.sh` `612cf7d7…`
+  - `preflight.sh` `3fa020f5…`
+  - `aggregate.sh` `e2c929a5…`
+  - `trigger.sh` `e52fff31…` (0c97a84f differs only in the default line)
+  - `setup-runner.sh` `1ea38fce…` (unchanged)
+  - `proof-lanes.yml` `c43fbc67…`
+
+| finding | closure (where) |
+|---|---|
+| A1 partial ≠ proof | The default is FULL mode. The manifest is derived from the target tree: every stage of both lanes, with journey-full included iff it is present (`lanes.sh manifest`). `STAGES` is refused unless `PARTIAL=1`, and `PARTIAL=1` is refused without `STAGES` (`pt_parse`). FULL mode needs every lane nonempty (preflight + aggregate) and each lane total > 0 with all tests passed (aggregate). Only FULL mode can print `VERDICT: PASS`. A clean PARTIAL run prints `PARTIAL (…NOT a proof…)` and the aggregate exits **78**, so the workflow is red. |
+| A2 pin on absent stage | Preflight refuses an `EXPECT_<stage>` whose stage is not `run` in the manifest, and an `EXPECT_TOTAL_<lane>` for a lane with no stage. The aggregate also fails if any pin was not checked. The summary lists each checked pin with its observed value. |
+| A3 key typos | Exact allowlist in `pt_parse`: `HARNESS_SHA`, `PKG_LOCK_SHA256`, `STAGES`, `PARTIAL`, `EXPECT_TOTAL_{s11,s10b}`, and `EXPECT_<one of the 9 stage names>`. Values must be decimal only. Duplicate keys, unknown keys and malformed lines are refused. The same parser runs in preflight and again in the aggregate. |
+| A4 shared state | Matrix jobs `lane s11 ALL` and `lane s10b ALL` are the authoritative jobs. Each runs its lane's stages **serially on one cluster with one bootstrap**, in the lane-s11.sh / lane-s10b.sh order, stopping at the first failure (`stage.sh <lane> ALL`). The two lanes run in parallel. The per-stage jobs are kept as a fast signal. The aggregate needs every per-stage job to PASS with the **same count** as the lane, and the lane receipt's stage list to equal the manifest exactly. |
+| A5 job results | The aggregate gets `NEEDS_JSON=${{ toJSON(needs) }}`. It fails unless every needed job is `success`, and `preflight` and `run` must both be present. |
+| A6 harness binding | `trigger.sh` takes `HARNESS_SHA` (default 0c97a84f), requires it to be a commit on proof/harness, and parents the run commit on exactly it. It writes `HARNESS_SHA=` into PROOF_TARGET, which is required. Preflight and aggregate (`run_binding`, fetch-depth 2) require exactly one parent == HARNESS_SHA, `git diff --name-only HEAD^ HEAD` == `PROOF_TARGET`, and a clean checkout. The summary prints `harness_sha` and the run commit. |
+| B1 migration set | Every live job writes `migrations-applied.txt` (finished, non-rolled-back names, sorted) and `migrations-at-head.txt`. It requires them to be byte-equal, with 0 duplicates and total rows == applied rows (no unfinished or rolled-back row). Bootstrap reports `exact_set=yes`. The aggregate requires it in every receipt. |
+
+### Rev-2 qualification (receipts in `ghlanes/runs/<label>/`)
+| run | URL | expected | result | wall-clock |
+|---|---|---|---|---|
+| qual2-419a756d-full-r1: FULL, pins s11=133, s10b=42, guard=95 (run commit 63f8af92) | https://github.com/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351463274 | PASS | **success, VERDICT: PASS**, 3/3 pins checked | 13 m 58 s (21:22:05–21:36:03Z) |
+| neg2-typo-key-r1: `EXPECT_guarrd=95` (run commit f5241e4e) | https://github.com/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351482941 | fail in preflight | **failure**: `PREFLIGHT_FAIL PROOF_TARGET refused: unknown stage in EXPECT_guarrd`. The run matrix was skipped. The aggregate returned FAIL (preflight=failure, run=skipped, refused key). | 55 s |
+| partial2-419a756d-r1: `STAGES=guard,s10-unseen PARTIAL=1 EXPECT_guard=95` (run commit 6ca69429) | https://github.com/BradleyGleavePortfolio/growth-project-backend/actions/runs/36351497200 | never PASS | **failure (exit 78)**, `VERDICT: PARTIAL (diagnostic subset; NOT a proof…)`: s11 guard 95/95, s10b s10-unseen 10/10, 1 pin checked | 1 m 54 s |
+
+Full-run serial lane receipts, 419a756d, compared with the local `compose/s11-v1` and `compose/s10b-v1`:
+
+| lane | stage | GH passed/total (jest s) | local |
+|---|---|---|---|
+| S11 (755 s) | bootstrap | exact_set=yes, 173 migrations | 173 migrations |
+| S11 | rls-g2-s11 | 6/6 (54) | 6/6 |
+| S11 | journey-core | 8/8 (187) | 8/8 |
+| S11 | readiness | 6/6 (80) | 6/6 |
+| S11 | settle-redrive | 8/8 (238) | 8/8 |
+| S11 | journey-induction | 4/4 (83) | 4/4 |
+| S11 | journey-full | 6/6 (93) | 6/6 |
+| S11 | guard | 95/95 (9) | 95/95 |
+| S11 | **total** | **133/133** | **133/133** |
+| S10-B (168 s) | bootstrap | exact_set=yes | |
+| S10-B | rls-s10b-s10c | 32/32, 2 suites (146) | 32/32 |
+| S10-B | s10-unseen | 10/10 (12) | 10/10 |
+| S10-B | **total** | **42/42** | **42/42** |
+
+- Stage order: `bootstrap rls-g2-s11 journey-core readiness settle-redrive journey-induction journey-full guard`, and
+  `bootstrap rls-s10b-s10c s10-unseen`. These match the local runners.
+- Every per-stage fast-signal job had the same counts as its lane.
+- Binding: TREE `6ce65c1b…`, pkg-lock `b7fed5ed…`, client `2c819c8a…`. All equal the local receipts.
+- An authoritative proof now takes about 14 min. That is bounded by the serial S11 lane (755 s of script time plus about
+  1.5 min of setup), compared with about 38 min for the two serialized local lanes. The per-stage signal arrives in
+  about 5 min.
+
+Trigger (rev 2), from a clean clone at proof/harness, with bash api_credentials ["github"]:
+```
+PROOF_REMOTE=preserve proof/trigger.sh <new-label> <40-hex sha> EXPECT_TOTAL_s11=N EXPECT_TOTAL_s10b=N EXPECT_guard=95
+# optional override: HARNESS_SHA=<reviewed sha> ...; diagnostic only: STAGES=a,b PARTIAL=1
+```
+
+### Consumer rule (what the harness cannot enforce on itself)
+A run commit can carry any workflow. Before accepting a run, check out of band that:
+- `harness_sha` in the summary == the reviewed SHA, and `git rev-parse <run commit>^` == that SHA
+- `git diff --name-only <run>^ <run>` == `PROOF_TARGET`
+- the overall workflow conclusion is `success` and the summary says `mode FULL` and `VERDICT: PASS`
+
+### Remaining limits (rev 2)
+- **C, policy on what we accept.** The per-stage jobs still use one fresh cluster per stage. They are a signal only, but a
+  failure in one makes the run red. That is fail closed, and a flaky per-stage job costs a re-run.
+- **C, local vs GH rule.** The exact migration-set rule (B1) is stricter than the local runners' count+max rule. The local
+  runners are unchanged.
+- **C, PARTIAL runs are red.** They exit 78 by design. Read their SUMMARY for the diagnostic counts.
+- Rev-1 runs, including the rev-1 qualification, were bound to 4a88f3eb and are superseded as proof evidence by the
+  rev-2 runs above.
+
+---
+# Rev 1 (superseded; kept for history)
+
 Result: **QUALIFIED.** The PG proof lanes now run on GitHub-hosted runners, one job per stage, all in parallel. Both
 qualification heads match the local runners stage by stage. The bad-SHA negative control failed in preflight. No product
 code was touched. The only remote writes were to `refs/heads/proof/**`. The evidence repo was not committed.

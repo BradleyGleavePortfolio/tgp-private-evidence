@@ -54,3 +54,8 @@
 - Dispatched: X1 (T4 fable, extension origin authorization), R1 (T2 sonnet, Roman P2 views bound to useImportRunStatus; the P2 views are the Roman
   surface and are NOT waste; correction to the earlier "waste" call).
 - GH-LANES: review A NO-GO (6 A findings + 1 B); returned to the builder with minimum closures. Local remains authoritative.
+
+## 21:40Z
+- OWNER-AUTHORIZED (form + "Yes get the north star change made"): extension main required approvals 1 → 0. test+codeql are still required and enforce_admins stays on.
+- N0 extension #31 merged. The north star is now live in all 4 repos.
+- C2b-1 r2 #32: review A NO-GO. The 10 test expectations were confirmed correct, but B1–B3 in roles.js (one-off ids as structure, origin userinfo, overflow as evidence) went back to the builder.
