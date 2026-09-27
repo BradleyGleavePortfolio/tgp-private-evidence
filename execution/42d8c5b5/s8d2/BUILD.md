@@ -8,12 +8,12 @@ Contract: `docs/decisions/2026-09-26-s8d-person-link.md` (read from `preserve/la
 | what | value |
 |---|---|
 | base | `419a756da4e6eebc28e22b19d0c08d72549f6d4e` (= origin/cand/x42/s12b1-on-s8d1) |
-| candidate HEAD | `__HEAD__` |
-| candidate tree | `__TREE__` |
-| pushed | `refs/heads/cand/x42/s8d2` → `__HEAD_SHORT__` (verified with `git ls-remote preserve`) |
+| candidate HEAD | `854fc456653eb3e6896fca85c5a897af1c73daf0` |
+| candidate tree | `f47fd05fd0e7e9f5fb4420db6a8a71c156e0346a` |
+| pushed | `refs/heads/cand/x42/s8d2` → `854fc456` (verified with `git ls-remote preserve`) |
 | author / committer | `Bradley Gleave <bradley@bradleytgpcoaching.com>` (both; lefthook pre-commit + commit-msg ran, no `--no-verify`) |
 | clone | `/home/user/workspace/worktrees/x42-s8d2`, branch `x42/s8d2`; `origin` push disabled, `preserve` = growth-project-backend |
-| commits | 1 |
+| commits | 1 (`feat(coach): S8-D2 imported-people roster collection, link markers, roster_bridge_pending retired`) |
 
 ## Design
 
@@ -67,13 +67,13 @@ coach id only (no platform-wide read — deliberate, see deviations). No Postgre
 
 ## Files
 
-Production (`git diff --numstat 419a756d HEAD -- src scripts` = **+__SRC_ADD__ / −__SRC_DEL__**; 11 files; grant ceiling 1,000; §6 estimate 250–400 — the
+Production (`git diff --numstat 419a756d HEAD -- src scripts` = **+573 / −52**; 11 files; grant ceiling 1,000; §6 estimate 250–400 — the
 overrun is DTO/OpenAPI documentation, not logic):
 
 | file | Δ | change |
 |---|---|---|
 | `src/coach/imported-people.dto.ts` (new) | +221 | DTOs + constants (`IMPORTED_PEOPLE_LABEL`, page sizes, hidden states), OpenAPI descriptions |
-| `src/coach/imported-people.service.ts` (new) | +152 | reader (above), `normaliseName`, `clampLimit` |
+| `src/coach/imported-people.service.ts` (new) | +151 | reader (above), `normaliseName`, `clampLimit` |
 | `src/coach/person-link-markers.ts` (new) | +48 | three null resolvers + `PERSON_LINK_BACKING_TABLES` |
 | `src/coach/coach.controller.ts` | +86/−12 | `GET clients/imported` handler + doctrine comment (prettier reflowed 3 unrelated lines) |
 | `src/coach/coach.service.ts` | +25/−9 | `getClients` rows → `person_link: null` (prettier reflowed the archive/unarchive signatures) |
@@ -85,13 +85,14 @@ overrun is DTO/OpenAPI documentation, not logic):
 
 Generated: `docs/contracts/importer-openapi.json` (regen x2 identical).
 
-Tests (`git diff --numstat 419a756d HEAD -- test` = **+__TEST_ADD__ / −__TEST_DEL__**):
+Tests (`git diff --numstat 419a756d HEAD -- test` = **+706 / −74**):
 
 | file | change |
 |---|---|
-| `test/coach/imported-people.service.spec.ts` (new) | tenant scope + state filter (Claimed/Deleted hidden, Suspended shown, other coach absent); exact select + exact row/envelope keys; no `source_person_id`/`email`/`@` in JSON; null display_name → no student read; markers null on every state; suggestions (normalised match; archived/other-coach/non-student/near-miss excluded; exact `user.findMany` args; cap + shared student; read-only fake); `normaliseName`; pagination (default/cap/bad take, 7 rows over 3 pages walked once, cursor/skip/take args, empty page); query DTO validation; controller `@Roles` + path + delegation; `getClients` `person_link: null` |
+| `test/coach/imported-people.service.spec.ts` (new, 18 `it`) | tenant scope + state filter (Claimed/Deleted hidden, Suspended shown, other coach absent); exact select + exact row/envelope keys; no `source_person_id`/`email`/`@` in JSON; null display_name → no student read; markers null on every state; suggestions (normalised match; archived/other-coach/non-student/near-miss excluded; exact `user.findMany` args; cap + shared student; read-only fake); `normaliseName`; pagination (default/cap/bad take, 7 rows over 3 pages walked once, cursor/skip/take args, empty page); query DTO validation; controller `@Roles` + path + delegation; `getClients` `person_link: null` |
 | `test/contracts/importer-contract.spec.ts` | +1 describe (S8-D2): GET only, params exactly `cursor`/`take` with bounds, 200/400/401/403; `ImportedPeopleResult`/`ImportedPersonDto`/marker/suggestion property sets; nullable markers; no `email`/`phone`/`source_person_id` in the schemas; `ScoutRosterResult` shape kept and `roster_bridge_pending` example `false` |
 | `test/scout/roster/scout-roster.service.spec.ts`, `scout-roster.controller.spec.ts` | `true` → `false` (7 asserts + fixture) |
+| `test/coach-ptm-risk-board.spec.ts` | 4th constructor stub for `CoachController` (prettier 3.9.9 also reflowed pre-existing lines) |
 | `test/scout/reconciliation/facts.service.spec.ts` | clients `qualifiers` → `[]` (3) |
 | `test/scout/s11/journey-full.pg.spec.ts` (PG, parent) | J19 leg B: clients cell `qualifiers: []`, roster `roster_bridge_pending` `false`; header/it-name comments. `S11_RANGE_END` untouched (`ce37c6ee`) |
 | `test/scout/s10/s10-unseen.pg.spec.ts` (PG, parent) | case (h) `qualifiers: []`; header |
@@ -100,9 +101,28 @@ Tests (`git diff --numstat 419a756d HEAD -- test` = **+__TEST_ADD__ / −__TEST_
 Untouched on purpose: `lifecycle.service.spec.ts` (vocabulary `FAMILY_QUALIFIERS` still `['roster_bridge_pending']`), `reconcile.spec.ts` /
 `scout.service.spec.ts` (fixture pass-through of the token), contract enum pin (`qualifiers.items.enum`).
 
-## Gates (clone; heavy ones under `flock -w 7200 /home/user/workspace/execution/test-validation.lock`, inode 657581; one acquisition, `s8d2-gates/run.sh`)
+## Gates (clone; heavy ones under `flock -w 7200 /home/user/workspace/execution/test-validation.lock`, inode 657581)
 
-__GATES__
+Three lock acquisitions (the slot was held ~50 min by parent PG lanes in between); logs copied beside this file (`gates.log`, `gates2.log`, `gates3.log`).
+
+| gate | command | RC |
+|---|---|---|
+| prettier 3.9.9 | `prettier --check <22 touched .ts + importer-openapi.json>` | 0 (run 2; run 1 also 0) |
+| eslint | `npx eslint --no-warn-ignored --max-warnings 0 <touched .ts>` | 0 (run 2; run 1 = 1: one unused import, fixed) |
+| tsc | `npx tsc --noEmit` | 0 (run 2; run 1 = 2: `coach-ptm-risk-board.spec.ts` needed the 4th constructor arg, fixed) |
+| contract regen #1 | `npx ts-node scripts/export-importer-contract.ts` → 18 paths, 50 schemas | 0, sha256 `44aed422…4a71f8` |
+| contract regen #2 | same | 0, sha256 identical (`44aed422…4a71f8`; same bytes committed) |
+| jest A | `test/coach` + `coach.service.sub-coach-scope` + `coach-timeline` + `coach-ptm-risk-board` + `roles-enforced` + `utils/g2-s11-db-guard` | run 2: 1 failed (my fixture: inner-whitespace name is narrowed out by the DB pre-filter — fixture corrected, narrowing now asserted) → run 3 `test/coach/imported-people.service.spec.ts` + `coach-ptm-risk-board.spec.ts`: **29 passed**, RC 0 |
+| jest B | `test/contracts` (incl. drift check + cross-process determinism of the committed artifact) | 0 — 116 passed |
+| jest C | `test/scout/roster` `test/scout/reconciliation` `test/scout/lifecycle` `src/scout` | 0 — 502 passed |
+| jest D | `test/scout/reconstruct` | 0 — 326 passed |
+| jest E | `test/scout/induction` `orchestration` `s10` `s11` `entities` (PG files `describe.skip` without a DB: 6 suites / 47 tests skipped) | 0 — 363 passed |
+| jest F | `test/scout/*.spec.ts` | 0 — 714 passed |
+| jest G | `test/coach-*.spec.ts`, `test/coach.*.spec.ts` | 0 — 346 passed, 5 todo |
+| lefthook pre-commit (commit) | banned-cast-tokens (R75), prettier, eslint, tsc, prod-readiness-quick; commit-msg no-ai-tokens | all ✔️ (tsc 103.9 s) |
+
+Run 1's single `jest --runInBand` over everything OOM'd at the 3 GB heap after 50 PASS (RC 134) — a harness limit, not a test failure; the batches above are the same set split. Everything under the flock; `NODE_OPTIONS=--max-old-space-size=3072`, `--runInBand`. No PostgreSQL run here.
+
 
 ## PG lanes the parent must run (no PostgreSQL in this build)
 

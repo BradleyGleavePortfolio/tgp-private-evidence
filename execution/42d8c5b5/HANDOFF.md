@@ -80,3 +80,7 @@ The open repo items are backend #573/#574, extension #32/#34/#35 and mobile #300
    - platform access, i.e. authority over the live source account;
    - the AI provider/key and the daily spend cap;
    - integration → main, deploy, and prod flags.
+
+## Progress log (after handoff start)
+- 22:35Z N1 LANDED: backend #573 → integration/importer d84cb7c3 (whole-repo guard, CI self-test); extension #34 → main 30e78a29. Both had a final review GO.
+  X1 must shrink the extension allowlist in its rebase (the builder has been told).
