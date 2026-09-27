@@ -93,7 +93,9 @@ Date: 2026-09-27
 
 - Extension PR #33: green.
 - Mobile PR #299: green.
-- Backend PR #573: all completed checks green; `build-and-test` was still
-  running at record time.
+- Backend PR #573: vendor guard, migration, RLS, audit, deployment-readiness,
+  and size checks passed. `build-and-test` failed on ten pre-existing unused
+  imports in unrelated files introduced by the updated base branch; the failing
+  step's guard, Prisma generation, and N1 linted surfaces had already passed.
 
 No PR was merged.
