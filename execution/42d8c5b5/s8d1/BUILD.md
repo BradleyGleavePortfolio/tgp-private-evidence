@@ -115,7 +115,7 @@ still reads `68cfe342`. Working tree clean. The parent re-creates the commit at 
 | what | value |
 |---|---|
 | local HEAD | `57d160b060083d2af18af1982e389499e49ac699` (tree `cfec4d824f298339e64746ddff4c96a4119f3568`) |
-| pushed cand ref | unchanged: `68cfe342` (hold) |
+| pushed cand ref | `57d160b0` — hold lifted 12:35 PDT; fast-forward `68cfe342..57d160b0`, confirmed by `git ls-remote preserve` |
 | patch | `execution/42d8c5b5/s8d1/round2.patch` = `git diff 68cfe342` (597 lines); sha256 `82b8a70b8e25b3629c589b4d945339f0e97f79f7cbe0859d32395fc04c125535` |
 | delta LOC (68cfe342 → HEAD) | prod **+62 / −9** (person-writer +36/−9, native-provenance +26); test **+363 / −4** |
 | cumulative prod LOC (aed23289 → HEAD) | +255 / −31 (ceiling 1,000) |
@@ -165,3 +165,77 @@ still reads `68cfe342`. Working tree clean. The parent re-creates the commit at 
 - **A** — none open (A1 closed as above).
 - **B** — B1 (journey-full patch, parent-owned) unchanged.
 - **C** — The concurrent proof on the fake pins the lock PROTOCOL (lock before claim check; loser observes the winner's committed claim), not PostgreSQL semantics; the creator-vs-adopter race relies on PG's insert row lock blocking `FOR UPDATE` until commit (static reasoning, standard READ COMMITTED). A live two-transaction PG race is not in any lane. C1 swap done in the writer only.
+
+## Round 3 — rebase onto S11-DE + journey-full leg-B flip
+
+Pushed to a NEW ref `refs/heads/cand/x42/s8d1-r3` (confirmed by `git ls-remote preserve`); `cand/x42/s8d1`
+stays at `57d160b0`. Branch `x42/s8d1-r3` in the same clone; working tree clean.
+
+| commit | SHA | tree | note |
+|---|---|---|---|
+| base (S11-DE r2, `cand/x42/s11de`) | `1ee239c09a19af8da1eb99677f320ec7576a6a5e` | — | on `ce37c6ee` on `aed23289` |
+| 1 D1 (rebased 68cfe342) | `77445a0d8685989fee6e723c88955cf377972986` | `dcd252405f311e600f6c74f3ba1d193ad2525f9e` | content identical to 68cfe342 |
+| 2 D1 r2 (rebased 57d160b0) | `f8464c2d3f07181debff2e4c81d492002ddeff0f` | `ae7e69614862ec5d9b4f5b6e0ae6c78f915dcb21` | content identical to 57d160b0 |
+| 3 test-only leg-B flip (new) | **`245940c0ece836bfab65061b56b137a37d82cc5d`** | `a3a025e5667513f5e97476b5f39be47e0e2f03e8` | `test/scout/s11/journey-full.pg.spec.ts` only, +52/−31 |
+
+All three: author+committer `Bradley Gleave <bradley@bradleytgpcoaching.com>`; commit 3 went through lefthook
+(pre-commit 5/5 ✔, commit-msg ✔). Patch-ids are identical before/after the rebase (`git patch-id --stable`):
+D1 `aed23289..68cfe342` = `1ee239c0..77445a0d` = `a6a13e57…`; D1 r2 `68cfe342..57d160b0` = `77445a0d..f8464c2d` =
+`ca29cd5b…` — the D1 diffs are byte-identical after the rebase. LOC over the S11-DE base: prod +255/−31, test +1416/−163.
+
+**Conflicts resolved:** none. S11-DE touches 17 files (roster/entities readers, cursor, family-scope, dto,
+openapi contract, journey-full, worker, their specs); the D1 commits touch 14 files; the intersection is
+empty, so `git rebase preserve/cand/x42/s11de` applied both commits cleanly. Semantic check: S11-DE's
+roster reader classifies staged tokens through the same registry the engine plans with and reads Person rows
+only (no persist path), so it neither calls nor bypasses `persistPerson`.
+
+**J20 hard rule:** untouched. S11-DE already closed the walk at `S11_RANGE_END = ce37c6ee` (S11-E) — the
+J20 half of `fa72efb2/s8d1/journey-full_leg-b_j20_required-changes.r3.patch` (which had pinned `aed23289`)
+is superseded and NOT applied. The two D1 src commits sit after the closed range, so SLICE_COMMITS gained no
+entry; the ancestor check (`SLICE_COMMITS ∪ S11_RANGE_END` ancestors of HEAD) holds on this branch.
+
+**Leg-B flip (adapted from the r3 patch's leg-B half):** header MANDATORY HONESTY paragraph and leg-B summary
+rewritten as past tense + D1 truth; `it` title → "settles `complete` … qualifier roster_bridge_pending still
+carried"; in-test comment names the D1 code path; assertions: `terminal_status 'complete'`, `reason_code`
+null, `conditions []`, clients cell `{staged_unique: rosterIds.size, native_present_verified: rosterIds.size,
+unresolved: 0, reasons: [], completeness_basis: 'source_signed_enumeration', observed_unique: rosterIds.size,
+qualifiers: ['roster_bridge_pending']}`; J17 readiness `not.toContain('partial'|'unresolved_identities')` kept
+(still meaningful); step-11 roster comment updated; roster reads stay `rosterVia` → `h.onInduction` (S11-DE
+seam) — unchanged, `accounting.staged === rosterIds.size`, `unclassified 0`, every person `InvitePending`.
+
+**Static trace of leg B → `complete`:**
+1. Staged: first source `[...ROSTER_ROWS(2× u10-members), ...first.nativeClean]` via P1, second source
+   `second.nativeClean` via P2 (`s11-sources.ts:158,172,177`); `firstRowsWithRoster` is exactly D2's case (h)
+   shape `[...ROSTER, ...NATIVE_CLEAN]`.
+2. Pass: worker builds the engine with `buildFamilyRegistry({sourceMappers, nativeRules})`
+   (`g2-s11-worker.cjs:318`) → repository `clientsFamily` → `persistPerson` step 3 for both roster ids
+   (fresh coach `COACH_B`, no provenance, no ext-ref match → create Person + `clients/person/created`
+   provenance; typed outcome → ledger `reconstructed`, `target_kind person`). Two raw ids are distinct after
+   trim (`u10-m-1`, `u10-m-2`) so the A1 claim check is never reached. Native-clean rows verify exactly as on
+   leg A (which S11-DE already settles `complete`).
+3. S9 facts: `readPersons` selects `state`/`updated_at`; both InvitePending → `archived_at null` →
+   `present_owned`; reconcile bucket j for both → clients `native_present_verified 2, unresolved 0`.
+4. Coverage: `observeRows(first, firstRowsWithRoster)` signs the roster ids under `clients` for the first
+   source (families from the spec incl. clients); second source declares no clients → clients basis is the
+   first source's signed enumeration, `observed_unique 2`, covers staged; claim `success` → every family
+   basis known (as leg A) → no `coverage_basis_unknown`; no orphan ledger rows; relationship edges as leg A
+   → conditions `[]`, verdict `complete / null`. Qualifier `roster_bridge_pending` is descriptive (S8-DOC §4.1),
+   not a verdict input. Live pin of the same shape: `s10-unseen.pg.spec.ts` case (h), S10-B lane 42/42 on
+   `57d160b0`.
+
+**Gates (round 3, clone at 245940c0's tree; heavy ones under the flock):**
+
+| gate | RC |
+|---|---|
+| prettier 3.9.9 `--write`/`--check` journey-full.pg.spec.ts | 0 |
+| `npx eslint --no-warn-ignored --max-warnings 0` journey-full + 4 D1 src files | 0 |
+| `npx tsc --noEmit -p tsconfig.json` | 0 |
+| `npx jest --runInBand test/scout/reconstruct test/scout/reconciliation src/scout test/scout/roster test/scout/entities test/scout/s10/s10-unseen.pg.spec.ts test/scout/s11` | 0 — **35 suites passed, 827 passed, 47 skipped** (6 PG suites `describe.skip`) |
+| `npx jest --runInBand test/utils/g2-s11-db-guard.spec.ts` | 0 — **95 passed** (incl. "names no real platform slug", "journey specs inert without the lane") |
+| lefthook pre-commit + commit-msg on commit 3 | ✔ |
+
+**PG lanes for the parent (on 245940c0):** S11 lane `journey-full` 6 pass WITHOUT any patch (leg B flipped
+here); S10-B lane 42 (unchanged from 57d160b0); everything else as round 2. Migration count 173.
+
+**Findings:** A none. B none (B1 closed by commit 3). C: leg-B `complete` is statically traced here and
+live-pinned only by the D2 case (h) analogue; the parent's S11 lane run is the live proof.

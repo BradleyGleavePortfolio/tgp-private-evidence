@@ -1,0 +1,254 @@
+From 1ee239c09a19af8da1eb99677f320ec7576a6a5e Mon Sep 17 00:00:00 2001
+From: Bradley Gleave <bradley@bradleytgpcoaching.com>
+Date: Sun, 27 Sep 2026 19:40:26 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?test(scout):=20S11-D=20round=204=20?=
+ =?UTF-8?q?=E2=80=94=20leg=20A=20readiness=20read,=20worker=20registry=20s?=
+ =?UTF-8?q?eam,=20J20=20range=20end=20(S11-E)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Proof v2 of the S11-D full journey (J19) failed at two lines; both were spec or
+harness defects, not engine ones, and the second is the roster-reader gap the
+S11-E src commit (ce37c6ee) closes.
+
+(a) Leg A J17 read terminal readiness with `h.pairCurrent('P2', COACH_A,
+    intentId)`: pairCurrent's third argument is the SETUP NONCE, so the read
+    looked for a setup that does not exist (404 "Pairing session not found").
+    It now uses the nonce-less current-setup read, the live-passing terminal
+    precedent of readiness.pg.spec R4 and of J01 in the same leg. The leg A
+    empty roster is now discriminated from a blind reader by a direct
+    `h.persons(COACH_A)` read (the same read journey-induction and
+    settle-redrive make).
+
+(b) test/utils/g2-s11-worker.cjs: roster | entities hand the readers the SAME
+    `sourceMappers` the engine planned with (`reconstruct.sourceMappers`, the
+    composed A1/A2 registry), the CJS field assignment the engine seam already
+    uses. Leg B asserts `accounting.unclassified === 0` beside the staged count
+    that failed in proof v2 (0 vs 2), so the fix is observed, not assumed.
+    Review B B1 (proof v1 of this spec: `unclassified` 6, not 0): `h.rosterOf`
+    carries the single A1-platform REGISTRY, under which none of leg B's
+    tokens classify. The leg A and leg B roster reads now go through
+    `h.onInduction` (the two-source registry the legs planned with); rosterOf
+    / entitiesOf stay on REGISTRY for journey-core, where that seam is right.
+    Traced against the induction registry: leg B staged 2, unclassified 0,
+    persons = the roster rows' source ids.
+
+(c) J20: SLICE_COMMITS pins ce37c6ee (the S11-E src commit) and the
+    full-range walk closes at S11_RANGE_END = ce37c6ee instead of HEAD; the
+    ancestor check covers the range end. Every src-touching commit in
+    3db615c0^..ce37c6ee is pinned and none carries a source slug. The
+    comment describing the full-range walk names S11_RANGE_END, not HEAD.
+---
+ test/scout/s11/journey-full.pg.spec.ts | 70 ++++++++++++++++++++------
+ test/utils/g2-s11-worker.cjs           | 25 +++++----
+ 2 files changed, 71 insertions(+), 24 deletions(-)
+
+diff --git a/test/scout/s11/journey-full.pg.spec.ts b/test/scout/s11/journey-full.pg.spec.ts
+index 9ca2ebb6..0456fdbf 100644
+--- a/test/scout/s11/journey-full.pg.spec.ts
++++ b/test/scout/s11/journey-full.pg.spec.ts
+@@ -105,6 +105,9 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+   afterAll(() => h?.resetData());
+ 
+   const FIRST = () => h.SOURCES.first;
++  /** A roster read on `host` through the two-source induction registry (review B B1). */
++  const rosterVia = (host: Host, coach: string, intentId: string) =>
++    h.onInduction(host, 'phone', { action: 'roster', coach, intent: intentId });
+   const SECOND = () => h.SOURCES.second;
+ 
+   /** Steps 1-2: setup on the phone (P1), pairing on the extension (P2). */
+@@ -309,7 +312,15 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+       expect(byFamily(basis.report, 'clients').observed_unique).toBe(0);
+ 
+       // ---- J17 (terminal): readiness reads `terminal` on either host, with no reason code leaked.
+-      const lateReadiness = await h.pairCurrent('P2', COACH_A, intentId);
++      // Round 4 (proof v2 finding, leg A :313): `pairCurrent`'s third argument is the SETUP
++      // NONCE (test/utils/g2-s11-harness.ts `pairCurrent = (host, coach, nonce?)` ->
++      // `pairing.current(coach, nonce)`, src/extension-pair/extension-pair.service.ts `current`:
++      // a nonce filters `setup_nonce`), so passing the intent id there read a setup that does
++      // not exist -> 404 "Pairing session not found". The nonce-less read (the coach's current,
++      // non-superseded setup) is the live-passing terminal-readiness precedent at
++      // test/scout/s11/readiness.pg.spec.ts:139-144 (R4, `h.pairCurrent('P1', COACH)` after the
++      // run went terminal), and J01 above already read this same coach's setup that way.
++      const lateReadiness = await h.pairCurrent('P2', COACH_A);
+       expect(lateReadiness.failure).toBeUndefined();
+       expect(lateReadiness.result.readiness).toEqual({
+         run: 'terminal',
+@@ -321,11 +332,19 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+       // ---- Step 11 (native review): the final roster read lists EXACTLY the reconstructed
+       // identities — for this native-clean run that is the exact EMPTY roster, asserted empty
+       // BECAUSE none were staged (not because of a failure or a non-`complete` terminal).
+-      const rosterP1 = await h.rosterOf('P1', COACH_A, intentId);
++      // Round 4: the empty projection is DISCRIMINATED from a blind reader by a direct read of
++      // the coach's Person rows (test/scout/s11/journey-induction.pg.spec.ts:147 and
++      // settle-redrive.pg.spec.ts:146 read `h.persons(coach)` the same way, live-passing): no
++      // Person exists for this coach, so an empty roster is the truth, not a reader gap.
++      expect(h.persons(COACH_A)).toEqual([]);
++      // S11-E r2 (review B B1): the roster reads go through the TWO-SOURCE induction registry
++      // (`h.onInduction`, the registry this leg planned with), not `h.rosterOf`'s single
++      // A1-platform REGISTRY, which classifies none of this leg's tokens.
++      const rosterP1 = await rosterVia('P1', COACH_A, intentId);
+       expect(rosterP1.failure).toBeUndefined();
+       expect(rosterP1.result.persons).toEqual([]);
+       expect(rosterP1.result.accounting.staged).toBe(0);
+-      const rosterP2 = await h.rosterOf('P2', COACH_A, intentId);
++      const rosterP2 = await rosterVia('P2', COACH_A, intentId);
+       expect(rosterP2.failure).toBeUndefined();
+       expect(JSON.stringify(rosterP2.result)).toBe(JSON.stringify(rosterP1.result));
+ 
+@@ -415,7 +434,7 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+       // principal, and never silently promoted to a client. This is the truth S8-D changes: once
+       // it lands, an otherwise-identical run is expected to settle `complete` and this same read
+       // is expected to keep listing these people, now bridged (owner-decided, not built here).
+-      const roster = await h.rosterOf('P1', COACH_B, intentId);
++      const roster = await rosterVia('P1', COACH_B, intentId);
+       expect(roster.failure).toBeUndefined();
+       // Response-level bridge-pending qualifier (src/scout/scout-roster.service.ts:178-179,
+       // `roster_bridge_pending: ROSTER_BRIDGE_PENDING`; the constant is defined fixed `true` at
+@@ -423,6 +442,20 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+       // roster response's own field for "imported, not yet joined," asserted alongside the
+       // per-person `InvitePending` state below, not merely narrated in a comment.
+       expect(roster.result.roster_bridge_pending).toBe(true);
++      // S11-E (src/scout/scout-roster.service.ts, `classifyFamilyScope`): `staged` counts the
++      // staged (source_platform, token) groups that classify to the roster family through the
++      // engine's registry — so the D2 roster token counts here although it is not literally
++      // `clients` (the proof v2 leg-B failure at :426, `staged` 0 vs 2, was the reader filtering
++      // `entity_type == 'clients'`). `unclassified` is the additive honesty field: staged rows
++      // NO spec classifies. It is 0 here because the read goes through the two-source induction
++      // registry (`rosterVia` → `h.onInduction`; review B B1: `h.rosterOf` carries the single
++      // A1-platform REGISTRY, under which every token of this leg is unclassified) and the
++      // worker hands the reader the SAME composed registry the engine planned with
++      // (test/utils/g2-s11-worker.cjs `roster.sourceMappers = reconstruct.sourceMappers`), so
++      // the second source's rows classify to their own native families. Traced against that
++      // registry: (first, roster token) → clients: staged 2; (first, two native tokens) and
++      // (second, two native tokens) → their own families: unclassified 0.
++      expect(roster.result.accounting.unclassified).toBe(0);
+       expect(roster.result.accounting.staged).toBe(rosterIds.size);
+       const gotIds = roster.result.persons
+         .map((p: { source_person_id: string }) => p.source_person_id)
+@@ -432,7 +465,7 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+         expect(person.state).toBe('InvitePending');
+         expect(person.source_platform).toBe(first.platform);
+       }
+-      const rosterOther = await h.rosterOf('P2', COACH_B, intentId);
++      const rosterOther = await rosterVia('P2', COACH_B, intentId);
+       expect(JSON.stringify(rosterOther.result)).toBe(JSON.stringify(roster.result));
+     },
+   );
+@@ -472,11 +505,16 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+    *
+    * Round 2 (S11D review C): SLICE_COMMITS below is a curated, manually pinned list, not a
+    * discovered one. A companion check ("no unlisted src-touching commit slipped in") walks
+-   * `git rev-list 3db615c0^..HEAD`, diffs EVERY commit in that full range against its own
+-   * parent for `-- src`, and fails loudly if any src-touching commit is absent from
+-   * SLICE_COMMITS -- so a future rebase/insertion that adds an uncovered src commit is caught
+-   * here rather than silently passing the two checks above (which only ever iterate the
+-   * pinned list itself, and could not otherwise notice a missing entry).
++   * `git rev-list 3db615c0^..S11_RANGE_END`, diffs EVERY commit in that full range against
++   * its own parent for `-- src`, and fails loudly if any src-touching commit is absent from
++   * SLICE_COMMITS -- so a rebase/insertion inside the range that adds an uncovered src commit
++   * is caught here rather than silently passing the two checks above (which only ever iterate
++   * the pinned list itself, and could not otherwise notice a missing entry).
++   *
++   * S11-E: the range is closed at S11_RANGE_END (the S11-E src commit), not at `HEAD`: the
++   * S11 slice's src surface is now complete, and later slices (S12+) pin their own ranges
++   * under their own gates rather than silently widening this one. The ancestor check
++   * includes S11_RANGE_END, so the walk can never run over an unreachable end.
+    * --------------------------------------------------------------------------------------- */
+   const repoRoot = resolve(__dirname, '../../..');
+   const git = (args: string[]): string =>
+@@ -491,7 +529,10 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+     '645fb6db022f2ef6299ed4aa2bcd3f409d2a8298', // S11-B (settle re-drive)
+     'dda794d7e8bee0482a7ad373795fcc51dcf54bb5', // S11-B r2 (raw-query retry)
+     '03e7a2344ef95b019c751983527bbc9f78200921', // S11-A2 (no src change; the base this slice builds on)
++    'ce37c6eeb49be1d65ee7c38f86068bd92af824b0', // S11-E (readers classify tokens through the registry)
+   ];
++  /** The last commit of the S11 slice's src surface (S11-E); the full-range walk ends here. */
++  const S11_RANGE_END = 'ce37c6eeb49be1d65ee7c38f86068bd92af824b0';
+   /** The pinned B for scripts/s10-core-diff-gate.sh (D2 diagnose/fix gate run; s10d2/d2_diagnose_fix.md
+    *  lines 129-130: `s10-core-diff-gate.sh 7fdcbc044dba...` -> `PASS B=7fdcbc04... HEAD=275e458c...`). */
+   const GATE_B = '7fdcbc044dba1747d0db2f2750ced951f3b6b752';
+@@ -512,9 +553,9 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+     return [d2.source_platform, a2.source_platform];
+   };
+ 
+-  it('every SLICE_COMMITS entry resolves and is an ancestor of HEAD (pins are real, not stale)', () => {
++  it('every SLICE_COMMITS entry and S11_RANGE_END resolve and are ancestors of HEAD (pins are real, not stale)', () => {
+     const head = git(['rev-parse', 'HEAD']).trim();
+-    for (const commit of SLICE_COMMITS) {
++    for (const commit of [...SLICE_COMMITS, S11_RANGE_END]) {
+       const resolved = git(['rev-parse', '--verify', '--quiet', `${commit}^{commit}`]).trim();
+       expect(resolved).toBe(commit);
+       expect(() => git(['merge-base', '--is-ancestor', commit, head])).not.toThrow();
+@@ -522,14 +563,13 @@ live('S11-D full journey (J19) and core diff (J20)', () => {
+   });
+ 
+   it(
+-    'no src-touching commit in 3db615c0^..HEAD is missing from the curated SLICE_COMMITS pins ' +
++    'no src-touching commit in 3db615c0^..S11_RANGE_END is missing from the curated SLICE_COMMITS pins ' +
+       '(D-S11D review C: the pins are curated, not discovered -- this walks the FULL range and ' +
+       'fails loudly on any uncovered src commit, so a future rebase/insertion cannot silently ' +
+       'bypass the two checks below, which only ever iterate the pinned list itself)',
+     () => {
+       const base = '3db615c0a5e64a63b910d34ce7c732ee6e63f24d';
+-      const head = git(['rev-parse', 'HEAD']).trim();
+-      const range = git(['rev-list', `${base}^..${head}`])
++      const range = git(['rev-list', `${base}^..${S11_RANGE_END}`])
+         .split('\n')
+         .filter(Boolean);
+       expect(range.length).toBeGreaterThan(0);
+diff --git a/test/utils/g2-s11-worker.cjs b/test/utils/g2-s11-worker.cjs
+index 562038a1..d87d58be 100644
+--- a/test/utils/g2-s11-worker.cjs
++++ b/test/utils/g2-s11-worker.cjs
+@@ -25,6 +25,11 @@
+ //     injected ones, cross-checked by S10-C's `buildInductionRegistry`; the planner, the native
+ //     families, the facts service (S10-C registry seam) and the observation service all bind the
+ //     SAME composed registries. `input.spec` / `input.rules` (A1) are unchanged and exclusive of it.
++// The S11-E delta (readers resolve source tokens through the registry; and nothing else):
++//   - roster | entities hand the reader the SAME `sourceMappers` the engine planned with
++//     (`reconstruct.sourceMappers`, composed above from the injected A1 spec / A2 packages), the
++//     same CJS field assignment the engine seam already uses — otherwise the readers would classify
++//     the injected platforms' rows as `unclassified` from the repository registry alone.
+ // Hooks only PAUSE real operations at named barriers; they never replace query results or
+ // transaction semantics. Used only by the explicitly guarded S11 live proofs.
+ // input (G2_S11_WORKER JSON): { root, head, client, url, coach, intent, action, pause?, pauseRow?,
+@@ -406,16 +411,17 @@ function instrument(target, onGate = null) {
+       case 'pair-session':
+         result = await pairing.session(input.coach, input.intent);
+         break;
+-      case 'roster':
+-        result = await new ScoutRosterService(prisma, analytics).getRoster(
+-          input.coach,
+-          input.intent,
+-          undefined,
+-          undefined,
+-        );
++      case 'roster': {
++        const roster = new ScoutRosterService(prisma, analytics);
++        // S11-E: the reader classifies (platform, token) through the registry the engine ran.
++        roster.sourceMappers = reconstruct.sourceMappers;
++        result = await roster.getRoster(input.coach, input.intent, undefined, undefined);
+         break;
+-      case 'entities':
+-        result = await new ScoutEntitiesService(prisma, analytics).getEntities(
++      }
++      case 'entities': {
++        const entities = new ScoutEntitiesService(prisma, analytics);
++        entities.sourceMappers = reconstruct.sourceMappers;
++        result = await entities.getEntities(
+           input.coach,
+           input.intent,
+           body.family ?? 'workouts',
+@@ -423,6 +429,7 @@ function instrument(target, onGate = null) {
+           undefined,
+         );
+         break;
++      }
+       case 'declare':
+         result = await induction.postDeclaration(
+           { user: { id: input.coach } },
+-- 
+2.53.0
+
