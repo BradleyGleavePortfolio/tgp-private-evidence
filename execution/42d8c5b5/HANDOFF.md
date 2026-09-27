@@ -105,3 +105,12 @@ Backend drafts #525–529, #522, #491, #427/#428 and the dependabot PRs.
 3. Flags: turn ALL on (owner-approved), EXCEPT any flag whose required key the report shows missing. Otherwise boot fails; those flags stay off with the reason "key NEEDED BY USER".
    The flag workflow only sets two flags today, and S12-B6, not yet landed, adds more. Setting all of them needs the generic `fly-secrets-set.yml` or an extended flag workflow.
 4. Smoke test: /health, and the importer endpoints return fail-closed responses without the extension.
+
+## Progress log
+- 22:40Z: N1 landed. backend #573 → integration d84cb7c3; extension #34 → main 30e78a29.
+- 22:55Z: extension #30 CLOSED (owner instruction).
+- 23:10Z: **backend #575 MERGED → main `3a9369b9fa9c459d08d1bf575ca4c6169673a291`**. This is integration/importer d84cb7c3 (52 commits, one additive migration).
+  - Green on the PR: build-and-test, migrations forward and reversible, rls-live-tests, mwb-3-live-tests, CodeQL, npm audit, danger (after a conventional-commit title) and deploy-readiness tests.
+  - The only red check is `shellcheck (scripts/*.sh)`, with SC2015 info findings in `scripts/s10-core-diff-gate.sh` (a proof script, class C hygiene; main has no branch protection). Fix it in any later T0 PR.
+  - **Nothing is deployed yet.** Production still runs the old main 1c10e2a1.
+- Owner-approved but not executed: turning ALL prod flags on. See the safe order in section 6; it waits on the deploy approval and the key gap report.
