@@ -7,14 +7,12 @@
   tree clean; nothing uncommitted, nothing further to push.
 
 ## DONE and verified
-scripts/check-rls-catalog.ts (360 lines): read-only pg_policies/pg_class RLS
-check for WorkoutSession, WeightLog, Habit, CheckIn,
-ClientWorkoutAssignment(+Snapshot). Transaction READ ONLY, no DDL/DML, no
-default DATABASE_URL, fails closed (exit 2) on missing/unreachable DB
-(dry-run verified). Migration audit confirms WorkoutSession/WeightLog/Habit
-have NO RLS migration ever; CheckIn/ClientWorkoutAssignment* do — encoded as
-EXPECTED_STATE. All gates green: prettier/eslint/tsc/R75/lefthook hooks.
-Correct commit identity, no --no-verify.
+scripts/check-rls-catalog.ts (360 lines): read-only RLS catalog check for
+WorkoutSession, WeightLog, Habit, CheckIn, ClientWorkoutAssignment(+Snapshot).
+READ ONLY txn, no DDL/DML, no default DATABASE_URL, fails closed (exit 2) on
+missing/unreachable DB (dry-run verified). Migration audit: first 3 tables
+have NO RLS migration ever; CheckIn/CWA* do — encoded as EXPECTED_STATE. All
+gates green (prettier/eslint/tsc/R75/lefthook). Correct commit identity.
 
 ## NOT done
 Grant-specified local-PG proof (migrate deploy + script run on throwaway

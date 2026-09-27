@@ -1,0 +1,1252 @@
+diff --git a/_locales/en/messages.json b/_locales/en/messages.json
+index 669174f..aba8c5a 100644
+--- a/_locales/en/messages.json
++++ b/_locales/en/messages.json
+@@ -150,6 +150,10 @@
+     "message": "TGP wasn't given permission to read this site, so nothing started. Press Start again and allow access to this site when Chrome asks.",
+     "description": "No-run error: the coach declined Chrome's site-access prompt on Start, or the grant was revoked before the worker checked it. Fact then remedy; the origin is never shown."
+   },
++  "prestart_source_tab_changed": {
++    "message": "The source page changed while the import was starting, so nothing started. Return to your source platform page and start again.",
++    "description": "No-run error: the source tab navigated away from the authorized origin (or a token from another document was offered) between Start and collection. Fact then remedy; no origin is shown."
++  },
+   "prestart_site_not_learned": {
+     "message": "TGP hasn't learned this site yet, so nothing was read or sent.",
+     "description": "No-run error: the authorized origin has no registered reader (registry lookup failed closed). No vendor or platform name is shown."
+diff --git a/background.js b/background.js
+index 9a84b97..98e6b4b 100644
+--- a/background.js
++++ b/background.js
+@@ -40,6 +40,7 @@ import {
+   clearTokensIfSession,
+   getSessionGeneration,
+   setAuthorizedOrigin,
++  getAuthorizedOrigin,
+   clearAuthorizedOrigin,
+ } from "./shared/session.js";
+ // The ONLY core import of the quarantined legacy oracle: it registers itself
+@@ -72,6 +73,7 @@ import { logNetworkEvent } from "./shared/log.js";
+ import {
+   attachDebugger,
+   stopCapture,
++  retireCaptureSessions,
+   registerCaptureLifecycle,
+   assertCaptureTabAllowed,
+ } from "./shared/capture.js";
+@@ -597,9 +599,55 @@ function notifyOutcome(platform, engineStatus) {
+ 
+ // ---- origin authorization (Authorization = Start) ---------------------------
+ 
++// A Start authorization is a FRESH grant: Chrome only fires permissions.onAdded
++// when the coach accepts its prompt, which chrome.permissions.request may show
++// only from a user gesture. The worker records each freshly granted origin in
++// memory and a run CONSUMES it (single use). A grant that merely exists — left
++// over from a run whose revoke failed, or from a Start whose message was lost
++// — is not a Start: it is revoked so the next Start prompts again.
++const freshGrants = new Set();
++chrome.permissions.onAdded.addListener((permissions) => {
++  const origins =
++    isRecord(permissions) && Array.isArray(permissions.origins)
++      ? permissions.origins
++      : [];
++  for (const pattern of origins) {
++    if (typeof pattern !== "string") continue;
++    const origin = tabOriginAllowlist(pattern.replace(/\/\*$/, "/"))?.[0];
++    if (origin !== undefined) freshGrants.add(origin);
++  }
++});
++
++function grantPattern(origin) {
++  return `${origin}/*`;
++}
++
++async function holdsGrant(origin) {
++  try {
++    return (
++      (await chrome.permissions.contains({
++        origins: [grantPattern(origin)],
++      })) === true
++    );
++  } catch {
++    return false;
++  }
++}
++
++// Revoke an origin's host grant and confirm Chrome no longer holds it.
++async function revokeGrant(origin) {
++  try {
++    await chrome.permissions.remove({ origins: [grantPattern(origin)] });
++  } catch {
++    return false;
++  }
++  return !(await holdsGrant(origin));
++}
++
+ // The tab's https origin becomes the run's single authorized origin ONLY if it
+-// is not a TGP origin and Chrome holds the host permission requested on the
+-// Start gesture (the worker never trusts the popup's claim; it asks Chrome).
++// is not a TGP origin, Chrome holds the host permission, and that permission
++// is a fresh Start grant (see freshGrants). The worker never trusts the
++// popup's claim; it asks Chrome, and it consumes the grant.
+ async function authorizeSourceOrigin(url) {
+   const origin = tabOriginAllowlist(url)?.[0] ?? null;
+   if (origin === null) {
+@@ -608,17 +656,17 @@ async function authorizeSourceOrigin(url) {
+   if (isTgpOrigin(origin)) {
+     return { error: `origin_is_tgp: ${origin}` };
+   }
+-  let granted = false;
+-  try {
+-    granted =
+-      (await chrome.permissions.contains({ origins: [`${origin}/*`] })) ===
+-      true;
+-  } catch {
+-    granted = false;
+-  }
+-  if (!granted) {
++  if (!(await holdsGrant(origin))) {
++    freshGrants.delete(origin);
+     return { error: `origin_not_granted: ${origin}` };
+   }
++  if (!freshGrants.has(origin)) {
++    // Possession of a durable permission is not a Start. Drop it so the coach
++    // is prompted afresh next time.
++    await revokeGrant(origin);
++    return { error: `start_not_authorized: ${origin}` };
++  }
++  freshGrants.delete(origin);
+   setAuthorizedOrigin(origin);
+   return { origin };
+ }
+@@ -674,6 +722,26 @@ async function handleStartIngest(message) {
+     return;
+   }
+ 
++  // The legacy entrypoint is held to the same source-token discipline as
++  // start_import: the bearer comes from the authorized tab's document, never
++  // from the message. A caller-supplied token starts nothing.
++  if (message.sourceToken !== undefined) {
++    broadcastStatus({
++      ...emptySnapshot(),
++      lastError: `source_token_not_accepted: ${authorized.origin}`,
++    });
++    return;
++  }
++  const collected = await collectSourceToken(
++    readTabId(message),
++    authorized.origin,
++  );
++  if (collected.error !== undefined) {
++    broadcastStatus({ ...emptySnapshot(), lastError: collected.error });
++    return;
++  }
++  const sourceToken = collected.token;
++
+   const controller = new AbortController();
+   const tally = new Map();
+   const staging = new Map();
+@@ -700,11 +768,6 @@ async function handleStartIngest(message) {
+     staging,
+   );
+ 
+-  // The source-platform bearer token is captured in-tab and passed on the
+-  // start message; the extractor reuses the coach's session.
+-  const sourceToken =
+-    typeof message.sourceToken === "string" ? message.sourceToken : "";
+-
+   let settlementSent = false;
+   try {
+     await extractor.run({ token: sourceToken, signal: controller.signal });
+@@ -767,12 +830,43 @@ async function handleStartIngest(message) {
+ // entrypoints (start_import + legacy start_ingest). Cleared when the run settles.
+ let importInFlight = false;
+ 
+-// A run's authorization ends with the run: origin dropped, collector
+-// unregistered, then the single-flight guard released.
++// Cleanup the last run still owes. While set, no run is admitted: the next
++// Start retries the cleanup and is refused until every step is verified.
++/** @type {{ origin: string | null } | null} */
++let pendingCleanup = null;
++
++// A run's authorization ends with the run, in this order: every capture
++// debugger is retired (no event or stop can outlive the run), the authorized
++// origin is dropped, the collector registration is removed and VERIFIED gone,
++// the origin's host grant is revoked and VERIFIED gone, and only then is the
++// single-flight guard released. Any failed step keeps the guard closed
++// (pendingCleanup) — cleanup is never assumed. Never throws.
+ async function settleRun() {
++  const origin = getAuthorizedOrigin();
++  await retireCaptureSessions();
+   clearAuthorizedOrigin();
+-  await unregisterSourceCollector();
+-  importInFlight = false;
++  const clean = await cleanUp(origin);
++  pendingCleanup = clean ? null : { origin };
++  if (!clean) {
++    logNetworkEvent("run_cleanup_pending");
++  }
++  importInFlight = !clean;
++}
++
++async function cleanUp(origin) {
++  const collectorGone = await unregisterSourceCollector();
++  const grantGone = origin === null ? true : await revokeGrant(origin);
++  return collectorGone && grantGone;
++}
++
++// Retry the cleanup a previous run left pending; admits new runs once verified.
++async function retryPendingCleanup() {
++  if (pendingCleanup === null) return;
++  const { origin } = pendingCleanup;
++  if (await cleanUp(origin)) {
++    pendingCleanup = null;
++    importInFlight = false;
++  }
+ }
+ 
+ // Confine the crawl to the origin the coach is looking at: the observed tab
+@@ -851,7 +945,9 @@ const SOURCE_COLLECTOR_ID = "tgp-source-collector";
+ const SOURCE_COLLECTOR_SCRIPT = "content/main.js";
+ 
+ async function registerSourceCollector(origin, tabId) {
+-  await unregisterSourceCollector();
++  if (!(await unregisterSourceCollector())) {
++    throw new Error("source_collector_stale");
++  }
+   await chrome.scripting.registerContentScripts([
+     {
+       id: SOURCE_COLLECTOR_ID,
+@@ -867,46 +963,76 @@ async function registerSourceCollector(origin, tabId) {
+   });
+ }
+ 
+-// Never throws: a missing registration is not a fault; cleanup cannot fail a run.
++// Remove the collector registration and VERIFY it is gone. A missing
++// registration is not a fault; a Chrome API failure is reported as `false` so
++// the caller fails closed (settleRun keeps the guard; register refuses).
+ async function unregisterSourceCollector() {
+   try {
+-    await chrome.scripting.unregisterContentScripts({
++    const before = await chrome.scripting.getRegisteredContentScripts({
++      ids: [SOURCE_COLLECTOR_ID],
++    });
++    if (before.length > 0) {
++      await chrome.scripting.unregisterContentScripts({
++        ids: [SOURCE_COLLECTOR_ID],
++      });
++    }
++    const after = await chrome.scripting.getRegisteredContentScripts({
+       ids: [SOURCE_COLLECTOR_ID],
+     });
++    return after.length === 0;
+   } catch {
+-    logNetworkEvent("source_collector_unregister_skipped");
++    logNetworkEvent("source_collector_unregister_failed");
++    return false;
+   }
+ }
+ 
+-// Obtain the SOURCE bearer from the coach's own tab WITHOUT exposing it to
+-// popup/storage/logs/payload: re-read the tab's LIVE origin and require it in the
+-// allowlist (fail closed on a navigated tab), accept only { ok, token }. Memory only.
+-async function collectSourceToken(tabId, allowedOrigins) {
+-  if (typeof tabId !== "number") {
+-    return "";
+-  }
+-  let tab;
++// The tab's live document origin, or null when the tab is gone / not https.
++async function liveTabOrigin(tabId) {
+   try {
+-    tab = await chrome.tabs.get(tabId);
++    const tab = await chrome.tabs.get(tabId);
++    return tabOriginAllowlist(readString(tab, "url"))?.[0] ?? null;
+   } catch {
+-    return "";
++    return null;
++  }
++}
++
++// Obtain the SOURCE bearer from the coach's own tab WITHOUT exposing it to
++// popup/storage/logs/payload. The token is bound to ONE document on the
++// authorized origin: the tab is checked before the collector is injected,
++// again after every await (a navigation during injection or collection fails
++// the run), and the collector's reply must name the document origin it read
++// from. Returns { token } ("" when the page holds none) or { error }.
++async function collectSourceToken(tabId, origin) {
++  if (typeof tabId !== "number") {
++    return { token: "" };
+   }
+-  const origin = tabOriginAllowlist(readString(tab, "url"))?.[0] ?? null;
+-  if (origin === null || !allowedOrigins.includes(origin)) {
+-    return ""; // the tab is not (or no longer) the confirmed source origin
++  const navigated = `source_tab_navigated: ${origin}`;
++  if ((await liveTabOrigin(tabId)) !== origin) {
++    return { error: navigated };
+   }
+   let reply;
+   try {
+     await registerSourceCollector(origin, tabId);
++    if ((await liveTabOrigin(tabId)) !== origin) {
++      return { error: navigated };
++    }
+     reply = await chrome.tabs.sendMessage(tabId, {
+       kind: "collect_source_token",
+     });
+   } catch {
+-    return ""; // no collector / port closed — proceed token-less (fails closed downstream)
++    return { token: "" }; // no collector / port closed — fails closed downstream
+   }
+-  return isRecord(reply) && reply.ok === true && typeof reply.token === "string"
+-    ? reply.token
+-    : "";
++  if ((await liveTabOrigin(tabId)) !== origin) {
++    return { error: navigated };
++  }
++  if (!isRecord(reply) || reply.ok !== true) {
++    return { token: "" };
++  }
++  // A token from any other document is refused outright, never "no token".
++  if (reply.origin !== origin || typeof reply.token !== "string") {
++    return { error: navigated };
++  }
++  return { token: reply.token };
+ }
+ 
+ async function handleStartImport(message) {
+@@ -946,6 +1072,15 @@ async function handleStartImport(message) {
+     return;
+   }
+ 
++  // Real source bearer from the coach's own tab; absent -> "" -> fails closed.
++  // A tab that left the authorized origin starts nothing.
++  const collected = await collectSourceToken(message.tabId, authorized.origin);
++  if (collected.error !== undefined) {
++    broadcastStatus({ ...emptySnapshot(), lastError: collected.error });
++    return;
++  }
++  const sourceToken = collected.token;
++
+   const controller = new AbortController();
+   const intent = {
+     intentId: `imp-${Date.now()}`,
+@@ -973,8 +1108,6 @@ async function handleStartImport(message) {
+     tally,
+     staging,
+   );
+-  // Real source bearer from the coach's own tab; absent -> "" -> fails closed.
+-  const sourceToken = await collectSourceToken(message.tabId, allowedOrigins);
+   const reporter = createProgressReporter({
+     postProgress: (body) => postProgress(body, generation),
+     intentId: intent.intentId,
+@@ -1222,6 +1355,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+       sendResponse({ ok: false, error: "untrusted_sender" });
+       return false;
+     }
++    if (pendingCleanup !== null) {
++      void retryPendingCleanup();
++      sendResponse({ ok: false, error: "cleanup_pending" });
++      return false;
++    }
+     // Shared single-flight (see importInFlight): reject a second concurrent run.
+     if (importInFlight) {
+       sendResponse({ ok: false, error: "import_in_progress" });
+@@ -1240,6 +1378,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+       sendResponse({ ok: false, error: "untrusted_sender" });
+       return false;
+     }
++    if (pendingCleanup !== null) {
++      void retryPendingCleanup();
++      sendResponse({ ok: false, error: "cleanup_pending" });
++      return false;
++    }
+     // Shared single-flight (see importInFlight): reject a second concurrent run.
+     if (importInFlight) {
+       sendResponse({ ok: false, error: "import_in_progress" });
+diff --git a/content/main.js b/content/main.js
+index 30ea090..2b12830 100644
+--- a/content/main.js
++++ b/content/main.js
+@@ -40,7 +40,13 @@
+       message.kind === "collect_source_token"
+     ) {
+       const token = readSourceBearer();
+-      sendResponse(token.length > 0 ? { ok: true, token } : { ok: false });
++      // The reply names the document origin it was read from, so the worker
++      // can refuse a token that belongs to any other document.
++      sendResponse(
++        token.length > 0
++          ? { ok: true, token, origin: location.origin }
++          : { ok: false },
++      );
+     }
+     return false;
+   });
+diff --git a/legacy/truecoach/net.js b/legacy/truecoach/net.js
+index 7cca98b..259f2c5 100644
+--- a/legacy/truecoach/net.js
++++ b/legacy/truecoach/net.js
+@@ -64,6 +64,8 @@ async function rawFetch(path, token, signal, rateMs = RATE_LIMIT_MS) {
+             method: "GET",
+             headers: authHeaders(token),
+             credentials: "include",
++            // Single-origin confinement: a source redirect is never followed.
++            redirect: "error",
+             signal,
+         },
+     );
+diff --git a/popup/outcome.js b/popup/outcome.js
+index 6ecf5f1..8759d27 100644
+--- a/popup/outcome.js
++++ b/popup/outcome.js
+@@ -138,13 +138,18 @@ export function preStartIssue(lastError, message) {
+           error.startsWith("origin_is_tgp")
+         ? "prestart_unsafe_origin"
+         : error.startsWith("origin_not_authorized") ||
+-            error.startsWith("origin_not_granted")
++            error.startsWith("origin_request_failed") ||
++            error.startsWith("origin_not_granted") ||
++            error.startsWith("start_not_authorized")
+           ? "prestart_origin_not_authorized"
+-          : error.startsWith("site_not_learned")
+-            ? "prestart_site_not_learned"
+-            : error === "blueprint resolve failed"
+-              ? "prestart_site_setup_unavailable"
+-              : "prestart_unknown";
++          : error.startsWith("source_tab_navigated") ||
++              error.startsWith("source_token_not_accepted")
++            ? "prestart_source_tab_changed"
++            : error.startsWith("site_not_learned")
++              ? "prestart_site_not_learned"
++              : error === "blueprint resolve failed"
++                ? "prestart_site_setup_unavailable"
++                : "prestart_unknown";
+   return message(key);
+ }
+ 
+diff --git a/popup/popup.js b/popup/popup.js
+index 1c18b50..4d238b1 100644
+--- a/popup/popup.js
++++ b/popup/popup.js
+@@ -153,6 +153,7 @@ const START_ISSUE_CODES = new Set([
+   "origin_not_https",
+   "origin_is_tgp",
+   "origin_not_authorized",
++  "origin_request_failed",
+ ]);
+ 
+ // On the Start gesture: ask Chrome for the active tab's origin (denial starts
+@@ -171,13 +172,15 @@ export function requestStartImport(runtime, tabs, permissions) {
+     if (isTgpOrigin(origin)) {
+       return { ok: false, error: "origin_is_tgp" };
+     }
+-    return permissions
+-      .request({ origins: [`${origin}/*`] })
+-      .then((granted) =>
++    // Chrome's prompt answers true (granted), false (declined) or rejects
++    // (no gesture, prompt unavailable). Each is its own honest no-run fact.
++    return permissions.request({ origins: [`${origin}/*`] }).then(
++      (granted) =>
+         granted === true
+           ? runtime.sendMessage({ kind: "start_import", url, tabId })
+           : { ok: false, error: "origin_not_authorized" },
+-      );
++      () => ({ ok: false, error: "origin_request_failed" }),
++    );
+   });
+ }
+ 
+diff --git a/shared/capture.js b/shared/capture.js
+index 07dcfe8..d36879e 100644
+--- a/shared/capture.js
++++ b/shared/capture.js
+@@ -13,7 +13,8 @@
+ // runtime-message boundary.
+ //
+ // R75: zero banned type-assertions — every narrowing is a real guard.
+-// R76: this file stays comfortably under 400 LOC.
++// Capture is a capability of the current run: sessions carry a run generation
++// and are retired on every settlement (see retireCaptureSessions).
+ 
+ import { CaptureBuffer, DEFAULT_MAX_BYTES } from "./capture-buffer.js";
+ import {
+@@ -25,6 +26,7 @@ import {
+   redactCredentialText,
+ } from "./credential-policy.js";
+ import { normalizeCaptureSnapshot } from "./blueprint/input.js";
++import { getAuthorizedOrigin } from "./session.js";
+ 
+ const DEBUGGER_PROTOCOL_VERSION = "1.3";
+ const MAX_PENDING = 1000;
+@@ -33,6 +35,29 @@ const MAX_PENDING = 1000;
+ // inflight-request table, and the debugger event listener used to tear down.
+ const sessions = new Map();
+ 
++// Capture is a capability of the CURRENT run only. Every session is stamped
++// with the generation it was attached under; retireCaptureSessions (called on
++// every run settlement / session clear) bumps the generation and drains every
++// debugger, and an event or stop for an obsolete generation is refused.
++let captureGeneration = 0;
++
++function originOf(url) {
++  try {
++    return new URL(url).origin;
++  } catch {
++    return null;
++  }
++}
++
++// A session is live only while it is current-generation AND its origin is
++// still the run's authorized origin. Anything else is torn down on sight.
++function isLiveSession(session) {
++  return (
++    session.generation === captureGeneration &&
++    getAuthorizedOrigin() === session.expectedOrigin
++  );
++}
++
+ function isRecord(value) {
+   return typeof value === "object" && value !== null;
+ }
+@@ -135,9 +160,9 @@ function redactUrl(url) {
+ // re-attaching to a tab that already has a session is a no-op that returns the
+ // existing session's buffer. Returns the tab's RingBuffer.
+ //
+-// The tab URL is validated against the capture allowlist (HTTPS + allowlisted
+-// host only) BEFORE chrome.debugger.attach is called, so the debugger handle
+-// never exists for chrome://, file://, extension, or non-allowlisted pages.
++// The tab URL is validated against the run's authorized origin (HTTPS, exact
++// origin, live grant) BEFORE chrome.debugger.attach is called, so the debugger
++// handle never exists for chrome://, file://, extension, or foreign pages.
+ async function attachDebugger(tabId, options) {
+   if (typeof tabId !== "number") {
+     throw new Error("attachDebugger: tabId must be a number");
+@@ -164,10 +189,30 @@ async function attachDebugger(tabId, options) {
+   const exclude = (reason, count = 1) =>
+     excluded.set(reason, (excluded.get(reason) ?? 0) + count);
+ 
++  const generation = captureGeneration;
++
+   const onEvent = (source, method, params) => {
+     if (source.tabId !== tabId) {
+       return;
+     }
++    const session = sessions.get(tabId);
++    if (session === undefined || session.onEvent !== onEvent) {
++      return; // a torn-down session receives nothing
++    }
++    if (!isLiveSession(session)) {
++      exclude("run_retired");
++      void teardownSession(tabId, { detach: true });
++      return;
++    }
++    // In-band navigation signal: a request issued by a document on another
++    // origin means the tab left the authorized origin. Detach immediately;
++    // the debugger is never exercised for that document.
++    const documentUrl = readString(params, "documentURL");
++    if (documentUrl !== null && originOf(documentUrl) !== expectedOrigin) {
++      exclude("document_navigated");
++      void teardownSession(tabId, { detach: true });
++      return;
++    }
+     if (
+       method === "Network.loadingFinished" &&
+       finalizers.size >= MAX_PENDING
+@@ -188,19 +233,31 @@ async function attachDebugger(tabId, options) {
+     void done.finally(() => finalizers.delete(done));
+   };
+ 
+-  sessions.set(tabId, {
++  const session = {
+     buffer,
+     inflight,
+     onEvent,
+     finalizers,
+     expectedOrigin,
+     excluded,
+-  });
++    generation,
++  };
++  sessions.set(tabId, session);
+   chrome.debugger.onEvent.addListener(onEvent);
+ 
+   try {
+     await chrome.debugger.attach(target, DEBUGGER_PROTOCOL_VERSION);
+     await chrome.debugger.sendCommand(target, "Network.enable", {});
++    // The tab may have navigated (or the run settled) while attach awaited:
++    // re-check the live document, the grant and the generation before the
++    // handle is allowed to exist.
++    const live = await assertCaptureTabAllowed(tabId);
++    if (originOf(live.url) !== expectedOrigin) {
++      throw new Error("capture_tab_navigated");
++    }
++    if (!isLiveSession(session)) {
++      throw new Error("capture_run_retired");
++    }
+   } catch (err) {
+     // A partial attach (coach denied the prompt, DevTools already open,
+     // Network.enable rejected) must not leak a debugger handle, listener, or
+@@ -331,6 +388,13 @@ async function finalizeEntry(target, params, inflight, buffer, exclude) {
+     return;
+   }
+ 
++  // No body is read for a session that stopped being live while this entry
++  // was in flight (run settled, origin cleared, tab navigated).
++  const session = sessions.get(target.tabId);
++  if (session === undefined || !isLiveSession(session)) {
++    exclude("run_retired");
++    return;
++  }
+   let body;
+   try {
+     body = await chrome.debugger.sendCommand(
+@@ -441,10 +505,30 @@ function normalizeCapturedSnapshot(snapshot) {
+ }
+ 
+ // Detach the debugger from a tab and return a snapshot of everything captured.
++// A session that outlived its run (obsolete generation, or the run's origin is
++// no longer authorized) is torn down but yields NO entries: its data belongs to
++// a capability that has ended.
+ async function stopCapture(tabId) {
++  const session = sessions.get(tabId);
++  if (session !== undefined && !isLiveSession(session)) {
++    await teardownSession(tabId, { detach: true });
++    return captureSnapshot([], null, new Map([["run_retired", 1]]));
++  }
+   return teardownSession(tabId, { detach: true });
+ }
+ 
++// End every capture session of the current run: bump the generation (so any
++// event or stop that races this is refused), then detach and drain each
++// debugger. Called on every run settlement and TGP session clear.
++async function retireCaptureSessions() {
++  captureGeneration += 1;
++  await Promise.allSettled(
++    [...sessions.keys()].map((tabId) =>
++      teardownSession(tabId, { detach: true }),
++    ),
++  );
++}
++
+ // Wire the MV3 lifecycle cleanup paths so a session never leaks its debugger
+ // handle or buffer when capture ends outside an explicit stop_capture:
+ //   - tabs.onRemoved       — the coach closed the captured tab.
+@@ -455,6 +539,36 @@ function registerCaptureLifecycle() {
+   chrome.tabs.onRemoved.addListener((tabId) => {
+     void teardownSession(tabId, { detach: true });
+   });
++  // The captured tab navigated: the handle must not follow it to another
++  // origin (even one Chrome holds a grant for). Same-origin navigations keep
++  // the session.
++  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
++    const session = sessions.get(tabId);
++    const url = readString(changeInfo, "url");
++    if (session === undefined || url === null) {
++      return;
++    }
++    if (originOf(url) !== session.expectedOrigin) {
++      session.excluded.set(
++        "document_navigated",
++        (session.excluded.get("document_navigated") ?? 0) + 1,
++      );
++      void teardownSession(tabId, { detach: true });
++    }
++  });
++  // Chrome revoked a host grant: any session on that origin ends now, not at
++  // its next event.
++  chrome.permissions.onRemoved.addListener((permissions) => {
++    const origins =
++      isRecord(permissions) && Array.isArray(permissions.origins)
++        ? permissions.origins
++        : [];
++    for (const [tabId, session] of [...sessions]) {
++      if (origins.includes(`${session.expectedOrigin}/*`)) {
++        void teardownSession(tabId, { detach: true });
++      }
++    }
++  });
+   chrome.debugger.onDetach.addListener((source) => {
+     if (isRecord(source) && typeof source.tabId === "number") {
+       void teardownSession(source.tabId, { detach: false });
+@@ -474,6 +588,7 @@ export {
+   recordRequest,
+   attachDebugger,
+   stopCapture,
++  retireCaptureSessions,
+   normalizeCapturedSnapshot,
+   registerCaptureLifecycle,
+ };
+diff --git a/test/capture-run-scope.spec.js b/test/capture-run-scope.spec.js
+new file mode 100644
+index 0000000..a19e917
+--- /dev/null
++++ b/test/capture-run-scope.spec.js
+@@ -0,0 +1,192 @@
++import { describe, it, expect, beforeEach } from "vitest";
++import { makeChromeMock, installChrome } from "./helpers/chrome-mock.js";
++import {
++  attachDebugger,
++  stopCapture,
++  retireCaptureSessions,
++  registerCaptureLifecycle,
++} from "../shared/capture.js";
++import {
++  clearAuthorizedOrigin,
++  setAuthorizedOrigin,
++} from "../shared/session.js";
++
++// Capture is a capability of the CURRENT run only (review A1/A2). These tests
++// fail on 7ac1fe9, where a debugger attached under run A kept receiving events
++// and reading bodies after A settled and B became the authorized origin, and
++// where the handle followed a tab that navigated to another origin.
++
++const TAB = 7;
++const A = "https://app.truecoach.co";
++const B = "https://other.example";
++const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
++
++function emitJson(mock, tabId, requestId, url, extra = {}) {
++  const source = { tabId };
++  mock.emit(source, "Network.requestWillBeSent", {
++    requestId,
++    request: { url, method: "GET", headers: {} },
++    ...extra,
++  });
++  mock.emit(source, "Network.responseReceived", {
++    requestId,
++    response: { mimeType: "application/json", status: 200 },
++  });
++  mock.emit(source, "Network.loadingFinished", {
++    requestId,
++    encodedDataLength: 10,
++  });
++}
++
++function bodyReads(mock) {
++  return mock.calls.sendCommand.filter(
++    (c) => c.method === "Network.getResponseBody",
++  );
++}
++
++describe("A1 — capture ends with the run", () => {
++  let mock;
++  beforeEach(() => {
++    mock = makeChromeMock();
++    installChrome(mock);
++    mock.onCommand("Network.getResponseBody", () => ({
++      body: JSON.stringify({ secret: "client-data" }),
++      base64Encoded: false,
++    }));
++  });
++
++  it("retireCaptureSessions detaches every debugger and drains it; a later stop yields nothing", async () => {
++    await attachDebugger(TAB);
++    emitJson(mock, TAB, "r1", `${A}/proxy/api/clients`);
++    await retireCaptureSessions();
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    expect(mock.listenerCount()).toBe(0);
++    const late = await stopCapture(TAB);
++    expect(late.entries).toEqual([]);
++  });
++
++  it("A -> B: events on an A tab after A's run settled are refused and the debugger is detached", async () => {
++    await attachDebugger(TAB);
++    // Run A settles; run B is now the only authorized origin.
++    await retireCaptureSessions();
++    setAuthorizedOrigin(B);
++    mock.grant(`${B}/*`);
++    const reads = bodyReads(mock).length;
++    // A stale listener (had one survived) must never read a body.
++    emitJson(mock, TAB, "r2", `${A}/proxy/api/clients`);
++    await flush();
++    expect(bodyReads(mock).length).toBe(reads);
++    expect((await stopCapture(TAB)).entries).toEqual([]);
++  });
++
++  it("a session whose origin stops being authorized mid-run reads no more bodies and tears down", async () => {
++    await attachDebugger(TAB);
++    emitJson(mock, TAB, "r1", `${A}/proxy/api/clients`);
++    await flush();
++    expect(bodyReads(mock)).toHaveLength(1);
++    // The run's authorization is withdrawn (settle / TGP session clear) while
++    // the debugger is still attached.
++    clearAuthorizedOrigin();
++    emitJson(mock, TAB, "r2", `${A}/proxy/api/clients`);
++    await flush();
++    expect(bodyReads(mock)).toHaveLength(1);
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    expect(mock.listenerCount()).toBe(0);
++    // Data captured under an ended capability is not handed out.
++    const snap = await stopCapture(TAB);
++    expect(snap.entries).toEqual([]);
++  });
++
++  it("Chrome revoking the origin's grant ends an attached session at once", async () => {
++    registerCaptureLifecycle();
++    await attachDebugger(TAB);
++    mock.revoke(`${A}/*`);
++    await flush();
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    expect(mock.listenerCount()).toBe(0);
++    emitJson(mock, TAB, "r2", `${A}/proxy/api/clients`);
++    await flush();
++    expect(bodyReads(mock)).toHaveLength(0);
++    // And no new handle can be created for it.
++    await expect(attachDebugger(TAB)).rejects.toThrow(
++      "capture_origin_not_granted",
++    );
++  });
++
++  it("a body read that resolves after retirement lands nowhere", async () => {
++    let release;
++    mock.onCommand(
++      "Network.getResponseBody",
++      () =>
++        new Promise((resolve) => {
++          release = resolve;
++        }),
++    );
++    await attachDebugger(TAB);
++    emitJson(mock, TAB, "r1", `${A}/proxy/api/clients`);
++    await flush();
++    const retiring = retireCaptureSessions();
++    release({ body: '{"late":true}', base64Encoded: false });
++    await retiring;
++    expect((await stopCapture(TAB)).entries).toEqual([]);
++  });
++});
++
++describe("A2 — the debugger never follows a navigation", () => {
++  let mock;
++  beforeEach(() => {
++    mock = makeChromeMock();
++    installChrome(mock);
++    registerCaptureLifecycle();
++    mock.onCommand("Network.getResponseBody", () => ({
++      body: "{}",
++      base64Encoded: false,
++    }));
++  });
++
++  it("a navigation that lands during attach is caught: the handle is rolled back", async () => {
++    // Chrome grants B too (a previous run), so a URL check alone would pass.
++    mock.grant(`${B}/*`);
++    const originalAttach = mock.chrome.debugger.attach;
++    mock.chrome.debugger.attach = async (target, version) => {
++      await originalAttach(target, version);
++      mock.navigateTab(TAB, `${B}/landing`);
++    };
++    await expect(attachDebugger(TAB)).rejects.toThrow();
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    expect(mock.listenerCount()).toBe(0);
++  });
++
++  it("tabs.onUpdated to another origin tears the session down, even a granted one", async () => {
++    mock.grant(`${B}/*`);
++    await attachDebugger(TAB);
++    mock.navigateTab(TAB, `${B}/app`);
++    await flush();
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    expect(mock.listenerCount()).toBe(0);
++    // Requests to A issued from the B document are not capturable.
++    emitJson(mock, TAB, "r9", `${A}/proxy/api/clients`);
++    await flush();
++    expect(bodyReads(mock)).toHaveLength(0);
++  });
++
++  it("a same-origin navigation keeps the session", async () => {
++    await attachDebugger(TAB);
++    mock.navigateTab(TAB, `${A}/clients/42`);
++    await flush();
++    expect(mock.listenerCount()).toBe(1);
++    await stopCapture(TAB);
++  });
++
++  it("a request issued by a foreign document (documentURL) detaches before any body read", async () => {
++    await attachDebugger(TAB);
++    emitJson(mock, TAB, "r1", `${A}/proxy/api/clients`, {
++      documentURL: `${B}/page`,
++    });
++    await flush();
++    expect(bodyReads(mock)).toHaveLength(0);
++    expect(mock.calls.detach).toContainEqual({ target: { tabId: TAB } });
++    const snap = await stopCapture(TAB);
++    expect(snap.entries).toEqual([]);
++  });
++});
+diff --git a/test/content-collector.spec.js b/test/content-collector.spec.js
+index f5e8d3b..a6df8b7 100644
+--- a/test/content-collector.spec.js
++++ b/test/content-collector.spec.js
+@@ -83,7 +83,13 @@ describe("wireCollector — answers only this extension's own worker", () => {
+       { kind: "collect_source_token" },
+       { id: runtime.id },
+     );
+-    expect(sendResponse).toHaveBeenCalledWith({ ok: true, token: JWT });
++    // The reply names the document origin the token was read from, so the
++    // worker can refuse a token from any other document.
++    expect(sendResponse).toHaveBeenCalledWith({
++      ok: true,
++      token: JWT,
++      origin: "https://app.truecoach.co",
++    });
+     expect(kept).toBe(false); // synchronous response, channel not held open
+   });
+ 
+diff --git a/test/content-entrypoint.spec.js b/test/content-entrypoint.spec.js
+index 0e8f773..4cc05cb 100644
+--- a/test/content-entrypoint.spec.js
++++ b/test/content-entrypoint.spec.js
+@@ -23,7 +23,10 @@ function boot(overrides = {}) {
+   };
+   const globals = {
+     chrome: { runtime },
+-    location: { href: "https://app.truecoach.co/clients" },
++    location: {
++      href: "https://app.truecoach.co/clients",
++      origin: "https://app.truecoach.co",
++    },
+     sessionStorage: fakePageStore(),
+     localStorage: fakePageStore(),
+   };
+@@ -89,6 +92,7 @@ describe("dynamically registered content script entrypoint", () => {
+     expect(reply).toHaveBeenCalledExactlyOnceWith({
+       ok: true,
+       token: "one.two.three",
++      origin: "https://app.truecoach.co",
+     });
+     expect(kept).toBe(false);
+   });
+@@ -101,6 +105,7 @@ describe("dynamically registered content script entrypoint", () => {
+     expect(page.request().reply).toHaveBeenCalledWith({
+       ok: true,
+       token: "fresh.session.token",
++      origin: "https://app.truecoach.co",
+     });
+   });
+ 
+@@ -130,6 +135,7 @@ describe("dynamically registered content script entrypoint", () => {
+     expect(page.request().reply).toHaveBeenCalledExactlyOnceWith({
+       ok: true,
+       token: "local.only.token",
++      origin: "https://app.truecoach.co",
+     });
+   });
+ 
+diff --git a/test/helpers/background-mock.js b/test/helpers/background-mock.js
+index 4841d35..d1c744e 100644
+--- a/test/helpers/background-mock.js
++++ b/test/helpers/background-mock.js
+@@ -47,15 +47,30 @@ function storageArea(seed) {
+ // collect_source_token tabs.sendMessage is `tab.sendMessage(id, msg)` when
+ // provided, else `{ ok: true, token }` when `tab.token` is set, else
+ // `{ ok: false }`. tabs.get / sendMessage may be overridden with `tab.get` /
+-// `tab.sendMessage` to model failures. `granted` (default true) is what
+-// chrome.permissions.contains answers for ANY https origin: the coach's Start
+-// gesture already granted the tab's origin. Pass false to model a revoked or
+-// never-granted origin. chrome.scripting records dynamic collector
+-// registrations/injections in `scripting` for inspection.
++// `tab.sendMessage` to model failures.
++//
++// Permissions are STATEFUL, as in Chrome: `grants` holds the origin patterns
++// Chrome currently holds; `permissions.request` adds one and fires
++// permissions.onAdded (the coach accepted the prompt); `permissions.remove`
++// drops one. `granted` (default true) is whether the coach accepts prompts.
++// `dispatch` of a start_import / start_ingest first performs the popup's Start
++// gesture for the message url (request + onAdded) unless `fresh: false`, which
++// models a stale grant that exists without a current Start (added silently).
++// `failRevoke` / `failUnregister` make the matching Chrome API reject, to
++// model cleanup failures. chrome.scripting is stateful too: `registeredIds`
++// is what getRegisteredContentScripts answers from.
+ /**
+- * @param {{ session?: any, tab?: any, granted?: boolean }} [options]
++ * @param {{ session?: any, tab?: any, granted?: boolean, fresh?: boolean,
++ *   failRevoke?: boolean, failUnregister?: boolean }} [options]
+  */
+-export function makeBgMock({ session, tab, granted = true } = {}) {
++export function makeBgMock({
++  session,
++  tab,
++  granted = true,
++  fresh = true,
++  failRevoke = false,
++  failUnregister = false,
++} = {}) {
+   const onMessage = eventHub();
+   const sessionStore = storageArea(session);
+   const localStore = storageArea();
+@@ -65,6 +80,11 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+   const tabMessages = [];
+   const scripting = { registered: [], executed: [], unregistered: [] };
+   const permissionRequests = [];
++  const permissionRemovals = [];
++  const grants = new Set();
++  const registeredIds = new Set();
++  const onPermissionAdded = eventHub();
++  const onPermissionRemoved = eventHub();
+ 
+   const chrome = {
+     i18n: {
+@@ -113,6 +133,7 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+     },
+     tabs: {
+       onRemoved: eventHub().api,
++      onUpdated: eventHub().api,
+       get: async (id) => {
+         if (tab && typeof tab.get === "function") return tab.get(id);
+         return tab ? { id, url: tab.url } : { id };
+@@ -122,7 +143,11 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+         if (tab && typeof tab.sendMessage === "function")
+           return tab.sendMessage(id, message);
+         if (tab && typeof tab.token === "string")
+-          return { ok: true, token: tab.token };
++          return {
++            ok: true,
++            token: tab.token,
++            origin: new URL(tab.url).origin,
++          };
+         return { ok: false };
+       },
+     },
+@@ -132,30 +157,70 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+       },
+     },
+     permissions: {
++      onAdded: onPermissionAdded.api,
++      onRemoved: onPermissionRemoved.api,
+       contains: async ({ origins }) =>
+-        granted === true &&
+-        Array.isArray(origins) &&
+-        origins.every((o) => o.startsWith("https://")),
+-      // The popup's Start-gesture prompt; records what was asked for.
++        Array.isArray(origins) && origins.every((o) => grants.has(o)),
++      // The popup's Start-gesture prompt; records what was asked for. On
++      // acceptance Chrome holds the grant and announces it.
+       request: async (request) => {
+         permissionRequests.push(request);
+-        return granted === true;
++        if (granted !== true) return false;
++        for (const o of request.origins ?? []) grants.add(o);
++        onPermissionAdded.emit({ origins: [...(request.origins ?? [])] });
++        return true;
++      },
++      remove: async (request) => {
++        permissionRemovals.push(request);
++        if (failRevoke) throw new Error("permissions.remove failed");
++        for (const o of request.origins ?? []) grants.delete(o);
++        onPermissionRemoved.emit({ origins: [...(request.origins ?? [])] });
++        return true;
+       },
+     },
+     scripting: {
+       registerContentScripts: async (scripts) => {
+         scripting.registered.push(...scripts);
++        for (const script of scripts) registeredIds.add(script.id);
+       },
++      getRegisteredContentScripts: async (filter) =>
++        [...registeredIds]
++          .filter((id) => !filter?.ids || filter.ids.includes(id))
++          .map((id) => ({ id })),
+       executeScript: async (injection) => {
+         scripting.executed.push(injection);
+         return [];
+       },
+       unregisterContentScripts: async (filter) => {
+         scripting.unregistered.push(filter);
++        if (failUnregister) throw new Error("unregisterContentScripts failed");
++        for (const id of filter?.ids ?? []) registeredIds.delete(id);
+       },
+     },
+   };
+ 
++  // Model the popup's Start gesture for a start message: the coach accepts
++  // Chrome's prompt for the tab origin just before the worker is asked.
++  function startGesture(message) {
++    if (message?.kind !== "start_import" && message?.kind !== "start_ingest") {
++      return;
++    }
++    let origin;
++    try {
++      origin = new URL(message.url).origin;
++    } catch {
++      return;
++    }
++    if (granted !== true) return;
++    const pattern = `${origin}/*`;
++    if (fresh) {
++      grants.add(pattern);
++      onPermissionAdded.emit({ origins: [pattern] });
++    } else {
++      grants.add(pattern); // held by Chrome, but no Start announced it
++    }
++  }
++
+   // Invoke the registered onMessage listener and resolve to the value the
+   // handler passes to sendResponse. Honours the MV3 `return true` async
+   // contract: a truthy return keeps the channel open until sendResponse fires.
+@@ -167,6 +232,7 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+     url: `chrome-extension://${chrome.runtime.id}/popup/pair.html`,
+   };
+   function dispatch(message, sender = extensionPageSender) {
++    startGesture(message);
+     return new Promise((resolve) => {
+       let settled = false;
+       const sendResponse = (r) => {
+@@ -190,6 +256,9 @@ export function makeBgMock({ session, tab, granted = true } = {}) {
+     tabMessages,
+     scripting,
+     permissionRequests,
++    permissionRemovals,
++    grants,
++    registeredIds,
+     sessionMap: sessionStore.map,
+     localMap: localStore.map,
+   };
+diff --git a/test/helpers/chrome-mock.js b/test/helpers/chrome-mock.js
+index be1431d..616b6fe 100644
+--- a/test/helpers/chrome-mock.js
++++ b/test/helpers/chrome-mock.js
+@@ -40,6 +40,8 @@ export function makeChromeMock() {
+ 
+   const onDetach = eventHub();
+   const onRemoved = eventHub();
++  const onUpdated = eventHub();
++  const onPermissionRemoved = eventHub();
+   const onSuspend = eventHub();
+ 
+   const chrome = {
+@@ -63,6 +65,7 @@ export function makeChromeMock() {
+     },
+     tabs: {
+       onRemoved: onRemoved.api,
++      onUpdated: onUpdated.api,
+       get: async (tabId) => {
+         calls.tabsGet.push(tabId);
+         if (tabUrls.has(tabId)) {
+@@ -76,6 +79,7 @@ export function makeChromeMock() {
+       onSuspend: onSuspend.api,
+     },
+     permissions: {
++      onRemoved: onPermissionRemoved.api,
+       contains: async ({ origins }) =>
+         Array.isArray(origins) && origins.every((o) => granted.has(o)),
+     },
+@@ -90,7 +94,10 @@ export function makeChromeMock() {
+     setTabUrl: (tabId, url) => tabUrls.set(tabId, url),
+     // Edit the live host-permission grant set (origin match patterns).
+     grant: (pattern) => granted.add(pattern),
+-    revoke: (pattern) => granted.delete(pattern),
++    revoke: (pattern) => {
++      granted.delete(pattern);
++      onPermissionRemoved.emit({ origins: [pattern] });
++    },
+     defaultOrigin: DEFAULT_ORIGIN,
+     // Register a canned response for a CDP method (e.g. Network.getResponseBody).
+     onCommand: (method, handler) => commandHandlers.set(method, handler),
+@@ -108,6 +115,12 @@ export function makeChromeMock() {
+     emitDetach: (source) => onDetach.emit(source),
+     emitTabRemoved: (tabId, info) =>
+       onRemoved.emit(tabId, info ?? { isWindowClosing: false }),
++    // The captured tab navigated: chrome.tabs.get now answers the new URL and
++    // Chrome announces it through tabs.onUpdated.
++    navigateTab: (tabId, url) => {
++      tabUrls.set(tabId, url);
++      onUpdated.emit(tabId, { url }, { id: tabId, url });
++    },
+     emitSuspend: () => onSuspend.emit(),
+   };
+ }
+diff --git a/test/helpers/source-tab.js b/test/helpers/source-tab.js
+index 166300c..cb658d6 100644
+--- a/test/helpers/source-tab.js
++++ b/test/helpers/source-tab.js
+@@ -7,7 +7,11 @@ import { readFileSync } from "node:fs";
+ import { Script } from "node:vm";
+ 
+ // No bundler or module import: exercise the production classic-script boundary.
+-export function wireCollector(runtime, stores) {
++export function wireCollector(
++  runtime,
++  stores,
++  href = "https://app.truecoach.co/clients",
++) {
+   const source = readFileSync(
+     new URL("../../content/main.js", import.meta.url),
+     "utf8",
+@@ -15,7 +19,8 @@ export function wireCollector(runtime, stores) {
+   new Script(source, { filename: "content/main.js" }).runInNewContext(
+     {
+       chrome: { runtime: { sendMessage: async () => undefined, ...runtime } },
+-      location: { href: "https://app.truecoach.co/clients" },
++      // The document the collector runs in: its origin travels with the reply.
++      location: { href, origin: new URL(href).origin },
+       sessionStorage: stores[0] ?? fakePageStore(),
+       localStorage: stores[1] ?? fakePageStore(),
+     },
+@@ -67,8 +72,14 @@ export function fakePageStore(entries = []) {
+ // Return a chrome.tabs.sendMessage-compatible responder backed by the REAL
+ // content-script listener. The extension worker addresses its own content
+ // script, so the sender id equals the extension id (the trust the content
+-// script requires). `senderId` overrides that to model an untrusted caller.
+-export function realSourceTab(extensionId, stores, senderId = extensionId) {
++// script requires). `senderId` overrides that to model an untrusted caller;
++// `href` is the document the collector runs in (default: the source tab).
++export function realSourceTab(
++  extensionId,
++  stores,
++  senderId = extensionId,
++  href = undefined,
++) {
+   let listener = null;
+   const runtime = {
+     id: extensionId,
+@@ -78,7 +89,7 @@ export function realSourceTab(extensionId, stores, senderId = extensionId) {
+       },
+     },
+   };
+-  wireCollector(runtime, stores);
++  wireCollector(runtime, stores, href);
+   return (_tabId, message) =>
+     new Promise((resolve, reject) => {
+       if (listener === null) {
+diff --git a/test/origin-authorization.spec.js b/test/origin-authorization.spec.js
+index 2ac297e..75338f4 100644
+--- a/test/origin-authorization.spec.js
++++ b/test/origin-authorization.spec.js
+@@ -52,6 +52,17 @@ function flush(n = 6) {
+   return p;
+ }
+ 
++// The origin is authorized once Chrome confirmed the grant (a few microtasks
++// after admission) and well before any network or tab interaction.
++async function authorizedSoon(sessionModule) {
++  for (let i = 0; i < 50; i += 1) {
++    const origin = sessionModule.getAuthorizedOrigin();
++    if (origin !== null) return origin;
++    await Promise.resolve();
++  }
++  return sessionModule.getAuthorizedOrigin();
++}
++
+ function snapshots(mock) {
+   return mock.sent.filter((m) => m && m.kind === "status_snapshot");
+ }
+@@ -197,9 +208,7 @@ describe("start_import — the granted origin is the run's single authorized ori
+       tabId: TAB_ID,
+     });
+     expect(ack).toEqual({ ok: true });
+-    // Bound synchronously with admission: the origin is authorized before the
+-    // handler yields, so a racing capture request sees the run's origin.
+-    expect(sessionModule.getAuthorizedOrigin()).toBe(TAB_ORIGIN);
++    expect(await authorizedSoon(sessionModule)).toBe(TAB_ORIGIN);
+ 
+     const terminal = await settle(mock);
+     expect(terminal).toBe("ingest_succeeded");
+@@ -243,7 +252,7 @@ describe("start_import — the granted origin is the run's single authorized ori
+       tab: withSourceTab(),
+     });
+     await mock.dispatch({ kind: "start_import", url: TAB_URL, tabId: TAB_ID });
+-    expect(sessionModule.getAuthorizedOrigin()).toBe(TAB_ORIGIN);
++    expect(await authorizedSoon(sessionModule)).toBe(TAB_ORIGIN);
+     await flush();
+     expect(sessionModule.getAuthorizedOrigin()).toBeNull();
+     expect(mock.sent.some((m) => m && m.kind === "auth_required")).toBe(true);
