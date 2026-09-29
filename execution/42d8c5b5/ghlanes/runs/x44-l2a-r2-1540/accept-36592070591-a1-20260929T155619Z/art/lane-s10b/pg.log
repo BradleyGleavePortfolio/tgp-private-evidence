@@ -1,0 +1,305 @@
+2026-09-29 15:42:11.162 UTC [3541] LOG:  starting PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit
+2026-09-29 15:42:11.162 UTC [3541] LOG:  listening on IPv4 address "127.0.0.1", port 55650
+2026-09-29 15:42:11.162 UTC [3541] LOG:  listening on Unix socket "/home/runner/work/_temp/lane-s10b-ALL-3376/s/.s.PGSQL.55650"
+2026-09-29 15:42:11.163 UTC [3544] LOG:  database system was shut down at 2026-09-29 15:42:10 UTC
+2026-09-29 15:42:11.165 UTC [3541] LOG:  database system is ready to accept connections
+2026-09-29 15:43:21.767 UTC [4923] ERROR:  permission denied for table ScoutRunDeclaration
+2026-09-29 15:43:21.767 UTC [4923] STATEMENT:  SELECT count(*) FROM "ScoutRunDeclaration"
+2026-09-29 15:43:21.787 UTC [4925] ERROR:  permission denied for table ScoutRunDeclaration
+2026-09-29 15:43:21.787 UTC [4925] STATEMENT:  SELECT count(*) FROM "ScoutRunDeclaration"
+2026-09-29 15:43:21.806 UTC [4927] ERROR:  permission denied for table ScoutRunObservation
+2026-09-29 15:43:21.806 UTC [4927] STATEMENT:  SELECT count(*) FROM "ScoutRunObservation"
+2026-09-29 15:43:21.826 UTC [4929] ERROR:  permission denied for table ScoutRunObservation
+2026-09-29 15:43:21.826 UTC [4929] STATEMENT:  SELECT count(*) FROM "ScoutRunObservation"
+2026-09-29 15:43:21.845 UTC [4931] ERROR:  permission denied for table ScoutRunSettledBasis
+2026-09-29 15:43:21.845 UTC [4931] STATEMENT:  SELECT count(*) FROM "ScoutRunSettledBasis"
+2026-09-29 15:43:21.865 UTC [4933] ERROR:  permission denied for table ScoutRunSettledBasis
+2026-09-29 15:43:21.865 UTC [4933] STATEMENT:  SELECT count(*) FROM "ScoutRunSettledBasis"
+2026-09-29 15:43:21.885 UTC [4935] ERROR:  permission denied for table ScoutRunDeclaration
+2026-09-29 15:43:21.885 UTC [4935] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('coach','803f21d6-02c1-433a-9dd2-f3b203aeae87','synthetic-src-b',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),decode(repeat('07',32),'hex'),
+	      '2026-09-26 00:00:00')
+2026-09-29 15:43:22.033 UTC [4949] ERROR:  insert or update on table "ScoutRunDeclaration" violates foreign key constraint "ScoutRunDeclaration_coach_id_intent_id_fkey"
+2026-09-29 15:43:22.033 UTC [4949] DETAIL:  Key (coach_id, intent_id)=(other-coach, 6ad32c9f-fe11-4889-a7d6-822b88dfacda) is not present in table "ScoutImport".
+2026-09-29 15:43:22.033 UTC [4949] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('other-coach','6ad32c9f-fe11-4889-a7d6-822b88dfacda','synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),decode(repeat('07',32),'hex'),
+	      '2026-09-26 00:00:00')
+2026-09-29 15:43:22.059 UTC [4951] ERROR:  insert or update on table "ScoutRunObservation" violates foreign key constraint "ScoutRunObservation_coach_id_intent_id_fkey"
+2026-09-29 15:43:22.059 UTC [4951] DETAIL:  Key (coach_id, intent_id)=(other-coach, 6ad32c9f-fe11-4889-a7d6-822b88dfacda) is not present in table "ScoutImport".
+2026-09-29 15:43:22.059 UTC [4951] STATEMENT:  INSERT INTO "ScoutRunObservation" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
+	      family,basis_kind,evidence,evidence_digest,received_at)
+	    VALUES (gen_random_uuid()::text,'other-coach','6ad32c9f-fe11-4889-a7d6-822b88dfacda',1,'synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),'clients','source_signed_enumeration',
+	      '{"evidence_version":1}'::jsonb,encode(digest('synthetic-evidence','sha256'),'hex'),'2026-09-26 00:00:00')
+2026-09-29 15:43:22.079 UTC [4953] ERROR:  insert or update on table "ScoutRunSettledBasis" violates foreign key constraint "ScoutRunSettledBasis_coach_id_intent_id_fkey"
+2026-09-29 15:43:22.079 UTC [4953] DETAIL:  Key (coach_id, intent_id)=(other-coach, 6ad32c9f-fe11-4889-a7d6-822b88dfacda) is not present in table "ScoutImport".
+2026-09-29 15:43:22.079 UTC [4953] STATEMENT:  INSERT INTO "ScoutRunSettledBasis" (coach_id,intent_id,execution_epoch,report_version,report,observation_digests,settled_at)
+	    VALUES ('other-coach','6ad32c9f-fe11-4889-a7d6-822b88dfacda',1,1,'{}'::jsonb,ARRAY[encode(digest('synthetic-evidence','sha256'),'hex')],'2026-09-26 00:00:00')
+2026-09-29 15:43:22.099 UTC [4955] ERROR:  insert or update on table "ScoutRunObservation" violates foreign key constraint "ScoutRunObservation_declaration_fkey"
+2026-09-29 15:43:22.099 UTC [4955] DETAIL:  Key (coach_id, intent_id, source_platform, account_scope_id_digest)=(coach, 6ad32c9f-fe11-4889-a7d6-822b88dfacda, synthetic-src-b, 92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3) is not present in table "ScoutRunDeclaration".
+2026-09-29 15:43:22.099 UTC [4955] STATEMENT:  INSERT INTO "ScoutRunObservation" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
+	      family,basis_kind,evidence,evidence_digest,received_at)
+	    VALUES (gen_random_uuid()::text,'coach','6ad32c9f-fe11-4889-a7d6-822b88dfacda',1,'synthetic-src-b',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),'clients','source_signed_enumeration',
+	      '{"evidence_version":1}'::jsonb,encode(digest('synthetic-evidence','sha256'),'hex'),'2026-09-26 00:00:00')
+2026-09-29 15:43:22.203 UTC [4965] ERROR:  permission denied for table ScoutRunDeclaration
+2026-09-29 15:43:22.203 UTC [4965] STATEMENT:  UPDATE "ScoutRunDeclaration" SET coach_id=coach_id
+2026-09-29 15:43:22.223 UTC [4967] ERROR:  permission denied for table ScoutRunDeclaration
+2026-09-29 15:43:22.223 UTC [4967] STATEMENT:  DELETE FROM "ScoutRunDeclaration"
+2026-09-29 15:43:22.243 UTC [4969] ERROR:  G2-S10B insert-only: UPDATE on ScoutRunDeclaration refused
+2026-09-29 15:43:22.243 UTC [4969] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.243 UTC [4969] STATEMENT:  UPDATE "ScoutRunDeclaration" SET coach_id=coach_id
+2026-09-29 15:43:22.263 UTC [4971] ERROR:  G2-S10B insert-only: DELETE on ScoutRunDeclaration refused
+2026-09-29 15:43:22.263 UTC [4971] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.263 UTC [4971] STATEMENT:  DELETE FROM "ScoutRunDeclaration"
+2026-09-29 15:43:22.282 UTC [4973] ERROR:  cannot truncate a table referenced in a foreign key constraint
+2026-09-29 15:43:22.282 UTC [4973] DETAIL:  Table "ScoutRunObservation" references "ScoutRunDeclaration".
+2026-09-29 15:43:22.282 UTC [4973] HINT:  Truncate table "ScoutRunObservation" at the same time, or use TRUNCATE ... CASCADE.
+2026-09-29 15:43:22.282 UTC [4973] STATEMENT:  TRUNCATE "ScoutRunDeclaration"
+2026-09-29 15:43:22.321 UTC [4977] ERROR:  permission denied for table ScoutRunObservation
+2026-09-29 15:43:22.321 UTC [4977] STATEMENT:  UPDATE "ScoutRunObservation" SET coach_id=coach_id
+2026-09-29 15:43:22.341 UTC [4980] ERROR:  permission denied for table ScoutRunObservation
+2026-09-29 15:43:22.341 UTC [4980] STATEMENT:  DELETE FROM "ScoutRunObservation"
+2026-09-29 15:43:22.362 UTC [4982] ERROR:  G2-S10B insert-only: UPDATE on ScoutRunObservation refused
+2026-09-29 15:43:22.362 UTC [4982] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.362 UTC [4982] STATEMENT:  UPDATE "ScoutRunObservation" SET coach_id=coach_id
+2026-09-29 15:43:22.388 UTC [4984] ERROR:  G2-S10B insert-only: DELETE on ScoutRunObservation refused
+2026-09-29 15:43:22.388 UTC [4984] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.388 UTC [4984] STATEMENT:  DELETE FROM "ScoutRunObservation"
+2026-09-29 15:43:22.407 UTC [4986] ERROR:  G2-S10B insert-only: TRUNCATE on ScoutRunObservation refused
+2026-09-29 15:43:22.407 UTC [4986] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.407 UTC [4986] STATEMENT:  TRUNCATE "ScoutRunObservation"
+2026-09-29 15:43:22.445 UTC [4990] ERROR:  permission denied for table ScoutRunSettledBasis
+2026-09-29 15:43:22.445 UTC [4990] STATEMENT:  UPDATE "ScoutRunSettledBasis" SET coach_id=coach_id
+2026-09-29 15:43:22.465 UTC [4992] ERROR:  permission denied for table ScoutRunSettledBasis
+2026-09-29 15:43:22.465 UTC [4992] STATEMENT:  DELETE FROM "ScoutRunSettledBasis"
+2026-09-29 15:43:22.485 UTC [4994] ERROR:  G2-S10B insert-only: UPDATE on ScoutRunSettledBasis refused
+2026-09-29 15:43:22.485 UTC [4994] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.485 UTC [4994] STATEMENT:  UPDATE "ScoutRunSettledBasis" SET coach_id=coach_id
+2026-09-29 15:43:22.505 UTC [4996] ERROR:  G2-S10B insert-only: DELETE on ScoutRunSettledBasis refused
+2026-09-29 15:43:22.505 UTC [4996] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.505 UTC [4996] STATEMENT:  DELETE FROM "ScoutRunSettledBasis"
+2026-09-29 15:43:22.524 UTC [4998] ERROR:  G2-S10B insert-only: TRUNCATE on ScoutRunSettledBasis refused
+2026-09-29 15:43:22.524 UTC [4998] CONTEXT:  PL/pgSQL function public.scout_run_observation_insert_only() line 4 at RAISE
+2026-09-29 15:43:22.524 UTC [4998] STATEMENT:  TRUNCATE "ScoutRunSettledBasis"
+2026-09-29 15:43:22.649 UTC [5010] ERROR:  permission denied for table ScoutRunObservation
+2026-09-29 15:43:22.649 UTC [5010] CONTEXT:  SQL statement "DELETE FROM public."ScoutRunObservation""
+	PL/pgSQL function g2_s10b_probe_delete() line 2 at SQL statement
+2026-09-29 15:43:22.649 UTC [5010] STATEMENT:  INSERT INTO public.g2_s10b_probe VALUES (1);
+2026-09-29 15:43:23.007 UTC [5044] ERROR:  G2-S10B declaration challenge differs within one run
+2026-09-29 15:43:23.007 UTC [5044] CONTEXT:  PL/pgSQL function public.scout_run_declaration_one_challenge() line 11 at RAISE
+2026-09-29 15:43:23.007 UTC [5044] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('other-coach','56fde3b6-5d99-4c9a-a7d3-83fe406d1f31','synthetic-src-b',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),decode(repeat('08',32),'hex'),
+	      '2026-09-26 00:00:00')
+2026-09-29 15:43:23.028 UTC [5046] ERROR:  G2-S10B declaration challenge differs within one run
+2026-09-29 15:43:23.028 UTC [5046] CONTEXT:  PL/pgSQL function public.scout_run_declaration_one_challenge() line 11 at RAISE
+2026-09-29 15:43:23.028 UTC [5046] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('other-coach','56fde3b6-5d99-4c9a-a7d3-83fe406d1f31','synthetic-src-b',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),decode(repeat('07',32),'hex'),
+	      '2026-09-26 00:00:01')
+2026-09-29 15:43:23.179 UTC [5060] ERROR:  new row for relation "ScoutRunDeclaration" violates check constraint "ScoutRunDeclaration_scope_digest_check"
+2026-09-29 15:43:23.179 UTC [5060] DETAIL:  Failing row contains (coach, 43e99574-3817-4a6a-a7f9-d2b414ca1c1f, synthetic-src-a, raw-account-id, \x07070707070707070707070707070707070707070707070707070707070707..., 2026-09-26 00:00:00).
+2026-09-29 15:43:23.179 UTC [5060] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('coach','43e99574-3817-4a6a-a7f9-d2b414ca1c1f','synthetic-src-a',
+	      'raw-account-id',decode(repeat('07',32),'hex'),
+	      '2026-09-26 00:00:00')
+2026-09-29 15:43:23.199 UTC [5062] ERROR:  new row for relation "ScoutRunDeclaration" violates check constraint "ScoutRunDeclaration_challenge_check"
+2026-09-29 15:43:23.199 UTC [5062] DETAIL:  Failing row contains (coach, 43e99574-3817-4a6a-a7f9-d2b414ca1c1f, synthetic-src-a, 92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3, \x00, 2026-09-26 00:00:00).
+2026-09-29 15:43:23.199 UTC [5062] STATEMENT:  INSERT INTO "ScoutRunDeclaration" (coach_id,intent_id,source_platform,account_scope_id_digest,challenge,declared_at)
+	    VALUES ('coach','43e99574-3817-4a6a-a7f9-d2b414ca1c1f','synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),decode('00','hex'),
+	      '2026-09-26 00:00:00')
+2026-09-29 15:43:23.240 UTC [5066] ERROR:  new row for relation "ScoutRunObservation" violates check constraint "ScoutRunObservation_family_check"
+2026-09-29 15:43:23.240 UTC [5066] DETAIL:  Failing row contains (9ab8910b-3ee7-4580-be21-ababc7d6b0d0, coach, 43e99574-3817-4a6a-a7f9-d2b414ca1c1f, 1, synthetic-src-a, 92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3, notes, source_signed_enumeration, {"evidence_version": 1}, 3c5763d016c26246a8b8906f3eacf399cb980b20b7efd076acc4435ffd307789, 2026-09-26 00:00:00).
+2026-09-29 15:43:23.240 UTC [5066] STATEMENT:  INSERT INTO "ScoutRunObservation" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
+	      family,basis_kind,evidence,evidence_digest,received_at)
+	    VALUES (gen_random_uuid()::text,'coach','43e99574-3817-4a6a-a7f9-d2b414ca1c1f',1,'synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),'notes','source_signed_enumeration',
+	      '{"evidence_version":1}'::jsonb,encode(digest('synthetic-evidence','sha256'),'hex'),'2026-09-26 00:00:00')
+2026-09-29 15:43:23.260 UTC [5068] ERROR:  new row for relation "ScoutRunObservation" violates check constraint "ScoutRunObservation_epoch_check"
+2026-09-29 15:43:23.260 UTC [5068] DETAIL:  Failing row contains (4ee6dc88-0b2a-49d4-9eed-41af4858b282, coach, 43e99574-3817-4a6a-a7f9-d2b414ca1c1f, 0, synthetic-src-a, 92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3, clients, source_signed_enumeration, {"evidence_version": 1}, 3c5763d016c26246a8b8906f3eacf399cb980b20b7efd076acc4435ffd307789, 2026-09-26 00:00:00).
+2026-09-29 15:43:23.260 UTC [5068] STATEMENT:  INSERT INTO "ScoutRunObservation" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
+	      family,basis_kind,evidence,evidence_digest,received_at)
+	    VALUES (gen_random_uuid()::text,'coach','43e99574-3817-4a6a-a7f9-d2b414ca1c1f',0,'synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),'clients','source_signed_enumeration',
+	      '{"evidence_version":1}'::jsonb,encode(digest('synthetic-evidence','sha256'),'hex'),'2026-09-26 00:00:00')
+2026-09-29 15:43:23.279 UTC [5070] ERROR:  new row for relation "ScoutRunObservation" violates check constraint "ScoutRunObservation_evidence_digest_check"
+2026-09-29 15:43:23.279 UTC [5070] DETAIL:  Failing row contains (0c2063d3-d556-42a0-815b-a6d0b6cd00e9, coach, 43e99574-3817-4a6a-a7f9-d2b414ca1c1f, 1, synthetic-src-a, 92931c14ca0d532d778df624c261f6298f778663ccfc6ad704f774833c7491b3, clients, source_signed_enumeration, {"evidence_version": 1}, not-hex                                                         , 2026-09-26 00:00:00).
+2026-09-29 15:43:23.279 UTC [5070] STATEMENT:  INSERT INTO "ScoutRunObservation" (id,coach_id,intent_id,execution_epoch,source_platform,account_scope_id_digest,
+	      family,basis_kind,evidence,evidence_digest,received_at)
+	    VALUES (gen_random_uuid()::text,'coach','43e99574-3817-4a6a-a7f9-d2b414ca1c1f',1,'synthetic-src-a',
+	      encode(digest('synthetic-scope-1','sha256'),'hex'),'clients','source_signed_enumeration',
+	      '{"evidence_version":1}'::jsonb,'not-hex','2026-09-26 00:00:00')
+2026-09-29 15:43:39.307 UTC [5569] ERROR:  Run declaration or observation state exists; retain schema and use compatible forward repair
+2026-09-29 15:43:39.307 UTC [5569] CONTEXT:  PL/pgSQL function inline_code_block line 50 at RAISE
+2026-09-29 15:43:39.307 UTC [5569] STATEMENT:  DO $$
+	BEGIN
+	  -- S10-B exactly as shipped. Presence is tested first (by name, no regclass cast) so a pre-S10-B
+	  -- database or a rerun receives this fixed text, not a raw undefined-table error; the table
+	  -- locks are taken only once the relations are known to exist.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_class t
+	    WHERE t.oid IN (to_regclass('public."ScoutRunDeclaration"'), to_regclass('public."ScoutRunObservation"'),
+	                    to_regclass('public."ScoutRunSettledBasis"'))
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	  ) <> 3 OR to_regprocedure('public.scout_run_observation_insert_only()') IS NULL
+	    OR to_regprocedure('public.scout_run_declaration_one_challenge()') IS NULL THEN
+	    RAISE EXCEPTION 'G2-S10B observation tables absent';
+	  END IF;
+	  LOCK TABLE public."ScoutRunObservation", public."ScoutRunDeclaration", public."ScoutRunSettledBasis"
+	    IN ACCESS EXCLUSIVE MODE;
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.contype = 'f' AND c.convalidated
+	      AND c.confrelid IN (to_regclass('public."ScoutImport"'), to_regclass('public."ScoutRunDeclaration"'))
+	      AND c.conname IN ('ScoutRunDeclaration_coach_id_intent_id_fkey', 'ScoutRunObservation_coach_id_intent_id_fkey',
+	                        'ScoutRunObservation_declaration_fkey', 'ScoutRunSettledBasis_coach_id_intent_id_fkey')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutRunObservation_unit_key"')
+	      AND i.indrelid = 'public."ScoutRunObservation"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutRunObservation_unit_key" ON public."ScoutRunObservation" USING btree (coach_id, intent_id, execution_epoch, source_platform, account_scope_id_digest, family)'
+	  ) OR (
+	    SELECT count(*) FROM pg_catalog.pg_trigger g
+	    WHERE NOT g.tgisinternal
+	      AND g.tgrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
+	                        'public."ScoutRunSettledBasis"'::regclass)
+	      AND g.tgname IN ('ScoutRunDeclaration_one_challenge', 'ScoutRunDeclaration_insert_only',
+	                       'ScoutRunDeclaration_no_truncate', 'ScoutRunObservation_insert_only',
+	                       'ScoutRunObservation_no_truncate', 'ScoutRunSettledBasis_insert_only',
+	                       'ScoutRunSettledBasis_no_truncate')
+	  ) <> 7 OR (
+	    SELECT count(*) FROM pg_catalog.pg_policy p
+	    WHERE p.polrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
+	                         'public."ScoutRunSettledBasis"'::regclass)
+	  ) <> 9 THEN
+	    RAISE EXCEPTION 'G2-S10B observation tables absent';
+	  END IF;
+	  -- Refuse to erase recorded S10 facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (SELECT 1 FROM public."ScoutRunDeclaration")
+	    OR EXISTS (SELECT 1 FROM public."ScoutRunObservation")
+	    OR EXISTS (SELECT 1 FROM public."ScoutRunSettledBasis") THEN
+	    RAISE EXCEPTION 'Run declaration or observation state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-29 15:43:39.474 UTC [5585] ERROR:  G2-S10B observation tables absent
+2026-09-29 15:43:39.474 UTC [5585] CONTEXT:  PL/pgSQL function inline_code_block line 13 at RAISE
+2026-09-29 15:43:39.474 UTC [5585] STATEMENT:  DO $$
+	BEGIN
+	  -- S10-B exactly as shipped. Presence is tested first (by name, no regclass cast) so a pre-S10-B
+	  -- database or a rerun receives this fixed text, not a raw undefined-table error; the table
+	  -- locks are taken only once the relations are known to exist.
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_class t
+	    WHERE t.oid IN (to_regclass('public."ScoutRunDeclaration"'), to_regclass('public."ScoutRunObservation"'),
+	                    to_regclass('public."ScoutRunSettledBasis"'))
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	  ) <> 3 OR to_regprocedure('public.scout_run_observation_insert_only()') IS NULL
+	    OR to_regprocedure('public.scout_run_declaration_one_challenge()') IS NULL THEN
+	    RAISE EXCEPTION 'G2-S10B observation tables absent';
+	  END IF;
+	  LOCK TABLE public."ScoutRunObservation", public."ScoutRunDeclaration", public."ScoutRunSettledBasis"
+	    IN ACCESS EXCLUSIVE MODE;
+	  IF (
+	    SELECT count(*) FROM pg_catalog.pg_constraint c
+	    WHERE c.contype = 'f' AND c.convalidated
+	      AND c.confrelid IN (to_regclass('public."ScoutImport"'), to_regclass('public."ScoutRunDeclaration"'))
+	      AND c.conname IN ('ScoutRunDeclaration_coach_id_intent_id_fkey', 'ScoutRunObservation_coach_id_intent_id_fkey',
+	                        'ScoutRunObservation_declaration_fkey', 'ScoutRunSettledBasis_coach_id_intent_id_fkey')
+	  ) <> 4 OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    WHERE i.indexrelid = to_regclass('public."ScoutRunObservation_unit_key"')
+	      AND i.indrelid = 'public."ScoutRunObservation"'::regclass
+	      AND i.indisunique AND i.indisvalid AND i.indpred IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutRunObservation_unit_key" ON public."ScoutRunObservation" USING btree (coach_id, intent_id, execution_epoch, source_platform, account_scope_id_digest, family)'
+	  ) OR (
+	    SELECT count(*) FROM pg_catalog.pg_trigger g
+	    WHERE NOT g.tgisinternal
+	      AND g.tgrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
+	                        'public."ScoutRunSettledBasis"'::regclass)
+	      AND g.tgname IN ('ScoutRunDeclaration_one_challenge', 'ScoutRunDeclaration_insert_only',
+	                       'ScoutRunDeclaration_no_truncate', 'ScoutRunObservation_insert_only',
+	                       'ScoutRunObservation_no_truncate', 'ScoutRunSettledBasis_insert_only',
+	                       'ScoutRunSettledBasis_no_truncate')
+	  ) <> 7 OR (
+	    SELECT count(*) FROM pg_catalog.pg_policy p
+	    WHERE p.polrelid IN ('public."ScoutRunDeclaration"'::regclass, 'public."ScoutRunObservation"'::regclass,
+	                         'public."ScoutRunSettledBasis"'::regclass)
+	  ) <> 9 THEN
+	    RAISE EXCEPTION 'G2-S10B observation tables absent';
+	  END IF;
+	  -- Refuse to erase recorded S10 facts. Fixed, identifier-free text; nothing is named.
+	  IF EXISTS (SELECT 1 FROM public."ScoutRunDeclaration")
+	    OR EXISTS (SELECT 1 FROM public."ScoutRunObservation")
+	    OR EXISTS (SELECT 1 FROM public."ScoutRunSettledBasis") THEN
+	    RAISE EXCEPTION 'Run declaration or observation state exists; retain schema and use compatible forward repair';
+	  END IF;
+	END $$;
+2026-09-29 15:43:39.585 UTC [5595] ERROR:  G2-S10B observation tables already present
+2026-09-29 15:43:39.585 UTC [5595] CONTEXT:  PL/pgSQL function inline_code_block line 48 at RAISE
+2026-09-29 15:43:39.585 UTC [5595] STATEMENT:  DO $$
+	BEGIN
+	  -- Accepted run identity: the (coach_id, intent_id) key on an RLS-forced table, exactly as shipped.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_index i
+	    JOIN pg_catalog.pg_class t ON t.oid = i.indrelid
+	    WHERE i.indexrelid = to_regclass('public."ScoutImport_coach_id_intent_id_key"')
+	      AND i.indrelid = to_regclass('public."ScoutImport"')
+	      AND t.relkind = 'r' AND t.relrowsecurity AND t.relforcerowsecurity
+	      AND i.indisunique AND i.indisvalid AND i.indisready AND i.indimmediate
+	      AND i.indnkeyatts = i.indnatts AND i.indpred IS NULL AND i.indexprs IS NULL
+	      AND pg_get_indexdef(i.indexrelid) =
+	        'CREATE UNIQUE INDEX "ScoutImport_coach_id_intent_id_key" ON public."ScoutImport" USING btree (coach_id, intent_id)'
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S10B unexpected run identity prerequisite';
+	  END IF;
+	  -- Run key columns exactly as shipped, and S7-L1's epoch (the observation binding) present.
+	  IF NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'coach_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'intent_id'
+	      AND NOT a.attisdropped AND a.atttypid = 'text'::regtype AND a.attnotnull
+	  ) OR NOT EXISTS (
+	    SELECT 1 FROM pg_catalog.pg_attribute a
+	    WHERE a.attrelid = 'public."ScoutImport"'::regclass AND a.attname = 'execution_epoch'
+	      AND NOT a.attisdropped AND a.atttypid = 'int4'::regtype AND a.attnotnull
+	  ) THEN
+	    RAISE EXCEPTION 'G2-S10B unexpected run column prerequisite';
+	  END IF;
+	  -- Nothing this file creates may already exist under its name: refused, never dropped or adopted.
+	  IF to_regclass('public."ScoutRunDeclaration"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunObservation"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunSettledBasis"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunDeclaration_pkey"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunObservation_pkey"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunObservation_unit_key"') IS NOT NULL
+	    OR to_regclass('public."ScoutRunSettledBasis_pkey"') IS NOT NULL
+	    OR to_regprocedure('public.scout_run_observation_insert_only()') IS NOT NULL
+	    OR to_regprocedure('public.scout_run_declaration_one_challenge()') IS NOT NULL
+	    OR EXISTS (
+	      SELECT 1 FROM pg_catalog.pg_constraint
+	      WHERE connamespace = 'public'::regnamespace
+	        AND conname LIKE ANY (ARRAY['ScoutRunDeclaration\_%', 'ScoutRunObservation\_%', 'ScoutRunSettledBasis\_%'])
+	    ) THEN
+	    RAISE EXCEPTION 'G2-S10B observation tables already present';
+	  END IF;
+	END $$;
+2026-09-29 15:44:06.687 UTC [6155] ERROR:  duplicate key value violates unique constraint "ScoutImportCompletion_coach_id_intent_id_key"
+2026-09-29 15:44:06.687 UTC [6155] DETAIL:  Key (coach_id, intent_id)=(coach, 5dfa3616-cec3-45d0-8b9f-07a22bee5b66) already exists.
+2026-09-29 15:44:06.687 UTC [6155] STATEMENT:  INSERT INTO "public"."ScoutImportCompletion" ("id","coach_id","intent_id","terminal_status","completed_at") VALUES ($1,$2,$3,$4,$5) RETURNING "public"."ScoutImportCompletion"."id", "public"."ScoutImportCompletion"."coach_id", "public"."ScoutImportCompletion"."intent_id", "public"."ScoutImportCompletion"."terminal_status", "public"."ScoutImportCompletion"."final_counts", "public"."ScoutImportCompletion"."error_summary", "public"."ScoutImportCompletion"."completed_at"
+2026-09-29 15:44:36.641 UTC [3541] LOG:  received fast shutdown request
+2026-09-29 15:44:36.641 UTC [3541] LOG:  aborting any active transactions
+2026-09-29 15:44:36.643 UTC [3541] LOG:  background worker "logical replication launcher" (PID 3547) exited with exit code 1
+2026-09-29 15:44:36.643 UTC [3542] LOG:  shutting down
+2026-09-29 15:44:36.643 UTC [3542] LOG:  checkpoint starting: shutdown immediate
+2026-09-29 15:44:36.653 UTC [3542] LOG:  checkpoint complete: wrote 1858 buffers (11.3%); 0 WAL file(s) added, 0 removed, 1 recycled; write=0.009 s, sync=0.001 s, total=0.011 s; sync files=0, longest=0.000 s, average=0.000 s; distance=14896 kB, estimate=14896 kB; lsn=0/23658F0, redo lsn=0/23658F0
+2026-09-29 15:44:36.661 UTC [3541] LOG:  database system is shut down
